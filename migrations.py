@@ -5420,6 +5420,95 @@ def migration_265_backfill_tipo_apontamento_restante():
     logger.info("[Migration 265] Concluída com sucesso")
 
 
+def migration_266_reparar_linhas_de_base_do_backfill():
+    """Repara as linhas de base v1 que as migrações 210/212 criaram torto.
+
+    Três defeitos foram corrigidos no código do backfill; este reparo é para
+    o que já ficou gravado, porque 210 e 212 estão carimbadas 'success' desde
+    22/07/2026 e nunca mais rodam por conta própria.
+
+    **1. Snapshot do cronograma do CLIENTE dentro da linha de base interna.**
+    A 210 nasceu sem o filtro `is_cliente IS FALSE` que a 212 sempre teve, e
+    fotografou também o plano paralelo do cliente (views/obras.py:3049). Num
+    rollback, `_restaurar` não acha essa tarefa em `por_id` (que filtra
+    `is_cliente=False`) e INSERE uma cópia nova como tarefa interna — o plano
+    do cliente duplicado dentro do Gantt, sem a guarda anti-delete disparar,
+    porque a contagem SOBE. Medido em dev: 269 snapshots em 224 versões.
+
+    **2. Versão atribuída a tenant que não é o dono da obra.** O `MIN(admin_id)`
+    entre as tarefas podia escolher um tenant arbitrário; a versão fica
+    invisível para o dono (`views/cronograma_importacao.py:557,637` filtram por
+    `admin_id`) e dá 404 na restauração. Zero casos em dev — o reparo roda
+    mesmo assim, porque outros ambientes podem ter o gatilho.
+
+    **3. Snapshot com admin diferente do da versão**, que faria `_restaurar`
+    re-hospedar tarefa de um tenant no cronograma de outro.
+
+    **O que este reparo NÃO faz, de propósito: mexer nos snapshots de tarefa
+    ARQUIVADA.** São 383 em dev, e não há como separar o legítimo do indevido.
+    `cronograma_versao` não tem coluna de criação (só `aplicada_em`, que a 210
+    nem preenche), então não dá para comparar `tarefa.arquivada_em` com a data
+    da versão — e só 154 das 383 têm `arquivada_em` sequer preenchido. Além
+    disso o caso comum é LEGÍTIMO: tarefa ativa no backfill e arquivada depois
+    DEVE voltar ativa no rollback, que é o que restaurar significa. Só a
+    arquivada ANTES do backfill é erro, e essa é indistinguível. Apagar todas
+    destruiria linha de base correta para consertar um subconjunto — o erro
+    mais seguro aqui é não tocar.
+
+    Idempotente: reexecutar não muda nada.
+    """
+    logger.info("[Migration 266] Iniciando — reparo das linhas de base v1")
+
+    # 1. Snapshot de tarefa do cliente em linha de base de backfill.
+    n_cliente = db.session.execute(text("""
+        DELETE FROM cronograma_tarefa_snapshot s
+        USING cronograma_versao v, tarefa_cronograma t
+        WHERE s.versao_id = v.id
+          AND t.id = s.tarefa_id
+          AND v.numero = 1
+          AND v.observacao LIKE '%backfill%'
+          AND t.is_cliente IS TRUE
+    """)).rowcount
+
+    # 2. Versão cujo admin não é o dono da obra.
+    n_versao = db.session.execute(text("""
+        UPDATE cronograma_versao v SET admin_id = o.admin_id
+        FROM obra o WHERE o.id = v.obra_id AND v.admin_id <> o.admin_id
+    """)).rowcount
+
+    # 3. Snapshot cujo admin não é o da versão (depois do passo 2, para o
+    #    alvo ser o admin já corrigido).
+    n_snap = db.session.execute(text("""
+        UPDATE cronograma_tarefa_snapshot s SET admin_id = v.admin_id
+        FROM cronograma_versao v
+        WHERE v.id = s.versao_id AND s.admin_id <> v.admin_id
+    """)).rowcount
+
+    db.session.commit()
+
+    logger.info("[Migration 266] %s snapshot(s) de cronograma de cliente "
+                "removido(s); %s versão(ões) reatribuída(s) ao dono da obra; "
+                "%s snapshot(s) realinhado(s) com o admin da versão",
+                n_cliente, n_versao, n_snap)
+
+    # Obra com tarefa interna ativa e sem versão nenhuma não tem ponto de
+    # rollback: a primeira importação .mpp dela é irreversível. A 212 existia
+    # para isso e já está 'success'; aqui é a última rede.
+    sem_versao = db.session.execute(text("""
+        SELECT count(*) FROM (
+            SELECT DISTINCT t.obra_id FROM tarefa_cronograma t
+            WHERE t.ativa IS TRUE AND t.is_cliente IS FALSE
+              AND NOT EXISTS (SELECT 1 FROM cronograma_versao v
+                              WHERE v.obra_id = t.obra_id)) x
+    """)).scalar() or 0
+    if sem_versao:
+        logger.info("[Migration 266] %s obra(s) sem versão — chamando o "
+                    "backfill corrigido", sem_versao)
+        _migration_212_backfill_versao_inicial_obras_novas()
+
+    logger.info("[Migration 266] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -5698,6 +5787,7 @@ def executar_migracoes():
             (263, "Fase 5 — rdo.rdo_retificado_id + motivo_retificacao (RDO retificador)", migration_263_rdo_retificador),
             (264, "Fase 5 — rdo_foto.armazenamento ('banco'|'disco'): marcador da migração de fotos", migration_264_rdo_foto_armazenamento),
             (265, "Carimba tipo_apontamento nas linhas de RDO que ficaram sem rótulo (import e views/rdo)", migration_265_backfill_tipo_apontamento_restante),
+            (266, "Repara as linhas de base v1 do backfill 210/212 (snapshot de cronograma de cliente, versão em tenant errado)", migration_266_reparar_linhas_de_base_do_backfill),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -15736,57 +15826,113 @@ def _migration_209_rdo_apontamento_semantico():
         raise
 
 
+def _backfill_versao_inicial(tag, colunas_snapshot, select_snapshot,
+                             observacao, filtro_obras=''):
+    """Cria versão nº1 'ativa' + snapshots para cada obra que ainda não tem
+    versão. Base comum das migrações 210 e 212.
+
+    Três decisões que já custaram defeito e que NÃO devem ser afrouxadas:
+
+    1. **O admin da versão vem de `obra.admin_id`**, não das tarefas. Uma
+       versão atribuída a outro tenant é invisível para o dono da obra:
+       `views/cronograma_importacao.py:557,637` filtram por
+       `admin_id=get_tenant_admin_id()`, e `_restaurar` busca a obra pelo
+       admin da versão — a versão existe na tabela e dá 404 na restauração.
+       (A tentativa anterior, `MIN(t.admin_id)`, escolhia o menor id entre
+       as tarefas: um tenant arbitrário.)
+
+    2. **O snapshot carrega o admin da VERSÃO**, não o de cada tarefa. Se os
+       dois divergem, `_restaurar` (services/cronograma_versao_service.py:725)
+       lê os snapshots só por `versao_id` e regrava tudo com o admin da
+       versão — tarefa de um tenant reaparece dentro do cronograma de outro.
+
+    3. **Falha de UMA obra não bloqueia as outras, mas AINDA assim propaga no
+       fim.** `run_migration_safe` (migrations.py:168-199) já captura toda
+       exceção, registra 'failed' e NÃO derruba o boot — o comentário dele é
+       literal: "Não propagar exceção - apenas logar". Quem levanta é
+       retentado na próxima subida, porque `is_migration_executed` só pula
+       status 'success'. Engolir a falha aqui e retornar normal carimba
+       'success' e a obra pulada nunca mais é revisitada: fica sem linha de
+       base, e a primeira importação .mpp dela passa a ser irreversível
+       (`_aplicar` só fotografa o estado anterior quando existe versão ativa).
+       Por isso o `raise` no fim: as obras boas ficam commitadas (transação
+       por obra), e a migração volta a ser tentada para as que faltaram.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.connect() as conn:
+        obras = conn.execute(sa_text(f"""
+            SELECT t.obra_id, o.admin_id
+            FROM tarefa_cronograma t
+            JOIN obra o ON o.id = t.obra_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM cronograma_versao v WHERE v.obra_id = t.obra_id
+            ) {filtro_obras}
+            GROUP BY t.obra_id, o.admin_id
+        """)).fetchall()
+
+    falhas = []
+    for obra_id, admin_id in obras:
+        try:
+            with db.engine.begin() as conn:
+                versao_id = conn.execute(sa_text("""
+                    INSERT INTO cronograma_versao
+                        (obra_id, admin_id, numero, status, observacao)
+                    VALUES (:o, :a, 1, 'ativa', :obs) RETURNING id
+                """), {'o': obra_id, 'a': admin_id, 'obs': observacao}).scalar()
+                conn.execute(sa_text(f"""
+                    INSERT INTO cronograma_tarefa_snapshot ({colunas_snapshot})
+                    SELECT {select_snapshot}
+                    FROM tarefa_cronograma t
+                    WHERE t.obra_id = :o
+                      AND t.ativa IS TRUE AND t.is_cliente IS FALSE
+                """), {'v': versao_id, 'a': admin_id, 'o': obra_id})
+        except Exception as e_obra:
+            falhas.append(obra_id)
+            logger.error("[Migration %s] obra %s FALHOU (as demais seguem): %s",
+                         tag, obra_id, e_obra)
+            continue
+        logger.info("[Migration %s] obra %s: versão 1 + snapshots.", tag, obra_id)
+
+    logger.info("[Migration %s] backfill em %d de %d obra(s) sem versão.",
+                tag, len(obras) - len(falhas), len(obras))
+    # Devolve em vez de levantar: quem chama ainda tem trabalho a fazer (a 210
+    # carimba `tipo_apontamento` depois daqui) e esse trabalho não pode ser
+    # pulado por causa de uma obra. O `raise` é a ÚLTIMA coisa da migração.
+    return falhas
+
+
+def _exigir_backfill_completo(tag, falhas):
+    """Levanta se alguma obra ficou de fora — ver decisão 3 do helper."""
+    if falhas:
+        raise RuntimeError(
+            f"[Migration {tag}] {len(falhas)} obra(s) sem versão: {falhas}. "
+            f"As demais foram gravadas; esta migração fica 'failed' de "
+            f"propósito, para ser retentada na próxima subida.")
+
+
 def _migration_210_backfill_versao_inicial():
     """Módulo 02 — backfill: versão nº1 ativa + snapshots por obra com tarefas;
     tipo_apontamento nos apontamentos existentes. Idempotente (pula o que já
     tem); commit por obra para caber no timeout de startup."""
     from sqlalchemy import text as sa_text
     try:
-        with db.engine.connect() as conn:
-            # `MIN(admin_id)` e não `DISTINCT obra_id, admin_id`: com o
-            # DISTINCT, uma obra cujas tarefas tivessem admin_id divergente
-            # saía DUAS vezes da consulta e o segundo INSERT batia em
-            # `uq_cronograma_versao_obra_numero` (obra_id, numero) — a obra
-            # ruim derrubava o backfill inteiro. Uma versão por obra, sempre.
-            obras = conn.execute(sa_text("""
-                SELECT t.obra_id, MIN(t.admin_id) FROM tarefa_cronograma t
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM cronograma_versao v WHERE v.obra_id = t.obra_id
-                )
-                GROUP BY t.obra_id
-            """)).fetchall()
-        # Uma obra ruim não pode bloquear o backfill das outras: isto roda no
-        # startup, e `raise` aqui derrubava a subida inteira. Cada obra tem a
-        # sua transação e o seu erro; o que falhar fica logado e é recuperado
-        # na próxima subida (a consulta acima é idempotente — só pega obra
-        # SEM versão).
-        falhas = []
-        for obra_id, admin_id in obras:
-            try:
-                with db.engine.begin() as conn:
-                    versao_id = conn.execute(sa_text("""
-                        INSERT INTO cronograma_versao (obra_id, admin_id, numero, status, observacao)
-                        VALUES (:o, :a, 1, 'ativa', 'backfill inicial') RETURNING id
-                    """), {'o': obra_id, 'a': admin_id}).scalar()
-                    conn.execute(sa_text("""
-                        INSERT INTO cronograma_tarefa_snapshot
-                            (versao_id, admin_id, tarefa_id, nome_tarefa, ordem,
-                             data_inicio, data_fim, duracao_dias, quantidade_total,
-                             unidade_medida, percentual_concluido_no_momento)
-                        SELECT :v, t.admin_id, t.id, t.nome_tarefa, t.ordem,
-                               t.data_inicio, t.data_fim, t.duracao_dias, t.quantidade_total,
-                               t.unidade_medida, t.percentual_concluido
-                        FROM tarefa_cronograma t WHERE t.obra_id = :o
-                    """), {'v': versao_id, 'o': obra_id})
-            except Exception as e_obra:
-                falhas.append(obra_id)
-                logger.error("[Migration 210] obra %s FALHOU (as demais "
-                             "seguem): %s", obra_id, e_obra)
-                continue
-            logger.info(f"[Migration 210] obra {obra_id}: versão 1 + snapshots.")
-        if falhas:
-            logger.error("[Migration 210] %d obra(s) sem versão após o "
-                         "backfill: %s", len(falhas), falhas)
+        # `ativa IS TRUE AND is_cliente IS FALSE` mora no helper: sem esse
+        # filtro a linha de base v1 fotografava também o cronograma paralelo
+        # do CLIENTE (views/obras.py:3049), e um rollback duplicava aquele
+        # plano dentro do Gantt interno — `_restaurar` não acha a tarefa em
+        # `por_id` (que filtra is_cliente=False) e INSERE uma cópia nova. A
+        # 212 sempre teve o filtro; a 210 nasceu sem ele. 223 versões de
+        # backfill em dev carregam snapshot de tarefa de cliente por causa
+        # disso — a migração 266 limpa o que já foi criado.
+        falhas = _backfill_versao_inicial(
+            '210',
+            'versao_id, admin_id, tarefa_id, nome_tarefa, ordem, '
+            'data_inicio, data_fim, duracao_dias, quantidade_total, '
+            'unidade_medida, percentual_concluido_no_momento',
+            ':v, :a, t.id, t.nome_tarefa, t.ordem, '
+            't.data_inicio, t.data_fim, t.duracao_dias, t.quantidade_total, '
+            't.unidade_medida, t.percentual_concluido',
+            'backfill inicial')
         with db.engine.begin() as conn:
             conn.execute(sa_text("""
                 UPDATE rdo_apontamento_cronograma ap SET
@@ -15803,6 +15949,7 @@ def _migration_210_backfill_versao_inicial():
                   AND ap.tipo_apontamento IS NULL
             """))
         logger.info("[Migration 210] backfill concluído.")
+        _exigir_backfill_completo('210', falhas)
     except Exception as e:
         logger.error(f"[Migration 210] Falha: {e}", exc_info=True)
         raise
@@ -15838,54 +15985,24 @@ def _migration_212_backfill_versao_inicial_obras_novas():
     cobre o intervalo. Idempotente (pula obra que já tem versão); commit por
     obra para caber no timeout de startup.
     """
-    from sqlalchemy import text as sa_text
     try:
-        with db.engine.connect() as conn:
-            obras = conn.execute(sa_text("""
-                SELECT t.obra_id, MIN(t.admin_id) FROM tarefa_cronograma t
-                WHERE t.ativa IS TRUE AND t.is_cliente IS FALSE
-                  AND NOT EXISTS (
-                    SELECT 1 FROM cronograma_versao v WHERE v.obra_id = t.obra_id
-                )
-                GROUP BY t.obra_id
-            """)).fetchall()
-        # Mesmo tratamento da 210: uma obra por linha (o DISTINCT com admin_id
-        # duplicava obra de admin divergente e batia na UNIQUE), e falha de
-        # uma não derruba as outras — isto roda no startup.
-        falhas = []
-        for obra_id, admin_id in obras:
-            try:
-                with db.engine.begin() as conn:
-                    versao_id = conn.execute(sa_text("""
-                        INSERT INTO cronograma_versao
-                            (obra_id, admin_id, numero, status, observacao, aplicada_em)
-                        VALUES (:o, :a, 1, 'ativa',
-                                'cronograma inicial (backfill 212)', NOW())
-                        RETURNING id
-                    """), {'o': obra_id, 'a': admin_id}).scalar()
-                    conn.execute(sa_text("""
-                        INSERT INTO cronograma_tarefa_snapshot
-                            (versao_id, admin_id, tarefa_id, mpp_uid, wbs_codigo,
-                             nome_tarefa, ordem, data_inicio, data_fim,
-                             duracao_dias, quantidade_total, unidade_medida,
-                             is_marco, percentual_concluido_no_momento)
-                        SELECT :v, t.admin_id, t.id, t.mpp_uid, t.wbs_codigo,
-                               t.nome_tarefa, t.ordem, t.data_inicio, t.data_fim,
-                               t.duracao_dias, t.quantidade_total, t.unidade_medida,
-                               t.is_marco, t.percentual_concluido
-                        FROM tarefa_cronograma t
-                        WHERE t.obra_id = :o AND t.ativa IS TRUE
-                          AND t.is_cliente IS FALSE
-                    """), {'v': versao_id, 'o': obra_id})
-            except Exception as e_obra:
-                falhas.append(obra_id)
-                logger.error("[Migration 212] obra %s FALHOU (as demais "
-                             "seguem): %s", obra_id, e_obra)
-        logger.info(f"[Migration 212] backfill em {len(obras) - len(falhas)} "
-                    f"de {len(obras)} obra(s) sem versão.")
-        if falhas:
-            logger.error("[Migration 212] %d obra(s) sem versão: %s",
-                         len(falhas), falhas)
+        # Mesmo helper da 210. A 212 difere em três coisas e só nelas: o
+        # filtro extra na escolha das obras (só conta obra que tenha tarefa
+        # interna ativa), as colunas de identidade do .mpp no snapshot
+        # (mpp_uid, wbs_codigo, is_marco) e a `observacao`.
+        falhas = _backfill_versao_inicial(
+            '212',
+            'versao_id, admin_id, tarefa_id, mpp_uid, wbs_codigo, '
+            'nome_tarefa, ordem, data_inicio, data_fim, '
+            'duracao_dias, quantidade_total, unidade_medida, '
+            'is_marco, percentual_concluido_no_momento',
+            ':v, :a, t.id, t.mpp_uid, t.wbs_codigo, '
+            't.nome_tarefa, t.ordem, t.data_inicio, t.data_fim, '
+            't.duracao_dias, t.quantidade_total, t.unidade_medida, '
+            't.is_marco, t.percentual_concluido',
+            'cronograma inicial (backfill 212)',
+            filtro_obras='AND t.ativa IS TRUE AND t.is_cliente IS FALSE')
+        _exigir_backfill_completo('212', falhas)
     except Exception as e:
         logger.error(f"[Migration 212] Falha: {e}", exc_info=True)
         raise
