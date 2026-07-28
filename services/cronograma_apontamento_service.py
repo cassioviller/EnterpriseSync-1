@@ -204,6 +204,18 @@ def recomputar_cadeia(tarefa_id: int, a_partir_de, admin_id: int) -> int:
         return 0
 
     # Estado ANTES da janela.
+    #
+    # O filtro de `tipo_apontamento` não é decorativo: linhas gravadas em
+    # PERCENTUAL guardam PONTOS PERCENTUAIS em `quantidade_executada_dia`
+    # (89.767 linhas em 48.261 tarefas de dev), e somá-las aqui como produção
+    # física é erro de unidade. Sem ele, uma tarefa de 100 m² com um dia
+    # percentual de 30 pp seguido de um dia quantitativo de 10 m² lia 10% na
+    # escrita e 40% depois de qualquer recomputo — e o gatilho mais comum do
+    # recomputo é excluir um RDO (views/rdo.py:excluir_rdo).
+    #
+    # Mesmo filtro de `registrar_apontamento` (abaixo), de
+    # `calcular_progresso_rdo` (utils/cronograma_engine.py) e da rota em
+    # views/rdo.py. Os quatro acumuladores agora concordam.
     acum = (
         db.session.query(sqlfunc.coalesce(
             sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
@@ -212,6 +224,8 @@ def recomputar_cadeia(tarefa_id: int, a_partir_de, admin_id: int) -> int:
             RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
             RDOApontamentoCronograma.admin_id == admin_id,
             RDO.data_relatorio < a_partir_de,
+            sqlfunc.coalesce(
+                RDOApontamentoCronograma.tipo_apontamento, '') != 'percentual',
         )
         .scalar()
     ) or 0.0

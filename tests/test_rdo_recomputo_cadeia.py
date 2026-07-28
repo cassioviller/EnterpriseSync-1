@@ -225,3 +225,46 @@ def test_excluir_rdo_recalcula_cadeia_via_http(ctx):
     assert l3.percentual_realizado == 30.0
     db.session.refresh(t)
     assert t.percentual_concluido == 30.0
+
+
+def test_recomputo_ignora_pontos_percentuais_no_acumulado_fisico(ctx):
+    """Linha percentual legada guarda PONTOS PERCENTUAIS em
+    `quantidade_executada_dia` — o recomputo não pode somá-los como produção.
+
+    `registrar_apontamento`, `calcular_progresso_rdo` e a rota de
+    views/rdo.py sempre excluíram `tipo_apontamento='percentual'` do
+    acumulado físico; `recomputar_cadeia` era a única das quatro que não
+    excluía. O mesmo fato valia 10% ao ser gravado e 40% depois de qualquer
+    recomputo — e o gatilho mais comum do recomputo é EXCLUIR um RDO
+    (views/rdo.py:excluir_rdo), que roda isto para cada tarefa afetada.
+
+    Em dev: 89.767 linhas percentuais carregam pp no campo de quantidade,
+    em 48.261 tarefas.
+    """
+    t = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2')
+
+    # dia 1 — linha percentual LEGADA: 30 pp gravados no campo de quantidade
+    r1 = _rdo(ctx, D0)
+    db.session.add(RDOApontamentoCronograma(
+        rdo_id=r1.id, tarefa_cronograma_id=t.id, admin_id=ctx['admin_id'],
+        tipo_apontamento='percentual',
+        quantidade_executada_dia=30.0, quantidade_acumulada=0.0,
+        percentual_realizado=30.0, percentual_acumulado=30.0))
+    db.session.commit()
+
+    # dia 2 — linha quantitativa de 10 m², pelo serviço oficial
+    r2 = _rdo(ctx, D0 + timedelta(days=1))
+    registrar_apontamento(r2, t, quantidade_dia=10.0, admin_id=ctx['admin_id'])
+    db.session.commit()
+    na_escrita = (_linha(r2.id, t.id).quantidade_acumulada,
+                  _linha(r2.id, t.id).percentual_realizado)
+    assert na_escrita == (10.0, 10.0), (
+        f'a escrita já saiu errada: {na_escrita}')
+
+    recomputar_cadeia(t.id, D0 + timedelta(days=1), ctx['admin_id'])
+    db.session.commit()
+
+    l2 = _linha(r2.id, t.id)
+    assert (l2.quantidade_acumulada, l2.percentual_realizado) == na_escrita, (
+        f'recomputo somou os 30 pp do dia 1 como 30 m² de produção: '
+        f'{(l2.quantidade_acumulada, l2.percentual_realizado)} != {na_escrita}')
