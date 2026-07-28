@@ -437,3 +437,65 @@ def test_recuar_preserva_numeracao_e_desrecuar_desloca():
         ctx2['a_id'], ctx2['f2_id'], ctx2['f1_id'], ctx2['b_id'], ctx2['c_id']]
     b_dict = _por_id(tarefas, ctx2['b_id'])
     assert b_dict['predecessoras_texto'] == '2'   # Etapa 2 agora é a linha 2
+
+
+# ---------------------------------------------------------------------------
+# Cadastro de quantitativo em tarefa com histórico em percentual
+# ---------------------------------------------------------------------------
+
+def _tarefa_com_apontamento_percentual():
+    """Tenant + tarefa SEM quantitativo, já apontada em percentual."""
+    from models import RDO, RDOApontamentoCronograma
+    with app.app_context():
+        admin, obra = _ambiente()
+        t = _tarefa(obra, admin, 'Pintura', ordem=0, duracao_dias=5,
+                    data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 7))
+        rdo = RDO(numero_rdo=f'RDO-PCT-{t.id}', data_relatorio=date(2026, 7, 3),
+                  obra_id=obra.id, admin_id=admin.id)
+        db.session.add(rdo)
+        db.session.flush()
+        db.session.add(RDOApontamentoCronograma(
+            rdo_id=rdo.id, tarefa_cronograma_id=t.id, admin_id=admin.id,
+            tipo_apontamento='percentual', quantidade_executada_dia=0.0,
+            quantidade_acumulada=0.0, percentual_realizado=80.0,
+            percentual_acumulado=80.0))
+        db.session.commit()
+        return {'admin_id': admin.id, 'obra_id': obra.id, 'tarefa_id': t.id}
+
+
+def test_rota_recusa_quantitativo_em_tarefa_apontada_em_percentual():
+    """A rota devolve 400 e NÃO grava.
+
+    O bloqueio existiu em `7b8cd6fc`, saiu no revert `39958447` e volta
+    aqui com outra justificativa: não é mais o histórico que se
+    reescreveria (isso virou defeito corrigido), é o avanço acumulado em %
+    que os apontamentos seguintes descartariam.
+    """
+    ctx = _tarefa_com_apontamento_percentual()
+    c = _client_como(ctx['admin_id'])
+    r = c.put(f"{_base(ctx)}/tarefa/{ctx['tarefa_id']}",
+              json={'quantidade_total': 200})
+    assert r.status_code == 400, r.get_data(as_text=True)
+    assert 'PERCENTUAL' in r.get_json()['msg']
+
+    with app.app_context():
+        t = db.session.get(TarefaCronograma, ctx['tarefa_id'])
+        assert t.quantidade_total in (None, 0), 'a rota gravou mesmo recusando'
+
+
+def test_rota_aceita_quantitativo_em_tarefa_sem_apontamento():
+    """O contrapeso: sem histórico em %, o cadastro segue livre pela tela."""
+    with app.app_context():
+        admin, obra = _ambiente()
+        t = _tarefa(obra, admin, 'Forma', ordem=0, duracao_dias=3,
+                    data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 3))
+        ctx = {'admin_id': admin.id, 'obra_id': obra.id, 'tarefa_id': t.id}
+
+    c = _client_como(ctx['admin_id'])
+    r = c.put(f"{_base(ctx)}/tarefa/{ctx['tarefa_id']}",
+              json={'quantidade_total': 48})
+    assert r.status_code == 200, r.get_data(as_text=True)
+
+    with app.app_context():
+        t = db.session.get(TarefaCronograma, ctx['tarefa_id'])
+        assert t.quantidade_total == 48

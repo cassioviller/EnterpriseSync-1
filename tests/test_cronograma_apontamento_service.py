@@ -329,3 +329,83 @@ def test_leitura_desempata_como_a_escrita_com_dois_rdos_no_mesmo_dia(ctx):
     # e é ESTÁVEL: repetir não muda a resposta
     assert calcular_progresso_rdo(
         tarefa.id, D0, ctx['admin_id'])['percentual_realizado'] == esperado
+
+
+def test_bloqueia_quantitativo_em_tarefa_com_historico_em_percentual(ctx):
+    """O avanço que o bloqueio protege — medido nos dois sentidos.
+
+    Depois de 687db151 o passado não é mais reescrito: a tarefa segue em
+    80% mesmo com um total cadastrado. O que continua em risco é o FUTURO
+    — o primeiro apontamento quantitativo vira a linha mais recente, e a
+    leitura passa a valer o que ela sozinha representa.
+    """
+    from utils.cronograma_engine import (
+        calcular_progresso_rdo, impedimento_para_cadastrar_quantitativo)
+
+    tarefa = _tarefa(ctx, quantidade_total=None)
+    rdo1, rdo2 = _rdo(ctx, D0), _rdo(ctx, D0 + timedelta(days=1))
+    for rdo, pct in ((rdo1, 60.0), (rdo2, 80.0)):
+        db.session.add(RDOApontamentoCronograma(
+            rdo_id=rdo.id, tarefa_cronograma_id=tarefa.id,
+            admin_id=ctx['admin_id'], tipo_apontamento='percentual',
+            quantidade_executada_dia=0.0, quantidade_acumulada=0.0,
+            percentual_realizado=pct, percentual_acumulado=pct))
+    db.session.commit()
+
+    def avanco(ate):
+        return calcular_progresso_rdo(
+            tarefa.id, ate, ctx['admin_id'])['percentual_realizado']
+
+    assert avanco(D0 + timedelta(days=10)) == 80.0
+
+    # 1) a regra bloqueia
+    msg = impedimento_para_cadastrar_quantitativo(tarefa, 200, ctx['admin_id'])
+    assert msg and 'PERCENTUAL' in msg, msg
+
+    # 2) o estrago que ela evita, medido: forçando o cadastro e apontando
+    #    por quantidade, o avanço DESPENCA
+    tarefa.quantidade_total = 200.0
+    tarefa.unidade_medida = 'un'
+    db.session.commit()
+    rdo3 = _rdo(ctx, D0 + timedelta(days=2))
+    registrar_apontamento(rdo3, tarefa, quantidade_dia=50.0,
+                          admin_id=ctx['admin_id'])
+    db.session.commit()
+    assert avanco(D0 + timedelta(days=10)) == 25.0, (
+        'o cenário que o bloqueio evita mudou — reveja a justificativa '
+        'de impedimento_para_cadastrar_quantitativo')
+
+
+def test_o_que_o_bloqueio_de_quantitativo_NAO_impede(ctx):
+    """As três edições legítimas continuam livres."""
+    from utils.cronograma_engine import impedimento_para_cadastrar_quantitativo
+
+    # tarefa sem apontamento nenhum
+    virgem = _tarefa(ctx, quantidade_total=None)
+    assert impedimento_para_cadastrar_quantitativo(
+        virgem, 48, ctx['admin_id']) is None
+
+    # tarefa que JÁ é quantitativa: ajustar o total é o comportamento certo
+    quantitativa = _tarefa(ctx, quantidade_total=100.0)
+    rdo = _rdo(ctx, D0)
+    registrar_apontamento(rdo, quantitativa, quantidade_dia=25.0,
+                          admin_id=ctx['admin_id'])
+    db.session.commit()
+    assert impedimento_para_cadastrar_quantitativo(
+        quantitativa, 50, ctx['admin_id']) is None
+
+    # limpar o campo é sempre seguro
+    pct = _tarefa(ctx, quantidade_total=None)
+    rdo_p = _rdo(ctx, D0)
+    db.session.add(RDOApontamentoCronograma(
+        rdo_id=rdo_p.id, tarefa_cronograma_id=pct.id,
+        admin_id=ctx['admin_id'], tipo_apontamento='percentual',
+        quantidade_executada_dia=0.0, quantidade_acumulada=0.0,
+        percentual_realizado=40.0, percentual_acumulado=40.0))
+    db.session.commit()
+    assert impedimento_para_cadastrar_quantitativo(
+        pct, 0, ctx['admin_id']) is None
+    assert impedimento_para_cadastrar_quantitativo(
+        pct, None, ctx['admin_id']) is None
+    # mas cadastrar um total nela, sim, é bloqueado
+    assert impedimento_para_cadastrar_quantitativo(pct, 10, ctx['admin_id'])

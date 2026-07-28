@@ -192,6 +192,55 @@ def historico_em_percentual(tarefa_id: int, admin_id: int, ate=None) -> bool:
     return db.session.query(q.exists()).scalar() or False
 
 
+def impedimento_para_cadastrar_quantitativo(tarefa, novo_total, admin_id):
+    """Mensagem de bloqueio, ou ``None`` quando a edição é segura.
+
+    Cadastrar `quantidade_total` numa tarefa já apontada em PERCENTUAL não
+    reescreve mais o passado — `historico_em_percentual` garante que as
+    linhas antigas continuam lidas como percentual. O que sobra é o
+    FUTURO: com um total cadastrado, `modo_da_tarefa` passa a oferecer
+    apontamento por quantidade, e a primeira linha quantitativa vira a
+    mais recente da tarefa. A leitura segue a linha mais recente, então o
+    avanço cai para o que aquela linha sozinha representa.
+
+    Medido: tarefa em 80% (60 pp + 20 pp) que ganha 200 un e recebe 50 un
+    no dia seguinte passa a marcar 25% — os 80% acumulados somem, e não
+    há como recuperá-los porque pp e unidades não se convertem sem uma
+    equivalência que ninguém declarou.
+
+    Este é o bloqueio que o commit 7b8cd6fc introduziu e o revert
+    39958447 tirou. Volta com escopo menor: lá ele existia porque a
+    leitura do histórico estava errada (defeito, corrigido em 687db151);
+    aqui existe porque a tarefa não pode ter as duas unidades ao mesmo
+    tempo — o que é uma regra de negócio, não um bug.
+
+    Só bloqueia a transição percentual → quantitativo COM apontamento já
+    lançado. Continuam livres, e cada um tem teste:
+      - tarefa sem apontamento nenhum (cadastro normal);
+      - ajustar o total de tarefa que JÁ é quantitativa (lá o acumulado é
+        físico e recalcular é o comportamento correto);
+      - limpar o campo.
+    """
+    try:
+        total = float(novo_total or 0)
+    except (TypeError, ValueError):
+        return None
+    if total <= 0:
+        return None                      # limpar o campo é seguro
+    if tarefa.quantidade_total and float(tarefa.quantidade_total) > 0:
+        return None                      # já é quantitativa: ajuste legítimo
+    if not historico_em_percentual(tarefa.id, admin_id):
+        return None                      # nada lançado em %: cadastro livre
+    return (
+        f'A tarefa "{tarefa.nome_tarefa}" já tem apontamento de RDO lançado '
+        f'em PERCENTUAL. Cadastrar uma quantidade total agora faria os '
+        f'próximos apontamentos virem em unidades, e o avanço passaria a '
+        f'valer o da última linha — descartando o que já foi acumulado em '
+        f'%. Para trabalhar esta tarefa por quantidade, crie uma tarefa '
+        f'nova com o quantitativo e aponte nela daqui para frente.'
+    )
+
+
 def ids_com_historico_percentual(admin_id: int, tarefa_ids) -> set:
     """Versão em lote de `historico_em_percentual`: uma consulta para o
     conjunto todo, em vez de uma por tarefa.

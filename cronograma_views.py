@@ -875,6 +875,17 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
             tarefa.data_inicio = d
 
     if 'quantidade_total' in data:
+        # Tarefa com histórico em percentual não vira quantitativa: os
+        # próximos apontamentos viriam em unidades e o avanço passaria a
+        # valer o da última linha, descartando o acumulado em %. Ver
+        # `impedimento_para_cadastrar_quantitativo` para a medição.
+        from utils.cronograma_engine import (
+            impedimento_para_cadastrar_quantitativo)
+        _impedimento = impedimento_para_cadastrar_quantitativo(
+            tarefa, data['quantidade_total'], admin_id)
+        if _impedimento:
+            db.session.rollback()
+            return jsonify({'status': 'error', 'msg': _impedimento}), 400
         try:
             tarefa.quantidade_total = float(data['quantidade_total']) or None
         except (ValueError, TypeError):
