@@ -574,12 +574,13 @@ def curva_realizado(obra) -> dict:
     tenant-scoped, excluindo FATURAMENTO_DIRETO. Fonte: RDO/diárias, empreitadas,
     compras, aluguel — cresce ao longo do tempo."""
     from models import db, GestaoCustoFilho, GestaoCustoPai
-    rows = (db.session.query(GestaoCustoFilho.data_referencia, GestaoCustoFilho.valor)
-            .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
-            .filter(GestaoCustoFilho.obra_id == obra.id)
-            .filter(GestaoCustoPai.admin_id == obra.admin_id)
-            .filter(GestaoCustoPai.tipo_categoria != 'FATURAMENTO_DIRETO')
-            .all())
+    from services.gestao_custos_query import sem_cancelados
+    rows = sem_cancelados(
+        db.session.query(GestaoCustoFilho.data_referencia, GestaoCustoFilho.valor)
+        .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+        .filter(GestaoCustoFilho.obra_id == obra.id)
+        .filter(GestaoCustoPai.admin_id == obra.admin_id)
+        .filter(GestaoCustoPai.tipo_categoria != 'FATURAMENTO_DIRETO')).all()
     out: dict = {}
     for dt, valor in rows:
         if not dt:
@@ -592,12 +593,13 @@ def curva_realizado(obra) -> dict:
 def realizado_por_etapa(obra) -> dict:
     """Realizado por etapa: {obra_servico_custo_id: Decimal} (exclui FATURAMENTO_DIRETO)."""
     from models import db, GestaoCustoFilho, GestaoCustoPai
-    rows = (db.session.query(GestaoCustoFilho.obra_servico_custo_id, GestaoCustoFilho.valor)
-            .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
-            .filter(GestaoCustoFilho.obra_id == obra.id)
-            .filter(GestaoCustoPai.admin_id == obra.admin_id)
-            .filter(GestaoCustoPai.tipo_categoria != 'FATURAMENTO_DIRETO')
-            .all())
+    from services.gestao_custos_query import sem_cancelados
+    rows = sem_cancelados(
+        db.session.query(GestaoCustoFilho.obra_servico_custo_id, GestaoCustoFilho.valor)
+        .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+        .filter(GestaoCustoFilho.obra_id == obra.id)
+        .filter(GestaoCustoPai.admin_id == obra.admin_id)
+        .filter(GestaoCustoPai.tipo_categoria != 'FATURAMENTO_DIRETO')).all()
     out: dict = {}
     for osc_id, valor in rows:
         if osc_id is None:

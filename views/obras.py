@@ -216,14 +216,17 @@ def obras():
             try:
                 from models import GestaoCustoFilho, GestaoCustoPai
                 from sqlalchemy import func as sqlfunc_l
+                from services.gestao_custos_query import sem_cancelados
                 gestao_lista = (
-                    db.session.query(GestaoCustoPai.tipo_categoria, sqlfunc_l.sum(GestaoCustoFilho.valor))
-                    .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
-                    .filter(
-                        GestaoCustoFilho.obra_id == obra.id,
-                        GestaoCustoFilho.data_referencia >= periodo_inicio,
-                        GestaoCustoFilho.data_referencia <= periodo_fim,
-                        GestaoCustoPai.admin_id == admin_id,
+                    sem_cancelados(
+                        db.session.query(GestaoCustoPai.tipo_categoria, sqlfunc_l.sum(GestaoCustoFilho.valor))
+                        .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+                        .filter(
+                            GestaoCustoFilho.obra_id == obra.id,
+                            GestaoCustoFilho.data_referencia >= periodo_inicio,
+                            GestaoCustoFilho.data_referencia <= periodo_fim,
+                            GestaoCustoPai.admin_id == admin_id,
+                        )
                     )
                     .group_by(GestaoCustoPai.tipo_categoria)
                     .all()
@@ -1768,7 +1771,8 @@ def detalhes_obra(id):
         try:
             from models import GestaoCustoFilho, GestaoCustoPai
             from sqlalchemy import func as sqlfunc
-            gestao_q = (
+            from services.gestao_custos_query import sem_cancelados
+            gestao_q = sem_cancelados(
                 db.session.query(GestaoCustoPai.tipo_categoria, sqlfunc.sum(GestaoCustoFilho.valor))
                 .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
                 .filter(
@@ -1980,11 +1984,18 @@ def detalhes_obra(id):
             ).filter(MedicaoObra.obra_id == obra_id).scalar()
             painel['valor_medido'] = float(medido_total or 0)
 
-            # 3. Custo acumulado (GestaoCustoFilho da obra, sem filtro de data)
-            from models import GestaoCustoFilho
-            custo_total = db.session.query(
-                _sqlfunc.coalesce(_sqlfunc.sum(GestaoCustoFilho.valor), 0)
-            ).filter(GestaoCustoFilho.obra_id == obra_id).scalar()
+            # 3. Custo acumulado (GestaoCustoFilho da obra, sem filtro de data).
+            # O join com o pai entrou junto com o filtro de cancelados: sem
+            # ele não há como saber que o lançamento foi anulado.
+            from models import GestaoCustoFilho, GestaoCustoPai
+            from services.gestao_custos_query import sem_cancelados
+            custo_total = sem_cancelados(
+                db.session.query(
+                    _sqlfunc.coalesce(_sqlfunc.sum(GestaoCustoFilho.valor), 0)
+                )
+                .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+                .filter(GestaoCustoFilho.obra_id == obra_id)
+            ).scalar()
             painel['custo_acumulado'] = float(custo_total or 0)
 
             # 4. Saldo = medido - custo

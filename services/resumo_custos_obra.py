@@ -16,6 +16,8 @@ from decimal import Decimal
 
 from sqlalchemy import func as sqlfunc
 
+from services.gestao_custos_query import sem_cancelados
+
 logger = logging.getLogger(__name__)
 
 
@@ -135,8 +137,8 @@ def recalcular_obra(obra_id: int, admin_id=None) -> bool:
         svc_ids = {s.id for s in svcs}
 
         # Soma todos os filhos da obra agrupados por (servico, categoria),
-        # incluindo os não vinculados (NULL).
-        q = (
+        # incluindo os não vinculados (NULL) e fora os cancelados.
+        q = sem_cancelados(
             db.session.query(
                 GestaoCustoFilho.obra_servico_custo_id,
                 GestaoCustoPai.tipo_categoria,
@@ -268,8 +270,9 @@ def calcular_resumo_obra(obra_id: int, admin_id=None) -> dict:
     total_realizado_svc = sum(s.realizado_total for s in svcs)
     total_a_realizar = sum(s.a_realizar_total for s in svcs)
 
-    # Realizado da obra = soma de GestaoCustoFilho (exceto FATURAMENTO_DIRETO)
-    q_real = (
+    # Realizado da obra = soma de GestaoCustoFilho (exceto FATURAMENTO_DIRETO
+    # e exceto pai CANCELADO — custo de RDO excluído não é realizado)
+    q_real = sem_cancelados(
         db.session.query(sqlfunc.coalesce(sqlfunc.sum(GestaoCustoFilho.valor), 0))
         .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
         .filter(GestaoCustoFilho.obra_id == obra_id)
@@ -289,7 +292,7 @@ def calcular_resumo_obra(obra_id: int, admin_id=None) -> dict:
         total_realizado = total_realizado_obra
 
     # Faturamento Direto (pai com categoria especial)
-    q_fat = (
+    q_fat = sem_cancelados(
         db.session.query(sqlfunc.coalesce(sqlfunc.sum(GestaoCustoFilho.valor), 0))
         .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
         .filter(GestaoCustoFilho.obra_id == obra_id)
