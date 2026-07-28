@@ -147,6 +147,55 @@ def caminho_ancestrais_tarefa(tarefa, cache=None):
     return ' › '.join(reversed(cadeia[:-1])) if len(cadeia) > 1 else ''
 
 
+def impedimento_para_cadastrar_quantitativo(tarefa, novo_total, admin_id):
+    """Devolve a MENSAGEM de bloqueio, ou ``None`` quando a edição é segura.
+
+    Cadastrar `quantidade_total` numa tarefa que já foi apontada por
+    PERCENTUAL reescreve o histórico de avanço dela, sem aviso. Nessas
+    linhas `quantidade_executada_dia` guarda PONTOS PERCENTUAIS, não
+    produção física — é assim que o import grava o modo percentual
+    (services/importacao_fisico_financeiro.py) e é o que
+    `calcular_progresso_rdo` soma. Assim que a tarefa passa a ter
+    `quantidade_total > 0`, a mesma soma é reinterpretada como quantidade:
+
+        tarefa em 80% (60 pp + 20 pp lançados)
+          → cadastra 200 un ⇒ passa a marcar  40%
+          → cadastra  48 un ⇒ passa a marcar 100%
+
+    Medido na Baia em 28/07/2026. O avanço da obra mudaria porque alguém
+    preencheu um campo de cadastro, o que ninguém consegue auditar depois.
+
+    Só bloqueia a transição percentual → quantitativo COM apontamento já
+    lançado. Continuam livres: tarefa sem apontamento nenhum, ajustar o
+    total de uma tarefa que já é quantitativa (lá o acumulado é físico, e
+    recalcular é o comportamento correto) e limpar o campo.
+    """
+    from models import RDOApontamentoCronograma
+    try:
+        total = float(novo_total or 0)
+    except (TypeError, ValueError):
+        return None
+    if total <= 0:
+        return None                      # limpar o campo é seguro
+    if tarefa.quantidade_total and float(tarefa.quantidade_total) > 0:
+        return None                      # já é quantitativa: ajuste legítimo
+    ja_lancados = (
+        RDOApontamentoCronograma.query
+        .filter_by(tarefa_cronograma_id=tarefa.id, admin_id=admin_id)
+        .count()
+    )
+    if not ja_lancados:
+        return None                      # nada lançado: cadastro livre
+    return (
+        f'Esta tarefa já tem {ja_lancados} apontamento(s) de RDO lançados em '
+        f'PERCENTUAL. Cadastrar uma quantidade total agora faria o sistema '
+        f'reinterpretar o que já foi lançado como se fosse produção física, '
+        f'mudando o avanço da tarefa (e o da obra) sem rastro. '
+        f'Para trabalhar esta tarefa por quantidade, crie uma tarefa nova '
+        f'com o quantitativo e aponte nela daqui para frente.'
+    )
+
+
 def agrupar_atividades_por_caminho(itens, chave='caminho_tarefa'):
     """``[(título, [itens])]`` para as atividades do dia de um RDO, agrupadas
     por onde moram no cronograma (o rótulo de `caminho_ancestrais_tarefa`).
