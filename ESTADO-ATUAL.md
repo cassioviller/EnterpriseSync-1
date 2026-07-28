@@ -1,7 +1,7 @@
 # ESTADO ATUAL — SIGE / Veks
 
-> Snapshot de **2026-07-27** (4ª revisão, após o editor de cronograma v2 e o
-> RDO em porcentagem livre).
+> Snapshot de **2026-07-28** (5ª revisão, após a rodada de revisão que fechou
+> 9 defeitos nas Fases 1–5 já entregues).
 > Este é o documento a ler PRIMEIRO ao retomar. Os demais (`DEVOLUTIVA.md`,
 > `DOSSIE-REPO.md`, `FECHO-FASE-0.5.md`) são o detalhe; este é o mapa.
 
@@ -27,13 +27,14 @@ defeito de fabricação que produziu os cinco erros.
 
 ## Onde estamos
 
-Branch: `main` · 🔬 27/07: **`origin/main == main == bdee680a`, árvore
+Branch: `main` · 🔬 28/07: **`origin/main == main == 5471507e`, árvore
 limpa**. O item humano nº 2 (push travado) **fechou em 24/07** — o reflog
 de `origin/main` registra os pushes de `35fe1a67` e `bdee680a`. O `gh` CLI
-continua deslogado *nesta máquina* (`gh auth status` → "not logged into any
-GitHub hosts"), o que é outra coisa: `git push` funciona, o que falta é a
-API do GitHub (PR, fetch de branch de triagem). Refazer o login é
-interativo — item humano, agora restrito ao `gh`.
+continua deslogado *nesta máquina* (🔬 28/07: `gh auth status` → "not logged
+into any GitHub hosts"; `GH_TOKEN`/`GITHUB_TOKEN` também ausentes), o que é
+outra coisa: `git push` funciona, o que falta é a API do GitHub (abrir PR,
+fetch de branch de triagem). Refazer o login é interativo — item humano,
+agora restrito ao `gh`.
 
 🔬 24/07 ~00h: **gate completo VERDE sobre a Fase 4** (worktree em
 `6775b391` pré-rebase): `pytest tests/ -m "not browser"` → **1177 passed,
@@ -42,6 +43,44 @@ foi mergeada em `main` por fast-forward após esse gate. 🔬 24/07: revisão
 de premissas P5-P9 apensada aos planos das Fases 5-9 (`941e6738`) e fix do
 achado R10 — PDF de medição do portal agora respeita expiração de token
 (`fe605252`).
+
+### 🔬 28/07 — rodada de revisão: 9 defeitos, dois deles de perda de dado
+
+`6db59790` → `5471507e`, todos em `main`. Nenhum era fase nova: são buracos
+deixados pelas Fases 1–5 **já fechadas**. Cada correção tem teste verificado
+por mutação (revertida a correção, o teste cai).
+
+| defeito | evidência |
+|---|---|
+| `HEAD` apagava RDO sem token CSRF (a guarda testava `== 'GET'`; o Flask despacha HEAD para a mesma view) | 🔬 `HEAD 302` + RDO apagado |
+| 3 das 4 FKs sem `ON DELETE` deixavam o RDO **oco** — filhos apagados, RDO vivo | 🔬 reproduzido |
+| **Exclusão de obra destruía os filhos e falhava** — `gestao_custo_pai` fora da lista, e cada DELETE em `AUTOCOMMIT` próprio | 🔬 obra viva, RDO/custos perdidos em definitivo |
+| Custo de RDO excluído seguia no Realizado (`cancelar_custos_rdo` marca CANCELADO; nenhum agregado olhava `status`) | 🔬 R$ 180,00 antes e depois |
+| `recomputar_cadeia` somava pontos percentuais como produção física | 🔬 10% na escrita → 40% no recomputo |
+| Apagar custo de RDO levava lançamento de terceiros (soma usada como contagem + cascade `delete-orphan`) | 🔬 removeu 1, apagou 3 |
+| **Backfill de versão engolia a falha e carimbava `success`** — a obra pulada nunca mais era revisitada | 📖 `run_migration_safe` já registrava 'failed' e retentava |
+| `editar_filho` aceitava **obra de outro tenant** no `obra_id` do form | 🔬 filho do tenant A apontando para obra do tenant B |
+| Retificar contava a mão de obra **duas vezes** | 🔬 R$ 124,00 → R$ 248,00 |
+
+Migração **266** repara as linhas de base v1 já gravadas (210/212 estão
+`success` desde 22/07 e não rodam mais).
+
+**A armadilha da rodada:** o commit `c79b179c` "consertou" o backfill
+engolindo a falha por obra, com a premissa de que um `raise` derrubava a
+subida. 📖 `migrations.py:198` diz o contrário — *"Não propagar exceção -
+apenas logar"*. O runner já capturava tudo e **retentava**; engolir removeu a
+única recuperação que existia. Corrigido em `3241b865`. Se você for mexer em
+migração, leia `run_migration_safe` antes de supor o que ela faz.
+
+**Sem procedência confiável:** as "223 versões com dano ativo" que eu reportei
+no meio da rodada eram ⚠️ dev — as obras foram apagadas por corridas de teste
+e a consulta, que juntava com `tarefa_cronograma`, perdeu as linhas. A *forma*
+do defeito é real; o volume não foi medido em produção.
+
+**Aberto:** 🔬⚠️ dev 28/07 — **40.824 snapshots com a tarefa apagada**. Num
+rollback, `_restaurar` não acha a tarefa e INSERE uma cópia nova, o mesmo
+efeito do defeito corrigido, em escala muito maior. Quase certamente carga de
+suíte; **medir em produção antes de escrever qualquer código**.
 
 ### 🔬 24/07 — editor de cronograma v2 (5 fases) em `main`
 
@@ -600,7 +639,8 @@ FUNCIONARIO.)*
 | Rotas totais / sem autenticação | 724 / 40 | 🧮 |
 | Rotas de **escrita** por token eterno | **8** | 📖 21/07 — não "1", ver acima |
 | Índice `rdo_apontamento_cronograma` | 881 ms → 0,034 ms | 🔬 |
-| Testes | gate 23/07: **1109 passed**, 9 skipped, 201 deselected, 37min40s | 🔬 23/07 |
+| Testes | gate 24/07 (Fase 5): **1284 passed**, 6 skipped, 201 deselected, 28min46s | 🔬 24/07 |
+| Testes — última medição | **847 passed** em `-k "obra or custo or rdo or fase"`, 8min25 · **não é o gate completo** | 🔬 28/07 |
 | Violações de ruff herdadas | 543, das quais 186 F821 | 🧮 |
 | Tabelas vazias | ~65 de 178 (37%) | 🧮 |
 | `models.py` / `migrations.py` | 7.610 / 14.300+ linhas | 🧮 |
@@ -671,6 +711,25 @@ FUNCIONARIO.)*
     `design_guidelines.md` está marcado como histórico (prescreve Tailwind num
     projeto Bootstrap).
 
+11. **Revisão em workflow retomada troca de alvo em silêncio.** 🔬 28/07: um
+    run de revisão foi pausado e retomado; ao retomar, o agente de escopo
+    rodou de novo e mirou `git diff HEAD~1` em vez do alvo original
+    `git diff e6223957..HEAD -- <arquivos das Fases 1-5>`. Entre a pausa e a
+    retomada houve 6 commits e um fast-forward na `main` — o `HEAD` se moveu.
+    O relatório saiu convincente e sobre **outra coisa**; os 35 candidatos
+    originais nunca foram verificados. `resumeFromRunId` reaproveita agentes,
+    mas **não congela o estado do repositório**. Ao retomar: fixe o comando de
+    diff nas instruções e confira `stats.candidates`/`refuted` do run
+    concluído antes de acreditar no que ele diz ter coberto.
+
+12. **Candidato de revisão não é defeito.** 🔬 28/07: dos 6 candidatos
+    triados à mão, 3 eram reais e 3 caíram na verificação. Antes disso, três
+    hipóteses minhas também caíram (a guarda de imutabilidade do RDO não
+    escapa por append via relacionamento; a exceção engolida de
+    `remover_custos_rdo` não tem gatilho alcançável; a instabilidade do teste
+    de backfill não era regressão minha). **Reproduza antes de corrigir** — e
+    antes de reportar.
+
 ## Decisões pendentes suas
 
 Consolidadas dos 10 planos. Cada uma **já tem recomendação adotada no plano** —
@@ -701,4 +760,5 @@ nenhum plano está bloqueado esperando resposta. Revise quando puder.
 | `FECHO-FASE-0.5.md` | o que a Fase 0.5 entregou e o que não |
 | `docs/integracao-dominio.md` | layout 11758. ⚠️ 11 lacunas mapeadas na F8 |
 | `docs/superpowers/plans/2026-07-17-modulo-*` | os 10 módulos do cronograma .mpp (M01–M10), fechados |
+| `docs/revisao-fases-1-5-PARCIAL.md` | 29 candidatos de revisão **não verificados** — pistas, não defeitos. Leia o topo: o workflow trocou de alvo ao ser retomado |
 | `docs/archive/` | documentos mortos |
