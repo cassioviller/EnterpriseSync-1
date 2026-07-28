@@ -3735,9 +3735,20 @@ def handoff_obra_get(id):
     """
     from models import Usuario
     from services.obra_handoff import dossie_handoff
+    from utils.autorizacao import pode_ver_obra
 
     admin_id = get_tenant_admin_id()
     obra = Obra.query.filter_by(id=id, admin_id=admin_id).first() if admin_id else None
+    # O tenant sozinho não basta: com `escopo_obra_ativo` ligado, quem não
+    # tem vínculo com a obra não pode nem ver o dossiê de handoff dela. O
+    # POST (`handoff_obra_post`) já checava com `pode_transitar_como`; era o
+    # GET que entregava o dossiê a qualquer usuário do tenant.
+    #
+    # Mesma resposta de "não existe", e não 403: distinguir os dois casos
+    # confirmaria a existência da obra. Doutrina de `obra_required` e de
+    # `_rdo_do_tenant_ou_404`.
+    if obra is not None and not pode_ver_obra(id):
+        obra = None
     if obra is None:
         if _quer_json():
             return jsonify({'erro': 'Obra não encontrada'}), 404
