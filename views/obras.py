@@ -1109,13 +1109,77 @@ def editar_obra(id):
                          servicos_obra=servicos_obra,
                          opcoes_obra_status=opcoes_obra_status)
 
+# Tabelas que `excluir_obra` limpa à mão, na ordem em que são limpas.
+#
+# Só precisam entrar aqui as FKs para `obra` com ON DELETE NO ACTION — as
+# CASCADE e SET NULL o banco resolve sozinho (é por isso que `cronograma_*`,
+# `medicao_*`, `usuario_obra` e outras 18 não aparecem).
+# `tests/test_excluir_obra.py` introspecciona o `pg_constraint` e falha se
+# alguma NO ACTION ficar de fora: foi assim que `gestao_custo_pai` apareceu,
+# depois de tornar indeletável toda obra que já teve RDO com mão de obra.
+#
+# Fica no módulo, e não dentro da função, justamente para o teste conseguir
+# ler a lista sem parsear o fonte.
+TABELAS_DEPENDENTES_OBRA = [
+    # ── V2: Módulos adicionados posteriormente (adicionar ANTES dos legados) ──
+    'reembolso_funcionario',       # V2: Reembolsos vinculados à obra
+    'lancamento_transporte',       # V2: Lançamentos de transporte
+    'gestao_custo_filho',          # V2: Itens de custo (filho de gestao_custo_pai)
+    'gestao_custo_pai',            # V2: SEMPRE depois do filho — o filho tem FK para cá
+    'pedido_compra',               # V2: Pedidos de compra de materiais
+    'tarefa_cronograma',           # V2: Tarefas do cronograma
+    'folha_processada',            # V2: Folhas processadas por obra
+    # ── Tabelas legadas com admin_id ──────────────────────────────────────────
+    'custo_obra',
+    'servico_obra_real',
+    'servico_obra',
+    'registro_ponto',
+    'historico_produtividade_servico',
+    'conta_pagar',
+    'conta_receber',
+    'fluxo_caixa',
+    'alimentacao_lancamento',
+    'almoxarifado_movimento',
+    'frota_utilizacao',
+    'configuracao_horario',
+    'dispositivo_obra',
+    'funcionario_obras_ponto',
+    'almoxarifado_estoque',
+    'alocacao_equipe',
+    'centro_custo',
+    'centro_custo_contabil',
+    'custo_veiculo',
+    'frota_despesa',
+    'movimentacao_estoque',
+    'notificacao_cliente',
+    'rdo',                         # CASCADE remove os filhos do RDO
+    'orcamento_obra',
+    'outro_custo',
+    'receita',
+    'registro_alimentacao',
+    'uso_veiculo',
+    'weekly_plan',
+    'allocation',
+    # ── Tabelas sem admin_id (tentar, mas não falhar) ─────────────────────────
+    'propostas_comerciais',        # tem obra_id mas admin_id próprio
+]
+# Saíram daqui `fleet_vehicle_usage`, `movimentacao_material`, `obra_servico`,
+# `proposta`, `vehicle_expense` e `vehicle_usage`: nenhuma dessas tabelas
+# existe no banco. Cada uma disparava um erro por exclusão, engolido pelo
+# `except` da rota — ruído que escondia os erros de verdade no log. O
+# `fk_column_map` foi junto: só mapeava essas duas.
+
+
 # CRUD OBRAS - Excluir Obra
 @main_bp.route('/obras/excluir/<int:id>', methods=['POST', 'GET'])
 @login_required
 def excluir_obra(id):
-    """Excluir obra - aceita GET e POST"""
-    # Se for GET, redirecionar para lista de obras
-    if request.method == 'GET':
+    """Excluir obra - só POST apaga; os demais métodos redirecionam"""
+    # `!= 'POST'`, não `== 'GET'`: o `CSRFProtect` (app.py:198) isenta GET,
+    # HEAD, OPTIONS e TRACE, e o Flask registra HEAD junto com GET e o
+    # despacha para ESTA view. Com o teste em `== 'GET'`, um `curl -I` ou um
+    # prefetcher de link entrava direto na exclusão, sem token nenhum.
+    if request.method != 'POST':
         flash('Operação de exclusão deve ser feita via POST', 'warning')
         return redirect(url_for('main.obras'))
     try:
@@ -1137,63 +1201,9 @@ def excluir_obra(id):
         # [WARN] TODAS as exclusões incluem admin_id para SEGURANÇA MULTI-TENANT
         # [LIST] Ordem de exclusão respeita dependências FK (filhos antes de pais)
         try:
-            # [FAST] LISTA COMPLETA: TODAS as 38 tabelas com FK para obra.id
-            # Ordem importa - dependências mais profundas primeiro
-            tabelas_dependentes = [
-                # ── V2: Módulos adicionados posteriormente (adicionar ANTES dos legados) ──
-                'reembolso_funcionario',       # V2: Reembolsos vinculados à obra
-                'lancamento_transporte',       # V2: Lançamentos de transporte
-                'gestao_custo_filho',          # V2: Itens de custo (filho de gestao_custo_pai)
-                'pedido_compra',               # V2: Pedidos de compra de materiais
-                'tarefa_cronograma',           # V2: Tarefas do cronograma
-                'folha_processada',            # V2: Folhas processadas por obra
-                # ── Tabelas legadas com admin_id ──────────────────────────────────────────
-                'custo_obra',
-                'servico_obra_real',
-                'servico_obra',
-                'registro_ponto',
-                'historico_produtividade_servico',
-                'conta_pagar',
-                'conta_receber',
-                'fluxo_caixa',
-                'alimentacao_lancamento',
-                'almoxarifado_movimento',
-                'frota_utilizacao',
-                'configuracao_horario',
-                'dispositivo_obra',
-                'funcionario_obras_ponto',
-                'almoxarifado_estoque',
-                'alocacao_equipe',
-                'centro_custo',
-                'centro_custo_contabil',
-                'custo_veiculo',
-                'fleet_vehicle_usage',
-                'frota_despesa',
-                'movimentacao_estoque',
-                'movimentacao_material',
-                'notificacao_cliente',
-                'rdo',                         # RDOs da obra — CASCADE remove filhos (rdo_mao_obra, rdo_equipamento, rdo_ocorrencia, rdo_foto, rdo_servico_subatividade)
-                'obra_servico',
-                'orcamento_obra',
-                'outro_custo',
-                'receita',
-                'registro_alimentacao',
-                'uso_veiculo',
-                'vehicle_expense',
-                'vehicle_usage',
-                'weekly_plan',
-                'allocation',
-                # ── Tabelas sem admin_id (tentar, mas não falhar) ─────────────────────────
-                'propostas_comerciais',  # tem obra_id mas admin_id próprio
-                'proposta',              # obra_gerada_id
-            ]
-            
-            # Mapeamento especial para tabelas com nomes de coluna FK diferentes
-            fk_column_map = {
-                'proposta':            'obra_gerada_id',  # Usa obra_gerada_id em vez de obra_id
-                'fleet_vehicle_usage': 'worksite_id',     # Usa worksite_id em vez de obra_id
-            }
-            
+            # Ordem importa — dependências mais profundas primeiro.
+            tabelas_dependentes = TABELAS_DEPENDENTES_OBRA
+
             # [DEBUG] INTROSPECT: Detectar quais tabelas têm admin_id ANTES de deletar
             # Isso evita rollbacks que desfazem exclusões anteriores
             logger.debug("[DEBUG] Introspectando colunas das tabelas dependentes...")
@@ -1216,65 +1226,67 @@ def excluir_obra(id):
             
                     logger.info(f"[STATS] {len(tabelas_com_admin_id)} tabelas COM admin_id, {len(tabelas_dependentes) - len(tabelas_com_admin_id)} SEM admin_id")
             
-            # [DEL] DELETAR: Usar conexão RAW com autocommit para isolar cada DELETE
-            # Isso evita que erros em uma tabela corrompam a sessão principal
+            # [DEL] DELETAR: tudo na MESMA transação da rota, um SAVEPOINT por
+            # tabela. Ou a obra some inteira, ou nada é tocado.
+            #
+            # Antes, cada DELETE rodava em `engine.connect()` com
+            # `isolation_level="AUTOCOMMIT"` — fora da transação da rota, um
+            # commit por tabela. Quando o `DELETE FROM obra` lá embaixo
+            # estourava numa FK (era o caso de TODA obra que já teve RDO com
+            # mão de obra, por causa de `gestao_custo_pai`), o `rollback` do
+            # `except` não tinha o que desfazer: RDOs, custos e lançamentos já
+            # estavam commitados um a um. A obra ficava viva e vazia, e repetir
+            # a exclusão dava o mesmo erro para sempre. Reproduzido e medido.
+            #
+            # O savepoint (`begin_nested`) preserva a intenção do código
+            # original — erro numa tabela não derruba as outras — que sem ele
+            # seria impossível: no Postgres o primeiro erro aborta a transação
+            # inteira e todo DELETE seguinte falha com InFailedSqlTransaction.
             total_deletados = 0
-            
-            # Obter conexão raw do engine (bypass SQLAlchemy session)
-            engine = db.engine
-            
+
             for tabela in tabelas_dependentes:
                 try:
-                    # Determinar nome da coluna FK (obra_id ou custom)
-                    fk_column = fk_column_map.get(tabela, 'obra_id')
-                    
-                    # Executar DELETE em conexão isolada com AUTOCOMMIT
-                    # CRITICAL: execution_options() retorna NOVA conexão configurada
-                    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-                        # Escolher query baseada na presença de admin_id
+                    with db.session.begin_nested():
                         if tabela in tabelas_com_admin_id:
                             # Tabela TEM admin_id - deletar com verificação
-                            result = conn.execute(
+                            result = db.session.execute(
                                 text(f"""
-                                    DELETE FROM {tabela} 
-                                    WHERE {fk_column} = :obra_id 
+                                    DELETE FROM {tabela}
+                                    WHERE obra_id = :obra_id
                                     AND admin_id = :admin_id
                                 """),
                                 {"obra_id": id, "admin_id": admin_id}
                             )
-                            count = result.rowcount
-                            if count > 0:
-                                logger.debug(f"[CLEAN] Removidos {count} de {tabela} (COM admin_id={admin_id})")
-                                total_deletados += count
                         else:
                             # Tabela NÃO tem admin_id - deletar sem verificação
                             # (Seguro porque já verificamos ownership da obra no início)
-                            result = conn.execute(
-                                text(f"DELETE FROM {tabela} WHERE {fk_column} = :obra_id"),
+                            result = db.session.execute(
+                                text(f"DELETE FROM {tabela} WHERE obra_id = :obra_id"),
                                 {"obra_id": id}
                             )
-                            count = result.rowcount
-                            if count > 0:
-                                logger.debug(f"[CLEAN] Removidos {count} de {tabela} (SEM admin_id)")
-                                total_deletados += count
-                    
+                        count = result.rowcount
+                    if count > 0:
+                        logger.debug(f"[CLEAN] Removidos {count} de {tabela}")
+                        total_deletados += count
+
                 except Exception as table_error:
-                    # Erro é isolado - não afeta outras tabelas nem a sessão principal
+                    # O savepoint já desfez o DELETE desta tabela; a transação
+                    # segue viva para as próximas.
                     logger.error(f"[WARN] Erro ao deletar de {tabela}: {table_error}")
-            
-                    logger.info(f"[STATS] Total de {total_deletados} registros dependentes removidos")
-            
+
+            logger.info(f"[STATS] Total de {total_deletados} registros dependentes removidos")
+
             # Deletar a própria obra via SQL direto (COM VERIFICAÇÃO ADMIN_ID)
             result_obra = db.session.execute(
                 text("DELETE FROM obra WHERE id = :obra_id AND admin_id = :admin_id"),
                 {"obra_id": id, "admin_id": admin_id}
             )
-            
+
             if result_obra.rowcount == 0:
                 raise Exception("Obra não encontrada ou não pertence ao admin atual")
-            
-                logger.info(f"[OK] Obra {id} e {total_deletados} registros dependentes deletados (multi-tenant seguro)")
-            
+
+            logger.info(f"[OK] Obra {id} e {total_deletados} registros dependentes deletados (multi-tenant seguro)")
+
             db.session.commit()
             
         except Exception as delete_error:
