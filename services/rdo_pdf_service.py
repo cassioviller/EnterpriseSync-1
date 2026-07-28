@@ -625,8 +625,23 @@ def gerar_pdf_rdo(rdo):
     elif mostrar_v2:
         elements.append(_section_rule('Apontamentos do Cronograma', styles))
         data = [['Tarefa', 'Progresso', 'Qtd. dia', 'Acumulado', '% Plan.', '% Real.']]
+        from utils.cronograma_engine import caminho_ancestrais_tarefa
+        _cache_pai: dict = {}
         for ap, tarefa in apontamentos_v2:
             nome = tarefa.nome_tarefa if tarefa else f'#{ap.tarefa_cronograma_id}'
+            # Onde a tarefa mora no cronograma. Sem isto, a mesma atividade nos
+            # dois galpões da Baia vira duas linhas idênticas na tabela do PDF
+            # e lê-se como lançamento em duplicidade — mesmo defeito corrigido
+            # na tela do RDO e no portal em 28/07/2026.
+            # `Paragraph` do ReportLab faz parse de mini-XML: o ' < ' do
+            # separador (e qualquer & no nome da tarefa) precisa ir escapado,
+            # senão a geração do PDF inteiro levanta.
+            from xml.sax.saxutils import escape as _xml_escape
+            _caminho = caminho_ancestrais_tarefa(tarefa, _cache_pai)
+            if _caminho:
+                nome = (f'{_xml_escape(nome)}<br/>'
+                        f'<font size="6" color="#6b7280">'
+                        f'{_xml_escape(_caminho)}</font>')
             unid = (tarefa.unidade_medida or '') if tarefa else ''
             if ap.tipo_apontamento == 'percentual':
                 # M07: linha percentual mostra o incremento persistido em

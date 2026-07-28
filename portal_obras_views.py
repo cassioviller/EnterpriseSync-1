@@ -868,6 +868,8 @@ def portal_rdo_detalhe(token: str, rdo_id: int):
     # cronograma. Deriva a mesma estrutura que o template espera (nome + % anterior/
     # incremento/atual) para a seção "Serviços / atividades" não aparecer vazia.
     if not subatividades:
+        from utils.cronograma_engine import caminho_ancestrais_tarefa
+        _cache_pai: dict = {}
         apontamentos = (
             RDOApontamentoCronograma.query
             .filter_by(rdo_id=rdo.id, admin_id=admin_id)
@@ -909,6 +911,11 @@ def portal_rdo_detalhe(token: str, rdo_id: int):
                 continue
             derivadas.append(SimpleNamespace(
                 nome_subatividade=tarefa.nome_tarefa,
+                # Onde a tarefa mora no cronograma. Sem isto, a mesma atividade
+                # nos dois galpões da Baia virava duas linhas idênticas e o
+                # cliente lia como lançamento em duplicidade (relato de
+                # 28/07/2026 no RDO de 22/07).
+                caminho_tarefa=caminho_ancestrais_tarefa(tarefa, _cache_pai),
                 descricao_subatividade=None,
                 observacoes_tecnicas=None,
                 percentual_anterior=anterior,

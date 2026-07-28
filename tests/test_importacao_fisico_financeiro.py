@@ -1257,7 +1257,7 @@ def test_apontamentos_do_mesmo_nome_em_galpoes_distintos_sao_distinguiveis():
     """
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from models import TarefaCronograma
-    from views.rdo import caminho_ancestrais_tarefa
+    from utils.cronograma_engine import caminho_ancestrais_tarefa
     with app.app_context():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
@@ -1284,7 +1284,7 @@ def test_caminho_ancestrais_nao_gira_em_ciclo_de_pai():
     guarda de visitados, a tela do RDO travaria o worker em laço infinito."""
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from models import TarefaCronograma
-    from views.rdo import caminho_ancestrais_tarefa
+    from utils.cronograma_engine import caminho_ancestrais_tarefa
     with app.app_context():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
@@ -1293,3 +1293,69 @@ def test_caminho_ancestrais_nao_gira_em_ciclo_de_pai():
         a.tarefa_pai_id, b.tarefa_pai_id = b.id, a.id
         db.session.commit()
         assert isinstance(caminho_ancestrais_tarefa(a), str)  # termina
+
+
+@pytest.mark.integration
+def test_portal_rdo_mostra_galpao_de_cada_atividade():
+    """No PORTAL (a tela que o cliente abre), duas atividades de mesmo nome em
+    galpões diferentes precisam sair identificadas — senão viram duas linhas
+    idênticas e leem-se como lançamento em duplicidade.
+
+    Reproduz o RDO real de 22/07/2026 da Baia: "AJR - Maquinário: …" no
+    Galpão B (60→80%) e "Ajr - Maquinário: …" no Galpão A (0→60%), no mesmo
+    dia. Só se distinguiam por um acaso de grafia herdado do .mpp.
+    """
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Obra, RDO
+    from datetime import date
+    with app.app_context():
+        aid = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
+        token = f'tok-galpao-{aid}'
+        obra = Obra.query.get(oid)
+        obra.token_cliente = token
+        obra.portal_ativo = True
+        db.session.commit()
+        rdo_id = RDO.query.filter_by(
+            obra_id=oid, admin_id=aid,
+            data_relatorio=date(2026, 7, 22)).first().id
+
+    with app.test_client() as c:
+        r = c.get(f'/portal/obra/{token}/rdo/{rdo_id}')
+        assert r.status_code == 200
+        html = r.get_data(as_text=True)
+        # Procura o RÓTULO da linha, não a palavra solta: o comentário deste RDO
+        # cita "Galpão A"/"Galpão B" em texto livre, e um `'Galpão A' in html`
+        # passa mesmo sem o fix (verificado). O `<` sai escapado no HTML.
+        assert 'Galpão B &lt; Baias' in html, 'linha do Galpão B sem rótulo'
+        assert 'Galpão A &lt; Baias' in html, 'linha do Galpão A sem rótulo'
+
+
+@pytest.mark.integration
+def test_pdf_do_rdo_gera_com_caminho_de_ancestrais():
+    """O nome da tarefa e o rótulo de ancestrais vão para um `Paragraph` do
+    ReportLab, que faz parse de mini-XML. Um `&` no nome de uma tarefa-pai
+    derruba a geração do PDF inteiro se o texto não for escapado."""
+    from services import importacao_fisico_financeiro as ff
+    from services.rdo_pdf_service import gerar_pdf_rdo
+    from models import RDO
+    os.makedirs('/tmp/vazio_pdf', exist_ok=True)
+    ff.FOTOS_RDO_BASE = '/tmp/vazio_pdf'
+    caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                           'cronograma_fisico_financeiro_baias.json')
+    payload = json.load(open(caminho, encoding='utf-8'))
+    with app.app_context():
+        aid = _novo_admin()
+        oid = ff.importar_fisico_financeiro(payload, aid)['obra_id']
+        # Nome hostil ao parser XML num ANCESTRAL (vai para o rótulo).
+        from models import TarefaCronograma, RDOApontamentoCronograma
+        rdo = RDO.query.filter_by(obra_id=oid, admin_id=aid,
+                                  data_relatorio=date(2026, 7, 22)).first()
+        ap = RDOApontamentoCronograma.query.filter_by(rdo_id=rdo.id).first()
+        folha = TarefaCronograma.query.get(ap.tarefa_cronograma_id)
+        pai = TarefaCronograma.query.get(folha.tarefa_pai_id)
+        pai.nome_tarefa = 'Fundação & Estrutura <B>'
+        db.session.commit()
+        pdf = gerar_pdf_rdo(rdo)
+    assert pdf and pdf[:4] == b'%PDF', 'PDF não foi gerado'
+    assert len(pdf) > 1000

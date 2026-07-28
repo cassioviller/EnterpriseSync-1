@@ -221,6 +221,14 @@
                     <tr>
                         <td>
                             <strong>{{ s.nome_subatividade }}</strong>
+                            {% if s.caminho_tarefa %}
+                            {# Onde a atividade mora no cronograma. Sem isto, a mesma
+                               atividade em dois galpões vira duas linhas idênticas e
+                               parece lançamento em duplicidade. #}
+                            <div style="font-size:.78rem;color:var(--text-muted);margin-top:2px;">
+                                <i class="fas fa-sitemap" style="opacity:.7;margin-right:4px;"></i>{{ s.caminho_tarefa }}
+                            </div>
+                            {% endif %}
                             {% if s.descricao_subatividade %}
                             <div style="font-size:.78rem;color:var(--text-muted);margin-top:2px;">{{ s.descricao_subatividade }}</div>
                             {% endif %}
