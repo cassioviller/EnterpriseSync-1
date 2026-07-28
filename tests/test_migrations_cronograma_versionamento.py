@@ -162,19 +162,97 @@ def ambiente_baias(tmp_path):
 
 @pytest.mark.integration
 def test_backfill_cria_versao_1_e_snapshots(ambiente_baias):
-    """Obra com tarefas ganha versão nº1 ativa e 1 snapshot por tarefa."""
+    """Obra com tarefas ganha versão nº1 ativa e 1 snapshot por tarefa.
+
+    A migração é GLOBAL: varre toda obra do banco sem versão (89 num dev
+    típico, e cresce a cada suíte que cria tarefas). Este teste falhava
+    sozinho porque uma obra alheia quebrando abortava o laço antes de chegar
+    na obra da fixture — a 210 agora isola a falha por obra, então o
+    resultado desta obra não depende mais do resto do banco.
+
+    O `.one()` de antes agravava: confundia "não criou" com "criou duas" e
+    não dizia qual dos dois aconteceu.
+    """
     from migrations import _migration_210_backfill_versao_inicial
     from models import CronogramaVersao, CronogramaTarefaSnapshot, TarefaCronograma
     with app.app_context():
-        _migration_210_backfill_versao_inicial()
         obra_id = ambiente_baias['obra_id']
         admin_id = ambiente_baias['admin_id']
-        v = CronogramaVersao.query.filter_by(obra_id=obra_id, status='ativa').one()
+
+        # Pré-condição explícita: sem isto, um backfill que não fizesse nada
+        # passaria despercebido caso a fixture deixasse de zerar as versões.
+        assert CronogramaVersao.query.filter_by(obra_id=obra_id).count() == 0, (
+            'a fixture deveria ter apagado as versões da obra antes do teste')
+
+        _migration_210_backfill_versao_inicial()
+
+        versoes = CronogramaVersao.query.filter_by(
+            obra_id=obra_id, status='ativa').all()
+        assert len(versoes) == 1, (
+            f'esperava 1 versão ativa para a obra {obra_id}, achei '
+            f'{len(versoes)}: {[(v.id, v.numero, v.observacao) for v in versoes]}')
+        v = versoes[0]
         assert v.numero == 1
         assert v.observacao == 'backfill inicial'
         n_tarefas = TarefaCronograma.query.filter_by(obra_id=obra_id, admin_id=admin_id).count()
         n_snaps = CronogramaTarefaSnapshot.query.filter_by(versao_id=v.id).count()
         assert n_snaps == n_tarefas
+
+
+@pytest.mark.integration
+def test_backfill_nao_para_por_causa_de_uma_obra_ruim(ambiente_baias):
+    """Obra quebrada não pode impedir o backfill das outras.
+
+    Era a causa da instabilidade: a 210 roda no startup, varre o banco
+    inteiro e re-levantava na PRIMEIRA obra com problema — bloqueando a
+    versão de todas as demais (e derrubando este teste quando a obra ruim
+    vinha antes da obra da fixture na ordem do laço).
+
+    A obra ruim aqui é construída com o defeito real que existia: tarefas
+    com `admin_id` divergente, que o `SELECT DISTINCT obra_id, admin_id`
+    devolvia DUAS vezes, fazendo o segundo INSERT bater na UNIQUE
+    (obra_id, numero).
+    """
+    from migrations import _migration_210_backfill_versao_inicial
+    from models import CronogramaVersao, Obra, TarefaCronograma
+    from sqlalchemy import text as sa_text
+
+    with app.app_context():
+        obra_boa = ambiente_baias['obra_id']
+        admin_bom = ambiente_baias['admin_id']
+
+        # Segundo admin, para dar à obra ruim tarefas de dois donos.
+        admin_outro = _novo_admin('bkf210b')
+
+        # Obra ruim: pelo ORM (que preenche os defaults das ~10 colunas
+        # NOT NULL de `obra`), com tarefas de DOIS admins.
+        molde = db.session.get(Obra, obra_boa)
+        ruim = Obra(nome=f'{molde.nome} RUIM', codigo=f'{molde.codigo}R',
+                    data_inicio=molde.data_inicio, admin_id=molde.admin_id,
+                    cliente_id=molde.cliente_id, valor_contrato=1000)
+        db.session.add(ruim)
+        db.session.commit()
+        obra_ruim = ruim.id
+        for dono in (admin_bom, admin_outro):
+            db.session.add(TarefaCronograma(
+                obra_id=obra_ruim, admin_id=dono,
+                nome_tarefa=f'Tarefa dono {dono}', ordem=1, duracao_dias=1))
+        db.session.commit()
+
+        try:
+            _migration_210_backfill_versao_inicial()
+
+            assert CronogramaVersao.query.filter_by(
+                obra_id=obra_boa, status='ativa').count() == 1, (
+                'a obra da fixture ficou sem versão — o laço parou na obra '
+                'ruim, que é exatamente o que este teste existe para impedir')
+            assert CronogramaVersao.query.filter_by(
+                obra_id=obra_ruim).count() == 1, (
+                'a obra com admin divergente deveria receber UMA versão')
+        finally:
+            db.session.execute(sa_text('DELETE FROM obra WHERE id = :o'),
+                               {'o': obra_ruim})
+            db.session.commit()
 
 
 @pytest.mark.integration

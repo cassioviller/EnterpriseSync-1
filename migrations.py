@@ -15743,29 +15743,50 @@ def _migration_210_backfill_versao_inicial():
     from sqlalchemy import text as sa_text
     try:
         with db.engine.connect() as conn:
+            # `MIN(admin_id)` e não `DISTINCT obra_id, admin_id`: com o
+            # DISTINCT, uma obra cujas tarefas tivessem admin_id divergente
+            # saía DUAS vezes da consulta e o segundo INSERT batia em
+            # `uq_cronograma_versao_obra_numero` (obra_id, numero) — a obra
+            # ruim derrubava o backfill inteiro. Uma versão por obra, sempre.
             obras = conn.execute(sa_text("""
-                SELECT DISTINCT t.obra_id, t.admin_id FROM tarefa_cronograma t
+                SELECT t.obra_id, MIN(t.admin_id) FROM tarefa_cronograma t
                 WHERE NOT EXISTS (
                     SELECT 1 FROM cronograma_versao v WHERE v.obra_id = t.obra_id
                 )
+                GROUP BY t.obra_id
             """)).fetchall()
+        # Uma obra ruim não pode bloquear o backfill das outras: isto roda no
+        # startup, e `raise` aqui derrubava a subida inteira. Cada obra tem a
+        # sua transação e o seu erro; o que falhar fica logado e é recuperado
+        # na próxima subida (a consulta acima é idempotente — só pega obra
+        # SEM versão).
+        falhas = []
         for obra_id, admin_id in obras:
-            with db.engine.begin() as conn:
-                versao_id = conn.execute(sa_text("""
-                    INSERT INTO cronograma_versao (obra_id, admin_id, numero, status, observacao)
-                    VALUES (:o, :a, 1, 'ativa', 'backfill inicial') RETURNING id
-                """), {'o': obra_id, 'a': admin_id}).scalar()
-                conn.execute(sa_text("""
-                    INSERT INTO cronograma_tarefa_snapshot
-                        (versao_id, admin_id, tarefa_id, nome_tarefa, ordem,
-                         data_inicio, data_fim, duracao_dias, quantidade_total,
-                         unidade_medida, percentual_concluido_no_momento)
-                    SELECT :v, t.admin_id, t.id, t.nome_tarefa, t.ordem,
-                           t.data_inicio, t.data_fim, t.duracao_dias, t.quantidade_total,
-                           t.unidade_medida, t.percentual_concluido
-                    FROM tarefa_cronograma t WHERE t.obra_id = :o
-                """), {'v': versao_id, 'o': obra_id})
+            try:
+                with db.engine.begin() as conn:
+                    versao_id = conn.execute(sa_text("""
+                        INSERT INTO cronograma_versao (obra_id, admin_id, numero, status, observacao)
+                        VALUES (:o, :a, 1, 'ativa', 'backfill inicial') RETURNING id
+                    """), {'o': obra_id, 'a': admin_id}).scalar()
+                    conn.execute(sa_text("""
+                        INSERT INTO cronograma_tarefa_snapshot
+                            (versao_id, admin_id, tarefa_id, nome_tarefa, ordem,
+                             data_inicio, data_fim, duracao_dias, quantidade_total,
+                             unidade_medida, percentual_concluido_no_momento)
+                        SELECT :v, t.admin_id, t.id, t.nome_tarefa, t.ordem,
+                               t.data_inicio, t.data_fim, t.duracao_dias, t.quantidade_total,
+                               t.unidade_medida, t.percentual_concluido
+                        FROM tarefa_cronograma t WHERE t.obra_id = :o
+                    """), {'v': versao_id, 'o': obra_id})
+            except Exception as e_obra:
+                falhas.append(obra_id)
+                logger.error("[Migration 210] obra %s FALHOU (as demais "
+                             "seguem): %s", obra_id, e_obra)
+                continue
             logger.info(f"[Migration 210] obra {obra_id}: versão 1 + snapshots.")
+        if falhas:
+            logger.error("[Migration 210] %d obra(s) sem versão após o "
+                         "backfill: %s", len(falhas), falhas)
         with db.engine.begin() as conn:
             conn.execute(sa_text("""
                 UPDATE rdo_apontamento_cronograma ap SET
@@ -15821,36 +15842,50 @@ def _migration_212_backfill_versao_inicial_obras_novas():
     try:
         with db.engine.connect() as conn:
             obras = conn.execute(sa_text("""
-                SELECT DISTINCT t.obra_id, t.admin_id FROM tarefa_cronograma t
+                SELECT t.obra_id, MIN(t.admin_id) FROM tarefa_cronograma t
                 WHERE t.ativa IS TRUE AND t.is_cliente IS FALSE
                   AND NOT EXISTS (
                     SELECT 1 FROM cronograma_versao v WHERE v.obra_id = t.obra_id
                 )
+                GROUP BY t.obra_id
             """)).fetchall()
+        # Mesmo tratamento da 210: uma obra por linha (o DISTINCT com admin_id
+        # duplicava obra de admin divergente e batia na UNIQUE), e falha de
+        # uma não derruba as outras — isto roda no startup.
+        falhas = []
         for obra_id, admin_id in obras:
-            with db.engine.begin() as conn:
-                versao_id = conn.execute(sa_text("""
-                    INSERT INTO cronograma_versao
-                        (obra_id, admin_id, numero, status, observacao, aplicada_em)
-                    VALUES (:o, :a, 1, 'ativa',
-                            'cronograma inicial (backfill 212)', NOW())
-                    RETURNING id
-                """), {'o': obra_id, 'a': admin_id}).scalar()
-                conn.execute(sa_text("""
-                    INSERT INTO cronograma_tarefa_snapshot
-                        (versao_id, admin_id, tarefa_id, mpp_uid, wbs_codigo,
-                         nome_tarefa, ordem, data_inicio, data_fim,
-                         duracao_dias, quantidade_total, unidade_medida,
-                         is_marco, percentual_concluido_no_momento)
-                    SELECT :v, t.admin_id, t.id, t.mpp_uid, t.wbs_codigo,
-                           t.nome_tarefa, t.ordem, t.data_inicio, t.data_fim,
-                           t.duracao_dias, t.quantidade_total, t.unidade_medida,
-                           t.is_marco, t.percentual_concluido
-                    FROM tarefa_cronograma t
-                    WHERE t.obra_id = :o AND t.ativa IS TRUE
-                      AND t.is_cliente IS FALSE
-                """), {'v': versao_id, 'o': obra_id})
-        logger.info(f"[Migration 212] backfill em {len(obras)} obra(s) sem versão.")
+            try:
+                with db.engine.begin() as conn:
+                    versao_id = conn.execute(sa_text("""
+                        INSERT INTO cronograma_versao
+                            (obra_id, admin_id, numero, status, observacao, aplicada_em)
+                        VALUES (:o, :a, 1, 'ativa',
+                                'cronograma inicial (backfill 212)', NOW())
+                        RETURNING id
+                    """), {'o': obra_id, 'a': admin_id}).scalar()
+                    conn.execute(sa_text("""
+                        INSERT INTO cronograma_tarefa_snapshot
+                            (versao_id, admin_id, tarefa_id, mpp_uid, wbs_codigo,
+                             nome_tarefa, ordem, data_inicio, data_fim,
+                             duracao_dias, quantidade_total, unidade_medida,
+                             is_marco, percentual_concluido_no_momento)
+                        SELECT :v, t.admin_id, t.id, t.mpp_uid, t.wbs_codigo,
+                               t.nome_tarefa, t.ordem, t.data_inicio, t.data_fim,
+                               t.duracao_dias, t.quantidade_total, t.unidade_medida,
+                               t.is_marco, t.percentual_concluido
+                        FROM tarefa_cronograma t
+                        WHERE t.obra_id = :o AND t.ativa IS TRUE
+                          AND t.is_cliente IS FALSE
+                    """), {'v': versao_id, 'o': obra_id})
+            except Exception as e_obra:
+                falhas.append(obra_id)
+                logger.error("[Migration 212] obra %s FALHOU (as demais "
+                             "seguem): %s", obra_id, e_obra)
+        logger.info(f"[Migration 212] backfill em {len(obras) - len(falhas)} "
+                    f"de {len(obras)} obra(s) sem versão.")
+        if falhas:
+            logger.error("[Migration 212] %d obra(s) sem versão: %s",
+                         len(falhas), falhas)
     except Exception as e:
         logger.error(f"[Migration 212] Falha: {e}", exc_info=True)
         raise
