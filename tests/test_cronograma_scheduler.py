@@ -375,3 +375,38 @@ def test_vinculo_apontando_para_pai_e_ignorado():
     # vínculo cuja predecessora é o PAI (resumo): ignorado com warning
     res = calcular_agendamento(nos, [_v(1, 3)], hoje=SEG)
     assert res[3].inicio == QUA                       # manteve o próprio início
+
+
+def test_ancorada_em_fim_de_semana_deriva_o_fim_do_primeiro_dia_util():
+    """Início gravado no sábado: o fim DERIVADO conta a partir da segunda.
+
+    `fim_por_duracao` conta dias úteis a partir do dia em que se trabalha.
+    Sem normalizar o início efetivo, sábado + 2 dias dava SEG — perdendo um
+    dia útil, porque o trabalho começa SEG e termina TER. O erro não ficava
+    na tarefa: `efetivas` alimenta as restrições das sucessoras, então a
+    cadeia inteira andava um dia a menos.
+
+    Em dev, 2.952 tarefas ativas têm `data_inicio` em fim de semana.
+    """
+    # duração 2 a partir de SAB (11/07): trabalho SEG2 (13/07) e TER2 (14/07)
+    nos = [_no(1, 'Iniciada no sábado', dur=2, inicio=SAB, fim=None,
+               ancorada=True),
+           _no(2, 'Depois', dur=1)]
+    res = calcular_agendamento(nos, [_v(1, 2)], hoje=SEG)
+
+    # a data GRAVADA da ancorada continua intocada (contrato de ancoragem)
+    assert res[1].inicio == SAB
+    assert res[1].fim is None
+
+    # a sucessora TI começa no dia útil seguinte ao fim efetivo (TER2)
+    assert res[2].inicio == date(2026, 7, 15), (
+        f'fim efetivo da ancorada saiu errado — sucessora em {res[2].inicio}')
+
+
+def test_ancorada_com_fim_gravado_em_fim_de_semana_nao_e_derivada():
+    """Quando o fim EXISTE, ele manda — normalizar o início não o inventa."""
+    nos = [_no(1, 'Iniciada', dur=1, inicio=SAB, fim=SAB, ancorada=True),
+           _no(2, 'Depois', dur=1)]
+    res = calcular_agendamento(nos, [_v(1, 2)], hoje=SEG)
+    assert (res[1].inicio, res[1].fim) == (SAB, SAB)
+    assert res[2].inicio == SEG2      # dia útil seguinte a SAB

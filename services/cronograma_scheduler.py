@@ -356,7 +356,18 @@ def calcular_agendamento(nos: list[NoTarefa], vinculos: list[VinculoSpec],
         dur_span = 0 if no.is_marco else dur  # marco agenda como duração 0
 
         if no.ancorada:
-            ini_ef = no.inicio
+            # As datas GRAVADAS da ancorada nunca mudam (é o que ancorar
+            # significa) — `resultados` abaixo devolve `no.inicio`/`no.fim`
+            # crus. Mas o início EFETIVO, do qual se deriva o fim quando ele
+            # não existe, tem de ser dia útil: `fim_por_duracao` conta a
+            # partir do dia em que se trabalha.
+            #
+            # Sem normalizar, um início em fim de semana perdia um dia útil:
+            # sábado + 2 dias dava segunda, quando o trabalho começa segunda
+            # e termina terça. Em dev, 2.952 tarefas ativas começam em fim de
+            # semana — e como `efetivas` alimenta as restrições das
+            # sucessoras, o erro escorria para a cadeia inteira.
+            ini_ef = proximo_dia_util(no.inicio) if no.inicio else None
             fim_ef = no.fim or (fim_por_duracao(ini_ef, dur_span) if ini_ef else None)
             if ini_ef is None:
                 logger.warning(
