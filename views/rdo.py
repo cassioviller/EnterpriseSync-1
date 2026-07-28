@@ -463,6 +463,18 @@ def rdos():
 @funcionario_required
 def excluir_rdo(rdo_id):
     """Excluir RDO e todas suas dependências"""
+    # Só POST apaga. `CSRFProtect` (app.py:198) valida apenas os métodos
+    # inseguros (`WTF_CSRF_METHODS`: POST/PUT/PATCH/DELETE) — GET, HEAD,
+    # OPTIONS e TRACE passam SEM token. Aceitar a exclusão por qualquer um
+    # deles entrega um caminho sem CSRF: bastava um
+    # `<img src=".../rdo/excluir/123">` numa página que um usuário logado
+    # abrisse. O teste é `!= 'POST'`, não `== 'GET'`, porque o Flask registra
+    # HEAD junto com GET e o despacha para ESTA view — um prefetcher de link
+    # ou um `curl -I` cairia aqui dentro. Mesma guarda que
+    # `views/obras.py:excluir_obra` faz.
+    if request.method != 'POST':
+        flash('Operação de exclusão deve ser feita via POST', 'warning')
+        return redirect(url_for('main.visualizar_rdo', id=rdo_id))
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
@@ -505,6 +517,40 @@ def excluir_rdo(rdo_id):
         except Exception as _e:
             logger.warning(f"[custo-dia] remover_custo_diario_rdo falhou: {_e}")
 
+        # As QUATRO FKs que apontam para `rdo` sem ON DELETE (confirmadas em
+        # pg_constraint, `confdeltype='a'`): custo_obra, movimentacao_estoque,
+        # alocacao_equipe e notificacao_cliente — as outras 12 são CASCADE ou
+        # SET NULL e se resolvem sozinhas. Na prática só `custo_obra` chega a
+        # estourar: as outras três têm relationship para RDO
+        # (`MovimentacaoEstoque.rdo`, `AlocacaoEquipe.rdo_gerado_rel`,
+        # `NotificacaoCliente`) e o SQLAlchemy anula a FK dos filhos
+        # carregados antes de deletar o pai; `custo_obra` não tem nenhuma.
+        # O tratamento explícito fica para as quatro assim mesmo: é um UPDATE
+        # em bloco em vez de carregar a coleção inteira na memória, e não
+        # depende de um backref que qualquer refactor pode remover.
+        # A rota tratava só a última — e como o percentual das tarefas era
+        # commitado antes (ver abaixo), o RDO ficava OCO: filhos apagados em
+        # definitivo, linha do RDO viva, e o retry falhando igual.
+        # Dois tratamentos, conforme o dado sobreviva ou não ao RDO:
+        #   somem junto  — custo_obra (custo derivado do RDO) e
+        #                  notificacao_cliente (aviso de um RDO que não existe
+        #                  mais não tem o que preservar; delete na linha abaixo)
+        #   soltam o ponteiro — movimentacao_estoque e alocacao_equipe, que são
+        #                  histórico próprio e valem sem o RDO
+        # Espelha `_materializar_rdos`
+        # (services/importacao_fisico_financeiro.py:366-373), com uma
+        # divergência deliberada: lá a notificação é anulada porque o RDO é
+        # RECRIADO em seguida; aqui ele acaba, e o aviso vai junto.
+        from models import AlocacaoEquipe, CustoObra, MovimentacaoEstoque
+        db.session.query(CustoObra).filter(
+            CustoObra.rdo_id == rdo_id).delete(synchronize_session=False)
+        db.session.query(MovimentacaoEstoque).filter(
+            MovimentacaoEstoque.rdo_id == rdo_id).update(
+                {MovimentacaoEstoque.rdo_id: None}, synchronize_session=False)
+        db.session.query(AlocacaoEquipe).filter(
+            AlocacaoEquipe.rdo_gerado_id == rdo_id).update(
+                {AlocacaoEquipe.rdo_gerado_id: None}, synchronize_session=False)
+
         db.session.query(NotificacaoCliente).filter(NotificacaoCliente.rdo_id == rdo_id).delete()
         db.session.query(RDOFoto).filter(RDOFoto.rdo_id == rdo_id).delete()
         db.session.query(RDOEquipamento).filter(RDOEquipamento.rdo_id == rdo_id).delete()
@@ -512,11 +558,12 @@ def excluir_rdo(rdo_id):
         db.session.query(RDOServicoSubatividade).filter(RDOServicoSubatividade.rdo_id == rdo_id).delete()
         db.session.query(RDOOcorrencia).filter(RDOOcorrencia.rdo_id == rdo_id).delete()
 
-        # V2: Excluir apontamentos de cronograma, recomputar a cadeia dos
-        # RDOs posteriores (M07) e recalcular percentuais das tarefas
+        # V2: apontamentos de cronograma + recomputo da cadeia dos RDOs
+        # posteriores (M07). `recomputar_cadeia` NÃO comita — de propósito,
+        # para rodar na mesma transação desta exclusão.
+        tarefa_ids_afetadas = []
         try:
             from models import RDOApontamentoCronograma
-            from utils.cronograma_engine import atualizar_percentual_tarefa
             from services.cronograma_apontamento_service import recomputar_cadeia
             data_rdo_excluido = rdo.data_relatorio
             aps = RDOApontamentoCronograma.query.filter_by(rdo_id=rdo_id).all()
@@ -525,15 +572,33 @@ def excluir_rdo(rdo_id):
             db.session.flush()
             for tid in tarefa_ids_afetadas:
                 recomputar_cadeia(tid, data_rdo_excluido, admin_id)
-            for tid in tarefa_ids_afetadas:
-                atualizar_percentual_tarefa(tid, admin_id)
         except Exception as e_v2:
             logger.warning(f"[WARN] Falha ao limpar apontamentos V2 do RDO {rdo_id}: {e_v2}")
 
-        # Excluir RDO
+        # Excluir RDO. Tudo acima está na MESMA transação: ou a exclusão
+        # inteira vale, ou nada vale. Antes, `atualizar_percentual_tarefa`
+        # rodava aqui dentro e comitava por conta própria — os filhos já
+        # estavam apagados em definitivo quando o DELETE do RDO estourava
+        # numa FK, e o `rollback` do `except` não tinha o que desfazer.
         db.session.delete(rdo)
         db.session.commit()
-        
+
+        # Só depois de o RDO ter sumido de verdade: refrescar o percentual
+        # das tarefas que ele alimentava. Fica FORA da transação porque
+        # `atualizar_percentual_tarefa` comita por tarefa (parcela de
+        # subempreitada inclusa, que a versão sem commit não cobre). Se algo
+        # aqui falhar, o percentual fica velho — e qualquer sincronização
+        # posterior o corrige. Nada é perdido.
+        if tarefa_ids_afetadas:
+            try:
+                from utils.cronograma_engine import atualizar_percentual_tarefa
+                for tid in tarefa_ids_afetadas:
+                    atualizar_percentual_tarefa(tid, admin_id)
+            except Exception as e_pct:
+                logger.warning(
+                    f"[WARN] RDO {rdo_id} excluído, mas o percentual das "
+                    f"tarefas {tarefa_ids_afetadas} não foi refrescado: {e_pct}")
+
         flash('RDO excluído com sucesso.', 'success')
         return redirect(url_for('main.rdos'))
         

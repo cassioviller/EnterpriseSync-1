@@ -723,3 +723,151 @@ def test_excluir_rdo_em_rascunho_continua_funcionando():
 
     with app.app_context():
         assert db.session.get(RDO, rid) is None
+
+
+@pytest.mark.parametrize('metodo', ['GET', 'HEAD'])
+def test_excluir_rdo_por_metodo_isento_de_csrf_nao_apaga(metodo):
+    """Nenhum método isento de CSRF pode apagar — só POST.
+
+    `CSRFProtect` valida apenas `WTF_CSRF_METHODS`
+    (POST/PUT/PATCH/DELETE); GET, HEAD, OPTIONS e TRACE passam SEM token.
+    Aceitar a exclusão por qualquer um deles entregava um caminho sem
+    proteção: um `<img src=".../rdo/excluir/123">` em qualquer página que
+    um usuário logado abrisse apagaria o RDO.
+
+    HEAD está aqui porque a primeira versão da guarda testava
+    `request.method == 'GET'` e o Flask registra HEAD junto com GET,
+    despachando-o para a MESMA view — um `curl -I` ou um prefetcher de link
+    entrava direto na exclusão. Foi confirmado apagando um RDO real.
+    """
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid = rdo.id, admin.id
+
+    cliente = _cliente_de(aid)
+    resposta = getattr(cliente, metodo.lower())(f'/rdo/excluir/{rid}',
+                                                follow_redirects=False)
+    assert resposta.status_code == 302, (
+        f'{metodo} devolveu {resposta.status_code} — esperava redirecionamento')
+
+    with app.app_context():
+        assert db.session.get(RDO, rid) is not None, f'{metodo} apagou o RDO'
+
+    # e o POST continua apagando
+    _cliente_de(aid).post(f'/rdo/excluir/{rid}', follow_redirects=True)
+    with app.app_context():
+        assert db.session.get(RDO, rid) is None
+
+
+def test_excluir_rdo_com_custo_obra_nao_deixa_rdo_oco():
+    """FK que bloqueia o DELETE não pode custar os filhos do RDO.
+
+    Quatro FKs apontam para `rdo` sem ON DELETE (custo_obra,
+    movimentacao_estoque, alocacao_equipe, notificacao_cliente) e qualquer
+    uma faz o DELETE final estourar. A rota tratava só a última — e como o
+    percentual das tarefas era commitado ANTES do DELETE, o RDO ficava
+    OCO: mão de obra, fotos, subatividades e apontamentos apagados em
+    definitivo, a linha do RDO viva, e o retry falhando igual.
+
+    Em dev, 45 RDOs têm `custo_obra` apontando para eles.
+    """
+    from models import CustoObra
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        from models import RDOOcorrencia
+        db.session.add(RDOOcorrencia(
+            rdo_id=rdo.id, admin_id=admin.id,
+            tipo_ocorrencia='Atraso', severidade='baixa',
+            descricao_ocorrencia='Filho que não pode se perder'))
+        db.session.add(CustoObra(
+            obra_id=obra.id, admin_id=admin.id, rdo_id=rdo.id,
+            tipo='mao_obra', descricao='Custo derivado do RDO',
+            valor=1000.0, data=rdo.data_relatorio))
+        db.session.commit()
+        rid, aid = rdo.id, admin.id
+
+    _cliente_de(aid).post(f'/rdo/excluir/{rid}', follow_redirects=True)
+
+    with app.app_context():
+        assert db.session.get(RDO, rid) is None, (
+            'o DELETE falhou na FK de custo_obra — RDO ficou oco')
+        from models import RDOOcorrencia
+        assert RDOOcorrencia.query.filter_by(rdo_id=rid).count() == 0
+        assert CustoObra.query.filter_by(rdo_id=rid).count() == 0, (
+            'custo derivado do RDO deveria sumir junto')
+
+
+def test_excluir_rdo_solta_ponteiro_sem_apagar_historico():
+    """As outras duas FKs sem ON DELETE: sobrevivem com `rdo_id` NULL.
+
+    `custo_obra` some junto com o RDO (é custo derivado dele), mas
+    `movimentacao_estoque` e `alocacao_equipe` são histórico próprio e
+    valem sem o RDO — o material saiu do almoxarifado, o funcionário foi
+    alocado. Este teste fixa esse contrato: o RDO some, as duas linhas
+    ficam, com o ponteiro solto.
+
+    CUIDADO ao ler este teste como guarda do código da rota: ele NÃO é.
+    Removendo o `.update({rdo_id: None})` de `views/rdo.py` ele continua
+    passando, porque as duas têm relationship para RDO
+    (`MovimentacaoEstoque.rdo`, `AlocacaoEquipe.rdo_gerado_rel`) e o
+    SQLAlchemy anula a FK dos filhos carregados antes de deletar o pai.
+    `CustoObra` não tem relationship nenhuma para RDO — por isso só ela
+    estoura de verdade, e só o teste do RDO oco guarda o código da rota.
+    O que este aqui protege é o contrato observável, valha ele pelo ORM ou
+    pelo UPDATE explícito: se um dia alguém trocar o tratamento por um
+    delete, ou o `rdo_gerado_rel` ganhar `cascade='all, delete-orphan'`,
+    este teste cai.
+    """
+    from models import (AlocacaoEquipe, CategoriaProduto, Funcionario,
+                        MovimentacaoEstoque, Produto)
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        suf = _sfx()
+
+        func = Funcionario(
+            codigo=f'F5{suf[:6].upper()}', nome=f'Pedreiro {suf}',
+            cpf=f'{suf[:3]}.{suf[3:6]}.{suf[:3]}-{suf[6:8]}',
+            data_admissao=date(2026, 1, 5), admin_id=admin.id)
+        cat = CategoriaProduto(
+            nome=f'Cimento {suf}', codigo=f'C{suf[:4].upper()}',
+            admin_id=admin.id)
+        db.session.add_all([func, cat])
+        db.session.flush()
+
+        prod = Produto(
+            codigo_interno=f'P{suf[:6].upper()}', nome=f'Saco cimento {suf}',
+            categoria_id=cat.id, unidade_medida='UN', admin_id=admin.id)
+        db.session.add(prod)
+        db.session.flush()
+
+        db.session.add(MovimentacaoEstoque(
+            produto_id=prod.id, tipo_movimentacao='SAIDA', quantidade=12,
+            rdo_id=rdo.id, obra_id=obra.id, usuario_id=admin.id,
+            admin_id=admin.id))
+        db.session.add(AlocacaoEquipe(
+            funcionario_id=func.id, obra_id=obra.id,
+            data_alocacao=rdo.data_relatorio, tipo_local='campo',
+            criado_por_id=admin.id, rdo_gerado_id=rdo.id, admin_id=admin.id))
+        db.session.commit()
+        rid, aid, pid, fid = rdo.id, admin.id, prod.id, func.id
+
+    _cliente_de(aid).post(f'/rdo/excluir/{rid}', follow_redirects=True)
+
+    with app.app_context():
+        assert db.session.get(RDO, rid) is None, (
+            'o DELETE estourou numa das duas FKs — RDO ficou oco')
+
+        mov = MovimentacaoEstoque.query.filter_by(produto_id=pid).one()
+        assert mov.rdo_id is None, 'ponteiro do RDO deveria ter sido solto'
+
+        alo = AlocacaoEquipe.query.filter_by(funcionario_id=fid).one()
+        assert alo.rdo_gerado_id is None, (
+            'ponteiro do RDO deveria ter sido solto')
