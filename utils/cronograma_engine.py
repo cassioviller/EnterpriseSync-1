@@ -147,6 +147,73 @@ def caminho_ancestrais_tarefa(tarefa, cache=None):
     return ' › '.join(reversed(cadeia[:-1])) if len(cadeia) > 1 else ''
 
 
+def historico_em_percentual(tarefa_id: int, admin_id: int, ate=None) -> bool:
+    """A tarefa tem apontamento GRAVADO em percentual até `ate`?
+
+    O modo de leitura de uma linha é um fato dela, não uma propriedade que a
+    tarefa tem hoje. `RDOApontamentoCronograma.tipo_apontamento` (migração
+    209) é onde esse fato mora, e é isto que se lê aqui.
+
+    Existe porque `calcular_progresso_rdo` decidia pela `quantidade_total`
+    **vigente**: bastava alguém cadastrar o quantitativo de uma tarefa já
+    apontada em % para os PONTOS PERCENTUAIS de `quantidade_executada_dia`
+    passarem a ser lidos como produção física, reescrevendo o avanço sem
+    rastro. Medido na Baia em 28/07/2026, tarefa "AJR - Maquinário:
+    Nivelamento das Calçadas", em 80% (60 pp + 20 pp lançados em 21 e 22/07):
+
+        cadastrar quantidade_total = 200 un  →  a tarefa passava a marcar  40%
+        cadastrar quantidade_total =  48 un  →  a tarefa passava a marcar 100%
+
+    É a mesma doutrina que `recomputar_cadeia`
+    (services/cronograma_apontamento_service.py) já aplicava do outro lado:
+    linha antiga se lê pelo formato em que foi gravada, e nada que aconteça
+    hoje muda a leitura do que já passou.
+
+    Basta UMA linha percentual: a coluna `quantidade_executada_dia` daquela
+    tarefa passa a misturar pp com unidades, e a soma deixa de ser produção
+    física para sempre. `ate=None` olha o histórico inteiro.
+
+    Linhas sem rótulo (`tipo_apontamento IS NULL`) não respondem nada — a
+    migração 265 carimbou as que existiam, e toda escrita nova carimba.
+    """
+    from models import RDO, RDOApontamentoCronograma, db
+
+    q = (
+        db.session.query(RDOApontamentoCronograma.id)
+        .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+        .filter(
+            RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
+            RDOApontamentoCronograma.admin_id == admin_id,
+            RDOApontamentoCronograma.tipo_apontamento == 'percentual',
+        )
+    )
+    if ate is not None:
+        q = q.filter(RDO.data_relatorio <= ate)
+    return db.session.query(q.exists()).scalar() or False
+
+
+def ids_com_historico_percentual(admin_id: int, tarefa_ids) -> set:
+    """Versão em lote de `historico_em_percentual`: uma consulta para o
+    conjunto todo, em vez de uma por tarefa.
+
+    Existe para `sincronizar_percentuais_obra`, que percorre a obra inteira
+    — lá o custo de uma consulta por tarefa apareceria na tela.
+    """
+    from models import RDOApontamentoCronograma, db
+
+    ids = [t for t in tarefa_ids if t]
+    if not ids:
+        return set()
+    return {
+        tid for (tid,) in
+        db.session.query(RDOApontamentoCronograma.tarefa_cronograma_id)
+        .filter(RDOApontamentoCronograma.admin_id == admin_id,
+                RDOApontamentoCronograma.tarefa_cronograma_id.in_(ids),
+                RDOApontamentoCronograma.tipo_apontamento == 'percentual')
+        .distinct()
+    }
+
+
 def agrupar_atividades_por_caminho(itens, chave='caminho_tarefa'):
     """``[(título, [itens])]`` para as atividades do dia de um RDO, agrupadas
     por onde moram no cronograma (o rótulo de `caminho_ancestrais_tarefa`).
@@ -291,7 +358,8 @@ def _percentual_livre(admin_id) -> bool:
 
 
 def _atualizar_percentual_sem_commit(tarefa, admin_id: int,
-                                     percentual_livre=None) -> None:
+                                     percentual_livre=None,
+                                     hist_pct=None) -> None:
     """
     Versão sem commit de atualizar_percentual_tarefa — para uso em batch.
     Usa o apontamento mais recente (por data_relatorio) de cada tarefa.
@@ -299,6 +367,10 @@ def _atualizar_percentual_sem_commit(tarefa, admin_id: int,
     `percentual_livre`: estado já resolvido da flag (ver `_percentual_livre`).
     `None` consulta — quem chama em laço passa o booleano para não consultar
     a configuração uma vez por tarefa.
+
+    `hist_pct`: conjunto de ids com histórico em percentual, já resolvido
+    (ver `ids_com_historico_percentual`). Mesma razão do parâmetro acima —
+    `None` consulta esta tarefa; o laço resolve o lote de uma vez.
     """
     from models import RDOApontamentoCronograma, RDO, db
 
@@ -322,7 +394,13 @@ def _atualizar_percentual_sem_commit(tarefa, admin_id: int,
     if ultimo is None:
         tarefa.percentual_concluido = 0.0
     elif (not percentual_livre
-            and tarefa.quantidade_total and tarefa.quantidade_total > 0):
+            and tarefa.quantidade_total and tarefa.quantidade_total > 0
+            and not (historico_em_percentual(tarefa.id, admin_id)
+                     if hist_pct is None else tarefa.id in hist_pct)):
+        # `historico_em_percentual`: linha lançada em % grava
+        # `quantidade_acumulada = 0` (o acumulado dela é percentual). Dividir
+        # esse 0 por um total cadastrado depois ZERAVA a tarefa — e aqui o
+        # estrago fica gravado em `percentual_concluido`, não só na leitura.
         tarefa.percentual_concluido = min(
             100.0,
             round(float(ultimo.quantidade_acumulada) / tarefa.quantidade_total * 100, 2)
@@ -394,6 +472,8 @@ def sincronizar_percentuais_obra(obra_id: int, admin_id: int, cliente: bool = Fa
 
     # Uma consulta para a obra inteira, não uma por tarefa.
     percentual_livre = _percentual_livre(admin_id)
+    # Idem para o histórico em percentual (ver `historico_em_percentual`).
+    hist_pct = ids_com_historico_percentual(admin_id, [t.id for t in tarefas])
 
     for tarefa in tarefas:
         # Tarefas de terceiros: percentual é gerenciado manualmente (checkbox),
@@ -404,7 +484,8 @@ def sincronizar_percentuais_obra(obra_id: int, admin_id: int, cliente: bool = Fa
         if r is None:
             tarefa.percentual_concluido = 0.0
         elif (not percentual_livre
-                and tarefa.quantidade_total and tarefa.quantidade_total > 0):
+                and tarefa.quantidade_total and tarefa.quantidade_total > 0
+                and tarefa.id not in hist_pct):
             tarefa.percentual_concluido = min(
                 100.0,
                 round(float(r.quantidade_acumulada) / tarefa.quantidade_total * 100, 2)
@@ -445,9 +526,12 @@ def rollup_percentual_pos_recalculo(tarefas: list, pai_ids: set, admin_id: int) 
     """
     # Sincronizar percentual_concluido de folhas com o último apontamento do RDO
     percentual_livre = _percentual_livre(admin_id)  # uma consulta para o lote
+    hist_pct = ids_com_historico_percentual(  # idem
+        admin_id, [t.id for t in tarefas if t.id not in pai_ids])
     for tarefa in tarefas:
         if tarefa.id not in pai_ids:  # só folhas recebem sync do RDO
-            _atualizar_percentual_sem_commit(tarefa, admin_id, percentual_livre)
+            _atualizar_percentual_sem_commit(tarefa, admin_id, percentual_livre,
+                                             hist_pct)
 
     # Bottom-up: % dos pais calculado a partir dos filhos (média ponderada por duração)
     pais = [t for t in tarefas if t.id in pai_ids]
@@ -619,6 +703,11 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int,
     from sqlalchemy import func as sqlfunc
     from models import RDO
 
+    # Linhas gravadas em PERCENTUAL guardam PONTOS PERCENTUAIS em
+    # `quantidade_executada_dia` — somá-las como produção física é um erro de
+    # unidade. Por isso a soma abaixo ignora essas linhas: sem o filtro, uma
+    # tarefa apontada em % que ganhasse `quantidade_total` depois teria os
+    # mesmos pp divididos pelo total (ver `historico_em_percentual`).
     acumulado = (
         db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
         .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
@@ -626,6 +715,8 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int,
             RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
             RDOApontamentoCronograma.admin_id == admin_id,
             RDO.data_relatorio <= data_rdo,
+            sqlfunc.coalesce(
+                RDOApontamentoCronograma.tipo_apontamento, '') != 'percentual',
         )
         .scalar()
     ) or 0.0
@@ -635,11 +726,14 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int,
 
     perc_realizado = 0.0
     if (not percentual_livre
-            and tarefa.quantidade_total and tarefa.quantidade_total > 0):
+            and tarefa.quantidade_total and tarefa.quantidade_total > 0
+            and not historico_em_percentual(tarefa_id, admin_id, data_rdo)):
         perc_realizado = min(100.0, round(acumulado / tarefa.quantidade_total * 100, 2))
     else:
-        # Tarefa sem quantidade física — ou QUALQUER tarefa quando a flag
-        # `rdo_percentual_livre` está ligada: o avanço é o
+        # Três casos caem aqui: tarefa sem quantidade física; QUALQUER tarefa
+        # quando a flag `rdo_percentual_livre` está ligada; e a tarefa cujo
+        # HISTÓRICO foi lançado em percentual, mesmo que alguém tenha
+        # cadastrado `quantidade_total` depois. O avanço é o
         # `percentual_realizado` do ÚLTIMO apontamento até data_rdo (mesma
         # fonte que sincronizar_percentuais_obra). Antes esse caso devolvia
         # sempre 0.
@@ -1049,21 +1143,33 @@ def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
         pct_sub = (round(float(qtd_sub) / tarefa.quantidade_total * 100, 2)
                    if tem_total and qtd_sub else 0.0)
         tarefa.percentual_concluido = min(100.0, round(pct_empresa + pct_sub, 2))
-    elif tem_total:
+    elif tem_total and not historico_em_percentual(tarefa_id, admin_id):
         # Empresa: quantidade_acumulada do último RDO (evita dupla contagem);
         # subempreitada: soma da produção registrada.
+        #
+        # `historico_em_percentual` porque a parcela da EMPRESA só é
+        # quantidade quando foi lançada como tal — senão `quantidade_acumulada`
+        # vale 0 e o total cadastrado depois zeraria a tarefa. A parcela da
+        # SUB continua física (ela reporta produção), e o ramo percentual
+        # abaixo já a converte pelo total, como no ramo da flag ligada.
         acum_empresa = float(ultimo.quantidade_acumulada) if ultimo else 0.0
         tarefa.percentual_concluido = min(
             100.0,
             round((acum_empresa + float(qtd_sub))
                   / tarefa.quantidade_total * 100, 2)
         )
-    elif ultimo is None:
+    elif ultimo is None and not qtd_sub:
         # Sem apontamentos — mantém 0
         tarefa.percentual_concluido = 0.0
     else:
-        # Sem quantidade_total: usa o percentual_realizado diretamente do apontamento
-        tarefa.percentual_concluido = min(100.0, float(ultimo.percentual_realizado or 0))
+        # Sem quantidade_total, OU tarefa cujo histórico da empresa foi
+        # lançado em percentual: o avanço da empresa é o percentual_realizado
+        # do apontamento. A parcela da SUB só entra quando há total para
+        # convertê-la — mesma regra do ramo `percentual_livre` acima.
+        pct_empresa = min(100.0, float(ultimo.percentual_realizado or 0)) if ultimo else 0.0
+        pct_sub = (round(float(qtd_sub) / tarefa.quantidade_total * 100, 2)
+                   if tem_total and qtd_sub else 0.0)
+        tarefa.percentual_concluido = min(100.0, round(pct_empresa + pct_sub, 2))
 
     db.session.add(tarefa)
     db.session.commit()

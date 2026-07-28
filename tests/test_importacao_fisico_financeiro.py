@@ -1441,3 +1441,146 @@ def test_pdf_do_rdo_agrupa_por_galpao():
                       for pg in pypdf.PdfReader(BytesIO(pdf)).pages)
     assert 'Baias › Galpão A › Fundação' in texto
     assert 'Baias › Galpão B › Fundação' in texto
+
+
+@pytest.mark.integration
+def test_cadastrar_quantitativo_nao_reescreve_avanco_ja_lancado_em_percentual():
+    """Cadastrar `quantidade_total` numa tarefa já apontada em PERCENTUAL não
+    pode mudar o avanço dela.
+
+    Medido na Baia em 28/07/2026: a tarefa "AJR - Maquinário…" está em 80%
+    (60 pp + 20 pp lançados em 21 e 22/07). Antes da correção, cadastrar
+    200 un a jogava para 40% e 48 un para 100% — porque
+    `quantidade_executada_dia` guarda PONTOS PERCENTUAIS nesse modo e
+    `calcular_progresso_rdo` decidia a leitura pela `quantidade_total`
+    VIGENTE, não pelo formato em que a linha foi gravada.
+    """
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import TarefaCronograma
+    from utils.cronograma_engine import calcular_progresso_rdo
+    from datetime import date
+    with app.app_context():
+        aid = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
+        # `like` e não `ilike`: o cronograma da Baia tem DUAS tarefas com
+        # este nome, diferindo só na caixa ('AJR - …' id 20 do .mpp e
+        # 'Ajr - …' id 65). É a de caixa alta que a medição de 28/07 usou —
+        # 60 pp em 21/07 + 20 pp em 22/07. O assert abaixo trava a escolha:
+        # se o fixture mudar, o teste diz o porquê em vez de sortear.
+        alvos = TarefaCronograma.query.filter(
+            TarefaCronograma.obra_id == oid, TarefaCronograma.admin_id == aid,
+            TarefaCronograma.nome_tarefa.like('AJR - %')).all()
+        assert len(alvos) == 1, f'esperava 1 tarefa "AJR - ", veio {len(alvos)}'
+        t = alvos[0]
+        assert t is not None
+
+        def avanco():
+            return calcular_progresso_rdo(
+                t.id, date(2026, 8, 1), aid)['percentual_realizado']
+
+        assert avanco() == 80.0, 'cenário base mudou'
+
+        for total in (200, 48, 1):
+            t.quantidade_total = total
+            db.session.flush()
+            assert avanco() == 80.0, (
+                f'cadastrar quantidade_total={total} reescreveu o avanço '
+                f'para {avanco()}%')
+
+        # e o que sustenta a leitura acima: a linha nasce carimbada
+        assert all(ap.tipo_apontamento == 'percentual'
+                   for ap in t.apontamentos), \
+            'apontamento do import ficou sem rótulo'
+        db.session.rollback()
+
+
+@pytest.mark.integration
+def test_tarefa_genuinamente_quantitativa_segue_pela_quantidade():
+    """A correção acima não pode capturar a tarefa que É quantitativa: lá o
+    acumulado é produção física e recalcular pelo total é o certo.
+    """
+    from models import (Cliente, Obra, TarefaCronograma, RDO,
+                        RDOApontamentoCronograma)
+    from utils.cronograma_engine import calcular_progresso_rdo
+    from datetime import date
+    with app.app_context():
+        aid = _novo_admin()
+        cli = Cliente(nome='Cliente quantitativo', admin_id=aid)
+        db.session.add(cli)
+        db.session.flush()
+        obra = Obra(nome='Obra quantitativa', admin_id=aid,
+                    cliente_id=cli.id, data_inicio=date(2026, 7, 1))
+        db.session.add(obra)
+        db.session.flush()
+        t = TarefaCronograma(
+            obra_id=obra.id, admin_id=aid, nome_tarefa='Alvenaria',
+            quantidade_total=100.0, unidade_medida='m2',
+            data_inicio=date(2026, 7, 1), duracao_dias=10, ordem=1)
+        db.session.add(t)
+        db.session.flush()
+        # `numero_rdo` é UNIQUE global, não por tenant — daí o id da obra.
+        rdo = RDO(obra_id=obra.id, admin_id=aid,
+                  numero_rdo=f'RDO-QTD-{obra.id}',
+                  data_relatorio=date(2026, 7, 10))
+        db.session.add(rdo)
+        db.session.flush()
+        db.session.add(RDOApontamentoCronograma(
+            rdo_id=rdo.id, tarefa_cronograma_id=t.id, admin_id=aid,
+            quantidade_executada_dia=25.0, quantidade_acumulada=25.0,
+            percentual_realizado=25.0, tipo_apontamento='quantitativo'))
+        db.session.flush()
+
+        assert calcular_progresso_rdo(
+            t.id, date(2026, 7, 10), aid)['percentual_realizado'] == 25.0
+        # ajustar o total de tarefa quantitativa RECALCULA — comportamento certo
+        t.quantidade_total = 50.0
+        db.session.flush()
+        assert calcular_progresso_rdo(
+            t.id, date(2026, 7, 10), aid)['percentual_realizado'] == 50.0
+        db.session.rollback()
+
+
+@pytest.mark.integration
+def test_sincronizar_nao_zera_tarefa_com_historico_em_percentual():
+    """Irmão do teste acima, no caminho que GRAVA.
+
+    `sincronizar_percentuais_obra` derivava `percentual_concluido` de
+    `quantidade_acumulada / quantidade_total`. Numa tarefa lançada em
+    percentual a `quantidade_acumulada` vale 0 (o acumulado dela é o
+    percentual), então cadastrar o quantitativo não só reescrevia o avanço —
+    **zerava** a tarefa, e o zero ficava gravado na coluna.
+    """
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import TarefaCronograma
+    from utils.cronograma_engine import (sincronizar_percentuais_obra,
+                                         atualizar_percentual_tarefa)
+    with app.app_context():
+        aid = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
+        # `like` e não `ilike`: o cronograma da Baia tem DUAS tarefas com
+        # este nome, diferindo só na caixa ('AJR - …' id 20 do .mpp e
+        # 'Ajr - …' id 65). É a de caixa alta que a medição de 28/07 usou —
+        # 60 pp em 21/07 + 20 pp em 22/07. O assert abaixo trava a escolha:
+        # se o fixture mudar, o teste diz o porquê em vez de sortear.
+        alvos = TarefaCronograma.query.filter(
+            TarefaCronograma.obra_id == oid, TarefaCronograma.admin_id == aid,
+            TarefaCronograma.nome_tarefa.like('AJR - %')).all()
+        assert len(alvos) == 1, f'esperava 1 tarefa "AJR - ", veio {len(alvos)}'
+        t = alvos[0]
+        assert t.percentual_concluido == 80.0, 'cenário base mudou'
+
+        t.quantidade_total = 200.0
+        t.unidade_medida = 'un'
+        db.session.commit()
+
+        sincronizar_percentuais_obra(oid, aid)
+        db.session.refresh(t)
+        assert t.percentual_concluido == 80.0, (
+            f'sincronizar zerou/reescreveu a tarefa para '
+            f'{t.percentual_concluido}%')
+
+        atualizar_percentual_tarefa(t.id, aid)
+        db.session.refresh(t)
+        assert t.percentual_concluido == 80.0, (
+            f'atualizar_percentual_tarefa reescreveu para '
+            f'{t.percentual_concluido}%')

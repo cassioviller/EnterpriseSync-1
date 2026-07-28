@@ -876,7 +876,11 @@ def criar_rdo():
                             ).first()
                             if not tarefa:
                                 continue
-                            # Calcular acumulado antes deste RDO
+                            # Calcular acumulado antes deste RDO. Linhas
+                            # gravadas em percentual ficam de fora: lá
+                            # `quantidade_executada_dia` são PONTOS
+                            # PERCENTUAIS, e somá-los aqui viraria produção
+                            # física (mesmo filtro de calcular_progresso_rdo).
                             from sqlalchemy import func as sqlfunc
                             acum_ant = (
                                 db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
@@ -885,6 +889,9 @@ def criar_rdo():
                                     RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
                                     RDOApontamentoCronograma.admin_id == admin_id,
                                     RDO.data_relatorio < data_relatorio,
+                                    sqlfunc.coalesce(
+                                        RDOApontamentoCronograma.tipo_apontamento,
+                                        '') != 'percentual',
                                 )
                                 .scalar()
                             ) or 0.0
@@ -901,6 +908,16 @@ def criar_rdo():
                                 percentual_realizado=perc_real,
                                 percentual_planejado=progresso['percentual_planejado'],
                                 admin_id=admin_id,
+                                # Esta rota só aponta por QUANTIDADE (o campo
+                                # do formulário é produção do dia). Carimbar
+                                # evita que a linha vire "sem rótulo" e caia
+                                # na adivinhação pela quantidade_total vigente.
+                                tipo_apontamento='quantitativo',
+                                percentual_acumulado=perc_real,
+                                quantidade_total_snapshot=(
+                                    float(tarefa.quantidade_total)
+                                    if tarefa.quantidade_total else None),
+                                unidade_snapshot=tarefa.unidade_medida,
                             )
                             db.session.add(ap)
                             tarefa_ids_afetadas.append(tarefa_id)

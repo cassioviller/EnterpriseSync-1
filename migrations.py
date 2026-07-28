@@ -5341,6 +5341,85 @@ def migration_264_rdo_foto_armazenamento():
     logger.info("[Migration 264] Concluída com sucesso")
 
 
+def migration_265_backfill_tipo_apontamento_restante():
+    """Carimba `tipo_apontamento` nas linhas que ficaram sem rótulo.
+
+    A migração 210 carimbou o que existia naquele momento, mas dois
+    caminhos de escrita continuaram criando linha sem rótulo depois dela:
+    o import físico-financeiro (`services/importacao_fisico_financeiro.py`,
+    de onde vieram os RDOs da Baia) e a rota de RDO em
+    `views/rdo.py`. Ambos passaram a carimbar na mesma rodada desta
+    migração; ela existe para o que já está gravado.
+
+    **Por que agora:** o rótulo distingue a linha cujo
+    `quantidade_executada_dia` é produção física da que guarda PONTOS
+    PERCENTUAIS. Sem ele, `calcular_progresso_rdo` só podia deduzir pela
+    `quantidade_total` VIGENTE da tarefa — e essa dedução muda de resposta
+    no dia em que alguém cadastra o quantitativo, reescrevendo o avanço
+    histórico em silêncio (medido na Baia em 28/07/2026: uma tarefa em 80%
+    passava a marcar 40% ou 100% conforme o total cadastrado).
+
+    Enquanto ninguém cadastrou esse total, a dedução ainda é a resposta
+    certa. É por isso que o backfill roda AGORA: ele congela na linha uma
+    verdade que continua conhecível hoje e deixa de ser amanhã.
+
+    Mesmo critério da 210 (`quantidade_total > 0` da tarefa), de propósito
+    — divergir dele reclassificaria linha que a 210 já rotulou vizinha.
+    Idempotente: só toca `tipo_apontamento IS NULL`.
+    """
+    logger.info("[Migration 265] Iniciando — backfill de tipo_apontamento")
+
+    pendentes = db.session.execute(text("""
+        SELECT COUNT(*) FROM rdo_apontamento_cronograma
+        WHERE tipo_apontamento IS NULL
+    """)).scalar() or 0
+    if not pendentes:
+        logger.info("[Migration 265] nada a fazer — nenhuma linha sem rótulo")
+        return
+
+    afetadas = db.session.execute(text("""
+        UPDATE rdo_apontamento_cronograma ap SET
+            tipo_apontamento = CASE
+                WHEN t.quantidade_total > 0 THEN 'quantitativo'
+                ELSE 'percentual' END,
+            quantidade_total_snapshot = COALESCE(
+                ap.quantidade_total_snapshot, t.quantidade_total),
+            unidade_snapshot = COALESCE(ap.unidade_snapshot, t.unidade_medida),
+            percentual_acumulado = CASE
+                WHEN t.quantidade_total > 0 THEN ap.percentual_acumulado
+                ELSE COALESCE(ap.percentual_acumulado, ap.percentual_realizado)
+                END,
+            percentual_incremento_dia = CASE
+                WHEN t.quantidade_total > 0 THEN ap.percentual_incremento_dia
+                ELSE COALESCE(ap.percentual_incremento_dia,
+                              ap.quantidade_executada_dia) END
+        FROM tarefa_cronograma t
+        WHERE t.id = ap.tarefa_cronograma_id
+          AND ap.tipo_apontamento IS NULL
+    """)).rowcount
+    db.session.commit()
+
+    distribuicao = db.session.execute(text("""
+        SELECT tipo_apontamento, COUNT(*) FROM rdo_apontamento_cronograma
+        GROUP BY tipo_apontamento ORDER BY 1
+    """)).fetchall()
+    orfas = db.session.execute(text("""
+        SELECT COUNT(*) FROM rdo_apontamento_cronograma
+        WHERE tipo_apontamento IS NULL
+    """)).scalar() or 0
+
+    logger.info("[Migration 265] %s de %s linha(s) carimbada(s); "
+                "distribuição final: %s", afetadas, pendentes,
+                {t: c for t, c in distribuicao})
+    if orfas:
+        # Linha cuja tarefa sumiu (FK é ON DELETE CASCADE, então isto não
+        # deveria existir). Fica sem rótulo em vez de receber um chute.
+        logger.warning("[Migration 265] %s linha(s) sem tarefa "
+                       "correspondente seguem sem rótulo", orfas)
+
+    logger.info("[Migration 265] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -5618,6 +5697,7 @@ def executar_migracoes():
             (262, "Fase 5 — tabela rdo_assinatura (autoria + hash + carimbo de tempo + IP)", migration_262_rdo_assinatura),
             (263, "Fase 5 — rdo.rdo_retificado_id + motivo_retificacao (RDO retificador)", migration_263_rdo_retificador),
             (264, "Fase 5 — rdo_foto.armazenamento ('banco'|'disco'): marcador da migração de fotos", migration_264_rdo_foto_armazenamento),
+            (265, "Carimba tipo_apontamento nas linhas de RDO que ficaram sem rótulo (import e views/rdo)", migration_265_backfill_tipo_apontamento_restante),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

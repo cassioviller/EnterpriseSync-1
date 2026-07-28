@@ -251,3 +251,74 @@ def test_backfill_multitenant_admin_sem_tarefas(ambiente_baias):
         assert CronogramaTarefaSnapshot.query.filter_by(admin_id=admin2).count() == 0
         v = CronogramaVersao.query.filter_by(obra_id=ambiente_baias['obra_id']).one()
         assert v.admin_id == ambiente_baias['admin_id']
+
+
+@pytest.mark.integration
+def test_migration_265_carimba_linhas_sem_rotulo(ambiente_baias):
+    """A 265 fecha o que a 210 não alcançava: linha criada DEPOIS dela, por
+    caminho de escrita que não carimbava (import físico-financeiro e
+    views/rdo). Sem rótulo, a leitura do avanço tinha de adivinhar pela
+    `quantidade_total` vigente da tarefa — e mudava de resposta no dia em que
+    alguém cadastrasse o quantitativo.
+
+    A fixture zera os rótulos justamente para reproduzir esse estado.
+    """
+    from migrations import migration_265_backfill_tipo_apontamento_restante
+    from models import RDOApontamentoCronograma, TarefaCronograma
+    with app.app_context():
+        admin_id = ambiente_baias['admin_id']
+        sem_rotulo = RDOApontamentoCronograma.query.filter_by(
+            admin_id=admin_id, tipo_apontamento=None).count()
+        assert sem_rotulo, 'fixture deveria ter linhas sem rótulo'
+
+        # os campos antigos são fato bruto e não podem ser tocados
+        sql_antigos = text(
+            "SELECT id, quantidade_executada_dia, quantidade_acumulada, "
+            "percentual_realizado FROM rdo_apontamento_cronograma "
+            "WHERE admin_id = :a ORDER BY id")
+        with db.engine.connect() as conn:
+            antes = [tuple(r) for r in
+                     conn.execute(sql_antigos, {'a': admin_id}).fetchall()]
+
+        migration_265_backfill_tipo_apontamento_restante()
+        db.session.expire_all()
+
+        with db.engine.connect() as conn:
+            depois = [tuple(r) for r in
+                      conn.execute(sql_antigos, {'a': admin_id}).fetchall()]
+        assert antes == depois, 'backfill NÃO pode alterar os campos antigos'
+
+        assert RDOApontamentoCronograma.query.filter_by(
+            admin_id=admin_id, tipo_apontamento=None).count() == 0
+
+        vistos = set()
+        for ap in RDOApontamentoCronograma.query.filter_by(
+                admin_id=admin_id).all():
+            t = db.session.get(TarefaCronograma, ap.tarefa_cronograma_id)
+            esperado = ('quantitativo'
+                        if (t.quantidade_total or 0) > 0 else 'percentual')
+            assert ap.tipo_apontamento == esperado
+            vistos.add(esperado)
+        assert vistos == {'quantitativo', 'percentual'}, \
+            f'fixture deveria exercitar os dois modos, veio {vistos}'
+
+
+@pytest.mark.integration
+def test_migration_265_e_idempotente(ambiente_baias):
+    """Roda duas vezes sem mudar nada na segunda — e não reescreve o rótulo
+    que já existe (a 210 e a escrita nova são donas dele)."""
+    from migrations import migration_265_backfill_tipo_apontamento_restante
+    from models import RDOApontamentoCronograma
+    with app.app_context():
+        admin_id = ambiente_baias['admin_id']
+        migration_265_backfill_tipo_apontamento_restante()
+        db.session.expire_all()
+        primeira = {ap.id: ap.tipo_apontamento for ap in
+                    RDOApontamentoCronograma.query.filter_by(
+                        admin_id=admin_id).all()}
+        migration_265_backfill_tipo_apontamento_restante()
+        db.session.expire_all()
+        segunda = {ap.id: ap.tipo_apontamento for ap in
+                   RDOApontamentoCronograma.query.filter_by(
+                       admin_id=admin_id).all()}
+        assert primeira == segunda

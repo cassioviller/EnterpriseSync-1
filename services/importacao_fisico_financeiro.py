@@ -447,13 +447,23 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db, avisos=None):
                 acum_qtd[tmpp] = acum
                 if db_id not in qtot_cache:
                     _t = TarefaCronograma.query.get(db_id)
-                    qtot_cache[db_id] = float(_t.quantidade_total or 0) if _t else 0.0
-                qtot = qtot_cache[db_id]
+                    qtot_cache[db_id] = (
+                        (float(_t.quantidade_total or 0), _t.unidade_medida)
+                        if _t else (0.0, None))
+                qtot, unid = qtot_cache[db_id]
                 pct = min(100.0, round(acum / qtot * 100, 2)) if qtot > 0 else 0.0
                 db.session.add(RDOApontamentoCronograma(
                     rdo_id=rdo.id, tarefa_cronograma_id=db_id, admin_id=admin_id,
                     quantidade_executada_dia=q, quantidade_acumulada=acum,
-                    percentual_realizado=pct, percentual_planejado=plan))
+                    percentual_realizado=pct, percentual_planejado=plan,
+                    # O modo é fato DA LINHA e se grava junto com ela: sem o
+                    # carimbo, `calcular_progresso_rdo` teria de adivinhar
+                    # pela `quantidade_total` de hoje — ver
+                    # `utils.cronograma_engine.historico_em_percentual`.
+                    tipo_apontamento='quantitativo',
+                    percentual_acumulado=pct,
+                    quantidade_total_snapshot=qtot or None,
+                    unidade_snapshot=unid))
             else:
                 # Modo percentual direto: o JSON traz o % ACUMULADO da tarefa no dia.
                 # O incremento diário é a diferença para o último acumulado da mesma
@@ -465,7 +475,14 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db, avisos=None):
                 db.session.add(RDOApontamentoCronograma(
                     rdo_id=rdo.id, tarefa_cronograma_id=db_id, admin_id=admin_id,
                     quantidade_executada_dia=inc, quantidade_acumulada=0.0,
-                    percentual_realizado=pct, percentual_planejado=plan))
+                    percentual_realizado=pct, percentual_planejado=plan,
+                    # Aqui `quantidade_executada_dia` guarda PONTOS
+                    # PERCENTUAIS, não produção. O carimbo é o que impede a
+                    # leitura de somá-los como quantidade se a tarefa ganhar
+                    # `quantidade_total` depois (medido na Baia, 28/07).
+                    tipo_apontamento='percentual',
+                    percentual_acumulado=pct,
+                    percentual_incremento_dia=inc))
 
         # Regra de foto no reimport: se a pasta do dia tiver arquivos, ELA manda
         # (reconstrói). Se vier vazia (0 fotos criadas), preserva as que já
