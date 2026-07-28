@@ -13,18 +13,27 @@ ENV PORT=5000
 ENV DIGITAL_MASTERY_MODE=true
 
 # Instalar dependências do sistema (mínimas)
-# Fase 0.5 / 1.1 — `postgresql-client` genérico do Debian bookworm instala a
-# versão 15. O servidor é PostgreSQL 16, e `pg_dump` RECUSA dumpar servidor
+# Fase 0.5 / 1.1 — `postgresql-client` genérico do Debian instala a versão que
+# vier na distro. O servidor é PostgreSQL 16, e `pg_dump` RECUSA dumpar servidor
 # mais novo ("aborting because of server version mismatch"). Sem o cliente 16,
 # a rotina de backup falharia em produção exatamente como falhou no
 # desenvolvimento. Fixamos a major 16 pelo repositório oficial do PGDG.
+#
+# O sufixo do repositório PGDG (`bookworm-pgdg`, `trixie-pgdg`, …) PRECISA
+# casar com a distro da imagem base, senão o apt mistura duas distros: o
+# libpq5 do PGDG-bookworm depende de `libldap-2.5-0`, que não existe no
+# trixie (lá é `libldap2` 2.6), e o build morre com "held broken packages".
+# Foi o que aconteceu quando o digest da base passou a apontar para trixie e
+# esta linha continuou dizendo bookworm. Lendo o codinome de /etc/os-release,
+# o repositório acompanha a base sozinho na próxima troca de digest.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates gnupg \
     && install -d /usr/share/postgresql-common/pgdg \
     && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
          -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && . /etc/os-release \
     && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
-https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
          > /etc/apt/sources.list.d/pgdg.list \
     && apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client-16 \
