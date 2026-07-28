@@ -53,18 +53,25 @@ dado novo já vem sendo alimentado sem que o motor novo esteja no comando.
 
        python scripts/verificar_equivalencia_obra.py <obra_id> --salvar antes.json
 
-4. **Ligue.**
+4. **Congele o plano de hoje numa linha de base.** É o registro que sobrevive
+   ao recálculo — e, desde 28/07, **condição do `--ligar`**: o script recusa
+   enquanto houver obra com cronograma datado e sem linha de base ativa.
+
+       python scripts/flag_cronograma_editor_v2.py <ID> --criar-baseline --status
+
+   > Isto era o passo 6 desta lista, depois de ligar. Estava tarde: o motor
+   > novo já teria recalculado as datas, e a linha de base congelaria o
+   > resultado do recálculo, não o plano que se queria preservar.
+
+5. **Ligue.**
 
        python scripts/flag_cronograma_editor_v2.py <ID> --ligar
 
-5. **Compare.** Mova uma tarefa na grade e confira que as sucessoras andaram
+6. **Compare.** Mova uma tarefa na grade e confira que as sucessoras andaram
    como o MS Project andaria — e que nenhuma tarefa **já iniciada** foi
    movida (o motor ancora as iniciadas de propósito).
 
        python scripts/verificar_equivalencia_obra.py <obra_id> --comparar antes.json
-
-6. **Crie uma linha de base** antes de o tenant começar a editar de verdade —
-   sem ela, a comparação planejado × real da Fase 4 não tem referência.
 
 7. **Entregue o manual em PDF** (Fase 5) a quem vai usar a grade.
 

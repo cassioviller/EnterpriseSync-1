@@ -90,6 +90,106 @@ def calendario_diverge(admin_id: int) -> bool:
         return False
 
 
+def obras_sem_linha_de_base(admin_id: int) -> list:
+    """Obras do tenant com cronograma datado e SEM linha de base ativa.
+
+    O rollback desta flag é assimétrico: desligar devolve o motor antigo, mas
+    **não desfaz as datas que o motor novo já gravou** — o recálculo em
+    cascata reescreve `data_inicio`/`data_fim` das tarefas, e não há de onde
+    trazê-las de volta. A `CronogramaBaseline` é esse "de onde": congela as
+    datas de hoje por tarefa (migração 225) e é o único registro que
+    sobrevive ao recálculo.
+
+    Por isso o runbook mandava tirar snapshot antes — instrução que ninguém
+    conseguia verificar. Aqui ela vira condição do `--ligar`.
+
+    Só entram obras com tarefa ativa e datada: sem datas não há o que
+    congelar, e o recálculo também não tem o que reescrever. Requer
+    app_context; nunca levanta.
+    """
+    try:
+        from models import CronogramaBaseline, Obra, TarefaCronograma
+        from app import db
+
+        com_datas = (
+            db.session.query(TarefaCronograma.obra_id,
+                             db.func.count(TarefaCronograma.id))
+            .filter(TarefaCronograma.admin_id == admin_id,
+                    TarefaCronograma.ativa.is_(True),
+                    TarefaCronograma.data_inicio.isnot(None),
+                    TarefaCronograma.data_fim.isnot(None))
+            .group_by(TarefaCronograma.obra_id)
+            .all()
+        )
+        if not com_datas:
+            return []
+        protegidas = {
+            oid for (oid,) in
+            db.session.query(CronogramaBaseline.obra_id)
+            .filter(CronogramaBaseline.admin_id == admin_id,
+                    CronogramaBaseline.ativa.is_(True))
+            .distinct()
+        }
+        pendentes = []
+        for obra_id, n_tarefas in com_datas:
+            if obra_id in protegidas:
+                continue
+            obra = db.session.get(Obra, obra_id)
+            pendentes.append({
+                'obra_id': obra_id,
+                'nome': getattr(obra, 'nome', None) or f'obra {obra_id}',
+                'tarefas': int(n_tarefas),
+            })
+        return sorted(pendentes, key=lambda o: -o['tarefas'])
+    except Exception as e:  # pragma: no cover - defensivo, igual às irmãs
+        print(f'AVISO: não foi possível conferir as linhas de base ({e})')
+        return []
+
+
+def criar_linha_de_base(obra_id: int, admin_id: int, nome=None) -> int:
+    """Congela as datas atuais da obra numa `CronogramaBaseline` ATIVA.
+
+    Mesmo conteúdo que a rota `POST /cronograma/obra/<id>/baseline` grava
+    (cronograma_views.py) — repetido aqui porque o rollout roda por CLI, sem
+    request nem `current_user`. Devolve o nº de tarefas congeladas.
+
+    Só o cronograma INTERNO (`is_cliente=False`): é o que o motor novo
+    recalcula. Requer app_context.
+    """
+    from datetime import date
+
+    from models import CronogramaBaseline, CronogramaBaselineItem, TarefaCronograma
+    from app import db
+
+    tarefas = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
+        .filter(TarefaCronograma.ativa.is_(True))
+        .filter(TarefaCronograma.data_inicio.isnot(None))
+        .filter(TarefaCronograma.data_fim.isnot(None))
+        .all()
+    )
+    if not tarefas:
+        return 0
+
+    (CronogramaBaseline.query
+     .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False, ativa=True)
+     .update({'ativa': False}, synchronize_session=False))
+
+    baseline = CronogramaBaseline(
+        obra_id=obra_id, admin_id=admin_id, is_cliente=False, ativa=True,
+        nome=(nome or f"Antes do editor v2 — {date.today().strftime('%d/%m/%Y')}")[:120])
+    db.session.add(baseline)
+    db.session.flush()
+    for t in tarefas:
+        db.session.add(CronogramaBaselineItem(
+            baseline_id=baseline.id, tarefa_id=t.id, admin_id=admin_id,
+            data_inicio=t.data_inicio, data_fim=t.data_fim,
+            duracao_dias=t.duracao_dias))
+    db.session.commit()
+    return len(tarefas)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description='Flag de rollout do editor de cronograma v2 (Fase 1)')
@@ -99,7 +199,12 @@ def main(argv=None) -> int:
     grupo.add_argument('--desligar', action='store_true')
     grupo.add_argument('--status', action='store_true')
     parser.add_argument('--forcar', action='store_true',
-                        help='liga mesmo com calendário divergente')
+                        help='liga mesmo com calendário divergente ou sem '
+                             'linha de base')
+    parser.add_argument('--criar-baseline', action='store_true',
+                        help='congela as datas atuais das obras que ainda não '
+                             'têm linha de base ativa (o snapshot que o '
+                             'rollback do motor NÃO faz sozinho)')
     args = parser.parse_args(argv)
 
     from app import app
@@ -124,6 +229,38 @@ def main(argv=None) -> int:
                   'aceitável. Desligar a flag reverte o motor, mas NÃO '
                   'desfaz um recálculo já aplicado.')
             return 1
+
+        if args.criar_baseline:
+            pendentes = obras_sem_linha_de_base(args.admin_id)
+            if not pendentes:
+                print('Nada a congelar: toda obra com cronograma datado já '
+                      'tem linha de base ativa.')
+            for obra in pendentes:
+                n = criar_linha_de_base(obra['obra_id'], args.admin_id)
+                print(f"  linha de base criada — obra {obra['obra_id']} "
+                      f"({obra['nome']}): {n} tarefa(s) congelada(s)")
+
+        # Segundo guard ANTES de gravar: sem linha de base, ligar a flag é
+        # uma porta só de ida. O motor novo recalcula as datas em cascata e
+        # desligar a flag devolve o motor, não as datas.
+        if args.ligar and not args.forcar:
+            pendentes = obras_sem_linha_de_base(args.admin_id)
+            if pendentes:
+                print(f'ABORTADO: {len(pendentes)} obra(s) do tenant '
+                      f'{args.admin_id} têm cronograma datado e NENHUMA linha '
+                      f'de base ativa:')
+                for obra in pendentes[:10]:
+                    print(f"  - obra {obra['obra_id']} ({obra['nome']}): "
+                          f"{obra['tarefas']} tarefa(s) com datas")
+                if len(pendentes) > 10:
+                    print(f'  … e mais {len(pendentes) - 10}.')
+                print('O motor novo recalcula datas em cascata, e DESLIGAR A '
+                      'FLAG NÃO AS DEVOLVE — a linha de base é o único '
+                      'registro do plano de hoje que sobrevive a isso.')
+                print(f'Congele antes:  python {os.path.basename(__file__)} '
+                      f'{args.admin_id} --criar-baseline --status')
+                print('Ou use --forcar se perder o plano atual for aceitável.')
+                return 1
 
         if not args.status:
             definir_flag(args.admin_id, args.ligar)
