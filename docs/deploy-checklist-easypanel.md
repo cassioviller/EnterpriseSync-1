@@ -34,7 +34,7 @@ novo — idempotente e barato (cache de aplicadas), mas vale saber que roda.
 | `DATABASE_URL` sem default embutido — deploy para sem ela | ✅ |
 | `SESSION_SECRET` obrigatório em produção (`app.py` levanta) | ✅ conferido no código |
 | Backup pré-migração REAL, e deploy aborta se falhar | ✅ |
-| `SIGE_ENABLE_DEMO_SEED` default **false** no entrypoint (e o seed de produção ainda exige `SIGE_ALLOW_PROD_SEED=1`) | ✅ trava dupla |
+| `SIGE_ENABLE_DEMO_SEED` default **false** no entrypoint (e o seed de produção ainda exige `SIGE_ALLOW_PROD_SEED=1`) | ⚠️ a trava valia só para o gunicorn — ver item 6 |
 | Migrações: **264 é a máxima**; 210 distintas aplicadas em dev; numeração tem buracos históricos (16-19, 21-26…) que são normais — nunca existiram na lista | ✅ |
 | Sem JVM na imagem: importação `.mpp` degrada para 422 com instrução de exportar `.xml` (MSPDI) — decisão deliberada, aviso no boot | ✅ degradação limpa |
 | Upload de JSON pela tela (payload leve) | ✅ testado em 27/07: obra criada, cronograma, RDO, versão nº1; reimport arquiva v1 e cria v2 |
@@ -125,7 +125,47 @@ O `REINDEX` bloqueia escrita nas tabelas que reindexa — não rode em horário
 de RDO. `REINDEX` sozinho não some com o aviso; quem apaga é o `ALTER`, e
 rodar o `ALTER` sem o `REINDEX` só silencia o alarme sem consertar o índice.
 
-### 6. Pendências humanas que o deploy NÃO resolve (continuam)
+### 6. A "trava dupla" do seed demo NÃO cobria o pre_start — corrigido em 28/07
+
+O entrypoint exporta `SIGE_ENABLE_DEMO_SEED=false` / `SIGE_ALLOW_PROD_SEED=0`
+na **linha 368**. O `pre_start.py` roda na **linha 136**. Quando ele importa
+`app`, o ambiente ainda está limpo e valiam os defaults de `app.py`, que eram
+`"true"` / `"1"` — ou seja, **auto-seed ligado no banco de produção**, pelo
+caminho que a auditoria de 27/07 deu como travado.
+
+🔬 Visto no deploy de 28/07:
+
+```
+[seed-demo-alfa] auto-seed iniciado em background
+...
+🔄 Executando Migração 222: ... tabela tarefa_vinculo + is_critica/folga_dias
+   (não concluiu)
+```
+
+O seed escreve em `tarefa_cronograma` (`DELETE FROM`, `scripts/seed_demo_alfa.py:231`);
+a migração 222 precisa de `ACCESS EXCLUSIVE` na mesma tabela para o
+`ALTER TABLE ... ADD COLUMN`. A migração ficou esperando o lock e o deploy
+bateu no `MIGRATION_TIMEOUT`.
+
+Fix: os defaults de `app.py` passaram a depender de `IS_PRODUCTION` — em
+produção o seed exige opt-in explícito; fora dela nada muda.
+
+**Independente do fix, defina as duas no painel** — é a trava que não depende
+de ordem de execução de script nenhum:
+
+```
+SIGE_ENABLE_DEMO_SEED=false
+SIGE_ALLOW_PROD_SEED=0
+```
+
+Se um deploy travar numa migração de novo, o diagnóstico é olhar lock:
+
+```sql
+SELECT pid, state, wait_event_type, left(query,80)
+  FROM pg_stat_activity WHERE datname='sige' AND state <> 'idle';
+```
+
+### 7. Pendências humanas que o deploy NÃO resolve (continuam)
 
 - Volume persistente + snapshot Hostinger + dump fora do servidor (parte B
   da Fase 5 — os 16 GB de fotos).

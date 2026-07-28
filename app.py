@@ -595,8 +595,21 @@ with app.app_context():
     # do gunicorn dispara). Para desligar, basta `SIGE_ENABLE_DEMO_SEED=false`.
     def _maybe_run_demo_seed():
         try:
-            enable = (os.environ.get("SIGE_ENABLE_DEMO_SEED", "true") or "").lower()
-            allow_prod = os.environ.get("SIGE_ALLOW_PROD_SEED", "1")
+            # Fase 0.5 / 2.1 — os defaults SEGUROS do entrypoint (`false`/`0`)
+            # só são exportados na etapa 3.7, DEPOIS que o pre_start.py já
+            # rodou (linha 136 do entrypoint vs. 368). No pre_start o ambiente
+            # ainda está limpo, então o default `true`/`1` daqui valia — e a
+            # "trava dupla" documentada no checklist não existia para esse
+            # caminho. No deploy de 28/07/2026 o seed disparou no banco de
+            # PRODUÇÃO e travou a migração 222 (o seed escreve em
+            # tarefa_cronograma; a migração precisa de ACCESS EXCLUSIVE nela).
+            # Agora, em produção o seed exige opt-in EXPLÍCITO no painel. Fora
+            # de produção o comportamento antigo continua — é ele que faz a
+            # demo aparecer sozinha em Replit/dev, que era a intenção original.
+            _default_enable = "false" if IS_PRODUCTION else "true"
+            _default_allow = "0" if IS_PRODUCTION else "1"
+            enable = (os.environ.get("SIGE_ENABLE_DEMO_SEED", _default_enable) or "").lower()
+            allow_prod = os.environ.get("SIGE_ALLOW_PROD_SEED", _default_allow)
             if enable != "true" or allow_prod != "1":
                 logger.info(
                     f"[seed-demo-alfa] auto-seed desligado "
