@@ -1024,3 +1024,64 @@ def test_pdf_do_rdo_sem_assinatura_continua_gerando():
         rdo = _rdo(obra, admin.id)
         pdf = gerar_pdf_rdo(rdo)
         assert pdf and pdf[:4] == b'%PDF'
+
+
+def test_hash_nao_depende_da_ordem_quando_as_linhas_EMPATAM_na_chave():
+    """O irmão do teste acima, no caso que ele não cobria.
+
+    Aquele usa funcionários distintos — a chave de ordenação já os
+    separava sozinha. O problema estava nas linhas que EMPATAM na chave e
+    diferem no resto: `sorted` é estável, então o desempate caía na ordem
+    do SELECT, que o Postgres não garante. Dois equipamentos
+    "Betoneira, qtd 1" com horas diferentes eram o caso mínimo.
+
+    Sem a ordem total, o mesmo conteúdo gera dois hashes — e a
+    verificação de integridade acusa adulteração num RDO intacto.
+    """
+    from models import RDOEquipamento
+    from services.rdo_hash import calcular_hash, payload_canonico
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        r1, r2 = _rdo(obra, admin.id), _rdo(obra, admin.id)
+        # mesmas duas linhas, inseridas em ordens opostas
+        for horas in (4.0, 6.0):
+            db.session.add(RDOEquipamento(
+                rdo_id=r1.id, admin_id=admin.id,
+                nome_equipamento='Betoneira', quantidade=1,
+                horas_uso=horas, estado_conservacao='bom'))
+        for horas in (6.0, 4.0):
+            db.session.add(RDOEquipamento(
+                rdo_id=r2.id, admin_id=admin.id,
+                nome_equipamento='Betoneira', quantidade=1,
+                horas_uso=horas, estado_conservacao='bom'))
+        db.session.commit()
+        db.session.refresh(r1)
+        db.session.refresh(r2)
+
+        assert payload_canonico(r1)['equipamentos'] == \
+            payload_canonico(r2)['equipamentos']
+
+        # o cabeçalho difere (rdo_id, numero_rdo), então compara-se a
+        # coleção; para o hash inteiro, o mesmo RDO lido duas vezes tem de
+        # dar sempre o mesmo valor
+        assert calcular_hash(r1) == calcular_hash(r1)
+
+
+def test_ordem_total_cobre_todas_as_colecoes_do_payload():
+    """Trava a correção: nenhuma coleção pode voltar a ordenar por prefixo.
+
+    Sem isto, uma coleção nova entra com `key=` parcial e o defeito
+    volta em silêncio — não há como notar até uma assinatura falhar.
+    """
+    import inspect
+
+    from services import rdo_hash
+
+    fonte = inspect.getsource(rdo_hash.payload_canonico)
+    assert 'key=lambda' not in fonte, (
+        'payload_canonico voltou a usar chave de ordenação parcial; '
+        'use _ordem_total (chave total sobre a linha inteira)')
+    assert fonte.count('_ordem_total(') == 6, (
+        'toda coleção do payload precisa passar por _ordem_total')

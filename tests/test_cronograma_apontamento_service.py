@@ -240,3 +240,92 @@ def test_sem_commit_do_servico(ctx):
     n = RDOApontamentoCronograma.query.filter_by(
         rdo_id=rdo.id, tarefa_cronograma_id=tarefa.id).count()
     assert n == 0
+
+
+def test_acumulado_anterior_ignora_linha_gravada_em_percentual(ctx):
+    """`acum_ant` não pode somar PONTOS PERCENTUAIS como produção física.
+
+    Este serviço nunca põe produção em linha percentual — grava 0.0 ali.
+    Mas as linhas que vieram ANTES dele põem: as pré-M02 e as do import
+    físico-financeiro guardam pp em `quantidade_executada_dia`. Sem o
+    filtro por `tipo_apontamento`, a soma do acumulado anterior misturava
+    pp com unidades e o apontamento quantitativo partia inflado.
+    """
+    tarefa = _tarefa(ctx, quantidade_total=200.0)
+    rdo_legado = _rdo(ctx, D0)
+    rdo_hoje = _rdo(ctx, D0 + timedelta(days=1))
+
+    # linha legada em PERCENTUAL com pp na coluna de quantidade — a forma
+    # que 79.334 das 121.918 linhas percentuais de dev têm
+    db.session.add(RDOApontamentoCronograma(
+        rdo_id=rdo_legado.id, tarefa_cronograma_id=tarefa.id,
+        admin_id=ctx['admin_id'], tipo_apontamento='percentual',
+        quantidade_executada_dia=60.0,   # 60 PONTOS PERCENTUAIS
+        quantidade_acumulada=0.0, percentual_realizado=60.0,
+        percentual_acumulado=60.0))
+    db.session.commit()
+
+    ap = registrar_apontamento(rdo_hoje, tarefa, quantidade_dia=50.0,
+                               admin_id=ctx['admin_id'])
+    db.session.flush()
+
+    assert ap.quantidade_acumulada == 50.0, (
+        f'os 60 pp da linha percentual entraram no acumulado físico: '
+        f'{ap.quantidade_acumulada}')
+    assert ap.percentual_realizado == 25.0, (
+        f'50 de 200 é 25%, veio {ap.percentual_realizado}%')
+
+
+def test_leitura_desempata_como_a_escrita_com_dois_rdos_no_mesmo_dia(ctx):
+    """Dois RDOs na MESMA data apontando a mesma tarefa: quem vence?
+
+    Não há unicidade de RDO por obra+data (conferido no schema; em dev há
+    obras com 10 RDOs na mesma data). O lado da ESCRITA sempre desempatou
+    por `(data_relatorio desc, id desc)` — `registrar_apontamento` usa
+    isso para achar o percentual anterior. As leituras do motor ordenavam
+    só por data, e aí a escolha ficava a cargo do banco: a mesma tarefa
+    exibia um percentual ou outro, e `sincronizar_percentuais_obra`
+    GRAVAVA o que saísse.
+
+    A regra que este teste trava: vence o apontamento de maior id dentro
+    da data máxima — em qualquer um dos caminhos de leitura.
+    """
+    from utils.cronograma_engine import (calcular_progresso_rdo,
+                                         sincronizar_percentuais_obra,
+                                         atualizar_percentual_tarefa)
+
+    tarefa = _tarefa(ctx, quantidade_total=None)
+    rdo_a = _rdo(ctx, D0)
+    rdo_b = _rdo(ctx, D0)          # mesma data, id maior
+    assert rdo_b.id > rdo_a.id
+
+    for rdo, pct in ((rdo_a, 30.0), (rdo_b, 70.0)):
+        db.session.add(RDOApontamentoCronograma(
+            rdo_id=rdo.id, tarefa_cronograma_id=tarefa.id,
+            admin_id=ctx['admin_id'], tipo_apontamento='percentual',
+            quantidade_executada_dia=0.0, quantidade_acumulada=0.0,
+            percentual_realizado=pct, percentual_acumulado=pct))
+    db.session.commit()
+
+    esperado = 70.0   # o de maior id dentro da data máxima
+
+    # 1) leitura pontual
+    assert calcular_progresso_rdo(
+        tarefa.id, D0, ctx['admin_id'])['percentual_realizado'] == esperado
+
+    # 2) leitura em lote, que GRAVA percentual_concluido
+    sincronizar_percentuais_obra(ctx['obra_id'], ctx['admin_id'])
+    db.session.refresh(tarefa)
+    assert tarefa.percentual_concluido == esperado, (
+        f'sincronizar gravou {tarefa.percentual_concluido}%')
+
+    # 3) caminho unitário (empresa + subempreitada)
+    tarefa.percentual_concluido = 0.0
+    db.session.commit()
+    atualizar_percentual_tarefa(tarefa.id, ctx['admin_id'])
+    db.session.refresh(tarefa)
+    assert tarefa.percentual_concluido == esperado
+
+    # e é ESTÁVEL: repetir não muda a resposta
+    assert calcular_progresso_rdo(
+        tarefa.id, D0, ctx['admin_id'])['percentual_realizado'] == esperado

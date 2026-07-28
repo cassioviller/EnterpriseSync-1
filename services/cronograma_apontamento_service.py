@@ -344,8 +344,16 @@ def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
 
     from sqlalchemy import func as sqlfunc
 
-    # Acumulado ANTES deste RDO (cópia literal da query original — soma dos
-    # dias em RDOs com data anterior).
+    # Acumulado ANTES deste RDO — soma dos dias em RDOs com data anterior,
+    # IGNORANDO as linhas gravadas em percentual.
+    #
+    # Este serviço nunca põe produção em linha percentual (grava 0.0 ali,
+    # ver `campos` no ramo do percentual), mas as linhas ANTERIORES a ele
+    # põem: as pré-M02 e as do import físico-financeiro guardam PONTOS
+    # PERCENTUAIS em `quantidade_executada_dia`. Somá-las aqui inflaria o
+    # acumulado físico com pp — 79.334 das 121.918 linhas percentuais de
+    # dev têm essa forma. Mesmo filtro de `calcular_progresso_rdo` e da
+    # rota em views/rdo.py.
     acum_ant = (
         db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
         .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
@@ -353,6 +361,8 @@ def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
             RDOApontamentoCronograma.tarefa_cronograma_id == tarefa.id,
             RDOApontamentoCronograma.admin_id == admin_id,
             RDO.data_relatorio < rdo.data_relatorio,
+            sqlfunc.coalesce(
+                RDOApontamentoCronograma.tipo_apontamento, '') != 'percentual',
         )
         .scalar()
     ) or 0.0

@@ -28,7 +28,8 @@ O que NÃO entra, e por quê:
 Formato: JSON com `sort_keys=True`, `ensure_ascii=False`,
 `separators=(',', ':')`, UTF-8. Números normalizados com
 `round(float(x), 4)` para que 8.0 e 8 gerem o mesmo hash. Coleções
-ordenadas por chave estável, nunca pela ordem de inserção.
+ordenadas por chave TOTAL — a linha inteira, nunca um prefixo dela e
+nunca a ordem de inserção (ver `_ordem_total`).
 """
 from __future__ import annotations
 
@@ -59,6 +60,34 @@ def _txt(valor):
     return texto or None
 
 
+def _ordem_total(linhas):
+    """Ordena as linhas de uma coleção por uma chave TOTAL — a linha inteira.
+
+    Chave parcial não serve aqui. `sorted` é estável: duas linhas que
+    empatam na chave mantêm a ordem de ENTRADA, e a entrada vem de um
+    SELECT sem ORDER BY — ordem que o Postgres não garante. O payload
+    deixava de ser canônico exatamente quando havia repetição.
+
+    Exemplo do que quebrava: dois equipamentos "Betoneira, qtd 1" (4h e
+    6h) empatam na chave `(nome, quantidade)` que este módulo usava. O
+    mesmo conteúdo gerava dois hashes conforme a ordem devolvida pelo
+    banco — e a verificação acusaria adulteração num RDO intacto.
+
+    Comparação por texto porque a linha mistura None, número e string, e
+    `None < str` levanta em Python 3. Não precisa ser uma ordem
+    *semântica*: precisa ser sempre a MESMA.
+
+    `VERSAO_PAYLOAD` NÃO muda com esta correção, de propósito. Onde não
+    havia empate a chave parcial já determinava a ordem sozinha, então os
+    bytes continuam idênticos e as assinaturas já gravadas seguem
+    verificando. Só mudam os payloads que eram ambíguos — e o hash deles
+    nunca foi confiável.
+    """
+    return sorted(linhas,
+                  key=lambda linha: ['' if x is None else str(x)
+                                     for x in linha])
+
+
 def payload_canonico(rdo) -> dict:
     """Representação determinística do conteúdo declarado do RDO."""
     from models import (RDOApontamentoCronograma, RDOEquipamento, RDOFoto,
@@ -83,48 +112,41 @@ def payload_canonico(rdo) -> dict:
         'criado_por_id': rdo.criado_por_id,
     }
 
-    subs = sorted(
-        ([_txt(s.nome_subatividade), s.servico_id,
-          _num(s.percentual_conclusao), _num(s.quantidade_produzida),
-          _txt(s.observacoes_tecnicas)]
-         for s in RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()),
-        key=lambda linha: (str(linha[0] or ''), linha[1] or 0))
+    subs = _ordem_total(
+        [_txt(s.nome_subatividade), s.servico_id,
+         _num(s.percentual_conclusao), _num(s.quantidade_produzida),
+         _txt(s.observacoes_tecnicas)]
+        for s in RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all())
 
-    mao_obra = sorted(
-        ([m.funcionario_id, _txt(m.funcao_exercida),
-          _num(m.horas_trabalhadas), m.subatividade_id,
-          m.tarefa_cronograma_id]
-         for m in RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()),
-        key=lambda linha: (linha[0] or 0, str(linha[1] or ''),
-                           linha[2] or 0.0, linha[3] or 0, linha[4] or 0))
+    mao_obra = _ordem_total(
+        [m.funcionario_id, _txt(m.funcao_exercida),
+         _num(m.horas_trabalhadas), m.subatividade_id,
+         m.tarefa_cronograma_id]
+        for m in RDOMaoObra.query.filter_by(rdo_id=rdo.id).all())
 
-    equipamentos = sorted(
-        ([_txt(e.nome_equipamento), _num(e.quantidade), _num(e.horas_uso),
-          _txt(e.estado_conservacao)]
-         for e in RDOEquipamento.query.filter_by(rdo_id=rdo.id).all()),
-        key=lambda linha: (str(linha[0] or ''), linha[1] or 0.0))
+    equipamentos = _ordem_total(
+        [_txt(e.nome_equipamento), _num(e.quantidade), _num(e.horas_uso),
+         _txt(e.estado_conservacao)]
+        for e in RDOEquipamento.query.filter_by(rdo_id=rdo.id).all())
 
-    ocorrencias = sorted(
-        ([_txt(o.tipo_ocorrencia), _txt(o.severidade),
-          _txt(o.descricao_ocorrencia), _txt(o.acoes_corretivas)]
-         for o in RDOOcorrencia.query.filter_by(rdo_id=rdo.id).all()),
-        key=lambda linha: (str(linha[0] or ''), str(linha[2] or '')))
+    ocorrencias = _ordem_total(
+        [_txt(o.tipo_ocorrencia), _txt(o.severidade),
+         _txt(o.descricao_ocorrencia), _txt(o.acoes_corretivas)]
+        for o in RDOOcorrencia.query.filter_by(rdo_id=rdo.id).all())
 
     # Só o que a pessoa DIGITOU no dia. `quantidade_acumulada` e
     # `percentual_realizado` são derivados e podem ser recalculados pelo
     # recomputo em cadeia de um RDO anterior.
-    apontamentos = sorted(
-        ([a.tarefa_cronograma_id, _txt(getattr(a, 'tipo_apontamento', None)),
-          _num(a.quantidade_executada_dia),
-          _num(getattr(a, 'percentual_acumulado', None))]
-         for a in RDOApontamentoCronograma.query.filter_by(rdo_id=rdo.id).all()),
-        key=lambda linha: (linha[0] or 0,))
+    apontamentos = _ordem_total(
+        [a.tarefa_cronograma_id, _txt(getattr(a, 'tipo_apontamento', None)),
+         _num(a.quantidade_executada_dia),
+         _num(getattr(a, 'percentual_acumulado', None))]
+        for a in RDOApontamentoCronograma.query.filter_by(rdo_id=rdo.id).all())
 
-    fotos = sorted(
-        ([f.id, _txt(f.nome_original) or _txt(f.nome_arquivo),
-          _txt(f.descricao) or _txt(f.legenda)]
-         for f in RDOFoto.query.filter_by(rdo_id=rdo.id).all()),
-        key=lambda linha: linha[0])
+    fotos = _ordem_total(
+        [f.id, _txt(f.nome_original) or _txt(f.nome_arquivo),
+         _txt(f.descricao) or _txt(f.legenda)]
+        for f in RDOFoto.query.filter_by(rdo_id=rdo.id).all())
 
     return {
         **cabecalho,

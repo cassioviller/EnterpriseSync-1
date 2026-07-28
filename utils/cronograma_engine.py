@@ -384,7 +384,13 @@ def _atualizar_percentual_sem_commit(tarefa, admin_id: int,
             RDOApontamentoCronograma.tarefa_cronograma_id == tarefa.id,
             RDOApontamentoCronograma.admin_id == admin_id,
         )
-        .order_by(RDO.data_relatorio.desc())
+        # Desempate ESTÁVEL: não há unicidade de RDO por obra+data, então
+        # dois RDOs do mesmo dia apontando a mesma tarefa deixariam a
+        # escolha a cargo do banco — e o avanço mudaria entre leituras.
+        # Mesma ordem que `registrar_apontamento` já usava do lado da
+        # escrita (services/cronograma_apontamento_service.py).
+        .order_by(RDO.data_relatorio.desc(),
+                  RDOApontamentoCronograma.id.desc())
         .first()
     )
 
@@ -450,7 +456,18 @@ def sincronizar_percentuais_obra(obra_id: int, admin_id: int, cliente: bool = Fa
         .subquery()
     )
 
-    # Apontamento correspondente à data máxima
+    # Apontamento correspondente à data máxima.
+    #
+    # A data máxima pode casar com MAIS DE UMA linha: não há unicidade de
+    # RDO por obra+data, então dois RDOs do mesmo dia apontando a mesma
+    # tarefa devolvem duas linhas aqui. O `mapa` abaixo é um dict — a
+    # última linha de cada tarefa vence — e sem ordenação essa "última"
+    # era a que o banco resolvesse devolver por último. Aqui o empate
+    # decidia um `percentual_concluido` que fica GRAVADO.
+    #
+    # A ordenação ASCENDENTE é o que torna o "último vence" do dict
+    # determinístico E correto: a linha de maior id dentro da data máxima
+    # é a que sobra, mesmo critério de `registrar_apontamento`.
     rows = (
         db.session.query(
             RDOApontamentoCronograma.tarefa_cronograma_id,
@@ -464,6 +481,7 @@ def sincronizar_percentuais_obra(obra_id: int, admin_id: int, cliente: bool = Fa
             & (subq.c.ultima_data == RDO.data_relatorio),
         )
         .filter(RDOApontamentoCronograma.admin_id == admin_id)
+        .order_by(RDO.data_relatorio.asc(), RDOApontamentoCronograma.id.asc())
         .all()
     )
 
@@ -745,7 +763,10 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int,
                 RDOApontamentoCronograma.admin_id == admin_id,
                 RDO.data_relatorio <= data_rdo,
             )
-            .order_by(RDO.data_relatorio.desc())
+            # Desempate ESTÁVEL — ver nota em
+            # `_atualizar_percentual_sem_commit`.
+            .order_by(RDO.data_relatorio.desc(),
+                      RDOApontamentoCronograma.id.desc())
             .first()
         )
         if ultimo is not None and ultimo[0] is not None:
@@ -951,7 +972,9 @@ def _progresso_fallback_subatividades(obra_id: int) -> float:
     from models import RDO, RDOServicoSubatividade
 
     ultimo = (RDO.query.filter_by(obra_id=obra_id)
-              .order_by(RDO.data_relatorio.desc()).first())
+              # `RDO.id` desempata: sem unicidade por obra+data, "o último
+              # RDO" seria escolha do banco.
+              .order_by(RDO.data_relatorio.desc(), RDO.id.desc()).first())
     if ultimo is None:
         return 0.0
     subs = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo.id).all()
@@ -1117,7 +1140,13 @@ def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
             RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
             RDOApontamentoCronograma.admin_id == admin_id,
         )
-        .order_by(RDO.data_relatorio.desc())
+        # Desempate ESTÁVEL: não há unicidade de RDO por obra+data, então
+        # dois RDOs do mesmo dia apontando a mesma tarefa deixariam a
+        # escolha a cargo do banco — e o avanço mudaria entre leituras.
+        # Mesma ordem que `registrar_apontamento` já usava do lado da
+        # escrita (services/cronograma_apontamento_service.py).
+        .order_by(RDO.data_relatorio.desc(),
+                  RDOApontamentoCronograma.id.desc())
         .first()
     )
 
