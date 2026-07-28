@@ -144,6 +144,29 @@ def caminho_ancestrais_tarefa(tarefa, cache=None):
     return ' < '.join(cadeia[:-1]) if len(cadeia) > 1 else ''
 
 
+def agrupar_atividades_por_caminho(itens, chave='caminho_tarefa'):
+    """``[(título, [itens])]`` para as atividades do dia de um RDO, agrupadas
+    por onde moram no cronograma (o rótulo de `caminho_ancestrais_tarefa`).
+
+    A ordem de entrada manda: os grupos saem na ordem em que aparecem pela
+    primeira vez, e dentro do grupo os itens mantêm a ordem recebida (o
+    chamador já ordenou por `ordem`/`ordem_execucao`). Não reordena nada —
+    a sequência das atividades no RDO é informação do cronograma.
+
+    Devolve UM grupo com título ``None`` quando não há o que separar (nenhum
+    item tem caminho, ou todos estão no mesmo): cabeçalho de grupo numa obra
+    sem hierarquia é só ruído na tela.
+    """
+    grupos: dict = {}
+    for item in itens:
+        titulo = (getattr(item, chave, '') or '') if not isinstance(item, dict) \
+            else (item.get(chave) or '')
+        grupos.setdefault(titulo, []).append(item)
+    if len(grupos) <= 1:
+        return [(None, list(itens))]
+    return [(titulo or None, membros) for titulo, membros in grupos.items()]
+
+
 def ordenar_arvore_visual(tarefas: list, com_nivel: bool = False):
     """Tree-flatten (DFS recursivo): intercala cada tarefa com todas as suas
     descendentes, de modo que as linhas apareçam imediatamente após o pai na

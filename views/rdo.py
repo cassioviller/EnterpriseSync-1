@@ -1474,6 +1474,7 @@ def visualizar_rdo(id):
         }
 
         # V2: Buscar apontamentos de produção do cronograma para este RDO
+        from utils.cronograma_engine import agrupar_atividades_por_caminho
         apontamentos_cronograma = []
         try:
             from utils.tenant import is_v2_active
@@ -1521,6 +1522,8 @@ def visualizar_rdo(id):
                              peso_por_subatividade=peso_por_subatividade,
                              total_horas_trabalhadas=total_horas_trabalhadas,
                              apontamentos_cronograma=apontamentos_cronograma,
+                             grupos_apontamentos=agrupar_atividades_por_caminho(
+                                 apontamentos_cronograma),
                              custos_dia_map=custos_dia_map,
                              custos_gerados_rdo=custos_gerados_rdo,
                              indice_medio_por_subatividade=indice_medio_por_subatividade,

@@ -1475,7 +1475,21 @@ console.log('Initializing RDO view with light theme...');
             </div>
             <div class="p-4">
                 <div class="row g-3">
-                {% for ap in apontamentos_cronograma %}
+                {# Agrupado por onde a atividade mora no cronograma: num RDO que tocou
+                   os dois galpões, "Galpão A" e "Galpão B" viram blocos separados em
+                   vez de cards idênticos alternados. Grupo único → título None e a
+                   grade fica como sempre foi. #}
+                {% for titulo_grupo, itens_grupo in grupos_apontamentos %}
+                {% if titulo_grupo %}
+                <div class="col-12">
+                    <div class="d-flex align-items-center gap-2 mt-2 mb-1">
+                        <i class="fas fa-sitemap text-secondary fa-sm"></i>
+                        <span class="small fw-bold text-uppercase text-secondary" style="letter-spacing:.03em">{{ titulo_grupo }}</span>
+                        <span class="flex-grow-1" style="height:1px;background:#dee2e6"></span>
+                    </div>
+                </div>
+                {% endif %}
+                {% for ap in itens_grupo %}
                 {# Task #67 — Status em 5 estados:
                    - Sem plano (cinza): tarefa sem data_inicio/duração
                    - Concluída (verde): realizado >= 100 e planejado <= 100 (no prazo/adiantada)
@@ -1565,7 +1579,8 @@ console.log('Initializing RDO view with light theme...');
                         </div>
                     </div>
                 </div>
-                {% endfor %}
+                {% endfor %}{# itens do grupo #}
+                {% endfor %}{# grupos #}
                 </div>
             </div>
         </div>

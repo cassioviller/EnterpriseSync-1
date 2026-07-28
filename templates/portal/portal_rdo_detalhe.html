@@ -216,19 +216,25 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for s in subatividades %}
+                    {# Agrupado por onde a atividade mora no cronograma: num RDO que
+                       tocou os dois galpões, "Galpão A" e "Galpão B" viram blocos
+                       separados. Grupo único → título None e a tabela fica como
+                       sempre foi (obra sem hierarquia não ganha cabeçalho à toa). #}
+                    {% for titulo_grupo, itens_grupo in grupos_atividades %}
+                    {% if titulo_grupo %}
+                    <tr>
+                        <td colspan="5" style="background:var(--bg-subtle,#f6f7f9);padding:6px 10px;border-top:1px solid var(--border,#e5e7eb);">
+                            <span style="font-size:.78rem;font-weight:700;letter-spacing:.02em;color:var(--text-muted);text-transform:uppercase;">
+                                <i class="fas fa-sitemap" style="opacity:.7;margin-right:5px;"></i>{{ titulo_grupo }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% for s in itens_grupo %}
                     {% set pc = s.percentual_conclusao or 0 %}
                     <tr>
                         <td>
                             <strong>{{ s.nome_subatividade }}</strong>
-                            {% if s.caminho_tarefa %}
-                            {# Onde a atividade mora no cronograma. Sem isto, a mesma
-                               atividade em dois galpões vira duas linhas idênticas e
-                               parece lançamento em duplicidade. #}
-                            <div style="font-size:.78rem;color:var(--text-muted);margin-top:2px;">
-                                <i class="fas fa-sitemap" style="opacity:.7;margin-right:4px;"></i>{{ s.caminho_tarefa }}
-                            </div>
-                            {% endif %}
                             {% if s.descricao_subatividade %}
                             <div style="font-size:.78rem;color:var(--text-muted);margin-top:2px;">{{ s.descricao_subatividade }}</div>
                             {% endif %}
@@ -245,7 +251,8 @@
                             </div>
                         </td>
                     </tr>
-                    {% endfor %}
+                    {% endfor %}{# itens do grupo #}
+                    {% endfor %}{# grupos #}
                 </tbody>
             </table>
         </div>

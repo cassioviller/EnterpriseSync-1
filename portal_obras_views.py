@@ -924,6 +924,15 @@ def portal_rdo_detalhe(token: str, rdo_id: int):
                 ordem_execucao=tarefa.ordem or 0,
             ))
         subatividades = sorted(derivadas, key=lambda s: s.ordem_execucao)
+
+    # Agrupa as atividades do dia por onde moram no cronograma. Num RDO que
+    # tocou os dois galpões, "Galpão A" e "Galpão B" viram blocos separados em
+    # vez de linhas alternadas que o cliente precisa conferir uma a uma.
+    # Grupo único (obra sem hierarquia) sai com título None e a tabela fica
+    # como sempre foi.
+    from utils.cronograma_engine import agrupar_atividades_por_caminho
+    grupos_atividades = agrupar_atividades_por_caminho(subatividades)
+
     mao_obra = RDOMaoObra.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).all()
     equipamentos = RDOEquipamento.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).all()
     ocorrencias = RDOOcorrencia.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).all()
@@ -937,6 +946,7 @@ def portal_rdo_detalhe(token: str, rdo_id: int):
         rdo=rdo,
         fotos=fotos,
         subatividades=subatividades,
+        grupos_atividades=grupos_atividades,
         mao_obra=mao_obra,
         equipamentos=equipamentos,
         ocorrencias=ocorrencias,

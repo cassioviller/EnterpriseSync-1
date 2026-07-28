@@ -1359,3 +1359,58 @@ def test_pdf_do_rdo_gera_com_caminho_de_ancestrais():
         pdf = gerar_pdf_rdo(rdo)
     assert pdf and pdf[:4] == b'%PDF', 'PDF não foi gerado'
     assert len(pdf) > 1000
+
+
+@pytest.mark.integration
+def test_agrupamento_por_caminho_preserva_ordem_e_nao_inventa_grupo():
+    """O agrupamento não pode reordenar as atividades (a sequência é do
+    cronograma) nem criar cabeçalho onde não há o que separar."""
+    from types import SimpleNamespace as NS
+    from utils.cronograma_engine import agrupar_atividades_por_caminho
+
+    a = NS(nome='a', caminho_tarefa='Fundação < Galpão B < Baias')
+    b = NS(nome='b', caminho_tarefa='Fundação < Galpão A < Baias')
+    c = NS(nome='c', caminho_tarefa='Fundação < Galpão B < Baias')
+
+    grupos = agrupar_atividades_por_caminho([a, b, c])
+    assert [t for t, _ in grupos] == ['Fundação < Galpão B < Baias',
+                                      'Fundação < Galpão A < Baias'], \
+        'ordem de primeira aparição dos grupos não preservada'
+    assert [i.nome for i in grupos[0][1]] == ['a', 'c']
+    assert [i.nome for i in grupos[1][1]] == ['b']
+
+    # Sem hierarquia (ou tudo no mesmo lugar): um grupo, sem título
+    iguais = [NS(nome='x', caminho_tarefa='Mesmo'), NS(nome='y', caminho_tarefa='Mesmo')]
+    assert agrupar_atividades_por_caminho(iguais) == [(None, iguais)]
+    sem = [NS(nome='x', caminho_tarefa=''), NS(nome='y', caminho_tarefa='')]
+    assert agrupar_atividades_por_caminho(sem) == [(None, sem)]
+    assert agrupar_atividades_por_caminho([]) == [(None, [])]
+
+
+@pytest.mark.integration
+def test_portal_rdo_agrupa_atividades_por_galpao():
+    """No portal, o RDO de 22/07 (que tocou os dois galpões) sai com um
+    cabeçalho de grupo por galpão, não com linhas alternadas."""
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Obra, RDO
+    from datetime import date
+    with app.app_context():
+        aid = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
+        token = f'tok-grupo-{aid}'
+        obra = Obra.query.get(oid)
+        obra.token_cliente = token
+        obra.portal_ativo = True
+        db.session.commit()
+        rdo_id = RDO.query.filter_by(
+            obra_id=oid, admin_id=aid,
+            data_relatorio=date(2026, 7, 22)).first().id
+
+    with app.test_client() as c:
+        r = c.get(f'/portal/obra/{token}/rdo/{rdo_id}')
+        assert r.status_code == 200
+        html = r.get_data(as_text=True)
+        # cabeçalho de grupo ocupa a linha inteira da tabela
+        assert html.count('colspan="5"') >= 2, 'faltou cabeçalho de grupo'
+        assert 'Galpão A &lt; Baias' in html
+        assert 'Galpão B &lt; Baias' in html
