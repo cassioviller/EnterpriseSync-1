@@ -158,7 +158,20 @@ def remover_custos_rdo(rdo, admin_id) -> int:
                 .scalar()
             ) or Decimal('0.00')
             pai.valor_total = total
-            if Decimal(str(total)) == Decimal('0.00') and pai.status == 'PENDENTE':
+            # "Pai zerado" é pai SEM FILHO, não pai cuja SOMA deu zero. Um
+            # estorno negativo ou um lançamento de valor 0 zera a soma com
+            # filhos vivos — e `GestaoCustoPai.itens` (models.py:6270) é
+            # `cascade='all, delete-orphan'`, então apagar o pai leva junto
+            # lançamentos de OUTRAS origens (importação, outro RDO).
+            # Reproduzido: removendo 1 filho de um pai com 3, sumiam os 3.
+            # Hoje nenhum filho em dev tem valor <= 0, então a soma acertava
+            # por convenção de dados, não por invariante do código.
+            restantes = (
+                db.session.query(sa_func.count(GestaoCustoFilho.id))
+                .filter(GestaoCustoFilho.pai_id == pai.id)
+                .scalar()
+            ) or 0
+            if restantes == 0 and pai.status == 'PENDENTE':
                 db.session.delete(pai)
 
         db.session.flush()

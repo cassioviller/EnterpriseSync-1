@@ -562,8 +562,19 @@ def _limpar_gestao_custo_filho(lancamento_id, admin_id):
                 pai.valor_total = Decimal(str(novo_total))
                 logger.info(f"[OK] CRUD Integrado: GestaoCusto pai={pai.id} total recalculado → {pai.valor_total}")
 
-                # Se o pai não tem mais filhos e está PENDENTE, exclui o pai também
-                if pai.valor_total == Decimal('0.00') and pai.status == 'PENDENTE':
+                # Se o pai não tem mais filhos e está PENDENTE, exclui o pai
+                # também. Conta os filhos em vez de olhar a SOMA: soma zero
+                # não é ausência de filho (um estorno negativo ou um valor 0
+                # zera a soma com filhos vivos), e `GestaoCustoPai.itens`
+                # (models.py:6270) é `cascade='all, delete-orphan'` — apagar o
+                # pai levaria junto lançamentos de outras origens. Mesmo
+                # conserto de `services/rdo_custos.py:remover_custos_rdo`.
+                restantes = (
+                    db.session.query(func.count(GestaoCustoFilho.id))
+                    .filter(GestaoCustoFilho.pai_id == pai.id)
+                    .scalar()
+                ) or 0
+                if restantes == 0 and pai.status == 'PENDENTE':
                     db.session.delete(pai)
                     logger.info(f"[OK] CRUD Integrado: GestaoCustoPai id={pai.id} excluído (sem filhos)")
 
