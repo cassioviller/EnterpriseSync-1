@@ -30,7 +30,7 @@ novo — idempotente e barato (cache de aplicadas), mas vale saber que roda.
 |---|---|
 | Base da imagem com digest fixado; deps pelo `uv.lock --frozen` | ✅ builds reproduzíveis |
 | Container roda como usuário **não-root** (`sige`) | ✅ |
-| `postgresql-client-16` (o 15 do Debian recusa dumpar servidor 16) | ✅ |
+| `postgresql-client-17` — o servidor do EasyPanel é **17.9**, e `pg_dump` recusa servidor mais novo que ele | ✅ corrigido 28/07 (o cliente 16 travou o deploy) |
 | `DATABASE_URL` sem default embutido — deploy para sem ela | ✅ |
 | `SESSION_SECRET` obrigatório em produção (`app.py` levanta) | ✅ conferido no código |
 | Backup pré-migração REAL, e deploy aborta se falhar | ✅ |
@@ -96,7 +96,36 @@ posterior já leva o fix.
 | `MIGRATION_TIMEOUT` / `HEALTH_CHECK_TIMEOUT` / `DB_WAIT_TIME` | não (300/60/30) | |
 | `PORTAL_BASE_URL` | para links do portal em e-mail/PDF | |
 
-### 5. Pendências humanas que o deploy NÃO resolve (continuam)
+### 5. O banco avisa "collation version mismatch" — pendência REAL, não ruído
+
+🔬 28/07, no log do backup em produção:
+
+```
+WARNING: database "sige" has a collation version mismatch
+DETAIL:  created using collation version 2.36, but the OS provides version 2.41
+```
+
+Isso é o Postgres dizendo que o cluster foi inicializado com a glibc do
+Debian 12 (2.36) e hoje roda sobre a do Debian 13 (2.41) — a imagem do
+serviço trocou de distro por baixo. **A ordenação de texto mudou**, então
+índices `text`/`varchar` e constraints `UNIQUE` sobre texto podem estar
+logicamente inconsistentes: uma busca por range pode pular linha e um
+`UNIQUE` pode ter deixado passar duplicata.
+
+É **aviso**, não erro: não bloqueia o backup nem o deploy. Mas continua
+valendo até alguém rodar, numa janela de baixo movimento e **depois de um
+backup bem-sucedido**:
+
+```sql
+REINDEX DATABASE sige;
+ALTER DATABASE sige REFRESH COLLATION VERSION;
+```
+
+O `REINDEX` bloqueia escrita nas tabelas que reindexa — não rode em horário
+de RDO. `REINDEX` sozinho não some com o aviso; quem apaga é o `ALTER`, e
+rodar o `ALTER` sem o `REINDEX` só silencia o alarme sem consertar o índice.
+
+### 6. Pendências humanas que o deploy NÃO resolve (continuam)
 
 - Volume persistente + snapshot Hostinger + dump fora do servidor (parte B
   da Fase 5 — os 16 GB de fotos).

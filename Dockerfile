@@ -14,10 +14,17 @@ ENV DIGITAL_MASTERY_MODE=true
 
 # Instalar dependências do sistema (mínimas)
 # Fase 0.5 / 1.1 — `postgresql-client` genérico do Debian instala a versão que
-# vier na distro. O servidor é PostgreSQL 16, e `pg_dump` RECUSA dumpar servidor
-# mais novo ("aborting because of server version mismatch"). Sem o cliente 16,
-# a rotina de backup falharia em produção exatamente como falhou no
-# desenvolvimento. Fixamos a major 16 pelo repositório oficial do PGDG.
+# vier na distro, e `pg_dump` RECUSA dumpar servidor MAIS NOVO que ele
+# ("aborting because of server version mismatch"). Como o backup pré-migração
+# aborta o deploy quando falha, cliente defasado = deploy travado. Por isso a
+# major vem fixada do repositório oficial do PGDG.
+#
+# A major TEM QUE SER >= a do servidor. Em 28/07/2026 o deploy travou aqui: o
+# comentário original afirmava "o servidor é PostgreSQL 16" e fixava o cliente
+# 16, mas o Postgres do EasyPanel responde
+#   server version: 17.9 (Debian 17.9-1.pgdg13+1)
+# e o pg_dump 16.14 se recusou a dumpar. Ao trocar a major do servidor, troque
+# esta linha ANTES — confira com `SELECT version();` no banco de produção.
 #
 # O sufixo do repositório PGDG (`bookworm-pgdg`, `trixie-pgdg`, …) PRECISA
 # casar com a distro da imagem base, senão o apt mistura duas distros: o
@@ -36,7 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
          > /etc/apt/sources.list.d/pgdg.list \
     && apt-get update && apt-get install -y --no-install-recommends \
-    postgresql-client-16 \
+    postgresql-client-17 \
     gcc \
     libpq-dev \
     libgl1 \
