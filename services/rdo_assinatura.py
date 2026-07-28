@@ -207,6 +207,35 @@ def criar_retificador(rdo, usuario, *, motivo):
     from views.rdo import _gerar_numero_rdo_unico
 
     admin_id = rdo.admin_id or rdo.obra.admin_id
+
+    # O custo do RDO retificado sai ANTES de a cópia existir. O retificador
+    # nasce com a mesma mão de obra e, quando for salvo, lança o custo dela
+    # de novo — sem isto a mesma jornada era contada duas vezes. Medido:
+    # R$ 124,00 viravam R$ 248,00 no Realizado da obra ao salvar o
+    # retificador, com os dois RDOs alimentando o MESMO GestaoCustoPai.
+    #
+    # `remover_custos_rdo` e não `cancelar_custos_rdo`: o cancelamento é no
+    # nível do PAI, e o pai é compartilhado entre os dois RDOs — cancelá-lo
+    # mataria junto o custo do retificador. A remoção é por FILHO (casa por
+    # `origem_tabela`/`origem_id` das linhas do original) e recalcula o total
+    # do pai. É o mesmo que o fluxo de edição faz antes de regravar
+    # (rdo_editar_sistema.py:357), e retificar é editar para um documento
+    # novo.
+    #
+    # O `RDOCustoDiario` do original fica: nenhum consumidor o agrega por
+    # obra (o job de cobertura ociosa procura dia SEM RDO), então removê-lo
+    # seria mexer no que não foi medido. A duplicação medida está no
+    # GestaoCustoFilho.
+    #
+    # A trilha da retificação fica em `rdo_transicao_estado`, não no
+    # financeiro — o custo de um documento substituído não é histórico a
+    # preservar, é lançamento a desfazer.
+    from services.rdo_custos import remover_custos_rdo
+    removidos = remover_custos_rdo(rdo, admin_id)
+    if removidos:
+        logger.info('[assinatura] rdo=%s retificado: %d lançamento(s) de '
+                    'custo removido(s) antes da cópia', rdo.id, removidos)
+
     novo = RDO(
         obra_id=rdo.obra_id,
         data_relatorio=rdo.data_relatorio,
