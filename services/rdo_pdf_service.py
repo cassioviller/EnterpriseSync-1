@@ -9,6 +9,7 @@ import base64
 import re
 from datetime import datetime
 from io import BytesIO
+from types import SimpleNamespace
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -243,6 +244,11 @@ def _build_styles():
         'cell_b': ParagraphStyle('cb', parent=base['Normal'],
                                  fontName='Helvetica-Bold', fontSize=8.3,
                                  textColor=INK, leading=11),
+        # Faixa de grupo dos apontamentos ("Baias › Galpão B › Fundação"):
+        # menor e mais clara que a linha de dado, para separar sem competir.
+        'cell_group': ParagraphStyle('cg', parent=base['Normal'],
+                                     fontName='Helvetica-Bold', fontSize=7.2,
+                                     textColor=MUTED, leading=9.5),
         'mono': ParagraphStyle('mono', parent=base['Normal'],
                                fontName='Courier', fontSize=8.3,
                                textColor=INK, leading=11, alignment=2),
@@ -625,47 +631,61 @@ def gerar_pdf_rdo(rdo):
     elif mostrar_v2:
         elements.append(_section_rule('Apontamentos do Cronograma', styles))
         data = [['Tarefa', 'Progresso', 'Qtd. dia', 'Acumulado', '% Plan.', '% Real.']]
-        from utils.cronograma_engine import caminho_ancestrais_tarefa
+        # Mesmo agrupamento do portal e da tela: as atividades saem sob um
+        # cabeçalho por lugar do cronograma. Sem isto, a mesma atividade nos
+        # dois galpões da Baia vira duas linhas idênticas na tabela e lê-se
+        # como lançamento em duplicidade.
+        from xml.sax.saxutils import escape as _xml_escape
+        from utils.cronograma_engine import (agrupar_atividades_por_caminho,
+                                             caminho_ancestrais_tarefa)
         _cache_pai: dict = {}
+        _linhas = []
         for ap, tarefa in apontamentos_v2:
-            nome = tarefa.nome_tarefa if tarefa else f'#{ap.tarefa_cronograma_id}'
-            # Onde a tarefa mora no cronograma. Sem isto, a mesma atividade nos
-            # dois galpões da Baia vira duas linhas idênticas na tabela do PDF
-            # e lê-se como lançamento em duplicidade — mesmo defeito corrigido
-            # na tela do RDO e no portal em 28/07/2026.
-            # `Paragraph` do ReportLab faz parse de mini-XML: o ' < ' do
-            # separador (e qualquer & no nome da tarefa) precisa ir escapado,
-            # senão a geração do PDF inteiro levanta.
-            from xml.sax.saxutils import escape as _xml_escape
-            _caminho = caminho_ancestrais_tarefa(tarefa, _cache_pai)
-            if _caminho:
-                nome = (f'{_xml_escape(nome)}<br/>'
-                        f'<font size="6" color="#6b7280">'
-                        f'{_xml_escape(_caminho)}</font>')
-            unid = (tarefa.unidade_medida or '') if tarefa else ''
-            if ap.tipo_apontamento == 'percentual':
-                # M07: linha percentual mostra o incremento persistido em
-                # pontos percentuais — não "0 {unidade}".
-                inc_pp = float(ap.percentual_incremento_dia or 0)
-                qtd_dia = f'{inc_pp:+g} pp'
-                qtd_ac = _fmt_pct(ap.percentual_acumulado
-                                  if ap.percentual_acumulado is not None
-                                  else ap.percentual_realizado)
-            else:
-                qtd_dia = f"{ap.quantidade_executada_dia or 0:g} {unid}".strip()
-                qtd_ac = f"{ap.quantidade_acumulada or 0:g} {unid}".strip()
-            data.append([
-                Paragraph(nome, styles['cell']),
-                _data_bar(ap.percentual_realizado, width=70, height=4),
-                Paragraph(qtd_dia, styles['mono']),
-                Paragraph(qtd_ac, styles['mono']),
-                Paragraph(_fmt_pct(ap.percentual_planejado) if ap.percentual_planejado is not None else '—', styles['mono']),
-                Paragraph(_fmt_pct(ap.percentual_realizado), styles['mono_b']),
-            ])
+            _linhas.append(SimpleNamespace(
+                ap=ap, tarefa=tarefa,
+                caminho_tarefa=caminho_ancestrais_tarefa(tarefa, _cache_pai)))
+        linhas_de_grupo = []      # índices que viram faixa de cabeçalho
+        for titulo, itens in agrupar_atividades_por_caminho(_linhas):
+            if titulo:
+                linhas_de_grupo.append(len(data))
+                data.append([Paragraph(_xml_escape(titulo), styles['cell_group']),
+                             '', '', '', '', ''])
+            for linha in itens:
+                ap, tarefa = linha.ap, linha.tarefa
+                nome = tarefa.nome_tarefa if tarefa else f'#{ap.tarefa_cronograma_id}'
+                # `Paragraph` faz parse de mini-XML: um `&` no nome derruba a
+                # geração do PDF inteiro se não for escapado.
+                nome = _xml_escape(nome)
+                unid = (tarefa.unidade_medida or '') if tarefa else ''
+                if ap.tipo_apontamento == 'percentual':
+                    # M07: linha percentual mostra o incremento persistido em
+                    # pontos percentuais — não "0 {unidade}".
+                    inc_pp = float(ap.percentual_incremento_dia or 0)
+                    qtd_dia = f'{inc_pp:+g} pp'
+                    qtd_ac = _fmt_pct(ap.percentual_acumulado
+                                      if ap.percentual_acumulado is not None
+                                      else ap.percentual_realizado)
+                else:
+                    qtd_dia = f"{ap.quantidade_executada_dia or 0:g} {unid}".strip()
+                    qtd_ac = f"{ap.quantidade_acumulada or 0:g} {unid}".strip()
+                data.append([
+                    Paragraph(nome, styles['cell']),
+                    _data_bar(ap.percentual_realizado, width=70, height=4),
+                    Paragraph(qtd_dia, styles['mono']),
+                    Paragraph(qtd_ac, styles['mono']),
+                    Paragraph(_fmt_pct(ap.percentual_planejado) if ap.percentual_planejado is not None else '—', styles['mono']),
+                    Paragraph(_fmt_pct(ap.percentual_realizado), styles['mono_b']),
+                ])
         tbl = Table(data, colWidths=[185, 80, 70, 70, 55, 55], repeatRows=1)
         style = _table_style(6, right_align_from=2)
         style.add('ALIGN', (1, 1), (1, -1), 'LEFT')
         style.add('VALIGN', (1, 1), (1, -1), 'MIDDLE')
+        for i in linhas_de_grupo:
+            # A faixa ocupa a largura toda; sem o SPAN o título seria espremido
+            # na 1ª coluna e as células vazias herdariam a zebra.
+            style.add('SPAN', (0, i), (-1, i))
+            style.add('BACKGROUND', (0, i), (-1, i), TABLE_HEAD)
+            style.add('ALIGN', (0, i), (-1, i), 'LEFT')
         tbl.setStyle(style)
         elements.append(tbl)
 

@@ -1324,11 +1324,11 @@ def test_portal_rdo_mostra_galpao_de_cada_atividade():
         r = c.get(f'/portal/obra/{token}/rdo/{rdo_id}')
         assert r.status_code == 200
         html = r.get_data(as_text=True)
-        # Procura o RÓTULO da linha, não a palavra solta: o comentário deste RDO
+        # Procura o RÓTULO inteiro, não a palavra solta: o comentário deste RDO
         # cita "Galpão A"/"Galpão B" em texto livre, e um `'Galpão A' in html`
-        # passa mesmo sem o fix (verificado). O `<` sai escapado no HTML.
-        assert 'Galpão B &lt; Baias' in html, 'linha do Galpão B sem rótulo'
-        assert 'Galpão A &lt; Baias' in html, 'linha do Galpão A sem rótulo'
+        # passa mesmo sem o fix (verificado).
+        assert 'Baias › Galpão B › Fundação' in html, 'linha do Galpão B sem rótulo'
+        assert 'Baias › Galpão A › Fundação' in html, 'linha do Galpão A sem rótulo'
 
 
 @pytest.mark.integration
@@ -1368,13 +1368,13 @@ def test_agrupamento_por_caminho_preserva_ordem_e_nao_inventa_grupo():
     from types import SimpleNamespace as NS
     from utils.cronograma_engine import agrupar_atividades_por_caminho
 
-    a = NS(nome='a', caminho_tarefa='Fundação < Galpão B < Baias')
-    b = NS(nome='b', caminho_tarefa='Fundação < Galpão A < Baias')
-    c = NS(nome='c', caminho_tarefa='Fundação < Galpão B < Baias')
+    a = NS(nome='a', caminho_tarefa='Baias › Galpão B › Fundação')
+    b = NS(nome='b', caminho_tarefa='Baias › Galpão A › Fundação')
+    c = NS(nome='c', caminho_tarefa='Baias › Galpão B › Fundação')
 
     grupos = agrupar_atividades_por_caminho([a, b, c])
-    assert [t for t, _ in grupos] == ['Fundação < Galpão B < Baias',
-                                      'Fundação < Galpão A < Baias'], \
+    assert [t for t, _ in grupos] == ['Baias › Galpão B › Fundação',
+                                      'Baias › Galpão A › Fundação'], \
         'ordem de primeira aparição dos grupos não preservada'
     assert [i.nome for i in grupos[0][1]] == ['a', 'c']
     assert [i.nome for i in grupos[1][1]] == ['b']
@@ -1412,5 +1412,32 @@ def test_portal_rdo_agrupa_atividades_por_galpao():
         html = r.get_data(as_text=True)
         # cabeçalho de grupo ocupa a linha inteira da tabela
         assert html.count('colspan="5"') >= 2, 'faltou cabeçalho de grupo'
-        assert 'Galpão A &lt; Baias' in html
-        assert 'Galpão B &lt; Baias' in html
+        assert 'Baias › Galpão A › Fundação' in html
+        assert 'Baias › Galpão B › Fundação' in html
+
+
+@pytest.mark.integration
+def test_pdf_do_rdo_agrupa_por_galpao():
+    """O PDF sai com uma faixa de cabeçalho por lugar do cronograma, como o
+    portal e a tela. Lê o TEXTO do PDF — gerar sem levantar não prova que o
+    agrupamento chegou na página.
+
+    Pula sem `pypdf` (não é dependência do projeto; use `pip install pypdf`
+    para rodar esta verificação localmente).
+    """
+    pypdf = pytest.importorskip('pypdf')
+    from io import BytesIO
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.rdo_pdf_service import gerar_pdf_rdo
+    from models import RDO
+    from datetime import date
+    with app.app_context():
+        aid = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
+        rdo = RDO.query.filter_by(obra_id=oid, admin_id=aid,
+                                  data_relatorio=date(2026, 7, 22)).first()
+        pdf = gerar_pdf_rdo(rdo)
+    texto = '\n'.join(pg.extract_text() or ''
+                      for pg in pypdf.PdfReader(BytesIO(pdf)).pages)
+    assert 'Baias › Galpão A › Fundação' in texto
+    assert 'Baias › Galpão B › Fundação' in texto

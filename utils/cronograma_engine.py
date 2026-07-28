@@ -106,9 +106,10 @@ def get_calendario(admin_id: int):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def caminho_ancestrais_tarefa(tarefa, cache=None):
-    """Onde a tarefa mora no cronograma: ``'Fundação < Galpão B < Baias'``, do
-    pai imediato para cima. A raiz (nome da obra) fica de fora — é igual para
-    toda tarefa e só ocuparia espaço na tela.
+    """Onde a tarefa mora no cronograma: ``'Baias › Galpão B › Fundação'``, do
+    ancestral mais alto para o pai imediato — a mesma direção em que a pessoa
+    lê a árvore do cronograma. A raiz (nome da obra) fica de fora: é igual
+    para toda tarefa e só ocuparia espaço na tela.
 
     FONTE ÚNICA do rótulo de contexto da tarefa: a tela interna do RDO e o
     portal do cliente consomem esta função. Existe porque as duas mostravam
@@ -141,7 +142,9 @@ def caminho_ancestrais_tarefa(tarefa, cache=None):
         atual = cache[pai_id]
         if atual is not None:
             cadeia.append(atual.nome_tarefa)
-    return ' < '.join(cadeia[:-1]) if len(cadeia) > 1 else ''
+    # `cadeia` sobe da folha para a raiz; a última entrada é a raiz (a obra) e
+    # sai fora. O que resta é invertido para ler de cima para baixo.
+    return ' › '.join(reversed(cadeia[:-1])) if len(cadeia) > 1 else ''
 
 
 def agrupar_atividades_por_caminho(itens, chave='caminho_tarefa'):
