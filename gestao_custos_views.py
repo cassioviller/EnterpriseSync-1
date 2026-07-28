@@ -534,14 +534,28 @@ def editar_filho(filho_id):
         else:
             try:
                 novo_obra_id = int(obra_id_raw)
-                if novo_obra_id != filho.obra_id:
-                    obra_alterada = True
-                filho.obra_id = novo_obra_id
-                # Passou a ter obra: o carimbo administrativo sai de cena.
-                filho.centro_custo_id = None
             except ValueError:
                 return jsonify({'status': 'error',
                                 'message': 'Obra inválida.'}), 400
+            # A obra TEM de ser do tenant. Sem esta checagem o `obra_id` vinha
+            # do formulário com só um `int()` de validação, e um POST com a
+            # obra de outro tenant era aceito: o lançamento passava a apontar
+            # para lá, e `sincronizar_obra_do_pai` levava o `pai.obra_id`
+            # junto. Reproduzido. O campo `obra_servico_custo_id`, logo
+            # abaixo, sempre validou assim — este ficou de fora.
+            #
+            # Mensagem genérica de propósito: dizer "obra de outro tenant"
+            # confirmaria a existência dela. Mesma doutrina do 404-em-vez-de-403
+            # de `_rdo_do_tenant_ou_404` e de `obra_required`.
+            if not Obra.query.filter_by(
+                    id=novo_obra_id, admin_id=admin_id).first():
+                return jsonify({'status': 'error',
+                                'message': 'Obra inválida.'}), 400
+            if novo_obra_id != filho.obra_id:
+                obra_alterada = True
+            filho.obra_id = novo_obra_id
+            # Passou a ter obra: o carimbo administrativo sai de cena.
+            filho.centro_custo_id = None
 
         # Vínculo direto custo→serviço (Task #74).
         # Aceita string vazia para "Sem serviço".
