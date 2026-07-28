@@ -171,15 +171,18 @@ runbook próprio desde 27/07, e o `--ligar` das duas **recusa antes de gravar**.
 
 - **`cronograma_editor_v2`** → `docs/cronograma-editor-v2-rollout.md`.
   O guard recusa tenant cujo calendário considera sábado/domingo (o motor novo
-  é seg-sex fixo nesta fase). ⚠️ Tire um snapshot do cronograma **antes**:
-  desligar a flag reverte o motor, não as datas que ele já gravou.
+  é seg-sex fixo nesta fase) e — desde 28/07 — tenant com obra datada **sem
+  linha de base ativa**: desligar a flag reverte o motor, não as datas que ele
+  já gravou, e a linha de base é o único registro do plano que sobrevive.
+  Congele com `--criar-baseline` antes de ligar.
 - **`rdo_percentual_livre`** → `docs/rdo-percentual-livre-rollout.md`.
   O guard recusa quando existem tarefas que **perderiam avanço físico** — as
   que têm quantidade acumulada e `percentual_realizado` zerado no apontamento
   mais recente (🔬 dev 27/07: 148 apontamentos, 133 tarefas, 84 tenants).
-  ⚠️ Continua faltando a **conferência visual dos dois fluxos de RDO** (novo e
-  editar) com a flag ligada — risco explícito do plano de 24/07, sem registro
-  de ter sido feita em nenhum ambiente.
+  ✅ A **conferência visual dos dois fluxos de RDO** (novo e editar) com a
+  flag ligada — risco explícito do plano de 24/07 — foi feita em dev em
+  27/07 (`e84cff79`); evidências em `docs/img/rdo-pct-*.png`. É a lacuna
+  nº 4 da tabela abaixo.
 
 ---
 
