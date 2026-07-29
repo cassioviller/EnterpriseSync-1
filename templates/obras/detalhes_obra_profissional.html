@@ -1500,6 +1500,133 @@
                         <i class="fas fa-external-link-alt me-2"></i>Abrir Portal
                     </a>
                 </div>
+
+                {# Fase 9a / 29-07 — ACESSO DO CLIENTE. O convite (link + senha
+                   temporária) e a cobrança de ciência nascem aqui, prontos
+                   para colar no WhatsApp — antes a senha nascia na tela de
+                   edição, o link nesta, e a mensagem era costurada à mão. #}
+                <div class="info-item" style="margin-top:0.75rem;">
+                    <div class="info-label">
+                        <i class="fas fa-file-signature"></i> Quem assina os RDOs
+                        {% set _pendencias = signatarios_cliente | selectattr('recuperacao_pedida_em') | selectattr('ativo') | list %}
+                        {% if _pendencias %}
+                        <span class="badge bg-warning text-dark ms-1">
+                            {{ _pendencias | length }} pedido(s) de senha
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    {% if senha_gerada %}
+                    {# A senha existe legível SÓ agora. A mensagem já sai
+                       inteira: quem copia não monta nada à mão. #}
+                    <div class="alert alert-success py-2 px-2 mt-2 mb-2">
+                        <div class="fw-semibold mb-1" style="font-size:.82rem;">
+                            <i class="fas fa-key me-1"></i>Convite pronto para {{ senha_gerada_para }}
+                        </div>
+                        <textarea class="form-control font-monospace" id="msgConvite" rows="7"
+                                  readonly style="font-size:.74rem;">Olá, {{ senha_gerada_para }}. Você foi cadastrado(a) para acompanhar a obra {{ obra.nome }} e assinar os relatórios diários (RDO) pelo portal do cliente.
+
+Acesse: {{ request.host_url }}portal/obra/{{ obra.token_cliente }}
+
+Sua senha temporária: {{ senha_gerada }}
+Ela vale 72 horas e será trocada por uma senha só sua no primeiro acesso.</textarea>
+                        <button type="button" class="btn btn-sm btn-success w-100 mt-1"
+                                onclick="copiarMensagemAcesso('msgConvite', this)">
+                            <i class="fas fa-copy me-1"></i>Copiar mensagem do convite
+                        </button>
+                        <small class="text-muted d-block mt-1">
+                            A senha não poderá ser vista de novo depois que você sair desta tela.
+                        </small>
+                    </div>
+                    {% endif %}
+
+                    {% if signatarios_cliente %}
+                    <div class="mt-2">
+                        {% for s in signatarios_cliente %}
+                        <div class="d-flex align-items-center gap-2 py-1 flex-wrap"
+                             style="border-bottom:1px solid #f1f5f9; {% if not s.ativo %}opacity:.55;{% endif %}">
+                            <div class="flex-grow-1" style="min-width:140px;">
+                                <div style="font-size:.82rem;font-weight:600;">{{ s.nome }}</div>
+                                <small class="text-muted" style="font-size:.72rem;">
+                                    {% if not s.ativo %}desativado
+                                    {% elif s.recuperacao_pedida_em %}pediu senha nova
+                                    {% elif s.travado %}bloqueado por tentativas
+                                    {% elif s.senha_expirada %}senha temporária vencida
+                                    {% elif s.senha_temporaria %}senha temporária — ainda não entrou
+                                    {% elif s.ultimo_acesso_em %}último acesso {{ s.ultimo_acesso_em.strftime('%d/%m %H:%M') }}
+                                    {% else %}nunca entrou{% endif %}
+                                </small>
+                            </div>
+                            {% if s.ativo %}
+                            <form method="POST" class="d-inline"
+                                  action="{{ url_for('main.gerar_senha_signatario_cliente', id=obra.id, sid=s.id) }}"
+                                  onsubmit="return confirm('Gerar senha temporária nova para {{ s.nome }}? A senha atual deixa de valer.')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="voltar" value="detalhes">
+                                <button type="submit" class="btn btn-sm btn-outline-primary"
+                                        title="Gera a senha temporária e monta a mensagem do convite">
+                                    <i class="fas fa-envelope"></i> Convite
+                                </button>
+                            </form>
+                            {% set _rdo_pendente = ciencia_cobranca.get(s.id) %}
+                            {% if _rdo_pendente %}
+                            <button type="button" class="btn btn-sm btn-outline-warning"
+                                    title="Copia a mensagem cobrando a ciência do RDO de {{ _rdo_pendente.data_relatorio.strftime('%d/%m/%Y') if _rdo_pendente.data_relatorio else '?' }}"
+                                    data-nome="{{ s.nome }}"
+                                    data-data="{{ _rdo_pendente.data_relatorio.strftime('%d/%m/%Y') if _rdo_pendente.data_relatorio else '' }}"
+                                    data-link="{{ request.host_url }}portal/obra/{{ obra.token_cliente }}/rdo/{{ _rdo_pendente.id }}"
+                                    onclick="copiarCobrancaCiencia(this)">
+                                <i class="fas fa-bell"></i> Cobrar
+                            </button>
+                            {% else %}
+                            <span class="badge bg-success" title="Nenhum RDO recente aguardando a ciência deste responsável">
+                                <i class="fas fa-check"></i> em dia
+                            </span>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <small class="text-muted d-block mt-1" style="font-size:.7rem;">
+                        Cadastrar, desativar ou reativar responsáveis:
+                        <a href="{{ url_for('main.editar_obra', id=obra.id) }}">editar a obra</a>.
+                    </small>
+                    {% else %}
+                    <small class="text-muted d-block mt-2">
+                        Nenhum responsável cadastrado — os RDOs desta obra não
+                        pedem ciência.
+                        <a href="{{ url_for('main.editar_obra', id=obra.id) }}">Cadastrar na edição da obra</a>.
+                    </small>
+                    {% endif %}
+                </div>
+
+                <script>
+                function copiarMensagemAcesso(idCampo, btn) {
+                    var campo = document.getElementById(idCampo);
+                    if (!campo) return;
+                    campo.select();
+                    campo.setSelectionRange(0, 99999);
+                    navigator.clipboard?.writeText(campo.value);
+                    var original = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-check me-1"></i>Copiado';
+                    setTimeout(function () { btn.innerHTML = original; }, 1600);
+                }
+
+                function copiarCobrancaCiencia(btn) {
+                    // O link direto no RDO apaga duas telas do percurso do
+                    // cliente: ele cai no relatório certo, não na capa.
+                    var msg = 'Olá, ' + btn.dataset.nome + '. O RDO de '
+                        + btn.dataset.data + ' da obra {{ obra.nome | e }} está '
+                        + 'pronto e aguarda a sua ciência.\n\n'
+                        + btn.dataset.link + '\n\n'
+                        + 'É só abrir o link, conferir o relatório e confirmar '
+                        + 'com a sua senha.';
+                    navigator.clipboard?.writeText(msg);
+                    var original = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-check"></i> Copiado';
+                    setTimeout(function () { btn.innerHTML = original; }, 1600);
+                }
+                </script>
                 {% else %}
                 <div class="text-muted small mt-2">
                     <i class="fas fa-info-circle me-1"></i>

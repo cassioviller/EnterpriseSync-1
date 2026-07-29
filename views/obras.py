@@ -2201,7 +2201,38 @@ def detalhes_obra(id):
         _pode_handoff = (_estado is _EO.PLANEJAMENTO
                          and _pode_como(obra, _EO.EM_EXECUCAO, current_user))
 
-        return render_template('obras/detalhes_obra_profissional.html', 
+        # Fase 9a / 29-07 — bloco "Acesso do cliente": o convite (link + senha)
+        # e a cobrança de ciência nascem AQUI, num lugar só. Antes a senha
+        # nascia na tela de edição e o link nesta — a construtora costurava a
+        # mensagem à mão a cada obra (spec 2026-07-29, D4).
+        from models import ObraSignatarioCliente as _OSC, RDOAssinatura as _RA
+        signatarios_cliente = (_OSC.query
+                               .filter_by(obra_id=obra.id)
+                               .order_by(_OSC.ativo.desc(), _OSC.nome).all())
+        # Para cada responsável ATIVO, o RDO mais recente que aceita ciência e
+        # ainda não tem a dele — é o alvo do botão "Cobrar ciência".
+        ciencia_cobranca = {}
+        _ativos = [s for s in signatarios_cliente if s.ativo]
+        if _ativos and rdos_obra:
+            from services.rdo_ciencia_cliente import motivo_inelegivel
+            _elegiveis = [r for r in rdos_obra
+                          if motivo_inelegivel(r) is None]
+            if _elegiveis:
+                _assinou: dict = {}
+                for _a in (_RA.query
+                           .filter(_RA.rdo_id.in_([r.id for r in _elegiveis]),
+                                   _RA.papel == _RA.PAPEL_CLIENTE).all()):
+                    _assinou.setdefault(_a.rdo_id, set()).add(
+                        _a.signatario_cliente_id)
+                for _s in _ativos:
+                    # rdos_obra já vem em data_relatorio desc: o primeiro que
+                    # falta é o mais recente.
+                    for _r in _elegiveis:
+                        if _s.id not in _assinou.get(_r.id, set()):
+                            ciencia_cobranca[_s.id] = _r
+                            break
+
+        return render_template('obras/detalhes_obra_profissional.html',
                              obra=obra, 
                              estado_atual=_estado,
                              estado_rotulo=_ROT[_estado],
@@ -2234,7 +2265,13 @@ def detalhes_obra(id):
                              mapas_v2=mapas_v2,
                              cronograma_cliente_items=cronograma_cliente_items,
                              painel=painel,
-                             entregas_detalhe=entregas_detalhe)
+                             entregas_detalhe=entregas_detalhe,
+                             # Fase 9a / 29-07 — bloco "Acesso do cliente".
+                             signatarios_cliente=signatarios_cliente,
+                             ciencia_cobranca=ciencia_cobranca,
+                             # Senha recém-gerada (convite): mostrada UMA vez,
+                             # vinda da sessão — nunca da URL.
+                             **_consumir_senha_gerada())
     except Exception as e:
         import traceback
         error_traceback = traceback.format_exc()
@@ -4012,6 +4049,10 @@ def gerar_senha_signatario_cliente(id, sid):
           f'{ObraSignatarioCliente.HORAS_SENHA_TEMPORARIA}h e será trocada no '
           f'primeiro acesso.', 'success')
     _guardar_senha_gerada(senha, signatario.nome)
+    # 29-07 — o bloco "Acesso do cliente" da tela de DETALHES também gera
+    # senha (é onde o convite é montado); quem veio de lá volta para lá.
+    if request.form.get('voltar') == 'detalhes':
+        return redirect(url_for('main.detalhes_obra', id=obra.id))
     return redirect(url_for('main.editar_obra', id=obra.id))
 
 

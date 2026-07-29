@@ -1262,3 +1262,59 @@ def test_recibo_pdf_sai_valido_com_nome_e_hash_completo():
     assert '203.0.113.9' in texto
     # O extrator pode quebrar linha no meio do hash — compara sem espaços.
     assert a.hash_conteudo in texto.replace('\n', '').replace(' ', '')
+
+
+# ---------------------------------------------------------------------------
+# O convite, num lugar só — lado da construtora (spec D4, Step F)
+# ---------------------------------------------------------------------------
+
+def test_detalhes_da_obra_mostram_responsaveis_e_cobranca_com_link_direto():
+    """A tela de DETALHES (não a de edição) lista quem assina e oferece a
+    cobrança com link direto para o RDO pendente — é o link que apaga duas
+    telas do percurso do cliente."""
+    ctx = _cenario(n_signatarios=2)
+    c = _client_admin(ctx['admin_id'])
+
+    html = c.get(f"/obras/{ctx['obra_id']}").get_data(as_text=True)
+    assert 'Quem assina os RDOs' in html
+    for sid in ctx['sig_ids']:
+        assert _sig(sid).nome in html
+    # Os dois têm RDO pendente: o botão de cobrar carrega o link DIRETO.
+    assert html.count(f"/portal/obra/{ctx['token']}/rdo/{ctx['rdo_id']}") >= 2
+    assert 'Cobrar' in html
+
+    # Um assina; para ele a cobrança dá lugar ao "em dia".
+    cliente = app.test_client()
+    _assinar(cliente, ctx, ctx['sig_ids'][0])
+    html = c.get(f"/obras/{ctx['obra_id']}").get_data(as_text=True)
+    assert 'em dia' in html
+    assert html.count(f"/portal/obra/{ctx['token']}/rdo/{ctx['rdo_id']}") == 1
+
+
+def test_convite_nasce_na_tela_de_detalhes_com_mensagem_inteira():
+    """Gerar a senha pelo bloco do convite volta para DETALHES e entrega a
+    mensagem pronta — link e senha juntos, uma vez só."""
+    import re as _re
+
+    ctx = _cenario(n_signatarios=1)
+    c = _client_admin(ctx['admin_id'])
+
+    r = c.post(f"/obras/{ctx['obra_id']}/signatarios/{ctx['sig_ids'][0]}/senha",
+               data={'voltar': 'detalhes'})
+    assert r.status_code == 302
+    destino = r.headers.get('Location', '')
+    assert '/obras/' in destino and 'editar' not in destino
+    assert 'senha_gerada' not in destino          # a senha nunca viaja na URL
+
+    html = c.get(f"/obras/{ctx['obra_id']}").get_data(as_text=True)
+    assert 'Convite pronto para' in html
+    m = _re.search(r'Sua senha temporária: (\S+)', html)
+    assert m, 'a mensagem do convite não trouxe a senha'
+    assert len(m.group(1)) == 10
+    # A mensagem carrega o link do portal — as duas metades juntas.
+    assert f"portal/obra/{ctx['token']}" in html
+
+    # E some no F5: a senha aparece UMA vez.
+    html2 = c.get(f"/obras/{ctx['obra_id']}").get_data(as_text=True)
+    assert m.group(1) not in html2
+    assert 'Convite pronto para' not in html2
