@@ -5,7 +5,7 @@ Data: 2026-07-29. Aprovado em conversa com o usuário (abordagem B —
 
 ## Resumo
 
-O ato de dar ciência num RDO sai do rodapé da página de leitura e passa a
+O ato de dar ciência num RDO sai de dentro da página de leitura e passa a
 ter **rota própria**, com começo, meio e comprovante. A sessão de login do
 signatário é **removida**: a senha deixa de ser pedágio para navegar e volta
 a ser o gesto de assinar, conferida no mesmo POST que grava a assinatura. Do
@@ -21,22 +21,38 @@ Clicksign) e qualquer mudança de schema — não há migração neste design.
 ## Por que agora
 
 A Fase 9a entregou a ciência funcionando, mas desenhada como um ato
-excepcional: login, sessão de 15 minutos e formulário no pé de um documento
-longo. O uso real é **diário e de um RDO por vez**, disparado por cobrança
+excepcional: login, sessão de 15 minutos e um cartão único que acumula quatro
+estados. O uso real é **diário e de um RDO por vez**, disparado por cobrança
 da construtora no WhatsApp. Um ato que se repete todo dia não pode custar o
 percurso de um ato raro.
 
-O levantamento do percurso atual foi feito em 29/07 e está resumido aqui:
-nove estações entre cadastrar o responsável e a primeira assinatura, duas
-metades do convite nascendo em telas diferentes, e o ato terminando sem
-devolver nada a quem assinou. O mapa visual e os mockups das telas estão em
-artefatos publicados na mesma data (ver seção 3).
+O levantamento do percurso atual foi feito em 29/07: nove estações entre
+cadastrar o responsável e a primeira assinatura, duas metades do convite
+nascendo em telas diferentes, e o ato terminando sem devolver nada a quem
+assinou. O mapa visual e os mockups das telas estão em artefatos publicados
+na mesma data (ver seção 3).
+
+> **Correção de 29/07, registrada de propósito.** A primeira versão deste
+> levantamento afirmava que o bloco de ciência ficava no rodapé do RDO e que
+> a pessoa precisava rolar a página inteira para achá-lo. **É falso.** O
+> `{% include %}` é a primeira linha do `{% block content %}`
+> (`templates/portal/portal_rdo_detalhe.html:133`), com um comentário do
+> próprio commit da Fase 9a explicando a escolha. O erro veio de ler o
+> parcial isolado e deduzir a posição pelo tamanho da página, em vez de
+> conferir onde ele é incluído. Quem retomar este design não deve
+> reintroduzir "mover para o topo" como ganho: esse ganho não existe.
 
 ## Contexto atual (verificado no código)
 
 - **O portal é anônimo por construção** (`portal_obras_views.py:3`). A
   identidade é o token na URL. Este design **não muda isso**: continua sendo
   possível navegar o portal inteiro sem se identificar.
+- **O bloco de ciência já é a primeira coisa da página do RDO**
+  (`templates/portal/portal_rdo_detalhe.html:133`, dentro de
+  `{% block content %}`). Ele acumula quatro estados decididos por uma cadeia
+  de `if` no template: placar nominal, formulário de login, formulário de
+  troca de senha e formulário de assinar — 369 linhas em
+  `_portal_ciencia_rdo.html`, incluindo dois `<script>` inline.
 - **A sessão do signatário** (`services/portal_signatario_auth.py`) vive numa
   chave própria (`portal_sig`), 15 minutos de inatividade, teto de 12 horas,
   com impressão da credencial no cookie para permitir revogação por troca de
@@ -84,18 +100,28 @@ primeiro, motivo real depois, achado 6 da revisão), `gerar_senha_temporaria`,
 `definir_senha`, `pedir_recuperacao`, `signatarios_da_obra`, a trava de 10
 falhas no modelo e o rate-limit.
 
-### D2 — O botão de assinar fica no topo da leitura
+### D2 — Na leitura fica o estado; o ato vai para a outra tela
 
-Esconder o botão até a pessoa rolar o documento inteiro não faz ninguém ler;
-faz quem já leu procurar. A leitura mínima que de fato importa foi movida
-para a tela do ato, no bloco "você está confirmando" — data, quantas
-atividades, quantas fotos, quantas ocorrências e a impressão digital.
+O bloco de ciência **já abre a página** — isso não muda e não é ganho deste
+design. O que muda é o que ele contém.
 
-O placar nominal continua no rodapé, onde ele é registro e não chamada.
+Hoje aquele cartão é uma máquina de quatro estados empilhados: o placar
+nominal, o formulário de login, o formulário de troca de senha e o formulário
+de assinar, decididos por uma cadeia de `if` no template. Numa página de
+leitura, a primeira coisa que o cliente vê é um campo de senha.
+
+Depois: uma faixa de estado (*falta a sua ciência* / *você já deu ciência* /
+*ainda sendo finalizado pela construtora*) e um botão. O placar nominal
+desce para o fim do relatório, onde ele é registro e não chamada. Os três
+formulários somem daqui — cada um vira uma tela com um trabalho só.
+
+A leitura mínima que de fato importa antes de assinar passa a estar na tela
+do ato, no bloco "você está confirmando" — data, quantas atividades, quantas
+fotos, quantas ocorrências e a impressão digital.
 
 ### D3 — O comprovante não é público
 
-Ele exibe o IP de quem assinou. O placar do rodapé já expõe nome e horário
+Ele exibe o IP de quem assinou. O placar nominal já expõe nome e horário
 para qualquer um com o link da obra; o IP não. A tela de comprovante fica
 disponível apenas para o navegador que acabou de assinar, por uma marca no
 cookie do Flask — mesmo lugar que `_guardar_senha_gerada`
@@ -169,10 +195,11 @@ Todo `_registrar_acesso` grava o IP de `request.remote_addr` — ver
 
 ## 3. As cinco telas
 
-1. **Leitura** (`/rdo/<id>`): faixa de estado no topo — *falta a sua
-   ciência* / *você já deu ciência* / *ainda sendo finalizado pela
-   construtora* — com o botão. Conteúdo intocado abaixo. Placar nominal no
-   rodapé.
+1. **Leitura** (`/rdo/<id>`): o bloco que já abre a página encolhe para uma
+   faixa de estado — *falta a sua ciência* / *você já deu ciência* / *ainda
+   sendo finalizado pela construtora* — mais o botão. Os três formulários
+   saem. Conteúdo do relatório intocado abaixo. O placar nominal desce para
+   o fim.
 2. **O ato** (`/ciencia`): resumo do que se está assinando, "quem é você",
    senha, observação opcional, o termo em português claro, botão. Links para
    reler o relatório e para "esqueci minha senha".
