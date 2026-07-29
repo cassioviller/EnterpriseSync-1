@@ -3,6 +3,17 @@
 Data: 2026-07-29. Aprovado em conversa com o usuário (abordagem B —
 "a página da assinatura").
 
+> **Emenda de 29/07, depois da implementação — pedido do usuário.** O ato
+> voltou para DENTRO da seção "Ciência do cliente", na própria página do
+> RDO: cada responsável pendente tem um **checkbox** ao lado do nome;
+> marcá-lo abre a confirmação de senha ali mesmo, com a identidade fixa na
+> linha (o seletor "quem é você?" morreu). A tela própria do ato
+> (`GET .../ciencia`) virou **redirect** para a seção — os links de cobrança
+> já distribuídos não morrem. Tudo o mais da abordagem B permanece: o POST
+> atômico com senha, o desvio de primeiro acesso (`.../ciencia/senha`), o
+> comprovante com marca de 15 min e o recibo em PDF. A faixa de estado no
+> topo aponta para a seção por âncora (`#ciencia-cliente`), não por rota.
+
 ## Resumo
 
 O ato de dar ciência num RDO sai de dentro da página de leitura e passa a

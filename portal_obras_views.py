@@ -1095,79 +1095,34 @@ def _assinatura_do_comprovante(rdo):
         id=aid, rdo_id=rdo.id, papel='cliente').first()
 
 
-def _contagem_atividades(rdo) -> int:
-    """Quantas atividades o RDO registra — para o resumo da tela do ato.
-
-    Espelha a derivação de `portal_rdo_detalhe`: RDOs criados via cronograma
-    não têm `RDOServicoSubatividade`, e as atividades do dia são os
-    apontamentos com incremento. Aqui basta a contagem, não a estrutura.
-    """
-    n = RDOServicoSubatividade.query.filter_by(
-        rdo_id=rdo.id, admin_id=rdo.admin_id).count()
-    if n:
-        return n
-    q = RDOApontamentoCronograma.query.filter_by(
-        rdo_id=rdo.id, admin_id=rdo.admin_id)
-    com_incremento = q.filter(
-        RDOApontamentoCronograma.percentual_incremento_dia > 0).count()
-    return com_incremento or q.count()
-
-
 def _hash_abreviado(valor: str) -> str:
     return f'{valor[:4]}…{valor[-4:]}' if valor and len(valor) > 12 else (valor or '')
 
 
 # ── As telas ─────────────────────────────────────────────────────────────────
 
+def _voltar_a_secao_ciencia(token: str, rdo_id: int):
+    """A seção "Ciência do cliente" no fim da leitura — onde o ato mora."""
+    return redirect(url_for('portal_obras.portal_rdo_detalhe',
+                            token=token, rdo_id=rdo_id,
+                            _anchor='ciencia-cliente'))
+
+
 @portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/ciencia')
 def ciencia_ato(token: str, rdo_id: int):
-    """A tela do ato: o que se assina, quem é você, senha, observação."""
-    from services.portal_signatario_auth import signatarios_da_obra
-    from services.rdo_ciencia_cliente import motivo_inelegivel
-    from services.rdo_hash import calcular_hash
+    """Redirect para a seção do ato.
 
+    A primeira versão do redesenho dava ao ato uma TELA própria; a emenda de
+    29-07 (pedido do usuário) o devolveu para dentro da seção "Ciência do
+    cliente", como checkbox por responsável. A rota fica como redirect para
+    os links já distribuídos — cobranças de WhatsApp apontando para cá não
+    podem morrer num 404.
+    """
     obra, inactive_response = _resolve_obra_for_view(token)
     if inactive_response is not None:
         return inactive_response
-    rdo = _rdo_do_portal(obra, rdo_id)
-
-    # RDO que não aceita ciência não ganha formulário: a leitura já mostra o
-    # motivo na faixa, e oferecer o botão que o POST recusaria seria mentira.
-    motivo = motivo_inelegivel(rdo)
-    if motivo:
-        flash(motivo, 'info')
-        return _voltar_ao_rdo(token, rdo_id)
-
-    signatarios = signatarios_da_obra(obra.id)
-    if not signatarios:
-        flash('A construtora ainda não definiu quem assina os relatórios '
-              'desta obra.', 'info')
-        return _voltar_ao_rdo(token, rdo_id)
-
-    try:
-        hash_atual = calcular_hash(rdo)
-    except Exception:
-        logger.exception('[PORTAL] falha ao calcular hash do rdo %s', rdo.id)
-        hash_atual = ''
-
-    config = ConfiguracaoEmpresa.query.filter_by(admin_id=obra.admin_id).first()
-    return render_template(
-        'portal/ciencia_ato.html',
-        obra=obra, rdo=rdo, token=token,
-        signatarios=signatarios,
-        # Preseleção vinda do redirect pós-troca de senha ou do link direto.
-        quem=request.args.get('quem', ''),
-        resumo={
-            'atividades': _contagem_atividades(rdo),
-            'fotos': RDOFoto.query.filter_by(
-                rdo_id=rdo.id, admin_id=rdo.admin_id).count(),
-            'ocorrencias': RDOOcorrencia.query.filter_by(
-                rdo_id=rdo.id, admin_id=rdo.admin_id).count(),
-            'hash': _hash_abreviado(hash_atual),
-        },
-        nome_empresa=config.nome_empresa if config else 'Construtora',
-        config_empresa=config,
-    )
+    _rdo_do_portal(obra, rdo_id)
+    return _voltar_a_secao_ciencia(token, rdo_id)
 
 
 @portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/ciencia',
@@ -1196,8 +1151,7 @@ def ciencia_confirmar(token: str, rdo_id: int):
                           {'signatario_id': request.form.get('signatario_id')})
         db.session.commit()   # a contagem de falhas precisa persistir
         flash(str(exc), 'error')
-        return redirect(url_for('portal_obras.ciencia_ato',
-                                token=token, rdo_id=rdo_id))
+        return _voltar_a_secao_ciencia(token, rdo_id)
 
     # Senha certa. O rastro do login é gravado e COMMITADO antes do ato:
     # existe o caso "senha certa, ciência recusada" (o RDO virou retificado
@@ -1387,10 +1341,9 @@ def ciencia_trocar_senha(token: str, rdo_id: int):
                       {'signatario_id': signatario.id})
     db.session.commit()
 
-    flash('Senha salva. Agora confirme sua ciência com a senha nova.',
-          'success')
-    return redirect(url_for('portal_obras.ciencia_ato',
-                            token=token, rdo_id=rdo_id, quem=signatario.id))
+    flash('Senha salva. Marque seu nome na seção "Ciência do cliente" e '
+          'confirme com a senha nova.', 'success')
+    return _voltar_a_secao_ciencia(token, rdo_id)
 
 
 @portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/ciencia/esqueci',

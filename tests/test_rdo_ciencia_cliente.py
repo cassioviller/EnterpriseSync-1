@@ -769,24 +769,33 @@ def test_tela_interna_mostra_quem_falta_dar_ciencia():
         assert _sig(sid).nome in html          # os dois que faltam, nomeados
 
 
-def test_pagina_do_rdo_mostra_faixa_e_placar_e_a_tela_do_ato_o_seletor():
-    """A leitura tem o estado (faixa + placar nominal); o formulário mora na
-    tela do ato. Cada tela com um trabalho — decisão D2 do redesenho."""
+def test_pagina_do_rdo_tem_o_ato_como_checkbox_na_secao_de_ciencia():
+    """Emenda de 29-07 (pedido do usuário): o ato mora na seção "Ciência do
+    cliente" da própria leitura, como checkbox por responsável. A identidade
+    é a linha — não existe mais "quem é você?"."""
     ctx = _cenario(n_signatarios=2)
     c = app.test_client()
 
     html = c.get(_url(ctx)).get_data(as_text=True)
-    assert 'Ciência do cliente' in html               # placar nominal, no fim
+    assert 'id="ciencia-cliente"' in html             # a seção existe
     assert '0 de 2' in html
-    assert 'Dar ciência' in html                      # a chamada, na faixa
-    assert 'Selecione seu nome' not in html           # formulário: só no ato
+    assert 'Dar ciência' in html                      # a faixa aponta p/ ela
+    assert '#ciencia-cliente' in html                 # …por âncora, não rota
+    # Um checkbox e um formulário de confirmação POR pendente, com a
+    # identidade fixa na linha.
+    assert html.count('class="ciencia-ck"') == 2
+    assert html.count('Confirmar minha ciência') == 2
     for sid in ctx['sig_ids']:
-        assert _sig(sid).nome in html                 # quem falta, nomeado
+        assert _sig(sid).nome in html
+        assert f'name="signatario_id"\n                               value="{sid}"' in html \
+            or f'value="{sid}"' in html
+    assert 'Selecione seu nome' not in html           # o seletor morreu
 
-    ato = c.get(_url(ctx, '/ciencia')).get_data(as_text=True)
-    assert 'Selecione seu nome' in ato
-    assert 'Confirmar minha ciência' in ato
-    assert 'Você está confirmando' in ato             # o resumo do documento
+    # A rota antiga da tela do ato não morre nos links já distribuídos:
+    # redireciona para a seção.
+    r = c.get(_url(ctx, '/ciencia'))
+    assert r.status_code == 302
+    assert 'ciencia-cliente' in r.headers.get('Location', '')
 
 
 # ---------------------------------------------------------------------------
@@ -1041,8 +1050,8 @@ def test_trocar_a_propria_senha_e_assinar_em_seguida_funciona():
                      'nova_senha': 'NovaSenha!2026',
                      'confirma_senha': 'NovaSenha!2026'})
     assert r.status_code == 302
-    destino = r.headers.get('Location', '')
-    assert '/ciencia' in destino and f"quem={ctx['sig_ids'][0]}" in destino
+    # De volta à seção do ato, na própria leitura (emenda de 29-07).
+    assert 'ciencia-cliente' in r.headers.get('Location', '')
 
     _assinar(c, ctx, senha='NovaSenha!2026')
     assert len(_assinaturas(ctx['rdo_id'])) == 1

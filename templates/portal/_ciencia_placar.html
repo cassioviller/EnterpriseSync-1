@@ -1,22 +1,19 @@
-{# Fase 9a / redesenho 29-07 — o PLACAR NOMINAL da ciência, no fim do
-   relatório. Aqui ele é registro, não chamada: quem assinou, quando, e se o
-   conteúdo ainda corresponde ao que foi assinado. A chamada para agir é a
-   faixa do topo (`_ciencia_faixa.html`).
+{# Fase 9a / redesenho 29-07, emendado no mesmo dia a pedido do usuário — a
+   seção "Ciência do cliente" é o placar E o lugar do ato: cada responsável
+   pendente tem um CHECKBOX ao lado do nome; marcá-lo abre a confirmação de
+   senha ali mesmo. A identidade é a linha (não há mais "quem é você?"), e o
+   POST continua atômico: identidade + senha + observação numa requisição —
+   o checkbox sozinho não prova autoria.
 
-   Espera do contexto: `ciencia` (placar), `token`, `rdo`. #}
+   Espera do contexto: `ciencia` (placar), `ciencia_bloqueio`, `token`, `rdo`. #}
 
 {% if ciencia.total or ciencia.extras %}
-<section class="section">
+<section class="section" id="ciencia-cliente">
     <div class="section-head">
         <span class="section-icon"><i class="fas fa-file-signature"></i></span>
         <h2 class="section-title">Ciência do cliente</h2>
         {% if ciencia.total %}
         <span class="ms-auto d-inline-flex align-items-center gap-2">
-            <span class="ciencia-dots" aria-hidden="true">
-                {% for item in ciencia.itens %}
-                <span class="ciencia-dot {{ 'on' if item.assinatura else '' }}"></span>
-                {% endfor %}
-            </span>
             <span class="pill {{ 'pill-success' if ciencia.completo else 'pill-neutral' }}">
                 {{ ciencia.assinados }} de {{ ciencia.total }}
             </span>
@@ -38,49 +35,116 @@
             </div>
             {% endif %}
 
+            {% if ciencia_bloqueio %}
+            <div class="ciencia-aviso">
+                <i class="fas fa-circle-info"></i> {{ ciencia_bloqueio }}
+            </div>
+            {% endif %}
+
             <ul class="ciencia-lista">
                 {% for item in ciencia.itens %}
-                <li class="ciencia-item">
-                    <span class="ciencia-check {{ 'on' if item.assinatura else '' }}">
-                        <i class="fas {{ 'fa-check' if item.assinatura else 'fa-clock' }}"></i>
-                    </span>
-                    <span class="ciencia-nome">
-                        {{ item.signatario.nome }}
-                        {% if item.signatario.cargo %}
-                        <small>{{ item.signatario.cargo }}</small>
-                        {% endif %}
-                    </span>
-                    <span class="ciencia-quando">
+                <li class="ciencia-item-bloco">
+                    <div class="ciencia-linha">
                         {% if item.assinatura %}
-                            {{ item.assinatura.assinado_em.strftime('%d/%m/%Y %H:%M') }}
-                            {# O hash guardado só serve se for conferido. Não
-                               bater quer dizer que o RDO mudou DEPOIS da
-                               assinatura — o cliente precisa saber disso. #}
-                            {% if not item.integra %}
-                            <span class="ciencia-alterado"
-                                  title="O conteúdo do RDO mudou depois desta assinatura">
-                                <i class="fas fa-triangle-exclamation"></i> alterado
-                            </span>
-                            {% endif %}
+                        <input type="checkbox" class="ciencia-ck" checked disabled
+                               aria-label="{{ item.signatario.nome }} já deu ciência">
+                        {% elif ciencia_bloqueio %}
+                        {# Bloqueado: o aviso acima já diz o porquê; um checkbox
+                           clicável que abre um formulário que o POST recusaria
+                           seria mentira. #}
+                        <input type="checkbox" class="ciencia-ck" disabled
+                               aria-label="ciência indisponível">
                         {% else %}
-                            aguardando
+                        <input type="checkbox" class="ciencia-ck"
+                               id="ck-{{ item.signatario.id }}"
+                               aria-controls="confirma-{{ item.signatario.id }}"
+                               onchange="cienciaToggle(this)">
                         {% endif %}
-                    </span>
+                        <label class="ciencia-nome"
+                               {% if not item.assinatura and not ciencia_bloqueio %}for="ck-{{ item.signatario.id }}"{% endif %}>
+                            {{ item.signatario.nome }}
+                            {% if item.signatario.cargo %}
+                            <small>{{ item.signatario.cargo }}</small>
+                            {% endif %}
+                        </label>
+                        <span class="ciencia-quando">
+                            {% if item.assinatura %}
+                                {{ item.assinatura.assinado_em.strftime('%d/%m/%Y %H:%M') }}
+                                {# O hash guardado só serve se for conferido. Não
+                                   bater quer dizer que o RDO mudou DEPOIS da
+                                   assinatura — o cliente precisa saber disso. #}
+                                {% if not item.integra %}
+                                <span class="ciencia-alterado"
+                                      title="O conteúdo do RDO mudou depois desta assinatura">
+                                    <i class="fas fa-triangle-exclamation"></i> alterado
+                                </span>
+                                {% endif %}
+                            {% else %}
+                                aguardando
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    {% if not item.assinatura and not ciencia_bloqueio %}
+                    {# A confirmação abre sob a linha de quem marcou. A
+                       identidade É a linha: `signatario_id` vai fixo. #}
+                    <form method="POST" class="ciencia-confirma" hidden
+                          id="confirma-{{ item.signatario.id }}"
+                          action="{{ url_for('portal_obras.ciencia_confirmar', token=token, rdo_id=rdo.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="signatario_id"
+                               value="{{ item.signatario.id }}">
+                        <label class="ciencia-campo">
+                            <span>Confirme com a sua senha, {{ item.signatario.nome.split(' ')[0] }}</span>
+                            <input type="password" name="senha" required
+                                   autocomplete="current-password">
+                        </label>
+                        <label class="ciencia-campo">
+                            <span>Observação (opcional)</span>
+                            <textarea name="observacao" rows="2" maxlength="500"
+                                      placeholder="Algo a registrar junto da sua ciência"></textarea>
+                        </label>
+                        <p class="ciencia-legal">
+                            Ao confirmar, ficam registrados seu nome, a data e a
+                            hora do servidor, o endereço de onde você acessou e
+                            uma impressão digital do conteúdo deste RDO — que
+                            permite provar depois que ele não foi alterado.
+                        </p>
+                        <button type="submit" class="btn btn-portal-success">
+                            <i class="fas fa-signature me-1"></i>
+                            Confirmar minha ciência
+                        </button>
+                        <span class="ciencia-links">
+                            <button type="submit" class="ciencia-link"
+                                    formaction="{{ url_for('portal_obras.ciencia_esqueci', token=token, rdo_id=rdo.id) }}"
+                                    formnovalidate>
+                                Esqueci minha senha
+                            </button>
+                            <a class="ciencia-link"
+                               href="{{ url_for('portal_obras.ciencia_definir_senha', token=token, rdo_id=rdo.id, quem=item.signatario.id) }}">
+                                Trocar minha senha
+                            </a>
+                        </span>
+                    </form>
+                    {% endif %}
                 </li>
                 {% endfor %}
 
                 {# Quem assinou e depois foi desativado: o ato aconteceu e
                    continua valendo, mas fica fora do denominador. #}
                 {% for extra in ciencia.extras %}
-                <li class="ciencia-item ciencia-item-extra">
-                    <span class="ciencia-check on"><i class="fas fa-check"></i></span>
-                    <span class="ciencia-nome">
-                        {{ extra.nome_signatario }}
-                        <small>acesso encerrado depois da assinatura</small>
-                    </span>
-                    <span class="ciencia-quando">
-                        {{ extra.assinado_em.strftime('%d/%m/%Y %H:%M') }}
-                    </span>
+                <li class="ciencia-item-bloco ciencia-item-extra">
+                    <div class="ciencia-linha">
+                        <input type="checkbox" class="ciencia-ck" checked disabled
+                               aria-label="assinatura registrada">
+                        <span class="ciencia-nome">
+                            {{ extra.nome_signatario }}
+                            <small>acesso encerrado depois da assinatura</small>
+                        </span>
+                        <span class="ciencia-quando">
+                            {{ extra.assinado_em.strftime('%d/%m/%Y %H:%M') }}
+                        </span>
+                    </div>
                 </li>
                 {% endfor %}
             </ul>
@@ -90,27 +154,26 @@
 </section>
 
 <style>
-.ciencia-dots { display: inline-flex; gap: 4px; }
-.ciencia-dot {
-    width: 9px; height: 9px; border-radius: 50%;
-    background: var(--border); display: inline-block;
-}
-.ciencia-dot.on { background: var(--success); }
-
 .ciencia-lista { list-style: none; margin: 0; padding: 0; }
-.ciencia-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 2px; border-bottom: 1px solid var(--border-soft);
+.ciencia-item-bloco {
+    padding: 4px 0; border-bottom: 1px solid var(--border-soft);
 }
-.ciencia-item:last-child { border-bottom: none; }
+.ciencia-item-bloco:last-child { border-bottom: none; }
 .ciencia-item-extra { opacity: .72; }
-.ciencia-check {
-    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
-    display: inline-flex; align-items: center; justify-content: center;
-    background: var(--surface-3); color: var(--text-subtle); font-size: .72rem;
+.ciencia-linha {
+    display: flex; align-items: center; gap: 12px; padding: 8px 2px;
 }
-.ciencia-check.on { background: var(--success-bg); color: var(--success); }
-.ciencia-nome { flex: 1; font-weight: 600; font-size: .92rem; }
+.ciencia-ck {
+    width: 20px; height: 20px; flex-shrink: 0;
+    accent-color: var(--success); cursor: pointer;
+}
+.ciencia-ck:disabled { cursor: default; }
+.ciencia-nome {
+    flex: 1; font-weight: 600; font-size: .92rem; margin: 0;
+    cursor: pointer;
+}
+.ciencia-nome[for] { cursor: pointer; }
+.ciencia-nome:not([for]) { cursor: default; }
 .ciencia-nome small {
     display: block; font-weight: 400; font-size: .78rem;
     color: var(--text-muted);
@@ -127,5 +190,52 @@
     background: var(--info-bg); color: var(--info); font-size: .86rem;
 }
 .ciencia-aviso-warn { background: var(--warning-bg); color: var(--warning); }
+
+.ciencia-confirma {
+    margin: 2px 0 10px 32px; padding: 12px 14px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+.ciencia-campo { display: block; margin-bottom: 10px; }
+.ciencia-campo > span {
+    display: block; font-size: .78rem; font-weight: 600;
+    color: var(--text-muted); margin-bottom: 4px;
+}
+.ciencia-campo input,
+.ciencia-campo textarea {
+    width: 100%; padding: 9px 11px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-size: .9rem; color: var(--text); background: var(--surface);
+}
+.ciencia-campo input:focus,
+.ciencia-campo textarea:focus {
+    outline: 2px solid var(--brand); outline-offset: 1px;
+    border-color: var(--brand);
+}
+.ciencia-legal {
+    font-size: .78rem; color: var(--text-muted); line-height: 1.5;
+    margin: 0 0 10px;
+}
+.ciencia-links {
+    display: inline-flex; gap: 14px; margin-left: 12px; flex-wrap: wrap;
+}
+.ciencia-link {
+    background: none; border: none; padding: 0; font-size: .82rem;
+    color: var(--text-muted); text-decoration: underline; cursor: pointer;
+}
+.ciencia-link:hover { color: var(--text); }
+@media (max-width: 575.98px) {
+    .ciencia-confirma { margin-left: 0; }
+}
 </style>
+
+<script>
+function cienciaToggle(ck) {
+    var form = document.getElementById(
+        ck.getAttribute('aria-controls'));
+    if (!form) return;
+    form.hidden = !ck.checked;
+    if (ck.checked) form.querySelector('input[name="senha"]').focus();
+}
+</script>
 {% endif %}
