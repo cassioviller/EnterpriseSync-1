@@ -542,6 +542,14 @@
                                 </div>
                             </div>
 
+                            {# Fase 9a — responsáveis do cliente que assinam RDO.
+                               Só na EDIÇÃO: precisa da obra gravada para ter
+                               obra_id, e os formulários abaixo postam para rotas
+                               próprias (não fazem parte do submit da obra). #}
+                            {% if obra and obra.id %}
+                            {% include 'obras/_signatarios_cliente.html' %}
+                            {% endif %}
+
                             {# Task #17 — Marcar a obra como ativa/concluída sem apagar dados.
                                Quando desmarcada, a obra fica oculta da listagem padrão e dos
                                seletores (RDO, Ponto, Financeiro etc.), mas permanece acessível

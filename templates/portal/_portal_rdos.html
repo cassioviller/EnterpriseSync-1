@@ -36,6 +36,17 @@
                     {% endif %}
                 </div>
                 <div class="rdo-meta">
+                    {# Fase 9a — placar em miniatura: o responsável acha de longe
+                       o que falta assinar, sem abrir um RDO por vez. Só nos que
+                       ACEITAM ciência; nos demais não haveria o que cobrar. #}
+                    {% set pl = ciencia_por_rdo.get(r.id) if ciencia_por_rdo else None %}
+                    {% if pl and pl.total %}
+                    <span class="rdo-ciencia {{ 'ok' if pl.completo else '' }}"
+                          title="Ciência do cliente: {{ pl.assinados }} de {{ pl.total }} responsáveis">
+                        <i class="fas {{ 'fa-circle-check' if pl.completo else 'fa-file-signature' }}"></i>
+                        {{ pl.assinados }}/{{ pl.total }}
+                    </span>
+                    {% endif %}
                     {% if r.fotos and r.fotos|length > 0 %}
                     <span class="rdo-fotos"><i class="fas fa-camera"></i> {{ r.fotos|length }} foto{{ 's' if r.fotos|length > 1 }}</span>
                     {% endif %}
@@ -46,4 +57,14 @@
         </div>
     </div>
 </section>
+
+<style>
+.rdo-ciencia {
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    padding: 3px 9px; border-radius: var(--radius-pill);
+    background: var(--surface-3); color: var(--text-muted);
+    font-size: .74rem; font-weight: 600;
+}
+.rdo-ciencia.ok { background: var(--success-bg); color: var(--success); }
+</style>
 {% endif %}

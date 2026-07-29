@@ -1,0 +1,369 @@
+{# Fase 9a — ciência do cliente no RDO.
+
+   O portal continua anônimo para NAVEGAR: este é o único ponto que pede
+   senha, e só porque é o único onde a identidade tem consequência.
+
+   Espera do contexto: `ciencia` (placar), `ciencia_bloqueio` (motivo de o RDO
+   não aceitar ciência, ou None), `signatarios` (ativos da obra),
+   `signatario_logado` (sessão) e `token`/`rdo`. #}
+
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-file-signature"></i></span>
+        <h2 class="section-title">Ciência do cliente</h2>
+        {% if ciencia.total %}
+        <span class="ms-auto d-inline-flex align-items-center gap-2">
+            <span class="ciencia-dots" aria-hidden="true">
+                {% for item in ciencia.itens %}
+                <span class="ciencia-dot {{ 'on' if item.assinatura else '' }}"></span>
+                {% endfor %}
+            </span>
+            <span class="pill {{ 'pill-success' if ciencia.completo else 'pill-muted' }}">
+                {{ ciencia.assinados }} de {{ ciencia.total }}
+            </span>
+        </span>
+        {% endif %}
+    </div>
+
+    <div class="card-portal">
+        <div class="card-portal-body">
+
+        {% if not ciencia.total %}
+            <div class="empty-state">
+                <i class="fas fa-user-plus"></i>
+                <div class="empty-title">Nenhum responsável cadastrado</div>
+                <div class="empty-msg">
+                    A construtora ainda não definiu quem assina os relatórios
+                    desta obra.
+                </div>
+            </div>
+        {% else %}
+
+            {# ── Placar nominal ──────────────────────────────────────── #}
+            <ul class="ciencia-lista">
+                {% for item in ciencia.itens %}
+                <li class="ciencia-item">
+                    <span class="ciencia-check {{ 'on' if item.assinatura else '' }}">
+                        <i class="fas {{ 'fa-check' if item.assinatura else 'fa-clock' }}"></i>
+                    </span>
+                    <span class="ciencia-nome">
+                        {{ item.signatario.nome }}
+                        {% if item.signatario.cargo %}
+                        <small>{{ item.signatario.cargo }}</small>
+                        {% endif %}
+                    </span>
+                    <span class="ciencia-quando">
+                        {% if item.assinatura %}
+                            {{ item.assinatura.assinado_em.strftime('%d/%m/%Y %H:%M') }}
+                            {# O hash guardado só serve se for conferido. Não
+                               bater quer dizer que o RDO mudou DEPOIS da
+                               assinatura — o cliente precisa saber disso. #}
+                            {% if not item.integra %}
+                            <span class="ciencia-alterado"
+                                  title="O conteúdo do RDO mudou depois desta assinatura">
+                                <i class="fas fa-triangle-exclamation"></i> alterado
+                            </span>
+                            {% endif %}
+                        {% else %}
+                            aguardando
+                        {% endif %}
+                    </span>
+                </li>
+                {% endfor %}
+
+                {# Quem assinou e depois foi desativado: o ato aconteceu e
+                   continua valendo, mas fica fora do denominador. #}
+                {% for extra in ciencia.extras %}
+                <li class="ciencia-item ciencia-item-extra">
+                    <span class="ciencia-check on"><i class="fas fa-check"></i></span>
+                    <span class="ciencia-nome">
+                        {{ extra.nome_signatario }}
+                        <small>acesso encerrado depois da assinatura</small>
+                    </span>
+                    <span class="ciencia-quando">
+                        {{ extra.assinado_em.strftime('%d/%m/%Y %H:%M') }}
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+
+            {# ── Ação ────────────────────────────────────────────────── #}
+            {# O motivo do bloqueio aparece SEMPRE que existe, mas não substitui
+               mais o resto do bloco: antes ele engolia até o formulário de
+               login, e numa obra cujos RDOs ainda não foram assinados o
+               responsável ficava sem NENHUM lugar para entrar e trocar a
+               própria senha. Agora ele entra normalmente; só o ato de assinar
+               é que fica indisponível. #}
+            {% if ciencia.alteradas %}
+                <div class="ciencia-aviso ciencia-aviso-warn">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    Este RDO foi alterado depois de assinado por
+                    {{ ciencia.alteradas | length }}
+                    {{ 'responsável' if ciencia.alteradas | length == 1 else 'responsáveis' }}.
+                    A ciência dada continua registrada, mas não corresponde mais
+                    ao conteúdo atual — peça um RDO retificador à construtora.
+                </div>
+            {% endif %}
+
+            {% if ciencia_bloqueio %}
+                <div class="ciencia-aviso">
+                    <i class="fas fa-circle-info"></i> {{ ciencia_bloqueio }}
+                </div>
+            {% endif %}
+
+            {% if signatario_logado %}
+                <div class="ciencia-sessao">
+                    <span>
+                        <i class="fas fa-user-check"></i>
+                        Você está identificado como
+                        <strong>{{ signatario_logado.nome }}</strong>
+                    </span>
+                    <span class="d-inline-flex align-items-center gap-3">
+                        {% if not signatario_logado.senha_temporaria %}
+                        <button type="button" class="ciencia-link"
+                                onclick="cienciaMostrarTrocaSenha()">trocar senha</button>
+                        {% endif %}
+                        <form method="POST"
+                              action="{{ url_for('portal_obras.ciencia_sair', token=token, rdo_id=rdo.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="ciencia-link">sair</button>
+                        </form>
+                    </span>
+                </div>
+
+                {# Troca voluntária: escondida até pedirem, para não competir
+                   com o botão de assinar, que é o que a pessoa veio fazer. #}
+                {% if not signatario_logado.senha_temporaria %}
+                <form method="POST" class="ciencia-form" id="cienciaTrocaSenha" hidden
+                      action="{{ url_for('portal_obras.ciencia_trocar_senha', token=token, rdo_id=rdo.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="ciencia-campos">
+                        <label>
+                            Nova senha
+                            <input type="password" name="nova_senha" minlength="8"
+                                   autocomplete="new-password">
+                        </label>
+                        <label>
+                            Repita a senha
+                            <input type="password" name="confirma_senha" minlength="8"
+                                   autocomplete="new-password">
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-portal-outline">
+                        <i class="fas fa-lock me-1"></i> Salvar nova senha
+                    </button>
+                </form>
+                <script>
+                function cienciaMostrarTrocaSenha() {
+                    var f = document.getElementById('cienciaTrocaSenha');
+                    if (!f) return;
+                    f.hidden = !f.hidden;
+                    if (!f.hidden) f.querySelector('input[name="nova_senha"]').focus();
+                }
+                </script>
+                {% endif %}
+
+                {% if signatario_logado.senha_temporaria %}
+                    {# Primeiro acesso: troca obrigatória antes de assinar. Uma
+                       senha que a construtora conhece não identifica ninguém. #}
+                    <div class="ciencia-aviso ciencia-aviso-warn">
+                        <i class="fas fa-key"></i>
+                        Esta é a senha temporária que a construtora gerou.
+                        Defina uma senha sua para poder assinar.
+                    </div>
+                    <form method="POST" class="ciencia-form"
+                          action="{{ url_for('portal_obras.ciencia_trocar_senha', token=token, rdo_id=rdo.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="ciencia-campos">
+                            <label>
+                                Nova senha
+                                <input type="password" name="nova_senha" required
+                                       minlength="8" autocomplete="new-password">
+                            </label>
+                            <label>
+                                Repita a senha
+                                <input type="password" name="confirma_senha" required
+                                       minlength="8" autocomplete="new-password">
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-portal-primary">
+                            <i class="fas fa-lock me-1"></i> Salvar minha senha
+                        </button>
+                    </form>
+
+                {% elif ciencia.itens | selectattr('signatario.id', 'equalto', signatario_logado.id)
+                                      | selectattr('assinatura') | list %}
+                    <div class="ciencia-aviso ciencia-aviso-ok">
+                        <i class="fas fa-circle-check"></i>
+                        Você já deu ciência neste RDO.
+                    </div>
+
+                {# Bloqueado: o aviso lá em cima já diz o porquê; não faz
+                   sentido oferecer o botão de assinar que a rota recusaria. #}
+                {% elif not ciencia_bloqueio %}
+                    <form method="POST" class="ciencia-form"
+                          action="{{ url_for('portal_obras.ciencia_assinar', token=token, rdo_id=rdo.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <label class="ciencia-obs">
+                            Observação (opcional)
+                            <textarea name="observacao" rows="2" maxlength="500"
+                                      placeholder="Algo a registrar junto da sua ciência"></textarea>
+                        </label>
+                        <p class="ciencia-legal">
+                            Ao confirmar, ficam registrados seu nome, a data e a
+                            hora do servidor, o endereço de onde você acessou e
+                            uma impressão digital do conteúdo deste RDO — que
+                            permite provar depois que ele não foi alterado.
+                        </p>
+                        <button type="submit" class="btn btn-portal-success">
+                            <i class="fas fa-signature me-1"></i> Confirmar minha ciência
+                        </button>
+                    </form>
+                {% endif %}
+
+            {% else %}
+                {# Sem sessão: escolher o próprio nome numa lista já conhecida é
+                   bem mais rápido no celular do que digitar e-mail. #}
+                <form method="POST" class="ciencia-form"
+                      action="{{ url_for('portal_obras.ciencia_entrar', token=token, rdo_id=rdo.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="ciencia-campos">
+                        <label>
+                            Quem é você?
+                            <select name="signatario_id" required id="cienciaQuem">
+                                <option value="">Selecione seu nome…</option>
+                                {% for s in signatarios %}
+                                <option value="{{ s.id }}">
+                                    {{ s.nome }}{% if s.cargo %} — {{ s.cargo }}{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label>
+                            Sua senha
+                            <input type="password" name="senha" required
+                                   autocomplete="current-password">
+                        </label>
+                    </div>
+                    <div class="ciencia-acoes">
+                        <button type="submit" class="btn btn-portal-primary">
+                            <i class="fas fa-right-to-bracket me-1"></i>
+                            {# Com a ciência bloqueada, entrar ainda serve — para
+                               trocar a senha —, mas prometer "assinar" seria
+                               mentira: a rota recusaria logo em seguida. #}
+                            {{ 'Entrar' if ciencia_bloqueio else 'Entrar para assinar' }}
+                        </button>
+                        <button type="submit" class="ciencia-link"
+                                formaction="{{ url_for('portal_obras.ciencia_esqueci', token=token, rdo_id=rdo.id) }}"
+                                formnovalidate
+                                onclick="return cienciaEsqueci(this);">
+                            Esqueci minha senha
+                        </button>
+                    </div>
+                </form>
+                <script>
+                // O "esqueci" reaproveita o seletor de nome do formulário, mas
+                // não deve exigir a senha — daí o formnovalidate + a checagem
+                // manual de que a pessoa ao menos se identificou.
+                function cienciaEsqueci(btn) {
+                    var sel = document.getElementById('cienciaQuem');
+                    if (!sel || !sel.value) {
+                        alert('Selecione seu nome na lista antes de pedir uma senha nova.');
+                        return false;
+                    }
+                    return true;
+                }
+                </script>
+            {% endif %}
+        {% endif %}
+
+        </div>
+    </div>
+</section>
+
+<style>
+.ciencia-dots { display: inline-flex; gap: 4px; }
+.ciencia-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--border); display: inline-block;
+}
+.ciencia-dot.on { background: var(--success); }
+
+.ciencia-lista { list-style: none; margin: 0 0 4px; padding: 0; }
+.ciencia-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 2px; border-bottom: 1px solid var(--border-soft);
+}
+.ciencia-item:last-child { border-bottom: none; }
+.ciencia-item-extra { opacity: .72; }
+.ciencia-check {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--surface-3); color: var(--text-subtle); font-size: .72rem;
+}
+.ciencia-check.on { background: var(--success-bg); color: var(--success); }
+.ciencia-nome { flex: 1; font-weight: 600; font-size: .92rem; }
+.ciencia-nome small {
+    display: block; font-weight: 400; font-size: .78rem;
+    color: var(--text-muted);
+}
+.ciencia-quando {
+    font-size: .8rem; color: var(--text-muted); white-space: nowrap;
+    text-align: right;
+}
+.ciencia-alterado {
+    display: block; font-size: .72rem; font-weight: 600; color: var(--warning);
+}
+
+.ciencia-aviso {
+    margin-top: 14px; padding: 10px 12px; border-radius: var(--radius-sm);
+    background: var(--info-bg); color: var(--info); font-size: .86rem;
+}
+.ciencia-aviso-warn { background: var(--warning-bg); color: var(--warning); }
+.ciencia-aviso-ok { background: var(--success-bg); color: var(--success); }
+
+.ciencia-sessao {
+    margin-top: 14px; padding: 9px 12px; border-radius: var(--radius-sm);
+    background: var(--surface-2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; font-size: .86rem; flex-wrap: wrap;
+}
+.ciencia-sessao form { margin: 0; }
+
+.ciencia-form { margin-top: 14px; }
+.ciencia-campos {
+    display: grid; gap: 12px; margin-bottom: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.ciencia-form label,
+.ciencia-obs {
+    display: block; font-size: .82rem; font-weight: 600;
+    color: var(--text-muted);
+}
+.ciencia-form input,
+.ciencia-form select,
+.ciencia-form textarea {
+    width: 100%; margin-top: 5px; padding: 9px 11px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-size: .9rem; font-weight: 400; color: var(--text);
+    background: var(--surface);
+}
+.ciencia-form input:focus,
+.ciencia-form select:focus,
+.ciencia-form textarea:focus {
+    outline: 2px solid var(--brand); outline-offset: 1px; border-color: var(--brand);
+}
+.ciencia-obs { margin-bottom: 10px; }
+.ciencia-legal {
+    font-size: .78rem; color: var(--text-muted); line-height: 1.5;
+    margin: 0 0 12px;
+}
+.ciencia-acoes {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.ciencia-link {
+    background: none; border: none; padding: 0; font-size: .82rem;
+    color: var(--text-muted); text-decoration: underline; cursor: pointer;
+}
+.ciencia-link:hover { color: var(--text); }
+</style>

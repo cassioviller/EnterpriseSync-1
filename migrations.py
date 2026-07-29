@@ -5509,6 +5509,195 @@ def migration_266_reparar_linhas_de_base_do_backfill():
     logger.info("[Migration 266] Concluída com sucesso")
 
 
+def _migration_267_signatario_cliente():
+    """Fase 9a — `obra_signatario_cliente` + `rdo_assinatura.signatario_cliente_id`.
+
+    ATENÇÃO (mesma nota das migrations 207/222/224/225): `db.create_all()`
+    roda ANTES das migrações, então numa base onde os modelos já foram
+    importados a tabela já existe e o DDL abaixo é no-op. Por isso tudo é
+    `IF NOT EXISTS` e os nomes de índice são os MESMOS declarados no
+    `__table_args__` do modelo — create_all e migração convergem.
+
+    A troca da constraint de unicidade fica na 268, separada de propósito:
+    criar tabela é aditivo e seguro; mexer na garantia de unicidade de uma
+    tabela com assinaturas gravadas merece falhar sozinho, sem levar a
+    criação da tabela junto.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS obra_signatario_cliente (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL
+                        REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    nome VARCHAR(200) NOT NULL,
+                    email VARCHAR(200),
+                    cargo VARCHAR(120),
+                    password_hash VARCHAR(256),
+                    senha_temporaria BOOLEAN NOT NULL DEFAULT FALSE,
+                    senha_expira_em TIMESTAMP,
+                    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                    falhas_login INTEGER NOT NULL DEFAULT 0,
+                    ultimo_acesso_em TIMESTAMP,
+                    recuperacao_pedida_em TIMESTAMP,
+                    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+                )
+            """))
+            conn.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS ix_obra_signatario_cliente_obra_id
+                    ON obra_signatario_cliente (obra_id)
+            """))
+            conn.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS ix_obra_signatario_obra_ativo
+                    ON obra_signatario_cliente (obra_id, ativo)
+            """))
+            conn.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS ix_obra_signatario_admin
+                    ON obra_signatario_cliente (admin_id)
+            """))
+            conn.execute(sa_text("""
+                ALTER TABLE rdo_assinatura
+                    ADD COLUMN IF NOT EXISTS signatario_cliente_id INTEGER
+                    REFERENCES obra_signatario_cliente(id) ON DELETE SET NULL
+            """))
+            conn.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS ix_rdo_assinatura_signatario_cliente_id
+                    ON rdo_assinatura (signatario_cliente_id)
+            """))
+        logger.info("[Migration 267] Concluída com sucesso")
+    except Exception as e:
+        logger.error(f"[Migration 267] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_268_unicidade_assinatura_por_signatario():
+    """Fase 9a — troca `UNIQUE (rdo_id, papel)` por DOIS índices parciais.
+
+    O PORQUÊ, que é o ponto todo desta migração: a constraint da Fase 5
+    permite UMA assinatura de cliente por RDO, e a Fase 9a precisa de N
+    responsáveis nomeados assinando o mesmo RDO.
+
+    A saída ingênua — acrescentar `signatario_cliente_id` à constraint —
+    AFROUXARIA silenciosamente o que a Fase 5 travou: no PostgreSQL NULL é
+    distinto de NULL, e `signatario_cliente_id` é NULL nos papéis internos,
+    então (rdo, 'executor', NULL) passaria a caber quantas vezes quisesse.
+    Dois índices com predicado resolvem sem abrir essa brecha:
+
+      * papéis internos  → UNIQUE (rdo_id, papel)                WHERE papel <> 'cliente'
+      * ciência          → UNIQUE (rdo_id, signatario_cliente_id) WHERE papel = 'cliente'
+
+    Tudo numa transação só (`engine.begin()`): a tabela nunca fica sem
+    proteção entre o DROP e os CREATE. Idempotente — `IF EXISTS` /
+    `IF NOT EXISTS` nos dois sentidos, porque `db.create_all()` pode já ter
+    criado os índices novos a partir do modelo.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            # Rede de segurança: se houver duplicata do mesmo papel interno, o
+            # índice único falharia no meio da transação e derrubaria tudo.
+            # Melhor descobrir aqui, com a linha na mão.
+            dups = conn.execute(sa_text("""
+                SELECT rdo_id, papel, count(*) AS n
+                  FROM rdo_assinatura
+                 WHERE papel <> 'cliente'
+                 GROUP BY rdo_id, papel HAVING count(*) > 1
+            """)).fetchall()
+            if dups:
+                raise RuntimeError(
+                    f'{len(dups)} par(es) (rdo_id, papel) duplicado(s) em '
+                    f'rdo_assinatura — resolva antes de trocar a unicidade: '
+                    f'{[tuple(d) for d in dups[:5]]}')
+
+            conn.execute(sa_text("""
+                ALTER TABLE rdo_assinatura
+                    DROP CONSTRAINT IF EXISTS uq_rdo_assinatura_papel
+            """))
+            conn.execute(sa_text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_rdo_assin_papel_interno
+                    ON rdo_assinatura (rdo_id, papel)
+                 WHERE papel <> 'cliente'
+            """))
+            conn.execute(sa_text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_rdo_assin_cliente
+                    ON rdo_assinatura (rdo_id, signatario_cliente_id)
+                 WHERE papel = 'cliente'
+            """))
+        logger.info("[Migration 268] Concluída com sucesso")
+    except Exception as e:
+        logger.error(f"[Migration 268] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_269_remover_indice_unico_antigo_de_assinatura():
+    """Fase 9a — conserta o buraco da 268: `uq_rdo_assinatura_papel` pode ser
+    ÍNDICE, e `DROP CONSTRAINT IF EXISTS` não remove índice.
+
+    A 268 assumiu que aquele nome era sempre uma CONSTRAINT — é o que ele é
+    num banco criado pelo `db.create_all()` do modelo pré-Fase 9a, que era o
+    caso deste ambiente de desenvolvimento. Mas a migração **262** cria o
+    MESMO nome como `CREATE UNIQUE INDEX IF NOT EXISTS` (migrations.py:5234),
+    e é esse o caminho de qualquer instalação NOVA: o `create_all` roda antes
+    das migrações (app.py:562) e, como models.py já não declara a constraint
+    antiga, a tabela nasce sem ela; a 262 então instala o índice global.
+
+    No PostgreSQL, `ALTER TABLE ... DROP CONSTRAINT IF EXISTS` sobre um nome
+    que é índice puro é **no-op silencioso** — verificado nesta base com uma
+    tabela de rascunho. Resultado em produção nova: o UNIQUE (rdo_id, papel)
+    global sobrevive, o primeiro responsável dá ciência e o SEGUNDO estoura
+    IntegrityError — a feature de N signatários nasce morta, e a suíte não
+    acusa porque o banco de teste veio pelo outro caminho.
+
+    Esta migração cobre as DUAS formas, na ordem certa: constraint primeiro
+    (que leva o índice de reboque), índice depois. Idempotente e segura de
+    rodar onde a 268 já fez o serviço.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            # 1) Se for constraint, sai por aqui (e o índice vai junto).
+            conn.execute(sa_text("""
+                ALTER TABLE rdo_assinatura
+                    DROP CONSTRAINT IF EXISTS uq_rdo_assinatura_papel
+            """))
+            # 2) Se sobreviveu, era índice puro — é o caso da instalação nova.
+            conn.execute(sa_text("""
+                DROP INDEX IF EXISTS uq_rdo_assinatura_papel
+            """))
+
+            # 3) Garante os dois índices parciais que a 268 deveria ter
+            #    deixado. Repetido aqui porque um banco onde a 268 falhou no
+            #    meio pode ter dropado sem criar.
+            conn.execute(sa_text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_rdo_assin_papel_interno
+                    ON rdo_assinatura (rdo_id, papel)
+                 WHERE papel <> 'cliente'
+            """))
+            conn.execute(sa_text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_rdo_assin_cliente
+                    ON rdo_assinatura (rdo_id, signatario_cliente_id)
+                 WHERE papel = 'cliente'
+            """))
+
+            # 4) Prova: se o nome antigo ainda existir sob QUALQUER forma, a
+            #    migração falhou em seu único propósito e precisa gritar.
+            resto = conn.execute(sa_text("""
+                SELECT count(*) FROM pg_class
+                 WHERE relname = 'uq_rdo_assinatura_papel'
+            """)).scalar()
+            if resto:
+                raise RuntimeError(
+                    'uq_rdo_assinatura_papel ainda existe após DROP CONSTRAINT '
+                    'e DROP INDEX — investigar antes de liberar a ciência do '
+                    'cliente neste ambiente.')
+        logger.info("[Migration 269] Concluída com sucesso")
+    except Exception as e:
+        logger.error(f"[Migration 269] Falha: {e}", exc_info=True)
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -5788,6 +5977,9 @@ def executar_migracoes():
             (264, "Fase 5 — rdo_foto.armazenamento ('banco'|'disco'): marcador da migração de fotos", migration_264_rdo_foto_armazenamento),
             (265, "Carimba tipo_apontamento nas linhas de RDO que ficaram sem rótulo (import e views/rdo)", migration_265_backfill_tipo_apontamento_restante),
             (266, "Repara as linhas de base v1 do backfill 210/212 (snapshot de cronograma de cliente, versão em tenant errado)", migration_266_reparar_linhas_de_base_do_backfill),
+            (267, "Fase 9a — obra_signatario_cliente + rdo_assinatura.signatario_cliente_id", _migration_267_signatario_cliente),
+            (268, "Fase 9a — unicidade de assinatura por signatário (dois índices parciais)", _migration_268_unicidade_assinatura_por_signatario),
+            (269, "Fase 9a — remove uq_rdo_assinatura_papel também quando é ÍNDICE (a 268 só tratava constraint)", _migration_269_remover_indice_unico_antigo_de_assinatura),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

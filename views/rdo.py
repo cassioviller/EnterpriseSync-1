@@ -1032,6 +1032,26 @@ def _estado_para_template(rdo):
         return {'valor': 'rascunho', 'rotulo': 'Rascunho', 'cor': 'secondary'}
 
 
+def _ciencia_para_template(rdo):
+    """Fase 9a — placar da ciência do cliente para a tela interna.
+
+    A tabela de assinaturas já lista quem assinou (as de papel `cliente`
+    entram nela sozinhas). O que falta ali é quem NÃO assinou — e é essa a
+    informação que a construtora usa para cobrar o cliente.
+
+    Nunca levanta, como as irmãs: um erro aqui não pode derrubar a tela do
+    RDO inteira. Devolve None quando não há responsáveis cadastrados na obra,
+    e o template simplesmente não mostra a seção.
+    """
+    try:
+        from services.rdo_ciencia_cliente import placar
+        p = placar(rdo)
+        return p if p['total'] else None
+    except Exception:
+        logger.warning('[Fase9a] placar de ciência ilegível', exc_info=True)
+        return None
+
+
 def _acoes_para_template(rdo):
     """Quais botões de transição este usuário vê. Falha FECHADA."""
     vazio = {'submeter': False, 'assinar': False, 'aprovar': False,
@@ -1612,7 +1632,12 @@ def visualizar_rdo(id):
                              # ── Fase 5 — ciclo de vida ──────────────
                              estado_rdo=_estado_para_template(rdo),
                              assinaturas_rdo=list(rdo.assinaturas or []),
-                             acoes_rdo=_acoes_para_template(rdo))
+                             acoes_rdo=_acoes_para_template(rdo),
+                             # ── Fase 9a — ciência do cliente ────────
+                             # A tabela de assinaturas já mostra QUEM assinou;
+                             # o placar mostra quem FALTA, que é a informação
+                             # acionável para cobrar o cliente.
+                             ciencia_cliente=_ciencia_para_template(rdo))
         
     except Exception as e:
         logger.error(f"ERRO VISUALIZAR RDO: {str(e)}")

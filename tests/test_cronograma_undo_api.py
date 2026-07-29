@@ -272,6 +272,39 @@ def test_desfazer_recuar_restaura_hierarquia_e_ordem():
     assert b.tarefa_pai_id is None and b.ordem == 1
 
 
+def test_desfazer_mover_restaura_hierarquia():
+    """(6b, Fase 6) O arrastar-e-soltar entra na pilha como qualquer ação."""
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/mover",
+               json={'novo_pai_id': ctx['a_id']})
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert _tarefa_db(ctx['b_id']).tarefa_pai_id == ctx['a_id']
+
+    r = c.post(f"{_base(ctx)}/desfazer")
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert r.get_json()['tipo_acao'] == 'mover_tarefa'
+    assert _tarefa_db(ctx['b_id']).tarefa_pai_id is None
+
+    r = c.post(f"{_base(ctx)}/refazer")
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert _tarefa_db(ctx['b_id']).tarefa_pai_id == ctx['a_id']
+
+
+def test_mover_no_op_nao_empilha_acao():
+    """Soltar onde a tarefa já está não pode gastar um passo do desfazer."""
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+    c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/mover",
+           json={'novo_pai_id': ctx['a_id']})
+    antes = len(_acoes(ctx['obra_id']))
+
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/mover",
+               json={'novo_pai_id': ctx['a_id']})
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert len(_acoes(ctx['obra_id'])) == antes
+
+
 def test_desfazer_criacao_de_vinculo_remove_o_par():
     """(7) Vínculo é chaveado pelo par natural, não por id."""
     ctx = _cenario()

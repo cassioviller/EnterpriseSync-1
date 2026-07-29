@@ -1178,6 +1178,54 @@ console.log('Initializing RDO view with light theme...');
     </div>
     {% endif %}
 
+    {# Fase 9a — ciência do cliente. A tabela acima já mostra QUEM assinou;
+       aqui fica quem FALTA, que é o que a construtora usa para cobrar. #}
+    {% if ciencia_cliente %}
+    <div class="card" style="margin:1rem 0;border-left:4px solid {{ '#198754' if ciencia_cliente.completo else '#0d6efd' }};">
+        <div class="card-body">
+            <h5 style="margin-bottom:.75rem;display:flex;align-items:center;gap:.6rem;">
+                <i class="fas fa-user-check"></i> Ciência do cliente
+                <span class="badge {{ 'bg-success' if ciencia_cliente.completo else 'bg-secondary' }}">
+                    {{ ciencia_cliente.assinados }} de {{ ciencia_cliente.total }}
+                </span>
+            </h5>
+
+            {% if ciencia_cliente.alteradas %}
+            <div class="alert alert-warning py-2 mb-3" style="font-size:.88rem;">
+                <i class="fas fa-triangle-exclamation me-1"></i>
+                O conteúdo deste RDO mudou depois de assinado por
+                {{ ciencia_cliente.alteradas | length }}
+                {{ 'responsável' if ciencia_cliente.alteradas | length == 1 else 'responsáveis' }}
+                — o hash gravado na ciência não bate mais. Emita um retificador.
+            </div>
+            {% endif %}
+
+            <div class="d-flex flex-wrap gap-2">
+                {% for item in ciencia_cliente.itens %}
+                <span class="badge {{ 'bg-success-subtle text-success-emphasis' if item.assinatura else 'bg-light text-muted' }}"
+                      style="font-weight:500;padding:.45rem .7rem;border:1px solid {{ '#a3cfbb' if item.assinatura else '#dee2e6' }};"
+                      title="{{ item.signatario.cargo or '' }}">
+                    <i class="fas {{ 'fa-check' if item.assinatura else 'fa-clock' }} me-1"></i>
+                    {{ item.signatario.nome }}
+                    {% if item.assinatura %}
+                        · {{ item.assinatura.assinado_em.strftime('%d/%m %H:%M') }}
+                    {% endif %}
+                </span>
+                {% endfor %}
+            </div>
+
+            {% if ciencia_cliente.pendentes %}
+            <p class="text-muted mb-0 mt-3" style="font-size:.85rem;">
+                <i class="fas fa-circle-info me-1"></i>
+                Aguardando
+                {{ ciencia_cliente.pendentes | map(attribute='nome') | join(', ') }}.
+                Eles assinam pelo portal do cliente, com senha própria.
+            </p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Cards de Estatísticas -->
     <div class="stats-grid">
         <div class="stat-card">

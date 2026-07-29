@@ -1506,8 +1506,21 @@ class RDOAssinatura(db.Model):
     assinou e em que função.
     """
     __tablename__ = 'rdo_assinatura'
+    # Fase 9a — a unicidade virou DOIS índices parciais (migração 268).
+    #
+    # Antes: UNIQUE (rdo_id, papel), que permitia UMA assinatura de cliente por
+    # RDO. Com N responsáveis nomeados por obra isso não serve. Simplesmente
+    # acrescentar `signatario_cliente_id` à constraint teria AFROUXADO o que a
+    # Fase 5 travou: no PostgreSQL NULL é distinto de NULL, então
+    # (rdo, 'executor', NULL) caberia várias vezes. Daí a separação por
+    # predicado — um índice para os papéis internos, outro para o cliente.
     __table_args__ = (
-        db.UniqueConstraint('rdo_id', 'papel', name='uq_rdo_assinatura_papel'),
+        db.Index('uq_rdo_assin_papel_interno', 'rdo_id', 'papel',
+                 unique=True,
+                 postgresql_where=db.text("papel <> 'cliente'")),
+        db.Index('uq_rdo_assin_cliente', 'rdo_id', 'signatario_cliente_id',
+                 unique=True,
+                 postgresql_where=db.text("papel = 'cliente'")),
         db.Index('ix_rdo_assinatura_rdo_papel', 'rdo_id', 'papel'),
     )
 
@@ -1529,6 +1542,13 @@ class RDOAssinatura(db.Model):
     funcionario_id = db.Column(
         db.Integer, db.ForeignKey('funcionario.id', ondelete='SET NULL'),
         nullable=True)
+    # Fase 9a — quem assinou quando `papel='cliente'`. Fica NULL nos papéis
+    # internos, onde a identidade vem de usuario_id/funcionario_id. Signatário
+    # de cliente NÃO é `Usuario` de propósito (ver ObraSignatarioCliente).
+    signatario_cliente_id = db.Column(
+        db.Integer,
+        db.ForeignKey('obra_signatario_cliente.id', ondelete='SET NULL'),
+        nullable=True, index=True)
 
     papel = db.Column(db.String(20), nullable=False)
     nome_signatario = db.Column(db.String(200), nullable=False)
@@ -1558,6 +1578,98 @@ class RDOAssinatura(db.Model):
     def __repr__(self):
         return (f'<RDOAssinatura rdo={self.rdo_id} papel={self.papel} '
                 f'por={self.nome_signatario}>')
+
+
+class ObraSignatarioCliente(db.Model):
+    """Responsável do cliente autorizado a dar ciência nos RDOs de UMA obra
+    — Fase 9a.
+
+    NÃO é um `Usuario`, e isso é a decisão central deste modelo. O
+    `login_manager` carrega `Usuario` por id (app.py:521) e toda a
+    autorização interna parte daí; um signatário de cliente que existisse
+    como `Usuario` estaria a um bug de distância de enxergar o sistema
+    inteiro. Tabela separada torna esse acidente impossível por construção,
+    e não por disciplina de quem for mexer depois.
+
+    O portal continua ANÔNIMO para navegar (token da obra, sem login,
+    portal_obras_views.py:3). A senha daqui é pedida só no ATO de assinar —
+    é onde a identidade tem consequência, e é o que o cliente pediu.
+
+    Escopo por OBRA (não por cliente): a mesma pessoa em duas obras tem dois
+    cadastros e duas senhas. Escolha do usuário, para a lista de quem assina
+    ser sempre legível olhando só a obra.
+
+    Recuperação de senha é MEDIADA pela construtora: não há SMTP configurado
+    no sistema (só o canal n8n, opt-in por `N8N_WEBHOOK_URL`), então "esqueci
+    a senha" grava um pedido e a construtora gera uma senha temporária pela
+    tela da obra. Só o hash é gravado — a senha em claro aparece uma vez e
+    não é recuperável.
+    """
+    __tablename__ = 'obra_signatario_cliente'
+    __table_args__ = (
+        db.Index('ix_obra_signatario_obra_ativo', 'obra_id', 'ativo'),
+        db.Index('ix_obra_signatario_admin', 'admin_id'),
+    )
+
+    # Falhas seguidas antes de travar o signatário. A trava é destravada pela
+    # construtora junto com a senha nova — não expira sozinha, porque quem
+    # errou 10 vezes provavelmente perdeu a senha mesmo.
+    MAX_FALHAS = 10
+    # Validade da senha temporária gerada pela construtora.
+    HORAS_SENHA_TEMPORARIA = 72
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer,
+                        db.ForeignKey('obra.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                         nullable=False)
+
+    nome = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(200), nullable=True)
+    cargo = db.Column(db.String(120), nullable=True)
+
+    password_hash = db.Column(db.String(256), nullable=True)
+    # Senha gerada pela construtora: obriga troca no primeiro uso e vence.
+    senha_temporaria = db.Column(db.Boolean, nullable=False, default=False)
+    senha_expira_em = db.Column(db.DateTime, nullable=True)
+
+    ativo = db.Column(db.Boolean, nullable=False, default=True)
+    falhas_login = db.Column(db.Integer, nullable=False, default=0)
+    ultimo_acesso_em = db.Column(db.DateTime, nullable=True)
+    # Marca d'água do "esqueci minha senha" — vira pendência na tela da obra.
+    recuperacao_pedida_em = db.Column(db.DateTime, nullable=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    obra = db.relationship(
+        'Obra',
+        backref=db.backref('signatarios_cliente', lazy='selectin',
+                           cascade='all, delete-orphan',
+                           passive_deletes=True,
+                           order_by='ObraSignatarioCliente.nome'))
+    assinaturas = db.relationship(
+        'RDOAssinatura', backref='signatario_cliente',
+        foreign_keys='RDOAssinatura.signatario_cliente_id')
+
+    @property
+    def travado(self) -> bool:
+        return (self.falhas_login or 0) >= self.MAX_FALHAS
+
+    @property
+    def senha_expirada(self) -> bool:
+        """Senha temporária vencida. Senha definitiva nunca expira."""
+        return bool(self.senha_temporaria and self.senha_expira_em
+                    and self.senha_expira_em < datetime.utcnow())
+
+    @property
+    def pode_assinar(self) -> bool:
+        """Apto a autenticar: ativo, com senha, sem trava e sem senha vencida."""
+        return bool(self.ativo and self.password_hash and not self.travado
+                    and not self.senha_expirada)
+
+    def __repr__(self):
+        return (f'<ObraSignatarioCliente obra={self.obra_id} '
+                f'{self.nome!r} ativo={self.ativo}>')
 
 
 # ===== MÓDULO ALIMENTAÇÃO - Gestão de Refeições =====

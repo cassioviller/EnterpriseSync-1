@@ -775,26 +775,41 @@ def criar_tarefa(obra_id: int):
                 'msg': 'Tarefa de referência não encontrada nesta obra',
             }), 400
         posicao = str(data.get('posicao') or '').strip().lower()
-        if posicao not in ('acima', 'abaixo'):
+        if posicao not in ('acima', 'abaixo', 'dentro'):
             db.session.rollback()
             return jsonify({
                 'status': 'error',
-                'msg': "Posição inválida: use 'acima' ou 'abaixo'",
+                'msg': "Posição inválida: use 'acima', 'abaixo' ou 'dentro'",
             }), 400
 
         _, _nivel_map, filhas_map = _estrutura_visual(
             obra_id, admin_id, cliente_mode)
-        # A nova tarefa (já em sessão, anexada no fim) sai de onde caiu e
-        # vira IRMÃ da referência — herda o `tarefa_pai_id` dela.
+        # A nova tarefa (já em sessão, anexada no fim) sai de onde caiu.
         atuais = filhas_map.get(tarefa.tarefa_pai_id or None, [])
         atuais[:] = [t for t in atuais if t.id != tarefa.id]
-        tarefa.tarefa_pai_id = ref.tarefa_pai_id
-        irmas = filhas_map.setdefault(ref.tarefa_pai_id or None, [])
-        pos_ref = next((i for i, t in enumerate(irmas) if t.id == ref.id),
-                       len(irmas) - 1)
-        # 'abaixo' = irmã seguinte: no DFS cai DEPOIS da subárvore inteira
-        # da referência; 'acima' cai imediatamente antes dela.
-        irmas.insert(pos_ref if posicao == 'acima' else pos_ref + 1, tarefa)
+
+        if posicao == 'dentro':
+            # Fase 6 — "Nova subtarefa dentro desta": a nova nasce FILHA da
+            # referência (última), em vez de irmã. Poupa o inserir-e-recuar,
+            # mas transforma a referência em resumo — então passa pelo MESMO
+            # guard do indent, senão criar seria a porta dos fundos do recuar.
+            erro_resumo = _guard_vira_resumo(
+                ref, filhas_map, obra_id, admin_id, cliente_mode,
+                sufixo=' de criar a subtarefa')
+            if erro_resumo:
+                db.session.rollback()
+                return erro_resumo
+            tarefa.tarefa_pai_id = ref.id
+            filhas_map.setdefault(ref.id, []).append(tarefa)
+        else:
+            # 'acima'/'abaixo' — vira IRMÃ da referência, herda o pai dela.
+            tarefa.tarefa_pai_id = ref.tarefa_pai_id
+            irmas = filhas_map.setdefault(ref.tarefa_pai_id or None, [])
+            pos_ref = next((i for i, t in enumerate(irmas) if t.id == ref.id),
+                           len(irmas) - 1)
+            # 'abaixo' = irmã seguinte: no DFS cai DEPOIS da subárvore inteira
+            # da referência; 'acima' cai imediatamente antes dela.
+            irmas.insert(pos_ref if posicao == 'acima' else pos_ref + 1, tarefa)
 
         resultado, erro = _aplicar_hierarquia(obra_id, admin_id, cliente_mode,
                                               filhas_map)
@@ -1547,6 +1562,50 @@ def _ciclo_hierarquico(novo_pai_id: int | None, tarefa_id: int,
     return False
 
 
+def _guard_vira_resumo(novo_pai, filhas_map: dict, obra_id: int,
+                       admin_id: int, cliente_mode: bool,
+                       sufixo: str = ''):
+    """Fase 6 — recusa transformar em resumo uma folha que não pode virar uma.
+
+    Extraído do corpo de `recuar_tarefa` (era inline): ganhar uma filha é a
+    MESMA operação, venha do indent, do arrasto (`/mover`) ou do
+    `posicao='dentro'`, e as três precisam recusar pelos mesmos motivos —
+    senão o arrasto viraria a porta dos fundos para o que o indent barra.
+
+    Só se aplica quando `novo_pai` ainda é FOLHA: quem já é resumo ganha mais
+    uma filha sem consequência. Devolve a resposta 400 pronta ou None.
+
+    `sufixo` completa a frase do erro de vínculo com o verbo de quem chamou
+    ("… antes de recuar"); o texto de `recuar` é o que
+    `tests/test_cronograma_grade_api.py` trava desde a Fase 2.
+    """
+    if filhas_map.get(novo_pai.id):
+        return None  # já é resumo — nada muda de natureza
+
+    tem_vinculo = db.session.query(TarefaVinculo.id).filter(
+        TarefaVinculo.obra_id == obra_id,
+        TarefaVinculo.admin_id == admin_id,
+        db.or_(TarefaVinculo.predecessora_id == novo_pai.id,
+               TarefaVinculo.sucessora_id == novo_pai.id),
+    ).first() is not None
+    if tem_vinculo:
+        return jsonify({
+            'status': 'error',
+            'msg': (f'A tarefa "{novo_pai.nome_tarefa}" tem vínculos de '
+                    'predecessora/sucessora e viraria uma tarefa-resumo — '
+                    f'remova os vínculos dela antes{sufixo}'),
+        }), 400
+
+    if novo_pai.id in ids_tarefas_iniciadas(obra_id, admin_id,
+                                            cliente=cliente_mode):
+        return jsonify({
+            'status': 'error',
+            'msg': (f'A tarefa "{novo_pai.nome_tarefa}" já foi iniciada '
+                    'e não pode virar tarefa-resumo'),
+        }), 400
+    return None
+
+
 def _aplicar_hierarquia(obra_id: int, admin_id: int, cliente_mode: bool,
                         filhas_map: dict):
     """Fase 2 — persistência comum de recuar/desrecuar/inserir-posicionado.
@@ -1660,28 +1719,12 @@ def recuar_tarefa(obra_id: int, tarefa_id: int):
         }), 400
     novo_pai = irmas[pos - 1]
 
-    if not filhas_map.get(novo_pai.id):
-        # P é folha e VIRARIA resumo — decisão crítica do plano: rejeitar.
-        tem_vinculo = db.session.query(TarefaVinculo.id).filter(
-            TarefaVinculo.obra_id == obra_id,
-            TarefaVinculo.admin_id == admin_id,
-            db.or_(TarefaVinculo.predecessora_id == novo_pai.id,
-                   TarefaVinculo.sucessora_id == novo_pai.id),
-        ).first() is not None
-        if tem_vinculo:
-            return jsonify({
-                'status': 'error',
-                'msg': (f'A tarefa "{novo_pai.nome_tarefa}" tem vínculos de '
-                        'predecessora/sucessora e viraria uma tarefa-resumo — '
-                        'remova os vínculos dela antes de recuar'),
-            }), 400
-        if novo_pai.id in ids_tarefas_iniciadas(obra_id, admin_id,
-                                                cliente=cliente_mode):
-            return jsonify({
-                'status': 'error',
-                'msg': (f'A tarefa "{novo_pai.nome_tarefa}" já foi iniciada '
-                        'e não pode virar tarefa-resumo'),
-            }), 400
+    # P é folha e VIRARIA resumo — decisão crítica do plano: rejeitar.
+    # (Fase 6: o mesmo guard serve `/mover` e `posicao='dentro'`.)
+    erro = _guard_vira_resumo(novo_pai, filhas_map, obra_id, admin_id,
+                              cliente_mode, sufixo=' de recuar')
+    if erro:
+        return erro
 
     # Defesa: a irmã anterior nunca é descendente de X, mas o check ascendente
     # fica (mesmo padrão de `atualizar_tarefa`) contra dado sujo.
@@ -1771,6 +1814,96 @@ def desrecuar_tarefa(obra_id: int, tarefa_id: int):
     if erro:
         return erro
     logger.info(f"[OK] Tarefa desrecuada id={tarefa_id} novo_pai={avo_id} "
+                f"obra={obra_id} (editor v2)")
+    return _resposta_grade(obra_id, admin_id, cliente_mode, tarefa,
+                           resultado.tarefas_afetadas)
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/tarefa/<int:tarefa_id>/mover',
+                     methods=['POST'])
+@login_required
+@_com_undo('mover_tarefa')
+def mover_tarefa(obra_id: int, tarefa_id: int):
+    """Fase 6 — re-parent explícito: X (com a subárvore) vira a ÚLTIMA filha
+    de `novo_pai_id`. Corpo: `{"novo_pai_id": <int|null>}`; `null` promove X
+    para a raiz, como última irmã do nível.
+
+    É o backend do arrastar-e-soltar SOBRE uma linha. Irmã de
+    `recuar`/`desrecuar` em tudo — mesmos guards, mesma persistência
+    (`_aplicar_hierarquia`), mesma resposta (`_resposta_grade`), mesmo undo —
+    e existe separada porque aquelas duas são RELATIVAS (irmã anterior, avô)
+    enquanto esta recebe o destino explícito que o mouse escolheu.
+
+    Deliberadamente NÃO reaproveita o `tarefa_pai_id` de `atualizar_tarefa`
+    (PUT): aquele bloco só checa ciclo, não aplica os guards de resumo nem
+    renumera `ordem`. Arrastar entraria por uma porta mais frouxa que o
+    indent, exatamente o que a Fase 2 decidiu barrar.
+    """
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+    tarefa = TarefaCronograma.query.filter_by(
+        id=tarefa_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
+    ).filter(TarefaCronograma.ativa.is_(True)).first()
+    if not tarefa:
+        return jsonify({'status': 'error', 'msg': 'Tarefa não encontrada'}), 404
+
+    data = request.get_json(silent=True) or {}
+    pai_raw = data.get('novo_pai_id')
+    novo_pai_id = None
+    if pai_raw not in (None, '', 0, '0'):
+        try:
+            novo_pai_id = int(pai_raw)
+        except (TypeError, ValueError):
+            return jsonify({'status': 'error',
+                            'msg': 'novo_pai_id inválido'}), 400
+    if novo_pai_id == tarefa.id:
+        return jsonify({'status': 'error',
+                        'msg': 'Uma tarefa não pode ser filha de si mesma'}), 400
+
+    ordenadas, _nivel_map, filhas_map = _estrutura_visual(
+        obra_id, admin_id, cliente_mode)
+    por_id = {t.id: t for t in ordenadas}
+
+    novo_pai = None
+    if novo_pai_id is not None:
+        novo_pai = por_id.get(novo_pai_id)
+        if novo_pai is None:
+            # Mesmo 404 opaco das irmãs: destino fora do alcance não vaza.
+            return jsonify({'status': 'error',
+                            'msg': 'Tarefa não encontrada'}), 404
+
+    # Soltar um pai dentro do próprio neto — aqui o check é o caso REAL, não
+    # a defesa contra dado sujo que ele é em recuar/desrecuar.
+    if _ciclo_hierarquico(novo_pai_id, tarefa.id, por_id):
+        return jsonify({
+            'status': 'error',
+            'msg': 'Hierarquia circular: uma tarefa não pode ser pai de seu próprio ancestral.',
+        }), 400
+
+    if tarefa.tarefa_pai_id == novo_pai_id:
+        # Já é filha desse pai: nada a fazer. Sem no-op o `_aplicar_hierarquia`
+        # renumeraria e o undo empilharia uma ação vazia.
+        return _resposta_grade(obra_id, admin_id, cliente_mode, tarefa, [])
+
+    if novo_pai is not None:
+        erro = _guard_vira_resumo(novo_pai, filhas_map, obra_id, admin_id,
+                                  cliente_mode, sufixo=' de mover para dentro dela')
+        if erro:
+            return erro
+
+    antigas = filhas_map.get(tarefa.tarefa_pai_id or None, [])
+    antigas[:] = [t for t in antigas if t.id != tarefa.id]
+    tarefa.tarefa_pai_id = novo_pai_id
+    filhas_map.setdefault(novo_pai_id, []).append(tarefa)
+
+    resultado, erro = _aplicar_hierarquia(obra_id, admin_id, cliente_mode,
+                                          filhas_map)
+    if erro:
+        return erro
+    logger.info(f"[OK] Tarefa movida id={tarefa_id} novo_pai={novo_pai_id} "
                 f"obra={obra_id} (editor v2)")
     return _resposta_grade(obra_id, admin_id, cliente_mode, tarefa,
                            resultado.tarefas_afetadas)

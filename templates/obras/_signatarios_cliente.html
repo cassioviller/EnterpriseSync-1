@@ -1,0 +1,192 @@
+{# Fase 9a — quem, do lado do cliente, assina os RDOs desta obra.
+
+   Os formulários daqui postam para rotas PRÓPRIAS
+   (main.criar_signatario_cliente etc.), fora do submit da obra: cadastrar
+   alguém e gerar senha são atos com efeito imediato, e misturá-los ao salvar
+   da obra faria uma senha nascer só porque o usuário mexeu no endereço.
+
+   Contexto: `signatarios_cliente`, `senha_gerada`, `senha_gerada_para`. #}
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="form-group">
+      <div style="background:#f8fafc;padding:16px;border-radius:8px;border:1px solid #e2e8f0;">
+
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+          <strong><i class="fas fa-file-signature me-1"></i>Assinatura de RDO pelo cliente</strong>
+          {% set pendencias = signatarios_cliente | selectattr('recuperacao_pedida_em') | list %}
+          {% if pendencias %}
+          <span class="badge bg-warning text-dark">
+            <i class="fas fa-key me-1"></i>{{ pendencias | length }} pedido(s) de senha
+          </span>
+          {% endif %}
+        </div>
+        <small class="text-muted d-block mb-3">
+          Cada responsável cadastrado assina por si, com senha própria. O RDO só
+          consta com ciência completa quando <strong>todos</strong> assinarem.
+          A senha é pedida apenas na hora de assinar — o resto do portal segue
+          aberto pelo link.
+        </small>
+
+        {# Senha recém-gerada: aparece UMA vez. Só o hash fica no banco. #}
+        {% if senha_gerada %}
+        <div class="alert alert-success d-flex align-items-start gap-2 py-2">
+          <i class="fas fa-key mt-1"></i>
+          <div class="flex-grow-1">
+            <div class="fw-semibold">
+              Senha temporária de {{ senha_gerada_para or 'novo responsável' }}
+            </div>
+            <div class="input-group input-group-sm mt-1" style="max-width:340px;">
+              <input type="text" class="form-control font-monospace" id="senhaGerada"
+                     value="{{ senha_gerada }}" readonly>
+              <button class="btn btn-outline-secondary" type="button"
+                      onclick="copiarSenhaSignatario()">
+                <i class="fas fa-copy"></i> Copiar
+              </button>
+            </div>
+            <small class="text-muted">
+              Entregue ao responsável pelo canal que você já usa. Ela não
+              poderá ser vista de novo, vale 72h e será trocada no primeiro
+              acesso.
+            </small>
+          </div>
+        </div>
+        {% endif %}
+
+        {# ── Lista ──────────────────────────────────────────────────── #}
+        {% if signatarios_cliente %}
+        <div class="table-responsive mb-3">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr class="text-muted" style="font-size:.78rem;">
+                <th>Responsável</th>
+                <th>Situação</th>
+                <th>Último acesso</th>
+                <th class="text-end">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in signatarios_cliente %}
+              <tr {% if not s.ativo %}class="opacity-50"{% endif %}>
+                <td>
+                  <div class="fw-semibold">{{ s.nome }}</div>
+                  <small class="text-muted">
+                    {{ s.cargo or '—' }}{% if s.email %} · {{ s.email }}{% endif %}
+                  </small>
+                </td>
+                <td style="font-size:.8rem;">
+                  {% if not s.ativo %}
+                    <span class="badge bg-secondary">Desativado</span>
+                  {% elif s.recuperacao_pedida_em %}
+                    <span class="badge bg-warning text-dark">Pediu senha nova</span>
+                  {% elif s.travado %}
+                    <span class="badge bg-danger">Bloqueado</span>
+                  {% elif s.senha_expirada %}
+                    <span class="badge bg-danger">Senha vencida</span>
+                  {% elif s.senha_temporaria %}
+                    <span class="badge bg-info text-dark">Senha temporária</span>
+                  {% else %}
+                    <span class="badge bg-success">Ativo</span>
+                  {% endif %}
+                </td>
+                <td style="font-size:.8rem;" class="text-muted">
+                  {{ s.ultimo_acesso_em.strftime('%d/%m/%Y %H:%M') if s.ultimo_acesso_em else 'nunca entrou' }}
+                </td>
+                <td class="text-end">
+                  <button type="button" class="btn btn-sm btn-outline-primary"
+                          onclick="postarAcaoSignatario('{{ url_for('main.gerar_senha_signatario_cliente', id=obra.id, sid=s.id) }}')"
+                          title="Gerar uma senha temporária nova">
+                    <i class="fas fa-key"></i>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary"
+                          onclick="postarAcaoSignatario('{{ url_for('main.toggle_signatario_cliente', id=obra.id, sid=s.id) }}')"
+                          title="{{ 'Reativar' if not s.ativo else 'Desativar o acesso' }}">
+                    <i class="fas {{ 'fa-toggle-off' if not s.ativo else 'fa-toggle-on' }}"></i>
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-muted small mb-3">
+          <i class="fas fa-circle-info me-1"></i>
+          Nenhum responsável cadastrado — os RDOs desta obra não pedem ciência.
+        </div>
+        {% endif %}
+
+        {# ── Cadastro ───────────────────────────────────────────────── #}
+        <div class="row g-2 align-items-end" id="novoSignatario">
+          <div class="col-md-4">
+            <label class="form-label mb-1" style="font-size:.8rem;">Nome</label>
+            <input type="text" class="form-control form-control-sm"
+                   id="sigNome" placeholder="João Martins" maxlength="200">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label mb-1" style="font-size:.8rem;">Cargo</label>
+            <input type="text" class="form-control form-control-sm"
+                   id="sigCargo" placeholder="Eng. responsável" maxlength="120">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label mb-1" style="font-size:.8rem;">E-mail</label>
+            <input type="email" class="form-control form-control-sm"
+                   id="sigEmail" placeholder="joao@cliente.com" maxlength="200">
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-sm btn-primary w-100"
+                    onclick="criarSignatarioCliente()">
+              <i class="fas fa-plus me-1"></i> Incluir
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Estas ações postam para rotas próprias. Como este bloco vive DENTRO do
+// <form> da obra, um <form> aninhado seria inválido em HTML — daí montar e
+// submeter um formulário solto, que é o que o navegador aceita.
+function postarAcaoSignatario(action, campos) {
+  const f = document.createElement('form');
+  f.method = 'POST';
+  f.action = action;
+  const csrf = document.querySelector('meta[name="csrf-token"]');
+  if (csrf) {
+    const i = document.createElement('input');
+    i.type = 'hidden'; i.name = 'csrf_token'; i.value = csrf.getAttribute('content');
+    f.appendChild(i);
+  }
+  Object.entries(campos || {}).forEach(([nome, valor]) => {
+    const i = document.createElement('input');
+    i.type = 'hidden'; i.name = nome; i.value = valor;
+    f.appendChild(i);
+  });
+  document.body.appendChild(f);
+  f.submit();
+}
+
+function criarSignatarioCliente() {
+  const nome = document.getElementById('sigNome').value.trim();
+  if (!nome) {
+    alert('Informe o nome do responsável.');
+    return;
+  }
+  postarAcaoSignatario('{{ url_for("main.criar_signatario_cliente", id=obra.id) }}', {
+    nome: nome,
+    cargo: document.getElementById('sigCargo').value.trim(),
+    email: document.getElementById('sigEmail').value.trim(),
+  });
+}
+
+function copiarSenhaSignatario() {
+  const campo = document.getElementById('senhaGerada');
+  if (!campo) return;
+  campo.select();
+  campo.setSelectionRange(0, 99999);
+  navigator.clipboard?.writeText(campo.value);
+}
+</script>
