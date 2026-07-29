@@ -52,7 +52,7 @@ MSG_SEM_IRMA = ('Não é possível recuar: não há tarefa acima no mesmo '
                 'nível para ser o novo grupo')
 MSG_JA_RAIZ = 'A tarefa já está no nível raiz — não é possível desrecuar'
 MSG_REF_INVALIDA = 'Tarefa de referência não encontrada nesta obra'
-MSG_POSICAO_INVALIDA = "Posição inválida: use 'acima' ou 'abaixo'"
+MSG_POSICAO_INVALIDA = "Posição inválida: use 'acima', 'abaixo' ou 'dentro'"
 
 
 @pytest.fixture(autouse=True)
@@ -499,3 +499,279 @@ def test_rota_aceita_quantitativo_em_tarefa_sem_apontamento():
     with app.app_context():
         t = db.session.get(TarefaCronograma, ctx['tarefa_id'])
         assert t.quantidade_total == 48
+
+
+# ---------------------------------------------------------------------------
+# Fase 6 — mover (re-parent explícito do arrastar-e-soltar)
+# ---------------------------------------------------------------------------
+
+def _mover(c, ctx, tarefa_id, novo_pai_id):
+    return c.post(f"{_base(ctx)}/tarefa/{tarefa_id}/mover",
+                  json={'novo_pai_id': novo_pai_id})
+
+
+def test_mover_entra_como_ultima_filha_do_destino_e_renumera_flat():
+    """Soltar B sobre o resumo A: entra DEPOIS das filhas que A já tinha."""
+    ctx = _grupo(_cenario(), filhas=2)
+    c = _client_como(ctx['admin_id'])
+
+    r = _mover(c, ctx, ctx['b_id'], ctx['a_id'])
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert [t['id'] for t in r.get_json()['tarefas']] == [
+        ctx['a_id'], ctx['f1_id'], ctx['f2_id'], ctx['b_id'], ctx['c_id']]
+    assert _pai_de(ctx['b_id']) == ctx['a_id']
+    # Renumeração flat sobre TODAS as tarefas do modo, como as rotas irmãs.
+    assert [o for _, o in _ordem_visual(ctx['obra_id'])] == [0, 1, 2, 3, 4]
+
+
+def test_mover_sobre_folha_a_transforma_em_resumo():
+    """O caso central do arrasto: a linha-alvo era folha e vira grupo."""
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+
+    r = _mover(c, ctx, ctx['c_id'], ctx['b_id'])
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert _pai_de(ctx['c_id']) == ctx['b_id']
+    assert [t['id'] for t in r.get_json()['tarefas']] == [
+        ctx['a_id'], ctx['b_id'], ctx['c_id']]
+    # B agora é resumo: o nível de C desceu (é o que dá a indentação no front).
+    assert _por_id(r.get_json()['tarefas'], ctx['c_id'])['nivel'] == 1
+
+
+def test_mover_com_pai_nulo_promove_para_a_raiz():
+    """`novo_pai_id: null` — o outro sentido do gesto (arrastar para fora)."""
+    ctx = _grupo(_cenario(), filhas=1)
+    c = _client_como(ctx['admin_id'])
+    assert _pai_de(ctx['f1_id']) == ctx['a_id']
+
+    r = _mover(c, ctx, ctx['f1_id'], None)
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert _pai_de(ctx['f1_id']) is None
+    # Última irmã da raiz — o append de `filhas_map[None]`.
+    assert [t['id'] for t in r.get_json()['tarefas']][-1] == ctx['f1_id']
+
+
+def test_mover_para_folha_com_vinculo_400_sem_persistir():
+    """Mesmo guard do indent: o arrasto não é porta dos fundos do recuar."""
+    ctx = _cenario()
+    with app.app_context():
+        db.session.add(TarefaVinculo(
+            admin_id=ctx['admin_id'], obra_id=ctx['obra_id'],
+            predecessora_id=ctx['a_id'], sucessora_id=ctx['c_id'],
+            tipo='TI', lag_dias=0))
+        db.session.commit()
+    c = _client_como(ctx['admin_id'])
+
+    r = _mover(c, ctx, ctx['b_id'], ctx['a_id'])
+    assert r.status_code == 400
+    assert r.get_json()['msg'] == (
+        'A tarefa "Fundação" tem vínculos de predecessora/sucessora e '
+        'viraria uma tarefa-resumo — remova os vínculos dela antes de mover '
+        'para dentro dela')
+    assert _pai_de(ctx['b_id']) is None
+    with app.app_context():
+        assert TarefaVinculo.query.filter_by(obra_id=ctx['obra_id']).count() == 1
+
+
+def test_mover_para_folha_iniciada_400():
+    """Âncora de apontamento não pode virar resumo — nem pelo mouse."""
+    ctx = _cenario()
+    with app.app_context():
+        obra = db.session.get(Obra, ctx['obra_id'])
+        admin = db.session.get(Usuario, ctx['admin_id'])
+        a = db.session.get(TarefaCronograma, ctx['a_id'])
+        _rdo_com_apontamento(obra, admin, a)
+    c = _client_como(ctx['admin_id'])
+
+    r = _mover(c, ctx, ctx['b_id'], ctx['a_id'])
+    assert r.status_code == 400
+    assert r.get_json()['msg'] == (
+        'A tarefa "Fundação" já foi iniciada e não pode virar tarefa-resumo')
+    assert _pai_de(ctx['b_id']) is None
+
+
+def test_mover_pai_para_dentro_do_proprio_filho_400():
+    """Ciclo: aqui é o caso REAL (o mouse alcança o próprio descendente)."""
+    ctx = _grupo(_cenario(), filhas=1)
+    c = _client_como(ctx['admin_id'])
+
+    r = _mover(c, ctx, ctx['a_id'], ctx['f1_id'])
+    assert r.status_code == 400
+    assert 'circular' in r.get_json()['msg']
+    assert _pai_de(ctx['a_id']) is None
+    assert _pai_de(ctx['f1_id']) == ctx['a_id']
+
+
+def test_mover_para_si_mesma_400():
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+    r = _mover(c, ctx, ctx['b_id'], ctx['b_id'])
+    assert r.status_code == 400
+    assert r.get_json()['msg'] == 'Uma tarefa não pode ser filha de si mesma'
+    assert _pai_de(ctx['b_id']) is None
+
+
+def test_mover_para_o_pai_atual_e_no_op_sem_erro():
+    """Soltar onde já está devolve a grade sem empilhar ação de desfazer."""
+    ctx = _grupo(_cenario(), filhas=1)
+    c = _client_como(ctx['admin_id'])
+
+    r = _mover(c, ctx, ctx['f1_id'], ctx['a_id'])
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert r.get_json()['tarefas_afetadas'] == []
+    assert _pai_de(ctx['f1_id']) == ctx['a_id']
+
+
+def test_mover_nao_existe_com_flag_off_e_e_404_cross_tenant():
+    """Mesmo escopo das irmãs: 404 opaco fora do rollout e fora do tenant."""
+    ctx_off = _cenario(flag=False)
+    c_off = _client_como(ctx_off['admin_id'])
+    assert _mover(c_off, ctx_off, ctx_off['b_id'],
+                  ctx_off['a_id']).status_code == 404
+    assert _pai_de(ctx_off['b_id']) is None
+
+    ctx = _cenario()
+    with app.app_context():
+        vizinho, _obra_b = _ambiente()
+        _flag_editor_v2(vizinho.id, True)
+        vid = vizinho.id
+    c = _client_como(vid)
+    assert _mover(c, ctx, ctx['b_id'], ctx['a_id']).status_code == 404
+    assert _pai_de(ctx['b_id']) is None
+
+
+def test_mover_para_pai_de_outra_obra_404_opaco():
+    """Destino existe, mas em outra obra — não pode nem vazar que existe."""
+    ctx = _cenario()
+    outra = _cenario()
+    c = _client_como(ctx['admin_id'])
+    r = _mover(c, ctx, ctx['b_id'], outra['a_id'])
+    assert r.status_code == 404
+    assert _pai_de(ctx['b_id']) is None
+
+
+# ---------------------------------------------------------------------------
+# Fase 6 — criar com posicao='dentro' (Nova subtarefa)
+# ---------------------------------------------------------------------------
+
+def test_criar_dentro_nasce_como_ultima_filha_da_referencia():
+    """Poupa o inserir-e-recuar: a nova já nasce dentro do grupo."""
+    ctx = _grupo(_cenario(), filhas=1)
+    c = _client_como(ctx['admin_id'])
+
+    r = _criar(c, ctx, ref_tarefa_id=ctx['a_id'], posicao='dentro')
+    assert r.status_code == 201, r.get_data(as_text=True)
+    nova = r.get_json()['tarefa']['id']
+    assert _pai_de(nova) == ctx['a_id']
+    assert [t['id'] for t in r.get_json()['tarefas']] == [
+        ctx['a_id'], ctx['f1_id'], nova, ctx['b_id'], ctx['c_id']]
+
+
+def test_criar_dentro_de_folha_transforma_a_referencia_em_grupo():
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+
+    r = _criar(c, ctx, ref_tarefa_id=ctx['b_id'], posicao='dentro')
+    assert r.status_code == 201, r.get_data(as_text=True)
+    nova = r.get_json()['tarefa']['id']
+    assert _pai_de(nova) == ctx['b_id']
+    assert _por_id(r.get_json()['tarefas'], nova)['nivel'] == 1
+
+
+def test_criar_dentro_de_folha_iniciada_400_sem_criar():
+    """O guard de resumo vale na criação também — e nada é persistido."""
+    ctx = _cenario()
+    with app.app_context():
+        obra = db.session.get(Obra, ctx['obra_id'])
+        admin = db.session.get(Usuario, ctx['admin_id'])
+        a = db.session.get(TarefaCronograma, ctx['a_id'])
+        _rdo_com_apontamento(obra, admin, a)
+    c = _client_como(ctx['admin_id'])
+
+    r = _criar(c, ctx, ref_tarefa_id=ctx['a_id'], posicao='dentro')
+    assert r.status_code == 400
+    assert r.get_json()['msg'] == (
+        'A tarefa "Fundação" já foi iniciada e não pode virar tarefa-resumo')
+    with app.app_context():
+        assert TarefaCronograma.query.filter_by(
+            obra_id=ctx['obra_id']).count() == 3
+
+
+# ---------------------------------------------------------------------------
+# Fase 6 — geometria do soltar-para-aninhar (achado da revisão de 29/07)
+# ---------------------------------------------------------------------------
+
+def test_soltar_fora_da_grade_nao_aninha():
+    """`onMove` só dispara sobre itens da lista: se o ponteiro cruza a faixa
+    central de uma linha e depois sai da tabela, `_alvoNest` fica armado com
+    alvo obsoleto e o `onEnd` aninhava numa linha onde o cursor já não estava.
+
+    O Playwright não sobe neste ambiente (libnspr4.so ausente), então o teste
+    extrai `_soltouSobreOAlvo` do template e exercita a geometria no Node —
+    que é exatamente onde o defeito morava.
+    """
+    import json
+    import os
+    import re
+    import shutil
+    import subprocess
+    import tempfile
+
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('node indisponível')
+
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(raiz, 'templates/obras/cronograma.html')) as f:
+        html = f.read()
+
+    consts = re.search(r'const NEST_MIN = [^;]+;', html)
+    func = re.search(
+        r'function _soltouSobreOAlvo\(oe, alvoId\) \{.*?\n\}', html, re.S)
+    assert consts and func, 'a função de conferência do drop sumiu do template'
+
+    # Linha alvo em y=100..140 (altura 40): faixa central = 112..128.
+    harness = f"""
+{consts.group(0)}
+function _rowDe(id) {{
+  if (id !== 7) return null;
+  return {{ getBoundingClientRect: () => (
+    {{ left: 0, right: 500, top: 100, height: 40 }}) }};
+}}
+{func.group(0)}
+const casos = {{
+  centro_da_linha:        _soltouSobreOAlvo({{clientX: 250, clientY: 120}}, 7),
+  borda_de_cima:          _soltouSobreOAlvo({{clientX: 250, clientY: 104}}, 7),
+  borda_de_baixo:         _soltouSobreOAlvo({{clientX: 250, clientY: 136}}, 7),
+  abaixo_da_tabela:       _soltouSobreOAlvo({{clientX: 250, clientY: 400}}, 7),
+  a_esquerda_fora:        _soltouSobreOAlvo({{clientX: -10, clientY: 120}}, 7),
+  sem_coordenadas:        _soltouSobreOAlvo({{}}, 7),
+  evento_nulo:            _soltouSobreOAlvo(null, 7),
+  toque_via_changedTouches: _soltouSobreOAlvo(
+      {{changedTouches: [{{clientX: 250, clientY: 120}}]}}, 7),
+  alvo_inexistente:       _soltouSobreOAlvo({{clientX: 250, clientY: 120}}, 99),
+}};
+console.log(JSON.stringify(casos));
+"""
+    with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False) as f:
+        f.write(harness)
+        caminho = f.name
+    try:
+        p = subprocess.run([node, caminho], capture_output=True, text=True)
+        assert p.returncode == 0, p.stderr
+        r = json.loads(p.stdout)
+    finally:
+        os.unlink(caminho)
+
+    # Só a faixa central aninha.
+    assert r['centro_da_linha'] is True
+    assert r['toque_via_changedTouches'] is True
+
+    # Tudo o mais cai para reordenação — o comportamento pré-Fase 6.
+    assert r['borda_de_cima'] is False
+    assert r['borda_de_baixo'] is False
+    assert r['abaixo_da_tabela'] is False, 'ESTE é o bug: soltar fora aninhava'
+    assert r['a_esquerda_fora'] is False
+    assert r['sem_coordenadas'] is False
+    assert r['evento_nulo'] is False
+    assert r['alvo_inexistente'] is False

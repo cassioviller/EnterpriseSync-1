@@ -15,6 +15,7 @@
 | 3 | Desfazer/refazer |
 | 4 | Linha de base (`CronogramaBaseline`) — congela o planejado para comparar com o real |
 | 5 | Manual de uso em PDF |
+| 6 | Descoberta da estrutura: menu de botão direito na grade, inserção por teclado (`Insert`/`Shift+Insert`/`Alt+Insert`), arrastar-e-soltar **sobre** uma linha para aninhar (`POST .../tarefa/<id>/mover`), criar já como subtarefa (`posicao='dentro'`) e expandir/recolher a árvore inteira |
 
 A flag governa as rotas de tarefa, o CRUD de vínculos e o frontend
 (`EDITOR_V2`). Com ela desligada há **dual-write** de vínculo TI/0, então o

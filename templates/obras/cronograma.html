@@ -66,13 +66,31 @@
         </button>
         <button class="btn btn-outline-secondary" id="btnInserirAbaixo" disabled
                 onclick="inserirLinha('abaixo')"
-                title="Inserir linha abaixo da selecionada">
+                title="Inserir linha abaixo da selecionada (Insert)">
           <i class="fas fa-arrow-down"></i><i class="fas fa-plus fa-xs ms-1"></i>
+        </button>
+        {# Fase 6 — cria já como filha: poupa o inserir-e-depois-recuar. #}
+        <button class="btn btn-outline-secondary" id="btnInserirDentro" disabled
+                onclick="inserirLinha('dentro')"
+                title="Nova subtarefa dentro da selecionada (Alt+Insert)">
+          <i class="fas fa-turn-down fa-rotate-270"></i><i class="fas fa-plus fa-xs ms-1"></i>
         </button>
         <button class="btn btn-outline-danger" id="btnExcluirLinha" disabled
                 onclick="excluirSelecionada()"
                 title="Excluir a linha selecionada">
           <i class="fas fa-trash-can"></i>
+        </button>
+      </div>
+      {# Fase 6 — a árvore inteira de uma vez. Numa obra de 100+ tarefas é a
+         diferença entre enxergar a estrutura e rolar a página. #}
+      <div class="btn-group btn-group-sm" role="group" aria-label="Árvore">
+        <button class="btn btn-outline-secondary" onclick="expandirTudo()"
+                title="Expandir todos os grupos">
+          <i class="fas fa-plus-square"></i>
+        </button>
+        <button class="btn btn-outline-secondary" onclick="recolherTudo()"
+                title="Recolher todos os grupos">
+          <i class="fas fa-minus-square"></i>
         </button>
       </div>
       {# Fase 5 — manual de uso do editor. PDF estático versionado no repo
@@ -834,6 +852,28 @@
 }
 .btn-toggle:hover { color: #d97706; }
 .toggle-placeholder { width: 18px; flex-shrink: 0; }
+
+/* Fase 6 — alvo de aninhamento no arrasto. Soltar SOBRE a linha acesa faz a
+   arrastada virar filha dela; soltar entre linhas segue só reordenando, e por
+   isso o realce é a borda inteira (não um traço de inserção). */
+tr.tarefa-row.drop-nest > td {
+  background: #e8f0fe !important;
+  border-top: 2px solid #1565c0 !important;
+  border-bottom: 2px solid #1565c0 !important;
+}
+tr.tarefa-row.drop-nest > td:first-child { border-left: 2px solid #1565c0 !important; }
+tr.tarefa-row.drop-nest > td:last-child  { border-right: 2px solid #1565c0 !important; }
+
+/* Menu de contexto (botão direito na grade) */
+#gradeCtxMenu {
+  position: fixed; z-index: 1080; display: none; min-width: 232px;
+  padding: 4px 0; font-size: .875rem;
+}
+#gradeCtxMenu.show { display: block; }
+#gradeCtxMenu .dropdown-item { padding: 5px 14px; display: flex; align-items: center; }
+#gradeCtxMenu .dropdown-item i:first-child { width: 18px; flex-shrink: 0; }
+#gradeCtxMenu .ctx-atalho { margin-left: auto; padding-left: 18px; color: #adb5bd; font-size: .75rem; }
+#gradeCtxMenu .dropdown-item.disabled .ctx-atalho { color: #ced4da; }
 
 /* Nome */
 .nome-tarefa { cursor: default; transition: color .15s; }
@@ -2517,6 +2557,82 @@ function _restaurarOrdemDOM(tbody, ordemIds) {
   renumerarTudo(tbody);
 }
 
+// Fase 6 — alvo de aninhamento armado pelo onMove: id da linha sobre cuja
+// FAIXA CENTRAL o ponteiro está. null = gesto de reordenação normal.
+let _alvoNest = null;
+
+function _limparNest() {
+  document.querySelectorAll('tr.drop-nest').forEach(r => r.classList.remove('drop-nest'));
+  _alvoNest = null;
+}
+
+// Alvo é descendente do arrastado? Sobe pela cadeia `data-pai` do DOM. O
+// backend rejeita o ciclo de qualquer jeito (400), mas realçar um alvo
+// impossível prometeria ao usuário algo que não vai acontecer.
+function _ehDescendente(alvoId, ancestralId) {
+  let cursor = _rowDe(alvoId);
+  const vistos = new Set();
+  while (cursor && cursor.dataset.pai) {
+    const paiId = Number(cursor.dataset.pai);
+    if (paiId === ancestralId) return true;
+    if (vistos.has(paiId)) break;
+    vistos.add(paiId);
+    cursor = _rowDe(paiId);
+  }
+  return false;
+}
+
+// Fração da altura da linha que conta como "solte aqui para aninhar". A MESMA
+// usada pelo onMove — as duas checagens têm de concordar, senão o realce
+// prometeria uma coisa e o soltar faria outra.
+const NEST_MIN = 0.30, NEST_MAX = 0.70;
+
+// O ponto onde soltou está mesmo dentro da faixa central do alvo armado?
+// Conservador de propósito: sem coordenadas legíveis devolve false, e o gesto
+// vira reordenação (o comportamento de antes da Fase 6) em vez de aninhar num
+// lugar que o usuário talvez não tenha escolhido.
+function _soltouSobreOAlvo(oe, alvoId) {
+  const cx = oe?.clientX ?? oe?.changedTouches?.[0]?.clientX;
+  const cy = oe?.clientY ?? oe?.changedTouches?.[0]?.clientY;
+  if (cx == null || cy == null) return false;
+  const r = _rowDe(alvoId)?.getBoundingClientRect();
+  if (!r || !r.height) return false;
+  return cx >= r.left && cx <= r.right
+      && cy >= r.top + r.height * NEST_MIN
+      && cy <= r.top + r.height * NEST_MAX;
+}
+
+async function _moverParaPai(tarefaId, novoPaiId, snapshot) {
+  const tbody = document.getElementById('tarefasBody');
+  let data = null, res;
+  try {
+    res = await fetch(apiUrl(`/tarefa/${tarefaId}/mover`), {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ novo_pai_id: novoPaiId }),
+    });
+    try { data = await res.clone().json(); } catch(_) {}
+  } catch (netErr) {
+    console.error('[cronograma] Erro de rede ao mover', netErr);
+    _restaurarOrdemDOM(tbody, snapshot);
+    renderGantt();
+    toast('Erro de rede ao mover a tarefa. Restaurada a posição anterior.', 'error');
+    return;
+  }
+  if (!res.ok || !data || data.status !== 'ok') {
+    // Motivos do backend (folha iniciada, com vínculos, ciclo) chegam prontos.
+    console.error('[cronograma] Falha ao mover', { status: res.status, data });
+    _restaurarOrdemDOM(tbody, snapshot);
+    renderGantt();
+    toast((data && (data.msg || data.error)) || `Erro ${res.status}`, 'error');
+    return;
+  }
+  marcarAcaoNova();
+  _aplicarListaServidor(data, tarefaId);
+  const row = _rowDe(tarefaId);
+  if (row) selecionarCelula(row, 2);
+  toast(novoPaiId ? 'Tarefa aninhada' : 'Tarefa promovida para a raiz');
+}
+
 function initRowDrag() {
   const tbody = document.getElementById('tarefasBody');
   if (!tbody) return;
@@ -2538,11 +2654,74 @@ function initRowDrag() {
     onStart() {
       _preDragOrder = Array.from(tbody.querySelectorAll('.tarefa-row'))
         .map(r => parseInt(r.dataset.id));
+      _limparNest();
+    },
+
+    // Fase 6 — decide, a cada movimento, entre REORDENAR e ANINHAR. A faixa
+    // central (30–70% da altura da linha sob o cursor) significa "solte aqui
+    // para virar filha"; as bordas seguem sendo inserção entre linhas, o
+    // gesto de sempre. Devolver false impede o Sortable de reordenar enquanto
+    // o alvo está armado — senão a linha andaria sob o cursor e o alvo fugiria.
+    onMove(evt) {
+      const alvo = evt.related;
+      const arrastadoId = parseInt(evt.dragged?.dataset.id);
+      if (!alvo || !alvo.classList.contains('tarefa-row')) { _limparNest(); return true; }
+
+      const alvoId = parseInt(alvo.dataset.id);
+      // Não faz sentido aninhar em si mesmo, no pai atual (já é filha dele)
+      // nem num descendente (ciclo).
+      const arrastadoEl = _rowDe(arrastadoId);
+      if (alvoId === arrastadoId ||
+          String(alvoId) === String(arrastadoEl?.dataset.pai || '') ||
+          _ehDescendente(alvoId, arrastadoId)) { _limparNest(); return true; }
+
+      const oe = evt.originalEvent;
+      // forceFallback:true ⇒ não há evento nativo de drag; o ponteiro vem do
+      // mouse/touch que o Sortable repassa aqui.
+      const clientY = oe?.clientY ?? oe?.touches?.[0]?.clientY;
+      if (clientY == null) { _limparNest(); return true; }
+
+      const r = alvo.getBoundingClientRect();
+      const frac = (clientY - r.top) / (r.height || 1);
+      if (frac >= NEST_MIN && frac <= NEST_MAX) {
+        if (_alvoNest !== alvoId) {
+          _limparNest();
+          alvo.classList.add('drop-nest');
+          _alvoNest = alvoId;
+        }
+        return false;                 // trava a reordenação: o gesto é aninhar
+      }
+      _limparNest();
+      return true;
     },
 
     async onEnd(evt) {
       const movedEl = evt.item;
       const movedId = parseInt(movedEl.dataset.id);
+
+      // Fase 6 — o alvo armado pelo onMove precisa ser RECONFERIDO contra o
+      // ponto onde o dedo/mouse soltou de verdade. O Sortable só dispara
+      // onMove sobre itens da lista: se o ponteiro atravessa a faixa central
+      // de uma linha e depois sai da tabela (área vazia abaixo, toolbar,
+      // cabeçalho), nenhum onMove novo acontece e `_alvoNest` fica armado com
+      // um alvo obsoleto — o arrasto aninhava numa linha onde o cursor já não
+      // estava, em vez de simplesmente reordenar como fazia antes da Fase 6.
+      if (_alvoNest && !_soltouSobreOAlvo(evt.originalEvent, _alvoNest)) {
+        _limparNest();          // segue para o caminho de reordenação normal
+      }
+
+      // Soltou mesmo sobre a faixa central: é aninhamento, não reordenação. O
+      // DOM volta ao estado pré-arraste e a verdade vem da resposta do
+      // servidor (que renumera a árvore inteira).
+      if (_alvoNest) {
+        const novoPaiId = _alvoNest;
+        const snapshot = _preDragOrder;
+        _limparNest();
+        _preDragOrder = null;
+        if (snapshot) _restaurarOrdemDOM(tbody, snapshot);
+        await _moverParaPai(movedId, novoPaiId, snapshot);
+        return;
+      }
 
       // Se o item movido é uma tarefa-pai, mantém o grupo coeso: arrasta TODOS
       // os descendentes (filhos, netos, etc.) para logo após o pai, preservando
@@ -2692,7 +2871,7 @@ function limparSelecao() {
 function atualizarToolbarGrade() {
   const temSel = !!(gradeSel && _rowDe(gradeSel.tarefaId));
   ['btnRecuar', 'btnDesrecuar', 'btnInserirAcima', 'btnInserirAbaixo',
-   'btnExcluirLinha'].forEach(id => {
+   'btnInserirDentro', 'btnExcluirLinha'].forEach(id => {
     const b = document.getElementById(id);
     if (b) b.disabled = !temSel;
   });
@@ -2924,7 +3103,90 @@ async function inserirLinha(posicao) {
   document.getElementById('emptyState')?.remove();
   const row = _rowDe(data.tarefa.id);
   if (row) { selecionarCelula(row, 2); entrarEdicao(); }
-  toast('Linha inserida');
+  // 'dentro' (Fase 6) transforma a referência em grupo — vale dizer, porque a
+  // linha clicada muda de natureza (ganha a setinha), não só de vizinhança.
+  toast(posicao === 'dentro' ? 'Subtarefa criada' : 'Linha inserida');
+}
+
+// ── Árvore inteira (Fase 6) ──
+// Reusa o contrato de estado de toggleFilhas (`data-expanded`, `icon-<id>`,
+// `.d-none`) em vez de manter um modelo paralelo: o que a setinha faz linha a
+// linha, estas fazem de uma vez.
+function expandirTudo() {
+  document.querySelectorAll('#tarefasBody .tarefa-row').forEach(r => r.classList.remove('d-none'));
+  document.querySelectorAll('#tarefasBody .toggle-btn').forEach(btn => {
+    btn.dataset.expanded = 'true';
+    const icon = btn.querySelector('i');
+    if (icon) icon.className = 'fas fa-chevron-down fa-xs';
+  });
+}
+
+function recolherTudo() {
+  document.querySelectorAll('#tarefasBody .tarefa-row').forEach(r => {
+    if (r.dataset.pai) r.classList.add('d-none');   // toda linha com pai some
+  });
+  document.querySelectorAll('#tarefasBody .toggle-btn').forEach(btn => {
+    btn.dataset.expanded = 'false';
+    const icon = btn.querySelector('i');
+    if (icon) icon.className = 'fas fa-chevron-right fa-xs';
+  });
+  // A seleção pode ter ficado numa linha agora oculta — o teclado navega só
+  // pelas visíveis (_linhasVisiveis), então ficaria presa.
+  if (gradeSel && _rowDe(gradeSel.tarefaId)?.classList.contains('d-none')) limparSelecao();
+}
+
+// ── Menu de contexto (Fase 6) ──
+const CTX_ACOES = {
+  'inserir-acima':  () => inserirLinha('acima'),
+  'inserir-abaixo': () => inserirLinha('abaixo'),
+  'inserir-dentro': () => inserirLinha('dentro'),
+  'recuar':         () => recuarSelecionada(),
+  'desrecuar':      () => desrecuarSelecionada(),
+  'toggle':         () => { if (gradeSel) toggleFilhas(gradeSel.tarefaId); },
+  'editar':         () => { if (gradeSel) abrirEditar(gradeSel.tarefaId); },
+  'excluir':        () => excluirSelecionada(),
+};
+
+function ctxAcao(acao) {
+  fecharCtxMenu();
+  CTX_ACOES[acao]?.();
+}
+
+function fecharCtxMenu() {
+  document.getElementById('gradeCtxMenu')?.classList.remove('show');
+}
+
+// Abre no ponto (x, y) da viewport, para a célula JÁ selecionada.
+function abrirCtxMenu(x, y) {
+  const menu = document.getElementById('gradeCtxMenu');
+  if (!menu || !gradeSel) return;
+  const t = tarefas.find(it => it.id === gradeSel.tarefaId);
+  const ePai = _ePai(gradeSel.tarefaId);
+
+  // Itens que não se aplicam à linha clicada ficam visíveis porém inertes —
+  // some-los mudaria a posição dos outros a cada clique.
+  const inapto = {
+    'desrecuar': !t || !t.tarefa_pai_id,   // já está na raiz
+    'toggle': !ePai,                       // não tem filhas para recolher
+  };
+  menu.querySelectorAll('[data-ctx]').forEach(btn => {
+    btn.classList.toggle('disabled', !!inapto[btn.dataset.ctx]);
+    btn.disabled = !!inapto[btn.dataset.ctx];
+  });
+  const btnToggle = document.getElementById('ctxToggleLabel');
+  if (btnToggle) {
+    const aberto = document.getElementById(`icon-${gradeSel.tarefaId}`)
+      ?.closest('.toggle-btn')?.dataset.expanded === 'true';
+    btnToggle.textContent = aberto ? 'Recolher subtarefas' : 'Expandir subtarefas';
+  }
+
+  // Mede escondido para não piscar fora da tela antes de reposicionar.
+  menu.style.visibility = 'hidden';
+  menu.classList.add('show');
+  const { width, height } = menu.getBoundingClientRect();
+  menu.style.left = Math.min(x, window.innerWidth  - width  - 8) + 'px';
+  menu.style.top  = Math.min(y, window.innerHeight - height - 8) + 'px';
+  menu.style.visibility = '';
 }
 
 function excluirSelecionada() {
@@ -3122,10 +3384,41 @@ function initGrade() {
     }
   });
 
+  // Fase 6 — botão direito na grade. Seleciona a célula sob o cursor ANTES de
+  // abrir, e por isso todo item do menu chama a mesma função da barra, que já
+  // opera sobre `gradeSel` — nenhum caminho novo de execução.
+  tbody.addEventListener('contextmenu', e => {
+    const td  = e.target.closest('td');
+    const row = e.target.closest('tr.tarefa-row');
+    if (!td || !row) return;                       // fora de linha: menu do navegador
+    e.preventDefault();
+    const col = COLS_NAV.includes(td.cellIndex) ? td.cellIndex : COLS_NAV[0];
+    selecionarCelula(row, col);
+    abrirCtxMenu(e.clientX, e.clientY);
+  });
+
+  // Fecha em qualquer clique fora, rolagem ou perda de foco da janela. O
+  // `scroll` é capturado (3º arg) porque quem rola é a div da grade, não a
+  // janela — sem isso o menu ficaria flutuando longe da linha.
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#gradeCtxMenu')) fecharCtxMenu();
+  });
+  document.addEventListener('scroll', fecharCtxMenu, true);
+  window.addEventListener('blur', fecharCtxMenu);
+  window.addEventListener('resize', fecharCtxMenu);
+
   document.addEventListener('keydown', e => {
     // Guards: nunca sequestrar um campo em edição nem um modal/offcanvas.
     if (e.target.closest?.('input, select, textarea, [contenteditable]')) return;
     if (document.querySelector('.modal.show, .offcanvas.show')) return;
+
+    // Escape fecha o menu antes de qualquer outra coisa (inclusive de limpar
+    // a seleção), senão fechar o menu custaria a linha em que se estava.
+    const menuAberto = document.getElementById('gradeCtxMenu')?.classList.contains('show');
+    if (menuAberto) {
+      if (e.key === 'Escape') { e.preventDefault(); fecharCtxMenu(); return; }
+      fecharCtxMenu();
+    }
 
     // Fase 3 — Ctrl+Z/Ctrl+Y ANTES do guard de seleção: desfazer não depende
     // de haver célula selecionada. (Ctrl+Y e Ctrl+Shift+Z, como no Project.)
@@ -3145,6 +3438,32 @@ function initGrade() {
       if (e.key === 'ArrowRight') recuarSelecionada(); else desrecuarSelecionada();
       return;
     }
+
+    // Fase 6 — inserção por teclado. Vem ANTES do return de modificadores
+    // porque Shift/Alt fazem parte da combinação. Não colide com nada: o
+    // `default` lá embaixo só captura `e.key.length === 1`, e 'Insert' não é.
+    if (e.key === 'Insert') {
+      e.preventDefault();
+      if (e.altKey) inserirLinha('dentro');
+      else if (e.shiftKey) inserirLinha('acima');
+      else inserirLinha('abaixo');
+      return;
+    }
+    // Teclado de MacBook não tem Insert — mesmo trio em Ctrl+Shift+Enter.
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Enter') {
+      e.preventDefault();
+      inserirLinha(e.altKey ? 'dentro' : 'abaixo');
+      return;
+    }
+    // Tecla Menu (ou Shift+F10): abre o menu de contexto sem mouse.
+    if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+      e.preventDefault();
+      const td = _rowDe(gradeSel.tarefaId)?.cells[gradeSel.col];
+      const r = td ? td.getBoundingClientRect() : { left: 100, bottom: 100 };
+      abrirCtxMenu(r.left, r.bottom);
+      return;
+    }
+
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     switch (e.key) {
@@ -3229,6 +3548,38 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 {% if editor_v2 %}
+{# ── Menu de contexto da grade (Fase 6) ──
+   Um único menu reaproveitado por todas as linhas: o handler de `contextmenu`
+   seleciona a célula sob o cursor ANTES de abrir, então cada item chama a
+   mesma função da barra de ferramentas, que já lê `gradeSel`. Classes do
+   Bootstrap que a página carrega — sem dependência nova. #}
+<ul class="dropdown-menu shadow" id="gradeCtxMenu" role="menu">
+  <li><button class="dropdown-item" data-ctx="inserir-acima" onclick="ctxAcao('inserir-acima')">
+    <i class="fas fa-arrow-up me-2 text-secondary"></i>Inserir linha acima
+    <span class="ctx-atalho">Shift+Ins</span></button></li>
+  <li><button class="dropdown-item" data-ctx="inserir-abaixo" onclick="ctxAcao('inserir-abaixo')">
+    <i class="fas fa-arrow-down me-2 text-secondary"></i>Inserir linha abaixo
+    <span class="ctx-atalho">Ins</span></button></li>
+  <li><button class="dropdown-item" data-ctx="inserir-dentro" onclick="ctxAcao('inserir-dentro')">
+    <i class="fas fa-turn-down fa-rotate-270 me-2 text-secondary"></i>Nova subtarefa dentro
+    <span class="ctx-atalho">Alt+Ins</span></button></li>
+  <li><hr class="dropdown-divider"></li>
+  <li><button class="dropdown-item" data-ctx="recuar" onclick="ctxAcao('recuar')">
+    <i class="fas fa-indent me-2 text-secondary"></i>Recuar (virar subtarefa)
+    <span class="ctx-atalho">Alt+Shift+→</span></button></li>
+  <li><button class="dropdown-item" data-ctx="desrecuar" onclick="ctxAcao('desrecuar')">
+    <i class="fas fa-outdent me-2 text-secondary"></i>Promover um nível
+    <span class="ctx-atalho">Alt+Shift+←</span></button></li>
+  <li><hr class="dropdown-divider"></li>
+  <li><button class="dropdown-item" data-ctx="toggle" onclick="ctxAcao('toggle')">
+    <i class="fas fa-chevron-down me-2 text-secondary"></i><span id="ctxToggleLabel">Recolher subtarefas</span></button></li>
+  <li><button class="dropdown-item" data-ctx="editar" onclick="ctxAcao('editar')">
+    <i class="fas fa-pen me-2 text-secondary"></i>Editar tarefa…</button></li>
+  <li><hr class="dropdown-divider"></li>
+  <li><button class="dropdown-item text-danger" data-ctx="excluir" onclick="ctxAcao('excluir')">
+    <i class="fas fa-trash-can me-2"></i>Excluir linha</button></li>
+</ul>
+
 {# ── Modal Linha de Base (Fase 4) ── #}
 <div class="modal fade" id="modalBaseline" tabindex="-1">
   <div class="modal-dialog">

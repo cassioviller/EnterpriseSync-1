@@ -132,10 +132,22 @@ def main() -> None:
                 'acima/abaixo da selecionada e excluem a linha. A exclusão '
                 'é reversível com Desfazer — os apontamentos de RDO da '
                 'tarefa são preservados.'))
+    fl.append(B('<b>Clique com o botão direito</b> em qualquer linha para o '
+                'menu com todas essas ações. Pelo teclado: <b>Insert</b> '
+                'insere abaixo, <b>Shift+Insert</b> acima e <b>Alt+Insert</b> '
+                'cria uma subtarefa já dentro da linha selecionada.'))
     fl.append(B('<b>Alt+Shift+→</b> recua a tarefa (ela vira subtarefa da '
                 'linha de cima); <b>Alt+Shift+←</b> desrecua (sobe um '
                 'nível). Tarefas-resumo têm datas e duração calculadas a '
                 'partir das subtarefas e não são editáveis diretamente.'))
+    fl.append(B('Para reorganizar com o mouse, arraste a linha pela alça à '
+                'esquerda: soltar <b>entre</b> duas linhas reordena; soltar '
+                '<b>sobre</b> uma linha (que acende) faz a arrastada virar '
+                'subtarefa dela. Os botões de expandir/recolher tudo abrem e '
+                'fecham a árvore inteira de uma vez.'))
+    fl.append(B('Uma tarefa que já foi iniciada, ou que tem vínculos de '
+                'predecessora, não pode virar tarefa-resumo — o sistema '
+                'recusa a operação e explica o motivo.'))
     fl.append(B('Tarefa que já tem avanço apontado em RDO não permite '
                 'alterar a data de início — ela já começou.'))
     fl.append(KeepTogether([
@@ -271,8 +283,14 @@ def main() -> None:
         ['Enter (editando)', 'Confirmar e descer uma linha'],
         ['Tab (editando)', 'Confirmar e ir para a célula seguinte'],
         ['Esc', 'Cancelar a edição / limpar a seleção'],
+        ['Insert', 'Inserir linha abaixo da selecionada'],
+        ['Shift+Insert', 'Inserir linha acima da selecionada'],
+        ['Alt+Insert', 'Nova subtarefa dentro da selecionada'],
+        ['Ctrl+Shift+Enter', 'Inserir linha abaixo (teclado sem a tecla '
+                             'Insert)'],
         ['Alt+Shift+→', 'Recuar (virar subtarefa da linha de cima)'],
         ['Alt+Shift+←', 'Desrecuar (subir um nível na hierarquia)'],
+        ['Shift+F10 ou Menu', 'Abrir o menu de contexto da linha'],
         ['Ctrl+Z', 'Desfazer'],
         ['Ctrl+Y ou Ctrl+Shift+Z', 'Refazer'],
     ]
