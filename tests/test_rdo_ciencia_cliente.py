@@ -5,6 +5,11 @@ O portal da obra é anônimo por construção (`portal_obras_views.py:3`) e
 Esta suíte cobre justamente isso: responsáveis nomeados por obra, senha
 pedida SÓ no ato de assinar, e o placar "todos precisam assinar".
 
+Redesenho de 29/07 (spec 2026-07-29-ciencia-rdo-portal-ux-design.md): NÃO HÁ
+MAIS SESSÃO DE LOGIN. A senha é conferida no mesmo POST que grava a ciência
+(`POST .../ciencia`), e as rotas `/entrar`, `/sair` e `/assinar` morreram —
+`test_rotas_de_sessao_morreram_de_verdade` garante que continuem mortas.
+
 O caso mais importante daqui não é nenhuma funcionalidade nova, e sim a
 REGRESSÃO da migração 268: trocar `UNIQUE (rdo_id, papel)` por dois índices
 parciais não pode ter afrouxado o "um executor por RDO" que a Fase 5 travou.
@@ -136,11 +141,40 @@ def _url(ctx, sufixo=''):
     return f"/portal/obra/{ctx['token']}/rdo/{ctx['rdo_id']}{sufixo}"
 
 
-def _entrar(c, ctx, sig_id=None, senha=None):
-    return c.post(_url(ctx, '/entrar'), data={
+def _assinar(c, ctx, sig_id=None, senha=None, observacao=None, rdo_id=None,
+             **kw):
+    """O POST atômico: identidade + senha + (observação) numa requisição só.
+
+    Substitui o antigo par `_login` + POST /assinar — não existe mais "estar
+    logado", existe assinar.
+    """
+    dados = {
         'signatario_id': sig_id if sig_id is not None else ctx['sig_ids'][0],
         'senha': senha if senha is not None else ctx['senha'],
-    }, follow_redirects=False)
+    }
+    if observacao is not None:
+        dados['observacao'] = observacao
+    rid = rdo_id if rdo_id is not None else ctx['rdo_id']
+    return c.post(f"/portal/obra/{ctx['token']}/rdo/{rid}/ciencia",
+                  data=dados, follow_redirects=False, **kw)
+
+
+def _rdos_extras(ctx, n=1):
+    """Mais N RDOs assinados na mesma obra — com trilha, como o principal."""
+    with app.app_context():
+        obra = db.session.get(Obra, ctx['obra_id'])
+        admin = db.session.get(Usuario, ctx['admin_id'])
+        ids = []
+        for i in range(n):
+            r = RDO(numero_rdo=f'RDO-EXTRA-{_sfx()}',
+                    data_relatorio=date(2026, 6, 23 + i), obra_id=obra.id,
+                    admin_id=obra.admin_id, estado=RASCUNHO)
+            db.session.add(r)
+            db.session.flush()
+            _levar_ao_estado(r, ASSINADO, admin)
+            ids.append(r.id)
+        db.session.commit()
+        return ids
 
 
 def _assinaturas(rdo_id):
@@ -169,9 +203,10 @@ def test_tres_responsaveis_assinam_e_o_placar_fecha_so_no_terceiro():
 
     for i, sid in enumerate(ctx['sig_ids'], start=1):
         c = app.test_client()
-        assert _entrar(c, ctx, sid).status_code == 302
-        r = c.post(_url(ctx, '/assinar'), data={})
+        r = _assinar(c, ctx, sid)
         assert r.status_code == 302
+        # O destino do ato é o comprovante, não a página de leitura.
+        assert '/ciencia/comprovante' in r.headers.get('Location', '')
 
         p = _placar(ctx)
         assert p['assinados'] == i
@@ -191,9 +226,11 @@ def test_placar_sem_responsavel_cadastrado_nao_anuncia_conclusao():
 def test_mesmo_responsavel_nao_assina_duas_vezes():
     ctx = _cenario(n_signatarios=2)
     c = app.test_client()
-    _entrar(c, ctx)
-    assert c.post(_url(ctx, '/assinar'), data={}).status_code == 302
-    assert c.post(_url(ctx, '/assinar'), data={}).status_code == 302
+    assert _assinar(c, ctx).status_code == 302
+    r = _assinar(c, ctx)
+    # A repetição não é falha: leva ao comprovante do ato que já existe.
+    assert r.status_code == 302
+    assert '/ciencia/comprovante' in r.headers.get('Location', '')
     assert len(_assinaturas(ctx['rdo_id'])) == 1
 
 
@@ -240,8 +277,7 @@ def test_ciencia_nao_altera_o_estado_do_rdo():
     """Ciência é ORTOGONAL ao ciclo de vida interno."""
     ctx = _cenario(n_signatarios=1, estado=ASSINADO)
     c = app.test_client()
-    _entrar(c, ctx)
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx)
     with app.app_context():
         assert db.session.get(RDO, ctx['rdo_id']).estado == ASSINADO
 
@@ -249,9 +285,8 @@ def test_ciencia_nao_altera_o_estado_do_rdo():
 def test_assinatura_grava_hash_ip_e_nome_em_snapshot():
     ctx = _cenario(n_signatarios=1)
     c = app.test_client()
-    _entrar(c, ctx)
-    c.post(_url(ctx, '/assinar'), data={'observacao': 'Conferido em campo.'},
-           environ_overrides={'REMOTE_ADDR': '203.0.113.9'})
+    _assinar(c, ctx, observacao='Conferido em campo.',
+             environ_overrides={'REMOTE_ADDR': '203.0.113.9'})
 
     a = _assinaturas(ctx['rdo_id'])[0]
     assert a.papel == RDOAssinatura.PAPEL_CLIENTE
@@ -272,8 +307,7 @@ def test_assinatura_grava_hash_ip_e_nome_em_snapshot():
 def test_rdo_ainda_editavel_recusa_ciencia(estado):
     ctx = _cenario(n_signatarios=1, estado=estado)
     c = app.test_client()
-    _entrar(c, ctx)
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx)
     assert _assinaturas(ctx['rdo_id']) == []
 
 
@@ -281,8 +315,7 @@ def test_rdo_ainda_editavel_recusa_ciencia(estado):
 def test_rdo_imutavel_aceita_ciencia(estado):
     ctx = _cenario(n_signatarios=1, estado=estado)
     c = app.test_client()
-    _entrar(c, ctx)
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx)
     assert len(_assinaturas(ctx['rdo_id'])) == 1
 
 
@@ -290,13 +323,11 @@ def test_rdo_imutavel_aceita_ciencia(estado):
 # Autenticação
 # ---------------------------------------------------------------------------
 
-def test_senha_errada_nao_autentica_e_conta_a_falha():
+def test_senha_errada_nao_assina_e_conta_a_falha():
     ctx = _cenario(n_signatarios=1)
     c = app.test_client()
-    _entrar(c, ctx, senha='errada')
+    _assinar(c, ctx, senha='errada')
     assert _sig(ctx['sig_ids'][0]).falhas_login == 1
-    # Sem sessão, assinar não faz nada.
-    c.post(_url(ctx, '/assinar'), data={})
     assert _assinaturas(ctx['rdo_id']) == []
 
 
@@ -304,11 +335,10 @@ def test_dez_falhas_travam_o_signatario_e_a_senha_certa_para_de_valer():
     ctx = _cenario(n_signatarios=1)
     c = app.test_client()
     for _ in range(ObraSignatarioCliente.MAX_FALHAS):
-        _entrar(c, ctx, senha='errada')
+        _assinar(c, ctx, senha='errada')
     assert _sig(ctx['sig_ids'][0]).travado is True
 
-    _entrar(c, ctx)                       # agora com a senha CERTA
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx)                      # agora com a senha CERTA
     assert _assinaturas(ctx['rdo_id']) == []
 
 
@@ -333,8 +363,11 @@ def test_gerar_senha_temporaria_destrava_e_limpa_o_pedido():
     assert s.senha_temporaria is True
     assert len(senha) == 10
 
+    # A senha temporária autentica — e o POST desvia para a troca.
     c = app.test_client()
-    assert _entrar(c, ctx, senha=senha).status_code == 302
+    r = _assinar(c, ctx, senha=senha)
+    assert r.status_code == 302
+    assert '/ciencia/senha' in r.headers.get('Location', '')
 
 
 def test_senha_temporaria_autentica_mas_nao_assina_antes_da_troca():
@@ -348,15 +381,17 @@ def test_senha_temporaria_autentica_mas_nao_assina_antes_da_troca():
         db.session.commit()
 
     c = app.test_client()
-    _entrar(c, ctx, senha=senha)
-    c.post(_url(ctx, '/assinar'), data={})
+    r = _assinar(c, ctx, senha=senha)
+    assert '/ciencia/senha' in r.headers.get('Location', '')
     assert _assinaturas(ctx['rdo_id']) == []
 
-    # Depois de definir senha própria, assina.
-    c.post(_url(ctx, '/senha'), data={'nova_senha': 'MinhaSenha!9',
-                                      'confirma_senha': 'MinhaSenha!9'})
+    # Define a senha própria — a atual autentica no próprio POST — e assina.
+    c.post(_url(ctx, '/ciencia/senha'),
+           data={'signatario_id': ctx['sig_ids'][0], 'senha_atual': senha,
+                 'nova_senha': 'MinhaSenha!9',
+                 'confirma_senha': 'MinhaSenha!9'})
     assert _sig(ctx['sig_ids'][0]).senha_temporaria is False
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx, senha='MinhaSenha!9')
     assert len(_assinaturas(ctx['rdo_id'])) == 1
 
 
@@ -371,8 +406,7 @@ def test_senha_temporaria_vencida_nao_autentica():
         db.session.commit()
 
     c = app.test_client()
-    _entrar(c, ctx, senha=senha)
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx, senha=senha)
     assert _assinaturas(ctx['rdo_id']) == []
 
 
@@ -381,16 +415,36 @@ def test_troca_de_senha_recusa_senha_curta_e_confirmacao_diferente():
 
     ctx = _cenario(n_signatarios=1)
     c = app.test_client()
-    _entrar(c, ctx)
 
-    c.post(_url(ctx, '/senha'), data={'nova_senha': 'abc',
-                                      'confirma_senha': 'abc'})
-    c.post(_url(ctx, '/senha'), data={'nova_senha': 'senhaboa123',
-                                      'confirma_senha': 'outracoisa'})
-    # Nenhuma das duas passou: a senha original continua valendo.
+    base = {'signatario_id': ctx['sig_ids'][0], 'senha_atual': ctx['senha']}
+    c.post(_url(ctx, '/ciencia/senha'),
+           data={**base, 'nova_senha': 'abc', 'confirma_senha': 'abc'})
+    c.post(_url(ctx, '/ciencia/senha'),
+           data={**base, 'nova_senha': 'senhaboa123',
+                 'confirma_senha': 'outracoisa'})
+    # Nenhuma das duas passou: a senha original continua assinando.
     c2 = app.test_client()
-    assert _entrar(c2, ctx).status_code == 302
+    _assinar(c2, ctx)
+    assert len(_assinaturas(ctx['rdo_id'])) == 1
     assert SENHA_MIN == 8
+
+
+def test_troca_de_senha_sem_a_senha_atual_certa_nao_passa():
+    """Sem sessão, a senha ATUAL é o que autentica a troca. Sem ela, qualquer
+    um trocaria a senha de qualquer nome da lista pública."""
+    ctx = _cenario(n_signatarios=1)
+    c = app.test_client()
+    antes = _sig(ctx['sig_ids'][0]).password_hash
+
+    c.post(_url(ctx, '/ciencia/senha'),
+           data={'signatario_id': ctx['sig_ids'][0],
+                 'senha_atual': 'chute-errado',
+                 'nova_senha': 'DoAtacante!9',
+                 'confirma_senha': 'DoAtacante!9'})
+
+    s = _sig(ctx['sig_ids'][0])
+    assert s.password_hash == antes, 'senha trocada sem provar a atual'
+    assert s.falhas_login == 1
 
 
 def test_rate_limit_barra_forca_bruta_por_signatario():
@@ -409,11 +463,13 @@ def test_rate_limit_barra_forca_bruta_por_signatario():
         c = app.test_client()
         alvo = ctx['sig_ids'][0]
         for _ in range(5):
-            _entrar(c, ctx, alvo, senha='errada')
-        assert _entrar(c, ctx, alvo, senha='errada').status_code == 429
+            _assinar(c, ctx, alvo, senha='errada')
+        assert _assinar(c, ctx, alvo, senha='errada').status_code == 429
 
-        # O colega, mesmo IP, não foi punido pelo erro do primeiro.
-        assert _entrar(c, ctx, ctx['sig_ids'][1]).status_code == 302
+        # O colega, mesmo IP, não foi punido pelo erro do primeiro — e a
+        # prova mais forte possível: ele ASSINA.
+        assert _assinar(c, ctx, ctx['sig_ids'][1]).status_code == 302
+        assert len(_assinaturas(ctx['rdo_id'])) == 1
     finally:
         limiter.enabled = False
         limiter.reset()
@@ -423,67 +479,46 @@ def test_esqueci_senha_marca_pendencia_sem_revelar_quem_existe():
     ctx = _cenario(n_signatarios=1)
     c = app.test_client()
 
-    r = c.post(_url(ctx, '/esqueci'), data={'signatario_id': ctx['sig_ids'][0]})
+    r = c.post(_url(ctx, '/ciencia/esqueci'),
+               data={'signatario_id': ctx['sig_ids'][0]})
     assert r.status_code == 302
     assert _sig(ctx['sig_ids'][0]).recuperacao_pedida_em is not None
 
     # Id inexistente responde igual — a rota não vira verificador de cadastro.
-    r2 = c.post(_url(ctx, '/esqueci'), data={'signatario_id': 999_999})
+    r2 = c.post(_url(ctx, '/ciencia/esqueci'), data={'signatario_id': 999_999})
     assert r2.status_code == 302
 
 
 # ---------------------------------------------------------------------------
-# Sessão e escopo
+# Escopo — sem sessão, a credencial vale para UMA obra e o token manda
 # ---------------------------------------------------------------------------
 
-def test_sessao_de_outra_obra_nao_assina_nesta():
+def test_credencial_de_uma_obra_nao_assina_em_outra():
+    """`autenticar` resolve o signatário DENTRO da obra do token — o id e a
+    senha da obra A são lixo na obra B."""
     a = _cenario(n_signatarios=1)
     b = _cenario(n_signatarios=1)
 
     c = app.test_client()
-    _entrar(c, a)                       # logado na obra A
-    c.post(_url(b, '/assinar'), data={})   # tenta assinar na obra B
+    _assinar(c, b, sig_id=a['sig_ids'][0], senha=a['senha'])
     assert _assinaturas(b['rdo_id']) == []
     assert _assinaturas(a['rdo_id']) == []
 
 
-def test_sessao_expirada_pede_senha_de_novo():
-    from services.portal_signatario_auth import CHAVE_SESSAO
-
+def test_cada_rdo_exige_a_senha_e_tres_atos_seguidos_funcionam():
+    """O contrato do redesenho: sem senha nada assina; com senha, assinar
+    três RDOs em sequência são três POSTs — nenhum estado entre eles."""
     ctx = _cenario(n_signatarios=1)
+    outros = _rdos_extras(ctx, n=2)
     c = app.test_client()
-    _entrar(c, ctx)
-    with c.session_transaction() as sess:
-        dados = dict(sess[CHAVE_SESSAO])
-        dados['exp'] = (datetime.utcnow() - timedelta(minutes=1)).isoformat()
-        sess[CHAVE_SESSAO] = dados
 
-    c.post(_url(ctx, '/assinar'), data={})
-    assert _assinaturas(ctx['rdo_id']) == []
-
-
-def test_uma_sessao_assina_varios_rdos_sem_redigitar():
-    """O motivo de a sessão existir: quem sumiu uma semana volta com fila."""
-    ctx = _cenario(n_signatarios=1)
-    with app.app_context():
-        obra = db.session.get(Obra, ctx['obra_id'])
-        admin = db.session.get(Usuario, ctx['admin_id'])
-        outros = []
-        for i in range(2):
-            r = RDO(numero_rdo=f'RDO-EXTRA-{_sfx()}',
-                    data_relatorio=date(2026, 6, 23 + i), obra_id=obra.id,
-                    admin_id=obra.admin_id, estado=RASCUNHO)
-            db.session.add(r)
-            db.session.flush()
-            _levar_ao_estado(r, ASSINADO, admin)   # com trilha, como o outro
-            outros.append(r.id)
-        db.session.commit()
-
-    c = app.test_client()
-    _entrar(c, ctx)                       # senha UMA vez
+    # Sem senha (corpo vazio), nenhum RDO assina — não há sessão que ajude.
     for rid in [ctx['rdo_id']] + outros:
-        c.post(f"/portal/obra/{ctx['token']}/rdo/{rid}/assinar", data={})
+        c.post(f"/portal/obra/{ctx['token']}/rdo/{rid}/ciencia", data={})
+        assert _assinaturas(rid) == []
 
+    for rid in [ctx['rdo_id']] + outros:
+        _assinar(c, ctx, rdo_id=rid)
     for rid in [ctx['rdo_id']] + outros:
         assert len(_assinaturas(rid)) == 1
 
@@ -491,8 +526,7 @@ def test_uma_sessao_assina_varios_rdos_sem_redigitar():
 def test_desativado_some_do_placar_mas_a_assinatura_dele_permanece():
     ctx = _cenario(n_signatarios=2)
     c = app.test_client()
-    _entrar(c, ctx, ctx['sig_ids'][0])
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx, ctx['sig_ids'][0])
 
     with app.app_context():
         s = db.session.get(ObraSignatarioCliente, ctx['sig_ids'][0])
@@ -506,15 +540,14 @@ def test_desativado_some_do_placar_mas_a_assinatura_dele_permanece():
     assert len(_assinaturas(ctx['rdo_id'])) == 1
 
 
-def test_desativado_no_meio_da_sessao_perde_o_acesso():
+def test_desativado_nao_autentica_mais():
     ctx = _cenario(n_signatarios=1)
-    c = app.test_client()
-    _entrar(c, ctx)
     with app.app_context():
         db.session.get(ObraSignatarioCliente, ctx['sig_ids'][0]).ativo = False
         db.session.commit()
 
-    c.post(_url(ctx, '/assinar'), data={})
+    c = app.test_client()
+    _assinar(c, ctx)
     assert _assinaturas(ctx['rdo_id']) == []
 
 
@@ -522,38 +555,71 @@ def test_token_de_outra_obra_nao_alcanca_este_rdo():
     a = _cenario(n_signatarios=1)
     b = _cenario(n_signatarios=1)
     c = app.test_client()
-    r = c.post(f"/portal/obra/{b['token']}/rdo/{a['rdo_id']}/assinar", data={})
+    r = c.post(f"/portal/obra/{b['token']}/rdo/{a['rdo_id']}/ciencia",
+               data={'signatario_id': a['sig_ids'][0], 'senha': a['senha']})
     assert r.status_code == 404
     assert _assinaturas(a['rdo_id']) == []
 
 
-def test_login_continua_disponivel_em_rdo_que_nao_aceita_ciencia():
-    """Regressão da 1ª versão: o aviso de bloqueio engolia o formulário
-    inteiro, e numa obra sem RDO assinado o responsável não tinha ONDE entrar
-    para trocar a própria senha."""
+def test_rotas_de_sessao_morreram_de_verdade():
+    """Guarda contra ressurreição (spec §6): as rotas da sessão respondem 404
+    e o cookie não carrega identidade nenhuma depois de assinar. Transforma
+    "removemos a sessão" numa propriedade verificada, não numa promessa."""
+    ctx = _cenario(n_signatarios=1)
+    c = app.test_client()
+
+    for sufixo in ('/entrar', '/sair', '/assinar'):
+        r = c.post(_url(ctx, sufixo), data={
+            'signatario_id': ctx['sig_ids'][0], 'senha': ctx['senha']})
+        assert r.status_code == 404, f'{sufixo} respondeu {r.status_code}'
+    assert _assinaturas(ctx['rdo_id']) == []
+
+    _assinar(c, ctx)
+    with c.session_transaction() as sess:
+        assert 'portal_sig' not in sess, 'a sessão de login ressuscitou'
+        # O que sobra é a marca do comprovante — id de assinatura + validade,
+        # nada de identidade.
+        marca = sess.get('portal_comprovante')
+        assert marca is not None
+        assert set(marca.keys()) == {'assinatura_id', 'exp'}
+
+    # E a marca não autentica: outro RDO continua exigindo a senha.
+    extra = _rdos_extras(ctx, n=1)[0]
+    c.post(f"/portal/obra/{ctx['token']}/rdo/{extra}/ciencia", data={})
+    assert _assinaturas(extra) == []
+
+
+def test_rdo_bloqueado_ainda_permite_trocar_a_propria_senha():
+    """Regressão da 1ª versão da Fase 9a, preservada no redesenho: o bloqueio
+    da ciência não pode deixar o responsável sem caminho para a troca de
+    senha. Hoje o caminho é a rota própria, não um formulário na leitura."""
     ctx = _cenario(n_signatarios=2, estado=PREENCHIDO)
     c = app.test_client()
+
     html = c.get(_url(ctx)).get_data(as_text=True)
+    assert 'ainda está sendo finalizado' in html      # o motivo, na faixa
+    assert 'Dar ciência' not in html                  # sem botão de assinar
 
-    assert 'ainda está sendo finalizado' in html      # o motivo aparece
-    assert 'Selecione seu nome' in html               # e o login também
-    assert '>Entrar<' in html or 'Entrar\n' in html   # sem prometer "assinar"
-    assert 'Confirmar minha ciência' not in html      # mas sem botão de assinar
-
-    # E entrar de fato funciona: dá para trocar a senha por aqui.
-    assert _entrar(c, ctx).status_code == 302
-    r = c.post(_url(ctx, '/senha'), data={'nova_senha': 'OutraSenha!7',
-                                          'confirma_senha': 'OutraSenha!7'})
+    # A tela do ato recusa e devolve à leitura…
+    r = c.get(_url(ctx, '/ciencia'))
     assert r.status_code == 302
-    assert _sig(ctx['sig_ids'][0]).senha_temporaria is False
+
+    # …mas trocar a senha continua funcionando, autenticada pelo POST.
+    antes = _sig(ctx['sig_ids'][0]).password_hash
+    r = c.post(_url(ctx, '/ciencia/senha'),
+               data={'signatario_id': ctx['sig_ids'][0],
+                     'senha_atual': ctx['senha'],
+                     'nova_senha': 'OutraSenha!7',
+                     'confirma_senha': 'OutraSenha!7'})
+    assert r.status_code == 302
+    assert _sig(ctx['sig_ids'][0]).password_hash != antes
 
 
 def test_rdo_alterado_depois_de_assinado_marca_a_ciencia_como_nao_integra():
     """O hash guardado só vale se for conferido — este é o teste que o cobra."""
     ctx = _cenario(n_signatarios=1)
     c = app.test_client()
-    _entrar(c, ctx)
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx)
 
     p = _placar(ctx)
     assert p['itens'][0]['integra'] is True
@@ -586,8 +652,7 @@ def test_placar_por_rdo_e_o_da_listagem_batem_com_o_detalhado():
 
     ctx = _cenario(n_signatarios=3)
     c = app.test_client()
-    _entrar(c, ctx, ctx['sig_ids'][0])
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx, ctx['sig_ids'][0])
 
     with app.app_context():
         rdo = db.session.get(RDO, ctx['rdo_id'])
@@ -612,8 +677,7 @@ def test_placar_da_listagem_ignora_rdo_que_nao_aceita_ciencia():
 def test_listagem_do_portal_mostra_o_placar_em_miniatura():
     ctx = _cenario(n_signatarios=2)
     c = app.test_client()
-    _entrar(c, ctx, ctx['sig_ids'][0])
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx, ctx['sig_ids'][0])
 
     html = c.get(f"/portal/obra/{ctx['token']}").get_data(as_text=True)
     assert 'rdo-ciencia' in html
@@ -644,8 +708,7 @@ def test_pdf_do_rdo_traz_a_ciencia_com_quem_falta():
     diferença entre "duas pessoas assinaram" e "falta o diretor"."""
     ctx = _cenario(n_signatarios=3)
     c = app.test_client()
-    _entrar(c, ctx, ctx['sig_ids'][0])
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx, ctx['sig_ids'][0])
 
     # `_section_rule` faz `label.upper()`: o título sai "CIÊNCIA DO CLIENTE".
     texto = _texto_do_pdf(ctx['rdo_id']).lower()
@@ -667,8 +730,7 @@ def test_pdf_alerta_quando_o_rdo_mudou_depois_de_assinado():
     não é. O papel tem de dizer."""
     ctx = _cenario(n_signatarios=1)
     c = app.test_client()
-    _entrar(c, ctx)
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx)
 
     texto = _texto_do_pdf(ctx['rdo_id']).lower()
     assert 'atenção' not in texto                 # íntegro: sem alerta
@@ -692,8 +754,7 @@ def test_tela_interna_mostra_quem_falta_dar_ciencia():
     placar diz quem falta — é o que serve para cobrar o cliente."""
     ctx = _cenario(n_signatarios=3)
     c = app.test_client()
-    _entrar(c, ctx, ctx['sig_ids'][0])
-    c.post(_url(ctx, '/assinar'), data={})
+    _assinar(c, ctx, ctx['sig_ids'][0])
 
     interno = app.test_client()
     with interno.session_transaction() as sess:
@@ -708,15 +769,24 @@ def test_tela_interna_mostra_quem_falta_dar_ciencia():
         assert _sig(sid).nome in html          # os dois que faltam, nomeados
 
 
-def test_pagina_do_rdo_mostra_o_placar_e_o_seletor_de_nomes():
+def test_pagina_do_rdo_mostra_faixa_e_placar_e_a_tela_do_ato_o_seletor():
+    """A leitura tem o estado (faixa + placar nominal); o formulário mora na
+    tela do ato. Cada tela com um trabalho — decisão D2 do redesenho."""
     ctx = _cenario(n_signatarios=2)
     c = app.test_client()
+
     html = c.get(_url(ctx)).get_data(as_text=True)
-    assert 'Ciência do cliente' in html
+    assert 'Ciência do cliente' in html               # placar nominal, no fim
     assert '0 de 2' in html
-    assert 'Selecione seu nome' in html
+    assert 'Dar ciência' in html                      # a chamada, na faixa
+    assert 'Selecione seu nome' not in html           # formulário: só no ato
     for sid in ctx['sig_ids']:
-        assert _sig(sid).nome in html
+        assert _sig(sid).nome in html                 # quem falta, nomeado
+
+    ato = c.get(_url(ctx, '/ciencia')).get_data(as_text=True)
+    assert 'Selecione seu nome' in ato
+    assert 'Confirmar minha ciência' in ato
+    assert 'Você está confirmando' in ato             # o resumo do documento
 
 
 # ---------------------------------------------------------------------------
@@ -920,7 +990,7 @@ def test_rate_limit_nao_e_contornavel_variando_a_grafia_do_id():
         c = app.test_client()
         codigos = []
         for g in grafias:
-            r = c.post(_url(ctx, '/entrar'),
+            r = c.post(_url(ctx, '/ciencia'),
                        data={'signatario_id': g, 'senha': 'errada'})
             codigos.append(r.status_code)
         assert 429 in codigos, (
@@ -934,14 +1004,16 @@ def test_rate_limit_nao_e_contornavel_variando_a_grafia_do_id():
     assert _sig(alvo).falhas_login < ObraSignatarioCliente.MAX_FALHAS
 
 
-def test_gerar_senha_nova_revoga_a_sessao_aberta_do_signatario():
-    """O cliente liga dizendo que a senha vazou; a construtora gera outra. O
-    intruso PRECISA cair — antes ele continuava assinando, porque a sessão só
-    era revalidada contra `ativo`."""
+def test_gerar_senha_nova_invalida_a_credencial_antiga_imediatamente():
+    """O cliente liga dizendo que a senha vazou; a construtora gera outra.
+    Sem sessão não há mais nada para "revogar" — o corte é a própria
+    credencial: o intruso com a senha antiga não assina mais NADA a partir do
+    POST seguinte."""
     ctx = _cenario(n_signatarios=1)
+    extra = _rdos_extras(ctx, n=1)[0]
+
     intruso = app.test_client()
-    _entrar(intruso, ctx)
-    intruso.post(_url(ctx, '/assinar'), data={})
+    _assinar(intruso, ctx)                # com a senha vazada, ainda vale
     assert len(_assinaturas(ctx['rdo_id'])) == 1
 
     # Construtora gera senha nova pela tela da obra.
@@ -952,47 +1024,28 @@ def test_gerar_senha_nova_revoga_a_sessao_aberta_do_signatario():
     admin.post(f"/obras/{ctx['obra_id']}/signatarios/{ctx['sig_ids'][0]}/senha",
                data={'csrf_token': tok})
 
-    # A sessão do intruso morreu: a página volta a pedir senha.
-    pagina = intruso.get(_url(ctx)).get_data(as_text=True)
-    assert 'Você está identificado' not in pagina
-    assert 'Selecione seu nome' in pagina
+    # A senha antiga morreu na hora — o próximo RDO não sai.
+    _assinar(intruso, ctx, rdo_id=extra)
+    assert _assinaturas(extra) == []
 
 
-def test_troca_de_senha_pelo_proprio_nao_derruba_quem_trocou():
-    """Contrapeso: quem troca a própria senha continua na sessão — a rota
-    reabre com a credencial nova. Derrubar aqui seria hostil."""
+def test_trocar_a_propria_senha_e_assinar_em_seguida_funciona():
+    """Contrapeso: quem troca a própria senha não pode ficar pior do que
+    estava. O redirect volta ao ato com o nome já escolhido, e a senha nova
+    assina."""
     ctx = _cenario(n_signatarios=1)
     c = app.test_client()
-    _entrar(c, ctx)
-    r = c.post(_url(ctx, '/senha'), data={'nova_senha': 'NovaSenha!2026',
-                                          'confirma_senha': 'NovaSenha!2026'})
+    r = c.post(_url(ctx, '/ciencia/senha'),
+               data={'signatario_id': ctx['sig_ids'][0],
+                     'senha_atual': ctx['senha'],
+                     'nova_senha': 'NovaSenha!2026',
+                     'confirma_senha': 'NovaSenha!2026'})
     assert r.status_code == 302
-    pagina = c.get(_url(ctx)).get_data(as_text=True)
-    assert 'Você está identificado' in pagina
+    destino = r.headers.get('Location', '')
+    assert '/ciencia' in destino and f"quem={ctx['sig_ids'][0]}" in destino
 
-
-def test_sessao_morre_no_teto_absoluto_mesmo_com_uso_continuo():
-    """A janela de 15 min é de INATIVIDADE e se renova a cada page view — sem
-    teto, uma aba aberta mantém a sessão viva para sempre."""
-    from services.portal_signatario_auth import (CHAVE_SESSAO,
-                                                 HORAS_SESSAO_MAXIMA)
-
-    ctx = _cenario(n_signatarios=1)
-    c = app.test_client()
-    _entrar(c, ctx)
-    assert 'Você está identificado' in c.get(_url(ctx)).get_data(as_text=True)
-
-    # Empurra o INÍCIO para além do teto, deixando o `exp` fresco — é o
-    # estado de quem ficou usando a aba o dia inteiro.
-    with c.session_transaction() as sess:
-        d = dict(sess[CHAVE_SESSAO])
-        d['ini'] = (datetime.utcnow()
-                    - timedelta(hours=HORAS_SESSAO_MAXIMA, minutes=1)).isoformat()
-        sess[CHAVE_SESSAO] = d
-
-    assert 'Você está identificado' not in c.get(_url(ctx)).get_data(as_text=True)
-    c.post(_url(ctx, '/assinar'), data={})
-    assert _assinaturas(ctx['rdo_id']) == []
+    _assinar(c, ctx, senha='NovaSenha!2026')
+    assert len(_assinaturas(ctx['rdo_id'])) == 1
 
 
 def test_senha_errada_nao_revela_conta_travada_nem_senha_vencida():
@@ -1033,43 +1086,46 @@ def test_senha_errada_nao_revela_conta_travada_nem_senha_vencida():
         assert 'venceu' in str(e.value)
 
 
-def test_ciencia_duplicada_pelo_indice_vira_mensagem_e_nao_500():
+def test_ciencia_duplicada_pelo_indice_vira_comprovante_e_nao_500():
     """`ja_assinou` não é atômica: em duplo-toque os dois POSTs passam por ela
     antes de qualquer commit e o índice parcial barra o segundo no flush.
     Isso é IntegrityError, não CienciaInvalida — e escapava como 500 cru.
 
-    Simula a corrida gravando a assinatura por fora entre a checagem e o
-    flush, que é o efeito observável do segundo request.
+    Simula a corrida fazendo a checagem mentir nas DUAS leituras que o
+    caminho novo faz (a da view e a de `registrar_ciencia`), gravando a
+    assinatura concorrente na primeira — que é o efeito observável do outro
+    request vencendo a corrida.
     """
     ctx = _cenario(n_signatarios=1)
     c = app.test_client()
-    _entrar(c, ctx)
 
     import services.rdo_ciencia_cliente as mod
     real = mod.ja_assinou
-    # Faz a checagem mentir UMA vez — exatamente o que a corrida produz.
-    estado = {'primeira': True}
+    estado = {'mentiras': 2}
 
     def _mente(rdo, signatario):
-        if estado['primeira']:
-            estado['primeira'] = False
-            with app.app_context():
-                db.session.add(RDOAssinatura(
-                    rdo_id=rdo.id, admin_id=ctx['admin_id'],
-                    signatario_cliente_id=signatario.id,
-                    papel=RDOAssinatura.PAPEL_CLIENTE,
-                    nome_signatario='Corrida', hash_conteudo='z' * 64))
-                db.session.commit()
+        if estado['mentiras'] > 0:
+            estado['mentiras'] -= 1
+            if estado['mentiras'] == 1:      # 1ª leitura: o rival grava
+                with app.app_context():
+                    db.session.add(RDOAssinatura(
+                        rdo_id=rdo.id, admin_id=ctx['admin_id'],
+                        signatario_cliente_id=signatario.id,
+                        papel=RDOAssinatura.PAPEL_CLIENTE,
+                        nome_signatario='Corrida', hash_conteudo='z' * 64))
+                    db.session.commit()
             return False          # mente: diz que ainda não assinou
         return real(rdo, signatario)
 
     mod.ja_assinou = _mente
     try:
-        r = c.post(_url(ctx, '/assinar'), data={})
+        r = _assinar(c, ctx)
     finally:
         mod.ja_assinou = real
 
     assert r.status_code == 302, f'virou {r.status_code} (500 = não tratado)'
+    # O banco decidiu certo, e o destino é o comprovante do ato que existe.
+    assert '/ciencia/comprovante' in r.headers.get('Location', '')
     assert len(_assinaturas(ctx['rdo_id'])) == 1
 
     # E a sessão do banco não ficou suja: a próxima operação funciona.
@@ -1123,16 +1179,86 @@ def test_ip_da_ciencia_nao_aceita_x_forwarded_for_forjado():
     cliente digita."""
     ctx = _cenario(n_signatarios=1)
     c = app.test_client()
-    _entrar(c, ctx)
 
     # O cliente manda a cadeia com um IP inventado à ESQUERDA. Num request
     # real, o proxy confiável APENDA o IP que ele observou, à direita — e é
     # esse que `ProxyFix(x_for=1)` promove a `remote_addr`. Tudo à esquerda é
     # texto que o próprio requisitante escreveu.
-    c.post(_url(ctx, '/assinar'), data={},
-           headers={'X-Forwarded-For': '8.8.8.8, 198.51.100.4'})
+    _assinar(c, ctx, headers={'X-Forwarded-For': '8.8.8.8, 198.51.100.4'})
 
     a = _assinaturas(ctx['rdo_id'])[0]
     assert a.ip != '8.8.8.8', 'gravou o salto forjável (leitura à esquerda)'
     assert a.ip == '198.51.100.4', (
         f'esperado o salto do proxy confiável, veio {a.ip}')
+
+
+# ---------------------------------------------------------------------------
+# Comprovante e recibo — redesenho de 29/07 (spec §§3-4, D3)
+# ---------------------------------------------------------------------------
+
+def test_comprovante_mostra_o_registro_para_quem_acabou_de_assinar():
+    ctx = _cenario(n_signatarios=1)
+    c = app.test_client()
+    r = _assinar(c, ctx, observacao='Conferido em campo.',
+                 environ_overrides={'REMOTE_ADDR': '203.0.113.9'})
+
+    html = c.get(r.headers['Location']).get_data(as_text=True)
+    assert 'Ciência registrada' in html
+    assert _sig(ctx['sig_ids'][0]).nome in html
+    assert '203.0.113.9' in html                  # o IP é da própria pessoa
+    assert 'Conferido em campo.' in html
+    assert 'Baixar recibo' in html
+
+
+def test_comprovante_sem_marca_nao_revela_nome_ip_nem_hash():
+    """Quem só tem o link da obra não vê o comprovante — ele carrega o IP,
+    que o placar público não expõe (D3)."""
+    ctx = _cenario(n_signatarios=1)
+    dono = app.test_client()
+    _assinar(dono, ctx, environ_overrides={'REMOTE_ADDR': '203.0.113.9'})
+
+    curioso = app.test_client()                   # outro navegador, sem marca
+    r = curioso.get(_url(ctx, '/ciencia/comprovante'))
+    assert r.status_code == 302                   # devolvido à leitura
+    r2 = curioso.get(_url(ctx, '/ciencia/recibo.pdf'))
+    assert r2.status_code == 302
+    assert '203.0.113.9' not in r.get_data(as_text=True)
+
+
+def test_marca_de_um_rdo_nao_abre_comprovante_de_outro():
+    """A marca aponta UMA assinatura; o token e o rdo da URL continuam
+    mandando. Sem esta guarda, assinar o RDO de hoje abriria o comprovante
+    de qualquer outro documento."""
+    ctx = _cenario(n_signatarios=1)
+    extra = _rdos_extras(ctx, n=1)[0]
+    c = app.test_client()
+    _assinar(c, ctx, environ_overrides={'REMOTE_ADDR': '203.0.113.9'})
+
+    r = c.get(f"/portal/obra/{ctx['token']}/rdo/{extra}/ciencia/comprovante")
+    assert r.status_code == 302, 'marca de um RDO abriu comprovante de outro'
+
+
+def test_recibo_pdf_sai_valido_com_nome_e_hash_completo():
+    """O recibo existe para provar: o hash sai COMPLETO, não abreviado como
+    na tela (spec §4)."""
+    from io import BytesIO
+
+    from pypdf import PdfReader
+
+    ctx = _cenario(n_signatarios=1)
+    c = app.test_client()
+    r = _assinar(c, ctx, environ_overrides={'REMOTE_ADDR': '203.0.113.9'})
+    assert r.status_code == 302
+
+    pdf = c.get(_url(ctx, '/ciencia/recibo.pdf'))
+    assert pdf.status_code == 200
+    assert pdf.data[:5] == b'%PDF-'
+    assert pdf.headers['Cache-Control'] == 'no-store'
+
+    texto = '\n'.join((p.extract_text() or '')
+                      for p in PdfReader(BytesIO(pdf.data)).pages)
+    a = _assinaturas(ctx['rdo_id'])[0]
+    assert _sig(ctx['sig_ids'][0]).nome in texto
+    assert '203.0.113.9' in texto
+    # O extrator pode quebrar linha no meio do hash — compara sem espaços.
+    assert a.hash_conteudo in texto.replace('\n', '').replace(' ', '')

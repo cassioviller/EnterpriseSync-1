@@ -1,0 +1,72 @@
+{# Fase 9a / redesenho 29-07 — a FAIXA DE ESTADO da ciência, no alto da
+   leitura. Só estado e um botão: os formulários (login, senha, assinar)
+   moram nas telas próprias sob `/ciencia`. A página é a mesma para todos —
+   sem sessão, não há "você"; a faixa nomeia quem falta e a pessoa se
+   reconhece na lista.
+
+   Espera do contexto: `ciencia` (placar), `ciencia_bloqueio`, `token`, `rdo`.
+   Sem responsável cadastrado a faixa não aparece: não há ciência a pedir. #}
+
+{% if ciencia.total %}
+<section class="section">
+    {% if ciencia_bloqueio %}
+    <div class="ciencia-faixa ciencia-faixa-info" role="status">
+        <i class="fas fa-circle-info"></i>
+        <div class="ciencia-faixa-texto">
+            <strong>Ciência ainda não disponível</strong>
+            <span>{{ ciencia_bloqueio }}</span>
+        </div>
+    </div>
+    {% elif ciencia.completo %}
+    <div class="ciencia-faixa ciencia-faixa-ok" role="status">
+        <i class="fas fa-circle-check"></i>
+        <div class="ciencia-faixa-texto">
+            <strong>Ciência completa</strong>
+            <span>Todos os {{ ciencia.total }} responsáveis confirmaram este
+                  relatório. O detalhe está no fim da página.</span>
+        </div>
+    </div>
+    {% else %}
+    <div class="ciencia-faixa ciencia-faixa-acao" role="status">
+        <i class="fas fa-file-signature"></i>
+        <div class="ciencia-faixa-texto">
+            <strong>Este relatório aguarda ciência</strong>
+            <span>
+                Falta{{ 'm' if ciencia.pendentes | length > 1 }} confirmar:
+                {{ ciencia.pendentes | map(attribute='nome') | join(', ') }}.
+            </span>
+        </div>
+        <a class="btn btn-portal-primary ciencia-faixa-btn"
+           href="{{ url_for('portal_obras.ciencia_ato', token=token, rdo_id=rdo.id) }}">
+            Dar ciência
+        </a>
+    </div>
+    {% endif %}
+</section>
+
+<style>
+.ciencia-faixa {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; border-radius: var(--radius);
+    border: 1px solid; flex-wrap: wrap;
+}
+.ciencia-faixa > i { font-size: 1.15rem; flex-shrink: 0; }
+.ciencia-faixa-texto { flex: 1; min-width: 220px; }
+.ciencia-faixa-texto strong { display: block; font-size: .95rem; }
+.ciencia-faixa-texto span { font-size: .85rem; opacity: .9; }
+.ciencia-faixa-btn { white-space: nowrap; }
+.ciencia-faixa-acao {
+    background: var(--warning-bg); color: var(--warning);
+    border-color: #fde68a;
+}
+.ciencia-faixa-ok {
+    background: var(--success-bg); color: #166534; border-color: #bbf7d0;
+}
+.ciencia-faixa-info {
+    background: var(--info-bg); color: var(--info); border-color: #bfdbfe;
+}
+@media (max-width: 575.98px) {
+    .ciencia-faixa-btn { width: 100%; text-align: center; }
+}
+</style>
+{% endif %}

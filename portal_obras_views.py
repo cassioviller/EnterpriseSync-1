@@ -962,7 +962,6 @@ def portal_rdo_detalhe(token: str, rdo_id: int):
     config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     nome_empresa = config.nome_empresa if config else 'Construtora'
 
-    from services.portal_signatario_auth import sessao_atual, signatarios_da_obra
     from services.rdo_ciencia_cliente import motivo_inelegivel, placar
 
     return render_template(
@@ -978,21 +977,29 @@ def portal_rdo_detalhe(token: str, rdo_id: int):
         nome_empresa=nome_empresa,
         config_empresa=config,
         token=token,
-        # Fase 9a — ciência do cliente.
+        # Fase 9a — ciência do cliente. A leitura mostra o ESTADO (faixa no
+        # topo, placar nominal no fim); o ato mora em rota própria. Sem
+        # sessão, não há `signatario_logado` — a página é a mesma para todos.
         ciencia=placar(rdo),
         ciencia_bloqueio=motivo_inelegivel(rdo),
-        signatarios=signatarios_da_obra(obra.id),
-        signatario_logado=sessao_atual(obra),
     )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CIÊNCIA DO CLIENTE NO RDO (Fase 9a)
+# CIÊNCIA DO CLIENTE NO RDO (Fase 9a; percurso refeito em 29/07 — ver
+# docs/superpowers/specs/2026-07-29-ciencia-rdo-portal-ux-design.md)
 #
-# O portal segue anônimo para NAVEGAR. A senha é pedida só no ato de assinar —
-# `services/portal_signatario_auth.py` explica por que a sessão é própria e não
-# Flask-Login. Toda rota abaixo resolve a obra pelo token primeiro: a sessão
-# sozinha nunca é autoridade sobre QUAL obra está em jogo.
+# O portal segue anônimo para NAVEGAR — e agora também para o resto: NÃO HÁ
+# SESSÃO DE LOGIN. A senha é conferida no MESMO POST que grava a ciência
+# (decisão D1 do spec): a assinatura repousa sobre a credencial, não sobre um
+# cookie, e não existe janela entre autenticar e assinar. Toda rota abaixo
+# resolve a obra pelo token primeiro; nada no cookie é autoridade sobre QUAL
+# obra ou QUEM está em jogo.
+#
+# O único estado que sobrevive no cookie é a MARCA DO COMPROVANTE — um passe
+# de 15 minutos para reabrir a tela "o que ficou registrado" e baixar o
+# recibo. Ela não é identidade: toda rota que a lê reconfere a assinatura
+# contra o RDO da obra do token antes de mostrar qualquer coisa (D3).
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _voltar_ao_rdo(token: str, rdo_id: int):
@@ -1037,18 +1044,146 @@ def _chave_limite_assinatura():
     return f'{get_remote_address()}:{sid}'
 
 
-@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/entrar', methods=['POST'])
-@limiter.limit('5 per 15 minutes', key_func=_chave_limite_assinatura)
-def ciencia_entrar(token: str, rdo_id: int):
-    """Autentica o responsável. Rate-limit por IP contra força bruta.
+# ── Marca do comprovante ─────────────────────────────────────────────────────
 
-    O limite é aplicado no decorator do `limiter` global (app.py:230); a trava
-    por signatário (10 falhas) mora no modelo e é destravada pela construtora.
-    São freios complementares: um contém o atacante distribuído no tempo, o
-    outro protege a conta específica.
+_CHAVE_COMPROVANTE = 'portal_comprovante'
+# 15 minutos: o suficiente para ler a tela, baixar o recibo e encaminhar.
+# NÃO é consumida na leitura — consumir quebraria o botão de baixar o recibo
+# na própria tela que o oferece (spec D3). Expira por tempo, e a assinatura
+# seguinte simplesmente a substitui.
+MINUTOS_COMPROVANTE = 15
+
+
+def _marcar_comprovante(assinatura) -> None:
+    """Passe de curta duração para o navegador que ACABOU de assinar.
+
+    Vive na sessão do Flask como `_guardar_senha_gerada` (views/obras.py),
+    mas com vida por tempo em vez de consumo na leitura. Não é identidade e
+    não autoriza nada além de reabrir aquele comprovante — quem o lê reconfere
+    a assinatura contra o RDO da obra do token.
+    """
+    from flask import session
+    session[_CHAVE_COMPROVANTE] = {
+        'assinatura_id': assinatura.id,
+        'exp': (datetime.utcnow()
+                + timedelta(minutes=MINUTOS_COMPROVANTE)).isoformat(),
+    }
+    session.modified = True
+
+
+def _assinatura_do_comprovante(rdo):
+    """Assinatura apontada pela marca — SE pertencer a este RDO desta obra.
+
+    `rdo` já chegou aqui resolvido pelo token (`_rdo_do_portal`), então
+    filtrar por `rdo_id=rdo.id` é o que impede a marca de uma assinatura de
+    abrir o comprovante de outro RDO ou de outra obra. Devolve None para
+    marca ausente, expirada, corrompida ou de outro documento.
+    """
+    from flask import session
+    from models import RDOAssinatura
+
+    dados = session.get(_CHAVE_COMPROVANTE)
+    if not isinstance(dados, dict):
+        return None
+    try:
+        if datetime.fromisoformat(dados['exp']) < datetime.utcnow():
+            return None
+        aid = int(dados['assinatura_id'])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return RDOAssinatura.query.filter_by(
+        id=aid, rdo_id=rdo.id, papel='cliente').first()
+
+
+def _contagem_atividades(rdo) -> int:
+    """Quantas atividades o RDO registra — para o resumo da tela do ato.
+
+    Espelha a derivação de `portal_rdo_detalhe`: RDOs criados via cronograma
+    não têm `RDOServicoSubatividade`, e as atividades do dia são os
+    apontamentos com incremento. Aqui basta a contagem, não a estrutura.
+    """
+    n = RDOServicoSubatividade.query.filter_by(
+        rdo_id=rdo.id, admin_id=rdo.admin_id).count()
+    if n:
+        return n
+    q = RDOApontamentoCronograma.query.filter_by(
+        rdo_id=rdo.id, admin_id=rdo.admin_id)
+    com_incremento = q.filter(
+        RDOApontamentoCronograma.percentual_incremento_dia > 0).count()
+    return com_incremento or q.count()
+
+
+def _hash_abreviado(valor: str) -> str:
+    return f'{valor[:4]}…{valor[-4:]}' if valor and len(valor) > 12 else (valor or '')
+
+
+# ── As telas ─────────────────────────────────────────────────────────────────
+
+@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/ciencia')
+def ciencia_ato(token: str, rdo_id: int):
+    """A tela do ato: o que se assina, quem é você, senha, observação."""
+    from services.portal_signatario_auth import signatarios_da_obra
+    from services.rdo_ciencia_cliente import motivo_inelegivel
+    from services.rdo_hash import calcular_hash
+
+    obra, inactive_response = _resolve_obra_for_view(token)
+    if inactive_response is not None:
+        return inactive_response
+    rdo = _rdo_do_portal(obra, rdo_id)
+
+    # RDO que não aceita ciência não ganha formulário: a leitura já mostra o
+    # motivo na faixa, e oferecer o botão que o POST recusaria seria mentira.
+    motivo = motivo_inelegivel(rdo)
+    if motivo:
+        flash(motivo, 'info')
+        return _voltar_ao_rdo(token, rdo_id)
+
+    signatarios = signatarios_da_obra(obra.id)
+    if not signatarios:
+        flash('A construtora ainda não definiu quem assina os relatórios '
+              'desta obra.', 'info')
+        return _voltar_ao_rdo(token, rdo_id)
+
+    try:
+        hash_atual = calcular_hash(rdo)
+    except Exception:
+        logger.exception('[PORTAL] falha ao calcular hash do rdo %s', rdo.id)
+        hash_atual = ''
+
+    config = ConfiguracaoEmpresa.query.filter_by(admin_id=obra.admin_id).first()
+    return render_template(
+        'portal/ciencia_ato.html',
+        obra=obra, rdo=rdo, token=token,
+        signatarios=signatarios,
+        # Preseleção vinda do redirect pós-troca de senha ou do link direto.
+        quem=request.args.get('quem', ''),
+        resumo={
+            'atividades': _contagem_atividades(rdo),
+            'fotos': RDOFoto.query.filter_by(
+                rdo_id=rdo.id, admin_id=rdo.admin_id).count(),
+            'ocorrencias': RDOOcorrencia.query.filter_by(
+                rdo_id=rdo.id, admin_id=rdo.admin_id).count(),
+            'hash': _hash_abreviado(hash_atual),
+        },
+        nome_empresa=config.nome_empresa if config else 'Construtora',
+        config_empresa=config,
+    )
+
+
+@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/ciencia',
+                       methods=['POST'])
+@limiter.limit('5 per 15 minutes', key_func=_chave_limite_assinatura)
+def ciencia_confirmar(token: str, rdo_id: int):
+    """O POST atômico: autentica E registra a ciência numa requisição só.
+
+    A ordem importa e está no spec §2. O rate-limit veio intacto do antigo
+    `/entrar` — este agora é o ponto de autenticação; a trava por signatário
+    (10 falhas) segue no modelo, destravada pela construtora.
     """
     from services.portal_signatario_auth import (AutenticacaoInvalida,
-                                                 abrir_sessao, autenticar)
+                                                 autenticar)
+    from services.rdo_ciencia_cliente import (CienciaInvalida, ja_assinou,
+                                              registrar_ciencia)
 
     obra = _get_obra_by_token(token)
     rdo = _rdo_do_portal(obra, rdo_id)
@@ -1061,42 +1196,36 @@ def ciencia_entrar(token: str, rdo_id: int):
                           {'signatario_id': request.form.get('signatario_id')})
         db.session.commit()   # a contagem de falhas precisa persistir
         flash(str(exc), 'error')
-        return _voltar_ao_rdo(token, rdo_id)
+        return redirect(url_for('portal_obras.ciencia_ato',
+                                token=token, rdo_id=rdo_id))
 
-    abrir_sessao(signatario)
+    # Senha certa. O rastro do login é gravado e COMMITADO antes do ato:
+    # existe o caso "senha certa, ciência recusada" (o RDO virou retificado
+    # entre a tela e o envio), e ele não pode apagar este evento.
     _registrar_acesso(obra, 'ciencia_login', 'rdo', rdo.id,
                       {'signatario_id': signatario.id,
                        'nome': signatario.nome})
     db.session.commit()
 
+    # Primeiro acesso: a senha da construtora autentica, mas não assina.
+    # Não é erro — é um degrau do caminho (spec, tela 3).
     if signatario.senha_temporaria:
-        flash('Primeiro acesso: defina uma senha sua antes de assinar.',
-              'warning')
-    return _voltar_ao_rdo(token, rdo_id)
+        return redirect(url_for('portal_obras.ciencia_definir_senha',
+                                token=token, rdo_id=rdo_id,
+                                quem=signatario.id))
 
-
-@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/sair', methods=['POST'])
-def ciencia_sair(token: str, rdo_id: int):
-    from services.portal_signatario_auth import fechar_sessao
-    _get_obra_by_token(token)
-    fechar_sessao()
-    return _voltar_ao_rdo(token, rdo_id)
-
-
-@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/assinar', methods=['POST'])
-def ciencia_assinar(token: str, rdo_id: int):
-    """Registra a ciência do responsável logado."""
-    from services.portal_signatario_auth import SessaoInvalida, exigir_sessao
-    from services.rdo_ciencia_cliente import CienciaInvalida, registrar_ciencia
-
-    obra = _get_obra_by_token(token)
-    rdo = _rdo_do_portal(obra, rdo_id)
-
-    try:
-        signatario = exigir_sessao(obra)
-    except SessaoInvalida as exc:
-        flash(str(exc), 'warning')
-        return _voltar_ao_rdo(token, rdo_id)
+    # Já assinou? Não é falha: leva ao comprovante do ato que existe. A
+    # pessoa acabou de provar a senha, então a marca é dela por direito.
+    if ja_assinou(rdo, signatario):
+        from models import RDOAssinatura
+        existente = RDOAssinatura.query.filter_by(
+            rdo_id=rdo.id, papel='cliente',
+            signatario_cliente_id=signatario.id).first()
+        if existente is not None:
+            _marcar_comprovante(existente)
+        flash('Você já deu ciência neste RDO.', 'info')
+        return redirect(url_for('portal_obras.ciencia_comprovante',
+                                token=token, rdo_id=rdo_id))
 
     try:
         assinatura = registrar_ciencia(
@@ -1105,73 +1234,167 @@ def ciencia_assinar(token: str, rdo_id: int):
     except CienciaInvalida as exc:
         db.session.rollback()
         flash(str(exc), 'error')
+        # Volta à LEITURA, não ao ato: o motivo (retificado, desativado…)
+        # também remove o botão de lá — a tela conta a mesma história.
         return _voltar_ao_rdo(token, rdo_id)
     except IntegrityError:
-        # A checagem `ja_assinou` de `registrar_ciencia` não é atômica: em
-        # duplo-toque no celular (ou duas abas) os dois POSTs passam por ela
-        # antes de qualquer commit, e o índice parcial `uq_rdo_assin_cliente`
-        # barra o segundo no flush. Sem este ramo o cliente via um 500 cru,
-        # com a sessão sem rollback pelo resto da requisição.
-        #
-        # O banco é a autoridade e ele decidiu certo: a ciência ESTÁ
-        # registrada, só não por esta requisição. Por isso a mensagem é a
-        # mesma do caminho detectado pela checagem.
+        # Duplo-toque no celular ou duas abas: `ja_assinou` não é atômica e o
+        # índice parcial `uq_rdo_assin_cliente` barra o segundo no flush. O
+        # banco decidiu certo — a ciência ESTÁ registrada, só não por esta
+        # requisição. Destino: o comprovante da assinatura que existe.
         db.session.rollback()
         logger.info('[PORTAL] ciência duplicada barrada pelo índice — '
                     'rdo=%s signatario=%s', rdo.id, signatario.id)
+        from models import RDOAssinatura
+        existente = RDOAssinatura.query.filter_by(
+            rdo_id=rdo.id, papel='cliente',
+            signatario_cliente_id=signatario.id).first()
+        if existente is not None:
+            _marcar_comprovante(existente)
         flash('Você já deu ciência neste RDO.', 'info')
-        return _voltar_ao_rdo(token, rdo_id)
+        return redirect(url_for('portal_obras.ciencia_comprovante',
+                                token=token, rdo_id=rdo_id))
 
     _registrar_acesso(obra, 'ciencia_rdo', 'rdo', rdo.id,
                       {'signatario_id': signatario.id,
                        'nome': signatario.nome,
                        'assinatura_id': assinatura.id})
     db.session.commit()
+    _marcar_comprovante(assinatura)
     flash('Ciência registrada. Obrigado!', 'success')
-    return _voltar_ao_rdo(token, rdo_id)
+    return redirect(url_for('portal_obras.ciencia_comprovante',
+                            token=token, rdo_id=rdo_id))
 
 
-@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/senha', methods=['POST'])
+@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/ciencia/comprovante')
+def ciencia_comprovante(token: str, rdo_id: int):
+    """O que ficou registrado — só para o navegador que acabou de assinar."""
+    obra, inactive_response = _resolve_obra_for_view(token)
+    if inactive_response is not None:
+        return inactive_response
+    rdo = _rdo_do_portal(obra, rdo_id)
+
+    assinatura = _assinatura_do_comprovante(rdo)
+    if assinatura is None:
+        # Sem marca não se mostra nada — nem nome, nem IP, nem hash. O
+        # registro durável continua no relatório e no PDF do RDO.
+        flash('O comprovante fica disponível logo após assinar. O registro '
+              'da ciência continua visível no próprio relatório.', 'info')
+        return _voltar_ao_rdo(token, rdo_id)
+
+    config = ConfiguracaoEmpresa.query.filter_by(admin_id=obra.admin_id).first()
+    return render_template(
+        'portal/ciencia_comprovante.html',
+        obra=obra, rdo=rdo, token=token,
+        assinatura=assinatura,
+        hash_abreviado=_hash_abreviado(assinatura.hash_conteudo),
+        nome_empresa=config.nome_empresa if config else 'Construtora',
+        config_empresa=config,
+    )
+
+
+@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/ciencia/recibo.pdf')
+def ciencia_recibo(token: str, rdo_id: int):
+    """Recibo do ato em PDF. Mesma guarda do comprovante."""
+    obra, inactive_response = _resolve_obra_for_view(token)
+    if inactive_response is not None:
+        return inactive_response
+    rdo = _rdo_do_portal(obra, rdo_id)
+
+    assinatura = _assinatura_do_comprovante(rdo)
+    if assinatura is None:
+        flash('O recibo fica disponível logo após assinar.', 'info')
+        return _voltar_ao_rdo(token, rdo_id)
+
+    from services.rdo_recibo_ciencia import gerar_recibo_ciencia
+    pdf = gerar_recibo_ciencia(assinatura)
+    from flask import Response
+    numero = rdo.numero_rdo or f'rdo-{rdo.id}'
+    return Response(pdf, mimetype='application/pdf', headers={
+        'Content-Disposition':
+            f'attachment; filename="recibo-ciencia-{numero}.pdf"',
+        # O recibo carrega IP e hash — nada de cache compartilhado.
+        'Cache-Control': 'no-store',
+    })
+
+
+@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/ciencia/senha')
+def ciencia_definir_senha(token: str, rdo_id: int):
+    """A tela de definir senha — primeiro acesso ou troca voluntária."""
+    from services.portal_signatario_auth import signatarios_da_obra
+
+    obra, inactive_response = _resolve_obra_for_view(token)
+    if inactive_response is not None:
+        return inactive_response
+    rdo = _rdo_do_portal(obra, rdo_id)
+
+    config = ConfiguracaoEmpresa.query.filter_by(admin_id=obra.admin_id).first()
+    return render_template(
+        'portal/ciencia_senha.html',
+        obra=obra, rdo=rdo, token=token,
+        signatarios=signatarios_da_obra(obra.id),
+        quem=request.args.get('quem', ''),
+        nome_empresa=config.nome_empresa if config else 'Construtora',
+        config_empresa=config,
+    )
+
+
+@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/ciencia/senha',
+                       methods=['POST'])
+@limiter.limit('5 per 15 minutes', key_func=_chave_limite_assinatura)
 def ciencia_trocar_senha(token: str, rdo_id: int):
-    """Troca de senha pelo próprio responsável (e saída do regime temporário)."""
+    """Troca de senha SEM sessão: a senha atual autentica no próprio POST.
+
+    É o mesmo desenho do ato (D1): quem prova a credencial vigente — a
+    temporária da construtora ou a própria — define a nova. O rate-limit
+    existe porque esta rota também confere senha.
+    """
     from services.portal_signatario_auth import (AutenticacaoInvalida,
-                                                 SessaoInvalida, abrir_sessao,
-                                                 definir_senha, exigir_sessao)
+                                                 autenticar, definir_senha)
 
     obra = _get_obra_by_token(token)
-    _rdo_do_portal(obra, rdo_id)
+    rdo = _rdo_do_portal(obra, rdo_id)
+
+    def _volta_para_ca():
+        return redirect(url_for('portal_obras.ciencia_definir_senha',
+                                token=token, rdo_id=rdo_id,
+                                quem=request.form.get('signatario_id', '')))
 
     try:
-        signatario = exigir_sessao(obra)
-    except SessaoInvalida as exc:
-        flash(str(exc), 'warning')
-        return _voltar_ao_rdo(token, rdo_id)
+        signatario = autenticar(obra, request.form.get('signatario_id'),
+                                request.form.get('senha_atual') or '')
+    except AutenticacaoInvalida as exc:
+        _registrar_acesso(obra, 'ciencia_login_falha', 'rdo', rdo.id,
+                          {'signatario_id': request.form.get('signatario_id')})
+        db.session.commit()   # a contagem de falhas precisa persistir
+        flash(str(exc), 'error')
+        return _volta_para_ca()
 
     nova = request.form.get('nova_senha') or ''
     if nova != (request.form.get('confirma_senha') or ''):
+        db.session.commit()   # o sucesso da autenticação (zerar falhas) fica
         flash('As duas senhas não conferem.', 'error')
-        return _voltar_ao_rdo(token, rdo_id)
+        return _volta_para_ca()
 
     try:
         definir_senha(signatario, nova)
     except AutenticacaoInvalida as exc:
+        db.session.commit()
         flash(str(exc), 'error')
-        return _voltar_ao_rdo(token, rdo_id)
+        return _volta_para_ca()
 
     _registrar_acesso(obra, 'ciencia_senha_trocada', 'rdo', rdo_id,
                       {'signatario_id': signatario.id})
     db.session.commit()
 
-    # A sessão carrega a impressão da credencial e é revogada quando ela muda
-    # — é o que faz "gerar senha nova" expulsar um intruso. Quem acabou de
-    # trocar a PRÓPRIA senha não é intruso: reabre com a credencial nova, ou
-    # a pessoa seria deslogada pelo ato de se proteger.
-    abrir_sessao(signatario)
-    flash('Senha alterada. Agora você pode assinar.', 'success')
-    return _voltar_ao_rdo(token, rdo_id)
+    flash('Senha salva. Agora confirme sua ciência com a senha nova.',
+          'success')
+    return redirect(url_for('portal_obras.ciencia_ato',
+                            token=token, rdo_id=rdo_id, quem=signatario.id))
 
 
-@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/esqueci', methods=['POST'])
+@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/ciencia/esqueci',
+                       methods=['POST'])
 def ciencia_esqueci(token: str, rdo_id: int):
     """Pede à construtora uma senha temporária.
 

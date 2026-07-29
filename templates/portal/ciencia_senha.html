@@ -1,0 +1,116 @@
+{% extends 'portal/_base.html' %}
+{# Fase 9a / redesenho 29-07 — DEFINIR A PRÓPRIA SENHA. Chega aqui quem foi
+   desviado do ato com a senha temporária da construtora, ou quem clicou em
+   "trocar minha senha". Sem sessão, a senha ATUAL autentica no próprio POST
+   — por isso o campo, que o mockup do spec não tinha (desvio consciente:
+   sem ele, qualquer um trocaria a senha de qualquer nome da lista). #}
+
+{% block title %}Definir senha — {{ obra.nome }}{% endblock %}
+
+{% block obra_titulo %}Defina a sua senha{% endblock %}
+{% block obra_subtitulo %}
+<div class="portal-brand-cliente">Antes da sua ciência nesta obra</div>
+{% endblock %}
+
+{% block extra_styles %}
+        .senha-wrap { max-width: 560px; margin: 0 auto; }
+        .senha-aviso {
+            background: var(--warning-bg); color: var(--warning);
+            border: 1px solid #fde68a; border-radius: var(--radius-sm);
+            padding: 12px 14px; font-size: .87rem; line-height: 1.5;
+            margin-bottom: 18px;
+        }
+        .senha-aviso strong { display: block; margin-bottom: 2px; }
+        .senha-campo { display: block; margin-bottom: 14px; }
+        .senha-campo > span {
+            display: block; font-size: .78rem; font-weight: 600;
+            color: var(--text-muted); margin-bottom: 5px;
+        }
+        .senha-campo input, .senha-campo select {
+            width: 100%; padding: 10px 12px;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            font-size: .95rem; color: var(--text); background: var(--surface);
+        }
+        .senha-campo input:focus, .senha-campo select:focus {
+            outline: 2px solid var(--brand); outline-offset: 1px;
+            border-color: var(--brand);
+        }
+        .senha-nota {
+            font-size: .8rem; color: var(--text-muted); margin: 0 0 16px;
+        }
+        .senha-acoes { display: grid; gap: 10px; }
+        .senha-acoes .btn { padding: 11px 14px; font-size: .95rem; }
+        .senha-voltar {
+            display: block; text-align: center; margin-top: 16px;
+            font-size: .84rem; color: var(--text-muted);
+            text-decoration: underline;
+        }
+        .senha-voltar:hover { color: var(--text); }
+{% endblock %}
+
+{% block content %}
+<div class="senha-wrap">
+    <div class="card-portal">
+        <div class="card-portal-body">
+
+            <div class="senha-aviso">
+                <strong><i class="fas fa-key me-1"></i> Por que uma senha sua?</strong>
+                A senha temporária foi gerada e entregue pela construtora.
+                Para que a sua ciência valha como sua, escolha uma senha que
+                só você conheça — a construtora não vê esta senha.
+            </div>
+
+            <form method="POST"
+                  action="{{ url_for('portal_obras.ciencia_trocar_senha', token=token, rdo_id=rdo.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <label class="senha-campo">
+                    <span>Quem é você?</span>
+                    <select name="signatario_id" required>
+                        <option value="">Selecione seu nome…</option>
+                        {% for s in signatarios %}
+                        <option value="{{ s.id }}"
+                                {{ 'selected' if quem|string == s.id|string }}>
+                            {{ s.nome }}{% if s.cargo %} — {{ s.cargo }}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <label class="senha-campo">
+                    <span>Senha atual (a temporária que você recebeu, ou a sua de hoje)</span>
+                    <input type="password" name="senha_atual" required
+                           autocomplete="current-password"
+                           {% if quem %}autofocus{% endif %}>
+                </label>
+
+                <label class="senha-campo">
+                    <span>Nova senha</span>
+                    <input type="password" name="nova_senha" required
+                           minlength="8" autocomplete="new-password">
+                </label>
+
+                <label class="senha-campo">
+                    <span>Repita a nova senha</span>
+                    <input type="password" name="confirma_senha" required
+                           minlength="8" autocomplete="new-password">
+                </label>
+
+                <p class="senha-nota">Mínimo de 8 caracteres.</p>
+
+                <div class="senha-acoes">
+                    <button type="submit" class="btn btn-portal-primary">
+                        <i class="fas fa-lock me-1"></i> Salvar e continuar
+                    </button>
+                </div>
+            </form>
+
+            <a class="senha-voltar"
+               href="{{ url_for('portal_obras.ciencia_ato', token=token, rdo_id=rdo.id, quem=quem) }}">
+                Voltar para a ciência
+            </a>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

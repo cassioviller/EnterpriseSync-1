@@ -1,0 +1,131 @@
+{# Fase 9a / redesenho 29-07 — o PLACAR NOMINAL da ciência, no fim do
+   relatório. Aqui ele é registro, não chamada: quem assinou, quando, e se o
+   conteúdo ainda corresponde ao que foi assinado. A chamada para agir é a
+   faixa do topo (`_ciencia_faixa.html`).
+
+   Espera do contexto: `ciencia` (placar), `token`, `rdo`. #}
+
+{% if ciencia.total or ciencia.extras %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-file-signature"></i></span>
+        <h2 class="section-title">Ciência do cliente</h2>
+        {% if ciencia.total %}
+        <span class="ms-auto d-inline-flex align-items-center gap-2">
+            <span class="ciencia-dots" aria-hidden="true">
+                {% for item in ciencia.itens %}
+                <span class="ciencia-dot {{ 'on' if item.assinatura else '' }}"></span>
+                {% endfor %}
+            </span>
+            <span class="pill {{ 'pill-success' if ciencia.completo else 'pill-neutral' }}">
+                {{ ciencia.assinados }} de {{ ciencia.total }}
+            </span>
+        </span>
+        {% endif %}
+    </div>
+
+    <div class="card-portal">
+        <div class="card-portal-body">
+
+            {% if ciencia.alteradas %}
+            <div class="ciencia-aviso ciencia-aviso-warn">
+                <i class="fas fa-triangle-exclamation"></i>
+                Este RDO foi alterado depois de assinado por
+                {{ ciencia.alteradas | length }}
+                {{ 'responsável' if ciencia.alteradas | length == 1 else 'responsáveis' }}.
+                A ciência dada continua registrada, mas não corresponde mais
+                ao conteúdo atual — peça um RDO retificador à construtora.
+            </div>
+            {% endif %}
+
+            <ul class="ciencia-lista">
+                {% for item in ciencia.itens %}
+                <li class="ciencia-item">
+                    <span class="ciencia-check {{ 'on' if item.assinatura else '' }}">
+                        <i class="fas {{ 'fa-check' if item.assinatura else 'fa-clock' }}"></i>
+                    </span>
+                    <span class="ciencia-nome">
+                        {{ item.signatario.nome }}
+                        {% if item.signatario.cargo %}
+                        <small>{{ item.signatario.cargo }}</small>
+                        {% endif %}
+                    </span>
+                    <span class="ciencia-quando">
+                        {% if item.assinatura %}
+                            {{ item.assinatura.assinado_em.strftime('%d/%m/%Y %H:%M') }}
+                            {# O hash guardado só serve se for conferido. Não
+                               bater quer dizer que o RDO mudou DEPOIS da
+                               assinatura — o cliente precisa saber disso. #}
+                            {% if not item.integra %}
+                            <span class="ciencia-alterado"
+                                  title="O conteúdo do RDO mudou depois desta assinatura">
+                                <i class="fas fa-triangle-exclamation"></i> alterado
+                            </span>
+                            {% endif %}
+                        {% else %}
+                            aguardando
+                        {% endif %}
+                    </span>
+                </li>
+                {% endfor %}
+
+                {# Quem assinou e depois foi desativado: o ato aconteceu e
+                   continua valendo, mas fica fora do denominador. #}
+                {% for extra in ciencia.extras %}
+                <li class="ciencia-item ciencia-item-extra">
+                    <span class="ciencia-check on"><i class="fas fa-check"></i></span>
+                    <span class="ciencia-nome">
+                        {{ extra.nome_signatario }}
+                        <small>acesso encerrado depois da assinatura</small>
+                    </span>
+                    <span class="ciencia-quando">
+                        {{ extra.assinado_em.strftime('%d/%m/%Y %H:%M') }}
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+
+        </div>
+    </div>
+</section>
+
+<style>
+.ciencia-dots { display: inline-flex; gap: 4px; }
+.ciencia-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--border); display: inline-block;
+}
+.ciencia-dot.on { background: var(--success); }
+
+.ciencia-lista { list-style: none; margin: 0; padding: 0; }
+.ciencia-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 2px; border-bottom: 1px solid var(--border-soft);
+}
+.ciencia-item:last-child { border-bottom: none; }
+.ciencia-item-extra { opacity: .72; }
+.ciencia-check {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--surface-3); color: var(--text-subtle); font-size: .72rem;
+}
+.ciencia-check.on { background: var(--success-bg); color: var(--success); }
+.ciencia-nome { flex: 1; font-weight: 600; font-size: .92rem; }
+.ciencia-nome small {
+    display: block; font-weight: 400; font-size: .78rem;
+    color: var(--text-muted);
+}
+.ciencia-quando {
+    font-size: .8rem; color: var(--text-muted); white-space: nowrap;
+    text-align: right;
+}
+.ciencia-alterado {
+    display: block; font-size: .72rem; font-weight: 600; color: var(--warning);
+}
+.ciencia-aviso {
+    margin-bottom: 12px; padding: 10px 12px; border-radius: var(--radius-sm);
+    background: var(--info-bg); color: var(--info); font-size: .86rem;
+}
+.ciencia-aviso-warn { background: var(--warning-bg); color: var(--warning); }
+</style>
+{% endif %}

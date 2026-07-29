@@ -4022,7 +4022,6 @@ def toggle_signatario_cliente(id, sid):
     """Ativa/desativa. Nunca exclui: a assinatura já dada precisa continuar
     apontando para um cadastro, e `nome_signatario` é snapshot do momento."""
     from models import ObraSignatarioCliente
-    from services.portal_signatario_auth import fechar_sessao  # noqa: F401
 
     obra = _obra_do_tenant(id)
     if not obra:

@@ -128,9 +128,10 @@
 
 {% block content %}
 
-{# Fase 9a — logo no topo: é a ação que o responsável veio fazer, e o placar
-   responde "falta alguém?" sem precisar rolar o relatório inteiro. #}
-{% include 'portal/_portal_ciencia_rdo.html' %}
+{# Fase 9a / redesenho 29-07 — no topo fica só o ESTADO e o botão; o ato mora
+   em rota própria (`/ciencia`). O placar nominal está no fim da página, onde
+   é registro e não chamada. #}
+{% include 'portal/_ciencia_faixa.html' %}
 
 <!-- Informações gerais ──────────────────────────────────────── -->
 <section class="section">
@@ -406,6 +407,11 @@
     </div>
 </section>
 {% endif %}
+
+{# Fase 9a / redesenho 29-07 — quem assinou, quando, e se o conteúdo ainda
+   corresponde: fecha o documento como um quadro de assinaturas fecha uma
+   ata. #}
+{% include 'portal/_ciencia_placar.html' %}
 
 <div class="modal-foto" id="modalFoto" onclick="this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Foto ampliada">
     <img id="modalFotoImg" src="" alt="Foto ampliada">

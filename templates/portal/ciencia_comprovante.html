@@ -1,0 +1,132 @@
+{% extends 'portal/_base.html' %}
+{# Fase 9a / redesenho 29-07 — O COMPROVANTE. Só o navegador que acabou de
+   assinar chega aqui (marca de 15 min no cookie — spec D3): a tela mostra o
+   IP, que o placar público não expõe. O registro durável continua no
+   relatório e no PDF do RDO. #}
+
+{% block title %}Ciência registrada — RDO {{ rdo.numero_rdo }} — {{ obra.nome }}{% endblock %}
+
+{% block obra_titulo %}Ciência registrada{% endblock %}
+{% block obra_subtitulo %}
+<div class="portal-brand-cliente">
+    RDO {{ rdo.numero_rdo }} ·
+    {{ rdo.data_relatorio.strftime('%d/%m/%Y') if rdo.data_relatorio else '' }}
+</div>
+{% endblock %}
+
+{% block extra_styles %}
+        .comp-wrap { max-width: 560px; margin: 0 auto; }
+        .comp-ok {
+            background: var(--success-bg); color: #166534;
+            border: 1px solid #bbf7d0; border-radius: var(--radius-sm);
+            padding: 12px 14px; font-size: .88rem; margin-bottom: 18px;
+            display: flex; gap: 10px; align-items: flex-start;
+        }
+        .comp-ok i { margin-top: 2px; }
+        .comp-ok strong { display: block; }
+
+        .comp-titulo {
+            font-size: .78rem; font-weight: 700; letter-spacing: .06em;
+            text-transform: uppercase; color: var(--text-muted);
+            margin: 0 0 10px;
+        }
+        .comp-registro { list-style: none; margin: 0 0 18px; padding: 0; }
+        .comp-registro li {
+            display: flex; justify-content: space-between; gap: 14px;
+            padding: 8px 0; border-bottom: 1px solid var(--border-soft);
+            font-size: .88rem;
+        }
+        .comp-registro li:last-child { border-bottom: none; }
+        .comp-registro .k { color: var(--text-muted); flex-shrink: 0; }
+        .comp-registro .v {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: .82rem; text-align: right; word-break: break-all;
+            font-variant-numeric: tabular-nums;
+        }
+        .comp-obs { font-family: inherit !important; font-size: .86rem !important; }
+
+        .comp-acoes { display: grid; gap: 10px; }
+        .comp-acoes .btn { padding: 11px 14px; font-size: .95rem; }
+        .comp-voltar {
+            display: block; text-align: center; margin-top: 16px;
+            font-size: .84rem; color: var(--text-muted);
+            text-decoration: underline;
+        }
+        .comp-voltar:hover { color: var(--text); }
+        .comp-nota {
+            font-size: .78rem; color: var(--text-subtle); text-align: center;
+            margin-top: 14px; line-height: 1.5;
+        }
+{% endblock %}
+
+{% block content %}
+<div class="comp-wrap">
+    <div class="card-portal">
+        <div class="card-portal-body">
+
+            <div class="comp-ok" role="status">
+                <i class="fas fa-circle-check"></i>
+                <div>
+                    <strong>Ciência registrada</strong>
+                    Obrigado. A construtora já enxerga a sua confirmação.
+                </div>
+            </div>
+
+            <p class="comp-titulo">O que ficou registrado</p>
+            <ul class="comp-registro">
+                <li>
+                    <span class="k">Responsável</span>
+                    <span class="v">{{ assinatura.nome_signatario }}</span>
+                </li>
+                {% if assinatura.cargo_signatario %}
+                <li>
+                    <span class="k">Cargo</span>
+                    <span class="v">{{ assinatura.cargo_signatario }}</span>
+                </li>
+                {% endif %}
+                <li>
+                    <span class="k">Data e hora do servidor</span>
+                    <span class="v">{{ assinatura.assinado_em.strftime('%d/%m/%Y %H:%M') }}</span>
+                </li>
+                {% if assinatura.ip %}
+                <li>
+                    <span class="k">Endereço de acesso</span>
+                    <span class="v">{{ assinatura.ip }}</span>
+                </li>
+                {% endif %}
+                <li>
+                    <span class="k"
+                          title="Resumo criptográfico do conteúdo — permite provar depois que o relatório não mudou">
+                        Impressão digital</span>
+                    <span class="v" title="{{ assinatura.hash_conteudo }}">{{ hash_abreviado }}</span>
+                </li>
+                {% if assinatura.observacao %}
+                <li>
+                    <span class="k">Observação</span>
+                    <span class="v comp-obs">{{ assinatura.observacao }}</span>
+                </li>
+                {% endif %}
+            </ul>
+
+            <div class="comp-acoes">
+                <a class="btn btn-portal-primary"
+                   href="{{ url_for('portal_obras.ciencia_recibo', token=token, rdo_id=rdo.id) }}">
+                    <i class="fas fa-file-pdf me-1"></i> Baixar recibo em PDF
+                </a>
+            </div>
+
+            <a class="comp-voltar"
+               href="{{ url_for('portal_obras.portal_rdo_detalhe', token=token, rdo_id=rdo.id) }}">
+                Voltar ao relatório
+            </a>
+
+            <p class="comp-nota">
+                Esta tela e o recibo ficam disponíveis por alguns minutos
+                depois de assinar. O registro da sua ciência continua
+                permanente no próprio relatório.
+            </p>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

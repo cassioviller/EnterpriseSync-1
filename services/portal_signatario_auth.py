@@ -1,26 +1,27 @@
 #!/usr/bin/env python3
-"""Autenticação do responsável do cliente no portal — SIGE Fase 9a.
+"""Credencial do responsável do cliente no portal — SIGE Fase 9a.
 
 O portal da obra é ANÔNIMO por construção (`portal_obras_views.py:3`): quem
 tem o link `/portal/obra/<token>` navega sem login. Este módulo NÃO muda
 isso. Ele existe para o único ato em que identidade tem consequência: dar
 ciência num RDO.
 
-Por que sessão própria e não Flask-Login: `login_manager.user_loader`
-carrega `Usuario` (app.py:521), e toda a autorização interna parte daí.
-Autenticar um signatário de cliente pelo mesmo mecanismo colocaria uma
-pessoa de fora dentro do mesmo espaço de identidade do sistema — a um bug
-de distância de enxergar o resto. A sessão daqui vive numa chave própria e
-é validada contra a obra do token em toda ação.
+NÃO HÁ SESSÃO — e já houve. A primeira versão mantinha um login próprio no
+cookie (15 min de inatividade, teto de 12 h, impressão da credencial para
+poder revogar). O redesenho de 29/07 (spec
+`docs/superpowers/specs/2026-07-29-ciencia-rdo-portal-ux-design.md`, D1)
+removeu tudo isso: a senha é conferida no MESMO POST que grava a ciência.
+O uso real é diário e de um RDO por vez, então o custo digitado é idêntico
+— e a assinatura passa a repousar sobre a credencial, não sobre um cookie.
+A máquina de revogação foi junto: ela existia só para consertar um problema
+que a própria sessão criava (achado 5 da revisão de 29/07).
 
-A sessão é curta e presa a UMA obra:
+Se o ritmo real um dia virar "vários RDOs numa sentada", o caminho é
+assinar em LOTE (um POST, uma senha, N RDOs) — não ressuscitar a sessão.
+O spec §7 registra essa decisão de propósito.
 
-    session['portal_sig'] = {'sid': <id>, 'obra_id': <id>, 'exp': <iso>}
-
-15 minutos de INATIVIDADE (renovados a cada ação), para o responsável que
-sumiu uma semana assinar os RDOs atrasados em sequência sem redigitar a
-senha a cada um — sem virar um login persistente, que é justamente o que o
-cliente não quis.
+Este módulo é, portanto, só credencial: gerar/definir/conferir senha e
+listar quem assina. Quem orquestra o ato é `portal_obras_views`.
 """
 from __future__ import annotations
 
@@ -34,14 +35,6 @@ from models import ObraSignatarioCliente, db
 
 logger = logging.getLogger('portal.signatario')
 
-# Inatividade tolerada antes de pedir a senha de novo.
-MINUTOS_SESSAO = 15
-# Teto absoluto desde o login, independente de atividade. A janela de
-# inatividade se renova a cada page view; sem este teto, uma aba deixada
-# aberta (ou sequestrada) mantém a sessão viva indefinidamente.
-HORAS_SESSAO_MAXIMA = 12
-CHAVE_SESSAO = 'portal_sig'
-
 # Alfabeto da senha temporária: sem 0/O/1/l/I, que viram erro de digitação
 # quando alguém dita a senha por telefone — e ditar por telefone é
 # exatamente o canal previsto (não há SMTP configurado no sistema).
@@ -51,11 +44,7 @@ SENHA_MIN = 8
 
 
 class AutenticacaoInvalida(Exception):
-    """Recusa de login, com mensagem apta à UI."""
-
-
-class SessaoInvalida(Exception):
-    """Sessão ausente, expirada ou de outra obra."""
+    """Recusa de credencial, com mensagem apta à UI."""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -181,119 +170,4 @@ def autenticar(obra, signatario_id, senha: str):
     signatario.ultimo_acesso_em = datetime.utcnow()
     logger.info('[signatario] autenticado — signatario=%s obra=%s',
                 signatario.id, obra.id)
-    return signatario
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Sessão
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _impressao_credencial(signatario) -> str:
-    """Marca curta e irreversível do hash de senha vigente.
-
-    É o que permite REVOGAR uma sessão trocando a senha. A sessão é um dict
-    autocontido no cookie (`{sid, obra_id, exp}`); sem esta marca, gerar senha
-    nova pela tela da obra trocava o `password_hash` e **não derrubava** quem
-    já estava dentro — exatamente o contrário do que a construtora acredita
-    estar fazendo quando o cliente liga dizendo que a senha vazou.
-
-    Deriva do hash, nunca da senha, e é truncada: não reintroduz o material
-    da credencial dentro do cookie.
-    """
-    import hashlib
-    base = (signatario.password_hash or '').encode('utf-8')
-    return hashlib.sha256(base).hexdigest()[:16]
-
-
-def abrir_sessao(signatario, *, inicio=None) -> None:
-    """Abre (ou renova) a sessão do signatário.
-
-    `inicio` preserva o instante do login original através das renovações —
-    é o que sustenta o teto absoluto de `HORAS_SESSAO_MAXIMA`.
-    """
-    from flask import session
-    agora = datetime.utcnow()
-    session[CHAVE_SESSAO] = {
-        'sid': signatario.id,
-        'obra_id': signatario.obra_id,
-        'exp': (agora + timedelta(minutes=MINUTOS_SESSAO)).isoformat(),
-        # Teto absoluto: sem ele, a janela de inatividade se renova a cada
-        # page view e uma aba deixada aberta mantém a sessão viva para sempre.
-        'ini': (inicio or agora).isoformat(),
-        'cred': _impressao_credencial(signatario),
-    }
-    session.modified = True
-
-
-def fechar_sessao() -> None:
-    from flask import session
-    session.pop(CHAVE_SESSAO, None)
-    session.modified = True
-
-
-def sessao_atual(obra):
-    """Signatário logado PARA ESTA OBRA, ou None.
-
-    Devolve None (em vez de levantar) porque a maioria dos chamadores é
-    renderização: sem sessão, a tela mostra o formulário de login. Renova a
-    validade a cada consulta — é o que faz a janela ser de INATIVIDADE.
-
-    Uma sessão de outra obra é tratada como ausente, não como erro: o mesmo
-    navegador pode ter aberto duas obras, e a segunda simplesmente pede
-    senha.
-    """
-    from flask import session
-
-    dados = session.get(CHAVE_SESSAO)
-    if not isinstance(dados, dict):
-        return None
-    if dados.get('obra_id') != obra.id:
-        return None
-
-    agora = datetime.utcnow()
-    try:
-        if datetime.fromisoformat(dados['exp']) < agora:
-            fechar_sessao()
-            return None
-        # Teto absoluto desde o login. A janela de inatividade sozinha nunca
-        # expira numa aba que fica sendo usada — e uma sessão sequestrada
-        # sobreviveria indefinidamente por isso.
-        inicio = datetime.fromisoformat(dados['ini'])
-        if agora - inicio > timedelta(hours=HORAS_SESSAO_MAXIMA):
-            fechar_sessao()
-            return None
-    except (KeyError, TypeError, ValueError):
-        # Sessão de formato antigo ou corrompida: derruba. Custa um login.
-        fechar_sessao()
-        return None
-
-    signatario = ObraSignatarioCliente.query.filter_by(
-        id=dados.get('sid'), obra_id=obra.id).first()
-    # Desativado no meio da sessão perde o acesso na ação seguinte.
-    if signatario is None or not signatario.ativo:
-        fechar_sessao()
-        return None
-
-    # REVOGAÇÃO por troca de senha: a construtora gerar uma senha temporária
-    # (ou o próprio responsável trocar a dele) invalida toda sessão aberta com
-    # a credencial anterior. Sem esta comparação, "gerar senha nova" não
-    # expulsava o intruso — só dava a ele mais uma senha para ignorar.
-    if dados.get('cred') != _impressao_credencial(signatario):
-        logger.info('[signatario] sessão revogada por troca de credencial — '
-                    'signatario=%s obra=%s', signatario.id, obra.id)
-        fechar_sessao()
-        return None
-
-    # Renova a janela de inatividade PRESERVANDO o início, senão o teto
-    # absoluto se moveria junto e não seria teto nenhum.
-    abrir_sessao(signatario, inicio=inicio)
-    return signatario
-
-
-def exigir_sessao(obra):
-    """Igual a `sessao_atual`, mas levanta — para as rotas que MUTAM."""
-    signatario = sessao_atual(obra)
-    if signatario is None:
-        raise SessaoInvalida(
-            'Sua sessão expirou. Informe a senha novamente para assinar.')
     return signatario
