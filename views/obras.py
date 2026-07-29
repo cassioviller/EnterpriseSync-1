@@ -8,6 +8,7 @@ from utils import calcular_valor_hora_periodo
 from utils.database_diagnostics import capture_db_errors
 from views.helpers import get_admin_id_robusta, verificar_dados_producao
 from datetime import datetime, date
+from functools import wraps
 import calendar
 from sqlalchemy import desc, text
 import os
@@ -903,7 +904,17 @@ def obter_funcionarios(admin_id):
 @login_required
 def editar_obra(id):
     """Editar obra existente - SISTEMA REFATORADO"""
-    obra = Obra.query.get_or_404(id)
+    # `Obra.query.get_or_404(id)` NÃO filtrava tenant: qualquer usuário logado
+    # abria a tela de edição de obra de outro admin. Passou a doer de verdade
+    # na Fase 9a, que pendurou aqui a lista de responsáveis do CLIENTE (nome,
+    # e-mail, último acesso, estado da senha) — dado de contato do cliente de
+    # um concorrente vazando pela URL.
+    #
+    # `obras_visiveis()` resolve os DOIS eixos de uma vez (tenant + escopo por
+    # obra da Fase 1) e devolve query; `first_or_404` mantém o 404 opaco que
+    # `utils/autorizacao.obra_required` já escolheu como padrão — obra fora do
+    # alcance não vaza nem a própria existência.
+    obra = obras_visiveis().filter(Obra.id == id).first_or_404()
     
     if request.method == 'POST':
         try:
@@ -1104,13 +1115,23 @@ def editar_obra(id):
     except NameError:
         _aid = obra.admin_id if obra else 10
     opcoes_obra_status = get_opcoes_valores('obra_status', _aid)
-    return render_template('obra_form.html', 
-                         titulo='Editar Obra', 
-                         obra=obra, 
-                         funcionarios=funcionarios, 
+    # Fase 9a — responsáveis do cliente que assinam RDO nesta obra.
+    from models import ObraSignatarioCliente
+    signatarios_cliente = (ObraSignatarioCliente.query
+                           .filter_by(obra_id=obra.id)
+                           .order_by(ObraSignatarioCliente.ativo.desc(),
+                                     ObraSignatarioCliente.nome).all())
+    return render_template('obra_form.html',
+                         titulo='Editar Obra',
+                         obra=obra,
+                         funcionarios=funcionarios,
                          servicos_disponiveis=servicos_disponiveis,
                          servicos_obra=servicos_obra,
-                         opcoes_obra_status=opcoes_obra_status)
+                         opcoes_obra_status=opcoes_obra_status,
+                         signatarios_cliente=signatarios_cliente,
+                         # Senha temporária recém-gerada: mostrada UMA vez e
+                         # esquecida. Vem da sessão, nunca da URL.
+                         **_consumir_senha_gerada())
 
 # Tabelas que `excluir_obra` limpa à mão, na ordem em que são limpas.
 #
@@ -3832,3 +3853,192 @@ def handoff_obra_post(id):
     flash(f'Obra entregue a {funcionario.nome}. A obra está em execução.',
           'success')
     return redirect(url_for('main.detalhes_obra', id=obra.id))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RESPONSÁVEIS DO CLIENTE QUE ASSINAM RDO (Fase 9a)
+#
+# O lado da construtora do fluxo de ciência. A recuperação de senha é MEDIADA
+# aqui de propósito: não existe SMTP configurado no sistema (só o canal n8n,
+# opt-in por `N8N_WEBHOOK_URL`), então "esqueci minha senha" no portal vira uma
+# pendência nesta tela e a construtora entrega a senha pelo canal que já usa
+# com o cliente.
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _obra_do_tenant(obra_id: int):
+    """Obra do tenant atual, ou None.
+
+    `obras_visiveis()` e não `filter_by(admin_id=...)`: resolve o tenant E o
+    escopo por obra da Fase 1 no mesmo lugar, que é o que `editar_obra` usa.
+    Duas portas para o mesmo dado precisam da mesma fechadura.
+    """
+    return obras_visiveis().filter(Obra.id == obra_id).first()
+
+
+_CHAVE_SENHA_GERADA = '_senha_signatario_gerada'
+
+
+def _guardar_senha_gerada(senha: str, nome: str) -> None:
+    """Entrega a senha à PRÓXIMA renderização da tela, pela sessão.
+
+    A primeira versão passava `?senha_gerada=...` na URL do redirect. Isso
+    grava a senha em três lugares que ninguém controla depois: histórico e
+    autocomplete do navegador, log de acesso do gunicorn/EasyPanel (que não
+    tem o mesmo controle do banco) e o header `Referer` mandado a todo asset
+    de terceiro que a página carregue. Derrota inteiramente o desenho de
+    `gerar_senha_temporaria`, que devolve o texto claro exatamente uma vez
+    porque "não há como recuperá-la depois, por construção".
+
+    A sessão é cookie assinado e vai só para o navegador de quem gerou.
+    """
+    from flask import session
+    session[_CHAVE_SENHA_GERADA] = {'senha': senha, 'nome': nome}
+    session.modified = True
+
+
+def _consumir_senha_gerada() -> dict:
+    """Lê e APAGA a senha pendente. Consumida na primeira renderização — um
+    F5 depois não a mostra de novo, que é o comportamento de "uma vez só"."""
+    from flask import session
+    dados = session.pop(_CHAVE_SENHA_GERADA, None) or {}
+    session.modified = True
+    return {'senha_gerada': dados.get('senha'),
+            'senha_gerada_para': dados.get('nome')}
+
+
+def exige_csrf(view):
+    """Reativa a checagem de CSRF numa rota do blueprint `main`.
+
+    `app.py:1051-1057` isenta o blueprint `main` INTEIRO de CSRF. Isso é
+    herança de quando ele era só telas de leitura e formulários internos; hoje
+    ele carrega rotas que cunham credencial. As três rotas de signatário
+    (criar, gerar senha, ativar/desativar) mudam quem pode assinar RDO em nome
+    do cliente — sem esta reativação, uma página maliciosa aberta noutra aba
+    por um funcionário logado troca a senha do responsável do cliente com um
+    POST forjado, e o `postarAcaoSignatario` do template, que já manda o
+    token, esconde a brecha em teste manual.
+
+    Não removo a isenção do blueprint inteiro de propósito: ela cobre dezenas
+    de rotas legadas cujo front pode não mandar token, e virar isso de uma vez
+    quebraria o sistema em lugares que esta revisão não olhou. A trava vai
+    onde o risco está.
+    """
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        from flask import current_app
+
+        # Respeita o desligamento global, como o `before_request` do próprio
+        # flask_wtf faz. `csrf.protect()` NÃO consulta `WTF_CSRF_ENABLED` —
+        # sem esta guarda o decorator rejeitaria todo POST da suíte (que
+        # desliga CSRF), e o pior é que os testes de escopo continuariam
+        # passando por acidente: "nada foi criado" também é o resultado de um
+        # bloqueio de CSRF, então a asserção certa daria verde pelo motivo
+        # errado.
+        if current_app.config.get('WTF_CSRF_ENABLED', True):
+            from app import csrf
+            csrf.protect()      # levanta CSRFError → handler de app.py:201
+        return view(*args, **kwargs)
+    return wrapper
+
+
+@main_bp.route('/obras/<int:id>/signatarios', methods=['POST'])
+@login_required
+@exige_csrf
+def criar_signatario_cliente(id):
+    """Cadastra um responsável e já devolve a primeira senha temporária."""
+    from models import ObraSignatarioCliente
+    from services.portal_signatario_auth import gerar_senha_temporaria
+
+    obra = _obra_do_tenant(id)
+    if not obra:
+        flash('Obra não encontrada.', 'danger')
+        return redirect(url_for('main.obras'))
+
+    nome = (request.form.get('nome') or '').strip()
+    if not nome:
+        flash('Informe o nome do responsável.', 'danger')
+        return redirect(url_for('main.editar_obra', id=obra.id))
+
+    signatario = ObraSignatarioCliente(
+        obra_id=obra.id,
+        admin_id=obra.admin_id,
+        nome=nome[:200],
+        email=((request.form.get('email') or '').strip() or None),
+        cargo=((request.form.get('cargo') or '').strip() or None),
+        ativo=True,
+    )
+    db.session.add(signatario)
+    db.session.flush()
+    senha = gerar_senha_temporaria(signatario)
+    db.session.commit()
+
+    logger.info('[signatario] criado id=%s obra=%s por usuario=%s',
+                signatario.id, obra.id, current_user.id)
+    flash(f'{nome} cadastrado. Entregue a senha temporária abaixo — ela não '
+          f'poderá ser vista de novo.', 'success')
+    _guardar_senha_gerada(senha, nome)
+    return redirect(url_for('main.editar_obra', id=obra.id))
+
+
+@main_bp.route('/obras/<int:id>/signatarios/<int:sid>/senha', methods=['POST'])
+@login_required
+@exige_csrf
+def gerar_senha_signatario_cliente(id, sid):
+    """Gera nova senha temporária — a resposta ao "esqueci"/"travei".
+
+    Destrava o acesso e limpa o pedido de recuperação: são o mesmo ato do
+    ponto de vista de quem opera a tela.
+    """
+    from models import ObraSignatarioCliente
+    from services.portal_signatario_auth import gerar_senha_temporaria
+
+    obra = _obra_do_tenant(id)
+    if not obra:
+        flash('Obra não encontrada.', 'danger')
+        return redirect(url_for('main.obras'))
+
+    signatario = ObraSignatarioCliente.query.filter_by(
+        id=sid, obra_id=obra.id).first()
+    if not signatario:
+        flash('Responsável não encontrado nesta obra.', 'danger')
+        return redirect(url_for('main.editar_obra', id=obra.id))
+
+    senha = gerar_senha_temporaria(signatario)
+    db.session.commit()
+
+    logger.info('[signatario] senha regerada id=%s obra=%s por usuario=%s',
+                signatario.id, obra.id, current_user.id)
+    flash(f'Senha temporária gerada para {signatario.nome}. Ela vale '
+          f'{ObraSignatarioCliente.HORAS_SENHA_TEMPORARIA}h e será trocada no '
+          f'primeiro acesso.', 'success')
+    _guardar_senha_gerada(senha, signatario.nome)
+    return redirect(url_for('main.editar_obra', id=obra.id))
+
+
+@main_bp.route('/obras/<int:id>/signatarios/<int:sid>/toggle', methods=['POST'])
+@login_required
+@exige_csrf
+def toggle_signatario_cliente(id, sid):
+    """Ativa/desativa. Nunca exclui: a assinatura já dada precisa continuar
+    apontando para um cadastro, e `nome_signatario` é snapshot do momento."""
+    from models import ObraSignatarioCliente
+    from services.portal_signatario_auth import fechar_sessao  # noqa: F401
+
+    obra = _obra_do_tenant(id)
+    if not obra:
+        flash('Obra não encontrada.', 'danger')
+        return redirect(url_for('main.obras'))
+
+    signatario = ObraSignatarioCliente.query.filter_by(
+        id=sid, obra_id=obra.id).first()
+    if not signatario:
+        flash('Responsável não encontrado nesta obra.', 'danger')
+        return redirect(url_for('main.editar_obra', id=obra.id))
+
+    signatario.ativo = not signatario.ativo
+    db.session.commit()
+    logger.info('[signatario] id=%s ativo=%s por usuario=%s',
+                signatario.id, signatario.ativo, current_user.id)
+    flash(f'{signatario.nome} '
+          f'{"reativado" if signatario.ativo else "desativado"}.', 'info')
+    return redirect(url_for('main.editar_obra', id=obra.id))

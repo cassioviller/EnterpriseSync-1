@@ -6,6 +6,7 @@ faixa de cabeçalho compacta com KPI de progresso geral, omissão de linhas
 vazias, paginação no rodapé.
 """
 import base64
+import logging
 import re
 from datetime import datetime
 from io import BytesIO
@@ -28,6 +29,8 @@ from models import (
     EngenheiroResponsavel, Funcionario, TarefaCronograma,
 )
 from utils.rdo_horas import normalizar_horas_funcionario
+
+logger = logging.getLogger('rdo.pdf')
 
 
 # ─── Paleta SIGE (DESIGN.md) ────────────────────────────────────────────────
@@ -824,10 +827,106 @@ def gerar_pdf_rdo(rdo):
         elements.append(Spacer(1, 18))
         elements.append(sig_block)
 
+    # ── Ciência do cliente (Fase 9a) ──
+    # Vem DEPOIS das assinaturas porque é outra coisa: aquelas são autoria
+    # (quem executou, quem responde); esta é o aceite de quem contratou.
+    ciencia_block = _ciencia_cliente_block(rdo, styles)
+    if ciencia_block:
+        elements.append(Spacer(1, 12))
+        elements.append(ciencia_block)
+
     footer = _Footer(empresa_nome, rdo.numero_rdo or f'RDO #{rdo.id}')
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     buf.seek(0)
     return buf.getvalue()
+
+
+def _assinaturas_desatualizadas(rdo, assinaturas):
+    """Assinaturas cujo hash não bate mais com o RDO de hoje.
+
+    UM recálculo para o documento inteiro (o payload canônico é o mesmo para
+    todas as assinaturas dele), comparado com o que cada uma guardou.
+
+    Falha FECHADA, como `services/rdo_hash.verificar_integridade`: se o hash
+    não puder ser recalculado, TODAS entram como desatualizadas. Num PDF que
+    se apresenta como evidência, um silêncio otimista é o pior resultado
+    possível — melhor um alerta a mais do que uma prova falsa.
+    """
+    try:
+        from services.rdo_hash import calcular_hash
+        atual = calcular_hash(rdo)
+    except Exception:
+        logger.exception('[rdo-pdf] falha ao recalcular hash do rdo %s',
+                         getattr(rdo, 'id', None))
+        return list(assinaturas)
+
+    return [a for a in assinaturas
+            if (a.algoritmo or 'sha256') != 'sha256'
+            or a.hash_conteudo != atual]
+
+
+def _ciencia_cliente_block(rdo, styles):
+    """Fase 9a — quadro da ciência do cliente, com quem FALTA assinar.
+
+    A tabela de assinaturas já lista quem assinou (as de papel `cliente`
+    entram nela junto com as internas). O que só este bloco diz é o
+    denominador: "2 de 3", e o nome de quem ainda não deu ciência. Num
+    documento entregue ao cliente ou anexado a uma medição, essa é a
+    diferença entre "duas pessoas assinaram" e "falta o diretor assinar".
+
+    Devolve None quando a obra não tem responsáveis cadastrados — sem
+    denominador não há placar, e uma seção vazia só ocuparia página.
+    """
+    try:
+        from services.rdo_ciencia_cliente import placar
+        p = placar(rdo)
+    except Exception:
+        logger.exception('[rdo-pdf] placar de ciência ilegível no rdo %s',
+                         getattr(rdo, 'id', None))
+        return None
+
+    if not p['total']:
+        return None
+
+    corpo = ParagraphStyle('cie_body', parent=styles['body'], fontSize=8,
+                           leading=10.5, textColor=INK)
+
+    situacao = (f"<b>{p['assinados']} de {p['total']}</b> "
+                f"{'responsável deu' if p['total'] == 1 else 'responsáveis deram'}"
+                f" ciência neste relatório.")
+    if p['completo']:
+        situacao += ' <b>Ciência completa.</b>'
+
+    linhas = [Paragraph(situacao, corpo)]
+
+    for item in p['itens']:
+        s, a = item['signatario'], item['assinatura']
+        cargo = f" — {s.cargo}" if s.cargo else ''
+        if a is not None:
+            quando = (a.assinado_em.strftime('%d/%m/%Y %H:%M:%S')
+                      if a.assinado_em else '—')
+            marca = '' if item['integra'] else '  <b>[conteúdo alterado depois]</b>'
+            texto = (f'&#10003; <b>{s.nome}</b>{cargo} — {quando} (UTC), '
+                     f'IP {a.ip or "—"}{marca}')
+        else:
+            # `&#183;` (·) e não `&#9675;` (○): a fonte base do reportlab não
+            # tem o círculo vazio e desenha um quadrado preto no lugar — que
+            # num PDF de obra parece marca de item CONCLUÍDO, o oposto do que
+            # a linha diz. O ponto médio é Latin-1 e sempre renderiza.
+            texto = (f'&#183; <b>{s.nome}</b>{cargo} — '
+                     f'<b>aguardando ciência</b>')
+        linhas.append(Paragraph(texto, corpo))
+
+    linhas.append(Spacer(1, 4))
+    linhas.append(Paragraph(
+        'A ciência é registrada pelo portal do cliente, com autenticação '
+        'individual por responsável, carimbo de tempo do servidor e verificação '
+        'de integridade (SHA-256) do conteúdo deste RDO. Ela atesta o aceite do '
+        'contratante e não substitui as assinaturas de autoria acima.',
+        ParagraphStyle('cie_nota', parent=styles['body_muted'], fontSize=6.5,
+                       leading=8.5)))
+
+    return KeepTogether([_section_rule('Ciência do cliente', styles)] + linhas)
 
 
 def _signature_block(rdo, config, styles):
@@ -889,8 +988,27 @@ def _signature_block(rdo, config, styles):
             ParagraphStyle('sig_nota', parent=styles['body_muted'],
                            fontSize=6.5, leading=8.5))
 
-        return KeepTogether([_section_rule('Assinaturas', styles), tabela,
-                             Spacer(1, 4), nota])
+        blocos = [_section_rule('Assinaturas', styles), tabela,
+                  Spacer(1, 4), nota]
+
+        # Fase 9a — um PDF que lista assinaturas de um documento ALTERADO
+        # depois delas é pior que um PDF sem assinatura nenhuma: parece prova
+        # e não é. Se algum hash não bate mais, o papel precisa dizer.
+        desatualizadas = _assinaturas_desatualizadas(rdo, assinaturas)
+        if desatualizadas:
+            nomes = ', '.join(a.nome_signatario or '—' for a in desatualizadas)
+            blocos.append(Spacer(1, 4))
+            blocos.append(Paragraph(
+                f'<b>ATENÇÃO:</b> o conteúdo deste RDO não corresponde mais '
+                f'ao que foi assinado por {nomes}. A verificação de '
+                f'integridade (SHA-256) falhou para {len(desatualizadas)} '
+                f'assinatura(s) — este documento não deve ser usado como '
+                f'evidência sem antes esclarecer a divergência.',
+                ParagraphStyle('sig_alerta', parent=styles['body'],
+                               fontSize=7, leading=9,
+                               textColor=colors.HexColor('#b45309'))))
+
+        return KeepTogether(blocos)
 
     # ── Sem assinatura eletrônica: comportamento pré-Fase 5 ──────────
     responsavel_nome = rdo.criado_por.nome if rdo.criado_por else 'Responsável pelo preenchimento'

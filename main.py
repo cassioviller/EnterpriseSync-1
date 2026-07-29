@@ -227,6 +227,12 @@ try:
     csrf.exempt(aprovar_mapa_concorrencia)
     csrf.exempt(portal_rdo_detalhe)
     csrf.exempt(selecionar_mapa_v2)
+    # As rotas de ciência (Fase 9a) ficam DE FORA desta lista de propósito.
+    # A isenção aqui existe porque o portal era anônimo — sem sessão, não há
+    # o que um CSRF sequestre. A assinatura mudou isso: há uma sessão
+    # autenticada (`portal_sig`) que autoriza gravar autoria, e é exatamente
+    # o alvo clássico de CSRF. Os formulários de `_ciencia_rdo.html` levam
+    # `csrf_token` por isso.
     logger.info("[OK] CSRF exempt: portal_obras (public routes only)")
 except Exception as e:
     logger.error(f"[WARN] CSRF exempt portal_obras routes: {e}", exc_info=True)
