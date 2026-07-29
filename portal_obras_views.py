@@ -112,13 +112,24 @@ def _registrar_acesso(obra, acao, alvo_tipo=None, alvo_id=None, detalhes=None):
     Nunca levanta: uma falha de auditoria não pode impedir o cliente de
     aprovar uma compra — mas o log fica, para que a falha apareça.
 
-    `X-Forwarded-For` vem primeiro porque a aplicação roda atrás de proxy
-    (EasyPanel); sem isso, todo evento registraria o IP do proxy.
+    `request.remote_addr` e NUNCA `X-Forwarded-For` lido à mão. A versão
+    anterior parseava o header e pegava o PRIMEIRO salto, justificando-se com
+    "a aplicação roda atrás de proxy (EasyPanel); sem isso, todo evento
+    registraria o IP do proxy" — o diagnóstico estava certo e a cura, errada.
+    `ProxyFix(x_for=1)` (app.py:94) já resolve o IP real desde a Fase 0.5, e o
+    primeiro salto da cadeia é justamente a parte que o REQUISITANTE escreve:
+    bastava mandar `X-Forwarded-For: 8.8.8.8` para carimbar esse IP em toda a
+    trilha do portal — inclusive nos eventos `ciencia_login` e `ciencia_rdo`,
+    que acompanham um ato de valor probatório.
+
+    Este era o último ponto do sistema que ainda lia o header à mão. As duas
+    irmãs (`services/rdo_assinatura._contexto_request` e
+    `services/rdo_ciencia_cliente._contexto_request`) já usavam `remote_addr`
+    pelo mesmo motivo — a trilha ficava contando uma história que a assinatura
+    ao lado desmentia.
     """
     try:
-        encaminhado = request.headers.get('X-Forwarded-For', '')
-        ip = (encaminhado.split(',')[0].strip() if encaminhado
-              else (request.remote_addr or ''))[:64]
+        ip = (request.remote_addr or '')[:64]
         db.session.add(PortalAcessoEvento(
             obra_id=obra.id,
             admin_id=obra.admin_id,

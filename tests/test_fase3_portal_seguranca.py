@@ -204,6 +204,45 @@ def test_post_no_portal_grava_trilha_com_ip():
         assert any(e.acao == 'compra_aprovar' for e in eventos)
 
 
+def test_trilha_do_portal_nao_aceita_x_forwarded_for_forjado():
+    """A trilha registra quem agiu — se o próprio agente escolher o IP, não
+    registra nada.
+
+    `_registrar_acesso` lia o header à mão e gravava o PRIMEIRO salto, que é
+    texto do requisitante. Num request real o proxy confiável apenda o IP que
+    observou à DIREITA, e é esse que `ProxyFix(x_for=1)` (app.py:94) promove a
+    `remote_addr`.
+
+    Espelha `test_ip_da_ciencia_nao_aceita_x_forwarded_for_forjado`
+    (tests/test_rdo_ciencia_cliente.py): o mesmo POST gravava um IP honesto na
+    `RDOAssinatura` e um IP forjado no `PortalAcessoEvento` do mesmo ato.
+    """
+    from models import PortalAcessoEvento
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra_com_token(admin.id)
+        compra = _compra(admin.id, obra.id)
+        token, oid, cid = obra.token_cliente, obra.id, compra.id
+
+    anon = app.test_client()
+    # O cliente manda a cadeia com um IP inventado à ESQUERDA. Num request
+    # real o proxy confiável APENDA o IP que observou, à direita, e é esse que
+    # `ProxyFix(x_for=1)` promove a `remote_addr`. Tudo à esquerda é texto que
+    # o próprio requisitante escreveu.
+    anon.post(f'/portal/obra/{token}/compra/{cid}/aprovar',
+              headers={'X-Forwarded-For': '8.8.8.8, 198.51.100.4'})
+
+    with app.app_context():
+        eventos = PortalAcessoEvento.query.filter_by(obra_id=oid).all()
+        assert eventos, 'POST anônimo no portal não deixou trilha'
+        ips = {e.ip for e in eventos}
+        assert '8.8.8.8' not in ips, (
+            'gravou o salto forjável (leitura à esquerda da cadeia)')
+        assert ips == {'198.51.100.4'}, (
+            f'esperado o salto do proxy confiável, veio {ips}')
+
+
 # ---------------------------------------------------------------------------
 # Governança ligada: o cliente dá ciência, não cria custo
 # ---------------------------------------------------------------------------

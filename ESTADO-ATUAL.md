@@ -730,6 +730,17 @@ FUNCIONARIO.)*
     de backfill não era regressão minha). **Reproduza antes de corrigir** — e
     antes de reportar.
 
+13. **Defeito de padrão tem irmãs; a revisão só acha uma.** 🔬 29/07: a rodada
+    fechou com o achado do IP forjável corrigido em
+    `services/rdo_ciencia_cliente`. Só que `_registrar_acesso`
+    (`portal_obras_views.py`) lia o `X-Forwarded-For` à mão do mesmo jeito — e
+    as duas gravam no **mesmo POST**: a assinatura ficava com o IP honesto e a
+    trilha do portal, ao lado, com o forjado. Achado depois do fecho, por
+    varredura (`grep` do padrão em todo o código de produção), não pela
+    revisão. **Ao corrigir um defeito que é uma leitura ou uma convenção
+    errada, varra o repositório pelo padrão antes de fechar** — o relatório
+    diz "corrigido" sobre o arquivo que ele olhou, não sobre o sistema.
+
 ## Decisões pendentes suas
 
 Consolidadas dos 10 planos. Cada uma **já tem recomendação adotada no plano** —

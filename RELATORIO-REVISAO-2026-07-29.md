@@ -1,9 +1,11 @@
 # Revisão de código — 29/07/2026 (Fase 6 do cronograma + Fase 9a)
 
-> **Status: concluída. 10 achados, 10 corrigidos**, cada um com teste que foi
+> **Status: concluída. 11 achados, 11 corrigidos**, cada um com teste que foi
 > verificado **falhando contra o código anterior** antes de a correção ser
-> aceita. Todas as correções estão nos dois commits de feature deste branch —
-> nenhum commit desta série contém o código vulnerável.
+> aceita. As correções 1–10 estão nos dois commits de feature deste branch —
+> nenhum commit daquela série contém o código vulnerável. A **11ª** foi
+> encontrada depois do fecho, ao conferir se a 10ª tinha irmãs, e vem em
+> commit próprio sobre a `main`.
 
 Duas passagens de revisão:
 
@@ -144,6 +146,25 @@ evidência de autoria sob a MP 2.200-2/2001.
 Passou a usar `request.remote_addr`, que o `ProxyFix(x_for=1)` (`app.py:94`)
 já resolveu promovendo o salto mais à **direita** — o que o proxy confiável
 escreveu. Mesma implementação da irmã em `services/rdo_assinatura`.
+
+### 11. O mesmo IP forjável na trilha do portal — `portal_obras_views.py`
+
+Achado **depois** de a rodada ser fechada, ao conferir se o #10 tinha sobrado
+em algum lugar: `_registrar_acesso` fazia exatamente a mesma leitura à mão do
+`X-Forwarded-For`, pegando o primeiro salto.
+
+Não é uma repetição inócua do #10. As duas gravações acontecem no **mesmo
+POST**: a `RDOAssinatura` guardava o IP honesto e o `PortalAcessoEvento` do
+mesmo ato guardava o forjado. A trilha passava a contradizer a assinatura ao
+lado — e é ela que carrega `ciencia_login` e `ciencia_rdo`, os eventos que
+acompanham o ato de valor probatório. Um `X-Forwarded-For: 8.8.8.8` carimbava
+esse IP em toda a trilha do portal, não só nesses dois eventos.
+
+Passou a usar `request.remote_addr`, como as duas irmãs
+(`services/rdo_assinatura` e `services/rdo_ciencia_cliente`). Varredura
+confirmou que este era o **último** leitor manual do header no código de
+produção: o que resta são o comentário do `ProxyFix` em `app.py:89`, as
+docstrings destas correções e os headers dos testes.
 
 ---
 
