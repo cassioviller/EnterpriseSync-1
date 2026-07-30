@@ -29,7 +29,8 @@ import main  # noqa: F401 — registra os blueprints antes de qualquer request
 from app import app, db
 from models import (Cliente, Obra, ObraSignatarioCliente, RDO, RDOAssinatura,
                     TipoUsuario, Usuario)
-from services.rdo_ciclo_vida import APROVADO, ASSINADO, PREENCHIDO, RASCUNHO
+from services.rdo_ciclo_vida import (APROVADO, ASSINADO, PREENCHIDO, RASCUNHO,
+                                     RETIFICADO)
 
 pytestmark = pytest.mark.integration
 
@@ -68,6 +69,9 @@ _CAMINHO = {
     PREENCHIDO: [PREENCHIDO],
     ASSINADO: [PREENCHIDO, ASSINADO],
     APROVADO: [PREENCHIDO, ASSINADO, APROVADO],
+    # Sem criar o retificador de verdade (isso é da suíte da Fase 5): o que
+    # esta suíte precisa é do ORIGINAL marcado, que é o que barra a ciência.
+    RETIFICADO: [PREENCHIDO, ASSINADO, RETIFICADO],
 }
 
 
@@ -303,20 +307,35 @@ def test_assinatura_grava_hash_ip_e_nome_em_snapshot():
 # Elegibilidade pelo estado do RDO
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize('estado', [RASCUNHO, PREENCHIDO])
-def test_rdo_ainda_editavel_recusa_ciencia(estado):
-    ctx = _cenario(n_signatarios=1, estado=estado)
-    c = app.test_client()
-    _assinar(c, ctx)
-    assert _assinaturas(ctx['rdo_id']) == []
+@pytest.mark.parametrize('estado', [RASCUNHO, PREENCHIDO, ASSINADO, APROVADO])
+def test_ciencia_nao_depende_do_estado_do_rdo(estado):
+    """Emenda de 30/07 (pedido do usuário): o estado NÃO bloqueia mais.
 
-
-@pytest.mark.parametrize('estado', [ASSINADO, APROVADO])
-def test_rdo_imutavel_aceita_ciencia(estado):
+    A regra original só aceitava ciência sobre RDO imutável, e a tela do
+    cliente ficava travada em "ainda está sendo finalizado pela construtora"
+    — nada que ele pudesse resolver. Quem está no portal dá ciência sobre o
+    RDO que está vendo. O preço (o documento ainda pode mudar depois) é pago
+    pela conferência de hash, que marca a assinatura como "alterado" —
+    `test_rdo_alterado_depois_de_assinado_marca_a_ciencia_como_nao_integra`.
+    """
     ctx = _cenario(n_signatarios=1, estado=estado)
     c = app.test_client()
     _assinar(c, ctx)
     assert len(_assinaturas(ctx['rdo_id'])) == 1
+
+
+def test_rdo_retificado_recusa_ciencia_e_aponta_o_substituto():
+    """O ÚNICO bloqueio que sobrou. Não é "ainda não", é "não aqui": assinar o
+    documento substituído registraria autoria sobre papel que já não vale."""
+    ctx = _cenario(n_signatarios=1, estado=RETIFICADO)
+    c = app.test_client()
+
+    html = c.get(_url(ctx)).get_data(as_text=True)
+    assert 'substituído por um retificador' in html
+    assert 'Confirmar minha ciência' not in html
+
+    _assinar(c, ctx)
+    assert _assinaturas(ctx['rdo_id']) == []
 
 
 # ---------------------------------------------------------------------------
@@ -589,15 +608,27 @@ def test_rotas_de_sessao_morreram_de_verdade():
     assert _assinaturas(extra) == []
 
 
-def test_rdo_bloqueado_ainda_permite_trocar_a_propria_senha():
-    """Regressão da 1ª versão da Fase 9a, preservada no redesenho: o bloqueio
-    da ciência não pode deixar o responsável sem caminho para a troca de
-    senha. Hoje o caminho é a rota própria, não um formulário na leitura."""
+def test_rdo_em_preenchimento_ja_mostra_o_ato_na_tela():
+    """O relato de 30/07: a seção mostrava a faixa "ainda está sendo
+    finalizado" e um relógio no lugar do checkbox. Agora o checkbox e o
+    formulário de senha estão lá desde o rascunho."""
     ctx = _cenario(n_signatarios=2, estado=PREENCHIDO)
     c = app.test_client()
 
     html = c.get(_url(ctx)).get_data(as_text=True)
-    assert 'ainda está sendo finalizado' in html      # o motivo, na faixa
+    assert 'ainda está sendo finalizado' not in html
+    assert 'Confirmar minha ciência' in html
+
+
+def test_rdo_bloqueado_ainda_permite_trocar_a_propria_senha():
+    """Regressão da 1ª versão da Fase 9a, preservada no redesenho: o bloqueio
+    da ciência não pode deixar o responsável sem caminho para a troca de
+    senha. Hoje o caminho é a rota própria, não um formulário na leitura."""
+    ctx = _cenario(n_signatarios=2, estado=RETIFICADO)
+    c = app.test_client()
+
+    html = c.get(_url(ctx)).get_data(as_text=True)
+    assert 'substituído por um retificador' in html   # o motivo, na faixa
     assert 'Dar ciência' not in html                  # sem botão de assinar
 
     # A tela do ato recusa e devolve à leitura…
@@ -664,11 +695,11 @@ def test_placar_por_rdo_e_o_da_listagem_batem_com_o_detalhado():
 
 
 def test_placar_da_listagem_ignora_rdo_que_nao_aceita_ciencia():
-    """Mostrar "0/3" num RDO que a construtora nem finalizou cobraria do
-    cliente algo que ele não pode fazer."""
+    """O placar da listagem é uma cobrança: cobrar ciência num RDO retificado
+    mandaria o cliente assinar o documento errado."""
     from services.rdo_ciencia_cliente import placar_por_rdo
 
-    ctx = _cenario(n_signatarios=2, estado=PREENCHIDO)
+    ctx = _cenario(n_signatarios=2, estado=RETIFICADO)
     with app.app_context():
         rdo = db.session.get(RDO, ctx['rdo_id'])
         assert placar_por_rdo(ctx['obra_id'], [rdo]) == {}

@@ -12,9 +12,19 @@ reflete isso em duas exigências que o cliente nunca satisfaz — estado
 construtora, e o RDO que ele enxerga no portal já está assinado.
 
 A ciência é ORTOGONAL: registra que uma pessoa nomeada pelo cliente viu
-aquele documento, sem mexer em `RDO.estado`. Por isso ela só é aceita sobre
-RDO em estado IMUTÁVEL — não se dá ciência a documento que ainda pode
-mudar debaixo da assinatura.
+aquele documento, sem mexer em `RDO.estado`. E é ortogonal ATÉ NO ESTADO —
+qualquer RDO visível no portal aceita ciência, inclusive um que a
+construtora ainda não assinou (decisão do usuário em 30/07, revertendo a
+exigência original de estado IMUTÁVEL). O cliente vê o RDO publicado; ele dá
+ciência sobre o que está vendo, e esperar a construtora assinar deixava a
+tela travada sem que o cliente pudesse fazer nada.
+
+O que se perde com isso NÃO é a prova, é a garantia prévia de que o
+documento não muda: um RDO ainda editável pode ser alterado depois da
+ciência. Isso já está coberto — o hash canônico é gravado por assinatura e
+reconferido em `placar()`, e a divergência aparece na tela como "alterado".
+A prova continua a mesma; o que ela passa a poder dizer é "assinou ISTO, e
+isto mudou depois".
 
 O que ela compartilha com a assinatura interna é o que importa para valer
 como prova: mesma tabela (`RDOAssinatura`, papel `cliente`), mesmo hash
@@ -27,7 +37,7 @@ from __future__ import annotations
 import logging
 
 from models import ObraSignatarioCliente, RDOAssinatura, db
-from services.rdo_ciclo_vida import ESTADOS_IMUTAVEIS, RETIFICADO, estado_de
+from services.rdo_ciclo_vida import RETIFICADO, estado_de
 from services.rdo_hash import calcular_hash
 
 logger = logging.getLogger('rdo.ciencia')
@@ -64,16 +74,17 @@ def motivo_inelegivel(rdo) -> str | None:
     """Por que este RDO não aceita ciência — ou None se aceita.
 
     Devolve o motivo em vez de um booleano porque a mensagem vai para a tela
-    do cliente, e "aguardando a construtora finalizar" é muito diferente de
-    "este RDO foi substituído".
+    do cliente: "este RDO foi substituído" precisa dizer ONDE assinar.
+
+    Sobrou UM motivo. O estado do RDO deixou de bloquear em 30/07 — rascunho
+    e preenchido também aceitam ciência (ver o docstring do módulo). O
+    retificado continua fora, e por um motivo diferente: não é "ainda não",
+    é "não aqui" — o documento vigente é outro, e ciência no RDO substituído
+    registraria autoria sobre papel que já não vale.
     """
-    estado = estado_de(rdo)
-    if estado == RETIFICADO:
+    if estado_de(rdo) == RETIFICADO:
         return ('Este RDO foi substituído por um retificador. Dê ciência no '
                 'RDO que o substituiu.')
-    if estado not in ESTADOS_IMUTAVEIS:
-        return ('Este RDO ainda está sendo finalizado pela construtora. '
-                'A ciência fica disponível quando ele for assinado.')
     return None
 
 
@@ -152,8 +163,8 @@ def placar_por_rdo(obra_id: int, rdos: list) -> dict:
     único `IN`.
 
     Devolve `{rdo_id: {'assinados', 'total', 'completo'}}`, e SÓ para os RDOs
-    que aceitam ciência — mostrar "0/3" num RDO que a construtora ainda nem
-    finalizou cobraria do cliente algo que ele não pode fazer.
+    que aceitam ciência — o placar é uma cobrança, e cobrar ciência num RDO
+    retificado mandaria o cliente assinar o documento errado.
     """
     if not rdos:
         return {}

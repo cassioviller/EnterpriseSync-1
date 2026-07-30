@@ -49,11 +49,17 @@
                         <input type="checkbox" class="ciencia-ck" checked disabled
                                aria-label="{{ item.signatario.nome }} já deu ciência">
                         {% elif ciencia_bloqueio %}
-                        {# Bloqueado: o aviso acima já diz o porquê; um checkbox
-                           clicável que abre um formulário que o POST recusaria
-                           seria mentira. #}
-                        <input type="checkbox" class="ciencia-ck" disabled
-                               aria-label="ciência indisponível">
+                        {# Bloqueado: NENHUM checkbox — um checkbox desabilitado
+                           convida o clique e responde com silêncio (relato de
+                           29-07). Desde 30-07 o único bloqueio é o RDO
+                           RETIFICADO (o estado deixou de barrar), e por isso o
+                           marcador NÃO é mais um relógio: não se está
+                           esperando nada aqui: o documento vigente é outro, e o
+                           aviso acima manda o cliente até ele. #}
+                        <span class="ciencia-vedado" aria-hidden="true"
+                              title="{{ ciencia_bloqueio }}">
+                            <i class="fas fa-ban"></i>
+                        </span>
                         {% else %}
                         <input type="checkbox" class="ciencia-ck"
                                id="ck-{{ item.signatario.id }}"
@@ -168,6 +174,11 @@
     accent-color: var(--success); cursor: pointer;
 }
 .ciencia-ck:disabled { cursor: default; }
+.ciencia-vedado {
+    width: 20px; height: 20px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-subtle); font-size: .85rem;
+}
 .ciencia-nome {
     flex: 1; font-weight: 600; font-size: .92rem; margin: 0;
     cursor: pointer;

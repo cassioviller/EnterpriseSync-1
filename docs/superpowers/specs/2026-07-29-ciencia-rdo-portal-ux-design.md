@@ -14,6 +14,24 @@ Data: 2026-07-29. Aprovado em conversa com o usuário (abordagem B —
 > comprovante com marca de 15 min e o recibo em PDF. A faixa de estado no
 > topo aponta para a seção por âncora (`#ciencia-cliente`), não por rota.
 
+> **Emenda de 30/07 — pedido do usuário.** O **estado do RDO deixou de
+> bloquear a ciência**. A regra original só aceitava ciência sobre RDO
+> imutável (`assinado`/`aprovado`), e a tela do cliente ficava travada na
+> faixa *"Este RDO ainda está sendo finalizado pela construtora"* — uma
+> espera que o cliente não tinha como resolver. Agora `rascunho` e
+> `preenchido` também aceitam: quem está no portal dá ciência sobre o RDO
+> que está vendo. `motivo_inelegivel` ficou com **um único** motivo, o RDO
+> **retificado** — e ali o bloqueio não é "ainda não", é "não aqui" (o
+> documento vigente é outro), então a faixa passou a dizer *"Ciência não é
+> dada neste RDO"*.
+>
+> O que se perde não é a prova, é a garantia PRÉVIA de que o documento não
+> muda: um RDO ainda editável pode ser alterado depois da ciência. Isso já
+> estava coberto — o hash canônico é gravado por assinatura e reconferido em
+> `placar()`, e a divergência aparece na tela como *"alterado"* mais o aviso
+> "este RDO foi alterado depois de assinado". A prova continua a mesma; o
+> que ela passa a poder dizer é "assinou ISTO, e isto mudou depois".
+
 ## Resumo
 
 O ato de dar ciência num RDO sai de dentro da página de leitura e passa a

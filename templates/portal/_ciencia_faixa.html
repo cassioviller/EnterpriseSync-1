@@ -10,10 +10,14 @@
 {% if ciencia.total %}
 <section class="section">
     {% if ciencia_bloqueio %}
+    {# Emenda de 30-07: o estado do RDO não bloqueia mais (rascunho e
+       preenchido aceitam ciência), então o único bloqueio que chega aqui é o
+       RDO RETIFICADO. Por isso o título não diz mais "ainda não disponível" —
+       não é uma espera, é outro documento. #}
     <div class="ciencia-faixa ciencia-faixa-info" role="status">
         <i class="fas fa-circle-info"></i>
         <div class="ciencia-faixa-texto">
-            <strong>Ciência ainda não disponível</strong>
+            <strong>Ciência não é dada neste RDO</strong>
             <span>{{ ciencia_bloqueio }}</span>
         </div>
     </div>
