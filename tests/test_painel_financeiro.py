@@ -19,7 +19,7 @@ def _fotos_base_isolada(tmp_path):
 
     Este arquivo importa a fixture canônica da Baia em ~15 testes e não
     verifica foto nenhuma. Sem o isolamento, cada import materializa as fotos
-    REAIS de `fotos_rdos/` (57 desde 27/07, eram 26) com otimização WebP +
+    REAIS de `fotos_rdos/` (116 desde 30/07, eram 90) com otimização WebP +
     base64 — minutos de suíte gastos em imagem que nenhum assert olha.
     """
     from services import importacao_fisico_financeiro as ff

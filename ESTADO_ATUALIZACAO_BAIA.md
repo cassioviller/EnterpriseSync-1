@@ -1,7 +1,91 @@
 # Estado da atualização da obra Baia — físico-financeiro
 
-> Documento de handoff. Última atualização: **2026-07-27**.
+> Documento de handoff. Última atualização: **2026-07-30**.
 > Resume o que foi feito nesta rodada e o que ainda falta.
+
+---
+
+## Rodada 2026-07-30 — RDOs de 23/07 a 29/07 vindos do WhatsApp
+
+Segunda passagem pelo caminho aberto em 27/07, e a prova de que ele repete: o
+export novo do grupo (`Conversa do WhatsApp com 📝 Diário de Obras - Veks
+Engenharia (1).zip`) trouxe **17 dias da Obra Itu, de 07/07 a 29/07**. Os 12
+primeiros já estavam no JSON e foram preservados intactos — entraram os **5
+dias novos: 23, 24, 27, 28 e 29/07**. Não há RDO de 25 e 26/07 (sábado e
+domingo) nem de 30/07 até o momento do export.
+
+Nenhuma peça nova de código. O comando é o mesmo que o documento previa:
+
+```bash
+python scripts/whatsapp_para_rdos.py \
+    --zip "Conversa do WhatsApp com 📝 Diário de Obras - Veks Engenharia (1).zip" \
+    --obra-marcador "Obra Itu" --regras docs/rdo/regras_apontamento_baia.json \
+    --desde 2026-07-23 --saida /tmp/payload.json
+```
+
+`--desde` é o que separa o novo do que já entrou: sem ele o parser reprocessa
+os 17 dias e o merge teria de descartar 12 na mão.
+
+### O de-para aplicado — REVISAR
+
+| Dia | Tarefa | Valor | Base no texto |
+|---|---|---|---|
+| 23/07 | 20 Nivelamento Calçadas (B) | 90% | nivelamento e compactação do solo das calçadas de A e B |
+| 23/07 | 65 Nivelamento Calçadas (A) | 80% | idem — A vinha de 60%, B de 80% |
+| 24/07 | 20 / 65 | 100% | "concluída a compactação do solo das áreas destinadas às calçadas dos Galpões A e B" |
+| 24/07 | 21 Ferragem Calçada (B) | 40% | "iniciada a armação das ferragens das calçadas do Galpão B" |
+| 27/07 | 21 | 60% | "concluída a armação das ferragens das calçadas do Galpão B" |
+| 28/07 | — | — | só lona e posicionamento de armadura: nenhum dos dois tem tarefa (ver abaixo) |
+| 29/07 | 21 | 75% | "iniciada a montagem das armaduras da calçada do Galpão B, com a colocação das malhas inferior e superior" |
+
+**Duas leituras que o texto não resolve sozinho, decididas pelo usuário em
+30/07:**
+
+1. **A tarefa 21 é UMA série contínua, não duas.** O texto diz "concluída a
+   armação" em 27/07 e "iniciada a montagem das armaduras" em 29/07 — o que,
+   lido ao pé da letra, fecharia a tarefa e depois a reabriria. A leitura
+   adotada: 24–27/07 é corte, dobra e pré-montagem; 29/07 é a colocação das
+   malhas na calçada. Fases da mesma tarefa, daí 40 → 60 → 75.
+2. **"Posicionamento da armação das vigas longitudinais do Galpão B" (23 e
+   28/07) NÃO aponta na tarefa 14.** Posicionar armação já executada não é
+   nova execução, e a 14 é a única tarefa com quantitativo (48 un) — saturada
+   desde 10/07. Lançar produziria clamp em 100% com warning e inflaria o
+   acumulado. Fica no texto do RDO.
+
+### O que o cronograma ainda não comporta
+
+O que era um aviso virou **fato**: em 27/07 o Grupo Mônica decidiu pelos cochos
+em **alvenaria**. Segundo o Eng. Gustavo, a carga passa de ~40 kg/m linear
+(estimativa da projetista de LSF) para **~700 kg/m linear**, o que obriga a
+verificar as vigas longitudinais e os blocos de coroamento **antes da
+concretagem**. A revisão do projeto estrutural estava prevista para 31/07.
+
+Consequências que este documento registra e o cronograma ainda não reflete:
+
+- A **concretagem das vigas baldrame segue sem execução** — o RDO de 24/07 diz
+  que a indefinição foi a causa, e as chuvas ainda obrigaram a prever caixaria
+  para conter as valas (mais material, mais mão de obra, mais prazo).
+- A proposta com os cenários técnicos foi enviada em **10/07 com validade de 10
+  dias**; a decisão veio em **27/07**. O RDO de 27/07 diz explicitamente que
+  será preciso reavaliar o planejamento e recalcular os impactos do período de
+  indefinição. **Isso não está no cronograma nem no financeiro.**
+- Enquanto o projeto revisado não chega, a obra segue pelo projeto aprovado em
+  contrato — decisão de engenharia registrada em 24/07 para não paralisar, com
+  o risco de retrabalho assumido e a ser apresentado ao cliente.
+
+### Dados no repositório
+
+`cronograma_fisico_financeiro_baias.json` (e o symlink em `tests/fixtures/`)
+passou de 26 para **31 RDOs**; o diff é de 184 linhas, **todas inserções** —
+nenhum dia anterior foi tocado. Fotos novas em `fotos_rdos/2026-07-23`, `-24`,
+`-28` e `-29` (**26 arquivos, +6,3 MB**; a pasta vai a 37 MB). O dia 27/07 não
+tem foto no grupo.
+
+Duas regras novas em `docs/rdo/regras_apontamento_baia.json`: `ferragem-calcada-b`
+e `malhas-calcada-b`, ambas para a tarefa 21. Nesta rodada os três bullets de
+ferragem de calçada caíram como "bullet sem regra" e a tarefa foi achada à mão;
+com as regras, o parser já as resolve — continuam sem `pct`, porque o
+percentual segue sendo decisão de engenharia.
 
 ---
 

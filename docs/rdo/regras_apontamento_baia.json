@@ -176,6 +176,30 @@
       "forma": "pct"
     },
     {
+      "id": "ferragem-calcada-b",
+      "quando": [
+        "ferragens",
+        "calçada"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 21,
+      "tarefa_nome": "Execução Ferragem Calçada, Travamento Chapas Base (Galpão B)",
+      "forma": "pct",
+      "observacao": "Nasceu na rodada 30/07, em que 'iniciada/concluída a armação das ferragens das calçadas do Galpão B' (24 e 27/07) caiu como 'bullet sem regra'. Não colide com nivelamento-calcada-b: aquela exige 'solo', esta exige 'ferragens'."
+    },
+    {
+      "id": "malhas-calcada-b",
+      "quando": [
+        "malhas",
+        "calçada"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 21,
+      "tarefa_nome": "Execução Ferragem Calçada, Travamento Chapas Base (Galpão B)",
+      "forma": "pct",
+      "observacao": "Mesma tarefa 21 pelo outro vocabulário: a montagem in loco aparece como 'malhas inferior e superior' (29/07), sem a palavra 'ferragens'. Decisão de 30/07: pré-montagem e montagem são fases da MESMA tarefa, não duas."
+    },
+    {
       "id": "nivelamento-calcada-b",
       "quando": [
         "solo",
@@ -221,7 +245,10 @@
     }
   ],
   "sem_tarefa_no_cronograma": [
-    "Protótipo do cocho de alimentação em Light Steel Frame (LSF) — iniciado em 21/07 e finalizado em 22/07. NÃO existe tarefa de cocho no cronograma: o sistema construtivo (alvenaria × LSF) segue indefinido e é a causa declarada do atraso. Enquanto não houver decisão e tarefa, fica só no texto do RDO.",
-    "Limpeza das valas, protetores de plástico nos vergalhões, demarcação — serviços de preparação sem tarefa própria."
+    "Protótipo do cocho de alimentação em Light Steel Frame (LSF) — iniciado em 21/07, finalizado em 22/07 e entregue na Fazenda em 23/07. NÃO existe tarefa de cocho no cronograma. ATUALIZAÇÃO 27/07: o Grupo Mônica decidiu por ALVENARIA, o que dispara revisão do projeto estrutural das fundações (a carga dos cochos vai de ~40 kg/m para ~700 kg/m). Continua sem tarefa até o projeto revisado chegar.",
+    "Limpeza das valas, protetores de plástico nos vergalhões, demarcação — serviços de preparação sem tarefa própria.",
+    "Aplicação de lona sobre a calçada do Galpão B (27 e 28/07) — proteção da área preparada, sem tarefa própria.",
+    "Instalação dos tampões de PVC na infra de esgoto (23/07) — preparo do teste de estanqueidade. A tarefa de instalação da infra hidráulica (39/84) já foi lançada a 100% em 16/07.",
+    "Posicionamento da armação das vigas longitudinais nas valas do Galpão B (23 e 28/07) — NÃO aponta na tarefa 14. Decisão de 30/07: posicionar armação já executada não é nova execução, e a 14 é a única tarefa com quantitativo (48 un), já saturada desde 10/07. Lançar só produziria clamp em 100% com warning."
   ]
 }

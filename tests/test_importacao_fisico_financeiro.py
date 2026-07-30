@@ -699,9 +699,9 @@ def test_fixture_baia_traz_rdos_do_relatorio():
         caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
                                'cronograma_fisico_financeiro_baias.json')
         payload = json.load(open(caminho, encoding='utf-8'))
-        assert len(payload.get('rdos', [])) == 26
+        assert len(payload.get('rdos', [])) == 31
         oid = importar_fisico_financeiro(payload, aid)['obra_id']
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 26
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 31
         por_nome = {t.nome_tarefa: float(t.percentual_concluido or 0) for t in
                     TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
         assert por_nome['Estudo de Solo SPT'] == 100.0
@@ -900,7 +900,7 @@ def test_fixture_rdos_sem_mao_de_obra():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(d, aid)['obra_id']
         rdo_ids = [r.id for r in RDO.query.filter_by(obra_id=oid, admin_id=aid).all()]
-        assert len(rdo_ids) == 26
+        assert len(rdo_ids) == 31
         assert RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).count() == 0
 
 
@@ -1210,7 +1210,7 @@ def test_reimport_limpa_custo_obra_referenciando_rdo():
         # reimporta — não deve levantar IntegrityError de FK
         oid2 = importar_fisico_financeiro(payload, aid)['obra_id']
         assert oid2 == oid
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 26
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 31
         assert CustoObra.query.filter_by(obra_id=oid, tipo='mao_obra').count() == 0
 
 
@@ -1465,8 +1465,10 @@ def test_cadastrar_quantitativo_nao_reescreve_avanco_ja_lancado_em_percentual():
         # `like` e não `ilike`: o cronograma da Baia tem DUAS tarefas com
         # este nome, diferindo só na caixa ('AJR - …' id 20 do .mpp e
         # 'Ajr - …' id 65). É a de caixa alta que a medição de 28/07 usou —
-        # 60 pp em 21/07 + 20 pp em 22/07. O assert abaixo trava a escolha:
-        # se o fixture mudar, o teste diz o porquê em vez de sortear.
+        # 60% em 21/07, 80% em 22/07 e, desde a rodada de 30/07, 90% em 23/07
+        # e 100% em 24/07 ("concluída a compactação do solo das calçadas").
+        # O assert abaixo trava a escolha: se o fixture mudar, o teste diz o
+        # porquê em vez de sortear — foi o que aconteceu em 30/07.
         alvos = TarefaCronograma.query.filter(
             TarefaCronograma.obra_id == oid, TarefaCronograma.admin_id == aid,
             TarefaCronograma.nome_tarefa.like('AJR - %')).all()
@@ -1478,12 +1480,12 @@ def test_cadastrar_quantitativo_nao_reescreve_avanco_ja_lancado_em_percentual():
             return calcular_progresso_rdo(
                 t.id, date(2026, 8, 1), aid)['percentual_realizado']
 
-        assert avanco() == 80.0, 'cenário base mudou'
+        assert avanco() == 100.0, 'cenário base mudou'
 
         for total in (200, 48, 1):
             t.quantidade_total = total
             db.session.flush()
-            assert avanco() == 80.0, (
+            assert avanco() == 100.0, (
                 f'cadastrar quantidade_total={total} reescreveu o avanço '
                 f'para {avanco()}%')
 
@@ -1560,14 +1562,16 @@ def test_sincronizar_nao_zera_tarefa_com_historico_em_percentual():
         # `like` e não `ilike`: o cronograma da Baia tem DUAS tarefas com
         # este nome, diferindo só na caixa ('AJR - …' id 20 do .mpp e
         # 'Ajr - …' id 65). É a de caixa alta que a medição de 28/07 usou —
-        # 60 pp em 21/07 + 20 pp em 22/07. O assert abaixo trava a escolha:
-        # se o fixture mudar, o teste diz o porquê em vez de sortear.
+        # 60% em 21/07, 80% em 22/07 e, desde a rodada de 30/07, 90% em 23/07
+        # e 100% em 24/07 ("concluída a compactação do solo das calçadas").
+        # O assert abaixo trava a escolha: se o fixture mudar, o teste diz o
+        # porquê em vez de sortear — foi o que aconteceu em 30/07.
         alvos = TarefaCronograma.query.filter(
             TarefaCronograma.obra_id == oid, TarefaCronograma.admin_id == aid,
             TarefaCronograma.nome_tarefa.like('AJR - %')).all()
         assert len(alvos) == 1, f'esperava 1 tarefa "AJR - ", veio {len(alvos)}'
         t = alvos[0]
-        assert t.percentual_concluido == 80.0, 'cenário base mudou'
+        assert t.percentual_concluido == 100.0, 'cenário base mudou'
 
         t.quantidade_total = 200.0
         t.unidade_medida = 'un'
@@ -1575,12 +1579,12 @@ def test_sincronizar_nao_zera_tarefa_com_historico_em_percentual():
 
         sincronizar_percentuais_obra(oid, aid)
         db.session.refresh(t)
-        assert t.percentual_concluido == 80.0, (
+        assert t.percentual_concluido == 100.0, (
             f'sincronizar zerou/reescreveu a tarefa para '
             f'{t.percentual_concluido}%')
 
         atualizar_percentual_tarefa(t.id, aid)
         db.session.refresh(t)
-        assert t.percentual_concluido == 80.0, (
+        assert t.percentual_concluido == 100.0, (
             f'atualizar_percentual_tarefa reescreveu para '
             f'{t.percentual_concluido}%')
