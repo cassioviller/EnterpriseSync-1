@@ -87,6 +87,34 @@ ferragem de calçada caíram como "bullet sem regra" e a tarefa foi achada à m�
 com as regras, o parser já as resolve — continuam sem `pct`, porque o
 percentual segue sendo decisão de engenharia.
 
+### Só a Obra Itu — e o que isso deixa de fora
+
+O grupo é compartilhado. Dos 19 blocos de RDO do export, **17 são da Obra Itu**
+e **2 são da "Obra a Angela"** (RDOs de 14 e 15/07, postados pelo Abel), que o
+`--obra-marcador` descarta. Há ainda um pedido de RDOs de Vila Velha e Santo
+Antônio em 29/07, mas esses RDOs nunca foram postados no grupo. Decisão de
+30/07: esta série é só da Obra Itu; a Angela, se um dia entrar, pede JSON
+canônico próprio e outra rodada do parser.
+
+A regra de herança do parser não contaminou nada: bloco sem marcador herda a
+obra do bloco anterior **do mesmo autor**, e os blocos da Angela são de outro
+autor. O único bloco herdado foi o de 22/07, do próprio Eng. Alan, e a herança
+saiu como aviso no relatório.
+
+### Fotos de 27 a 29/06 seguem sem legenda — de propósito
+
+Os dias 27, 28 e 29/06 têm 7 fotos no repositório e **nenhuma chave `fotos`** no
+JSON. Isso NÃO as deixa de fora do RDO: `materializar_fotos_rdo` tem um caminho
+para "pasta com imagem e JSON sem legenda" que anexa todas em ordem numérica com
+legenda vazia. Medido no import real — 27/06: 1 foto, 28/06: 1, 29/06: 5, todas
+criadas, nenhuma com legenda (contra 30/06, que tem 9 no JSON e 9 com legenda).
+
+As legendas originais não são recuperáveis: o export do grupo pula de **25/05
+para 08/07** e não cobre junho. Decisão do usuário em 30/07: **deixar sem**.
+Legenda escrita a partir da imagem seria descrição de quem olhou a foto, não o
+que o engenheiro registrou — e num documento que serve de respaldo essa
+diferença importa.
+
 ---
 
 ## Rodada 2026-07-27 — RDOs de 07/07 a 22/07 vindos do WhatsApp
