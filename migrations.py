@@ -6390,9 +6390,9 @@ def _migration_48_adicionar_admin_id_modelos_faltantes():
                     WHERE admin_id IS NULL
                 ),
                 admins_destino AS (
-                    SELECT id as admin_id 
-                    FROM usuario 
-                    WHERE tipo_usuario = 'admin' AND id NOT IN (
+                    SELECT id as admin_id
+                    FROM usuario
+                    WHERE tipo_usuario = 'ADMIN' AND id NOT IN (
                         SELECT DISTINCT admin_id FROM tipo_ocorrencia WHERE admin_id IS NOT NULL
                     )
                 )
@@ -6405,7 +6405,7 @@ def _migration_48_adicionar_admin_id_modelos_faltantes():
                 
                 -- Atualiza registros órfãos com primeiro admin
                 UPDATE tipo_ocorrencia
-                SET admin_id = (SELECT id FROM usuario WHERE tipo_usuario = 'admin' ORDER BY id LIMIT 1)
+                SET admin_id = (SELECT id FROM usuario WHERE tipo_usuario = 'ADMIN' ORDER BY id LIMIT 1)
                 WHERE admin_id IS NULL;
             """, "duplicação de seeds para cada admin"),
             
@@ -6426,9 +6426,9 @@ def _migration_48_adicionar_admin_id_modelos_faltantes():
                     WHERE admin_id IS NULL
                 ),
                 admins_destino AS (
-                    SELECT id as admin_id 
-                    FROM usuario 
-                    WHERE tipo_usuario = 'admin'
+                    SELECT id as admin_id
+                    FROM usuario
+                    WHERE tipo_usuario = 'ADMIN'
                 )
                 INSERT INTO calendario_util (data, admin_id, dia_semana, eh_util, eh_feriado, descricao_feriado)
                 SELECT cu.data, ad.admin_id, cu.dia_semana, cu.eh_util, cu.eh_feriado, cu.descricao_feriado
@@ -6617,8 +6617,18 @@ def _migration_48_adicionar_admin_id_modelos_faltantes():
         validacao_passou = True
         distribuicao_admin = {}
         
-        # Contar número total de admins no sistema
-        cursor.execute("SELECT COUNT(DISTINCT id) FROM usuario WHERE tipo_usuario = 'admin'")
+        # Contar número total de admins no sistema.
+        #
+        # 'ADMIN' MAIÚSCULO. O enum `tipousuario` guarda o NOME do membro de
+        # `models.TipoUsuario` (SQLAlchemy Enum sobre enum Python), e os
+        # valores no banco são SUPER_ADMIN/ADMIN/GESTOR_EQUIPES/ALMOXARIFE/
+        # FUNCIONARIO. Com 'admin' o Postgres não compara: rejeita o literal
+        # ("invalid input value for enum tipousuario"). Como isso acontecia
+        # AQUI, na validação — depois do loop, que pula toda tabela que já tem
+        # `admin_id` —, esta migração REEXECUTAVA E FALHAVA EM TODO BOOT de
+        # worker com o trabalho de schema há muito concluído. Conserto de
+        # 30/07; o resto do arquivo já usava a grafia certa.
+        cursor.execute("SELECT COUNT(DISTINCT id) FROM usuario WHERE tipo_usuario = 'ADMIN'")
         total_admins_sistema = cursor.fetchone()[0]
         logger.info(f"📊 Total de admins no sistema: {total_admins_sistema}")
         
@@ -11092,6 +11102,20 @@ def migration_132_obra_cliente_id_fk():
            d) Caso contrário, cria um novo Cliente.
     Mantém os campos texto (cliente_nome/email/telefone/cliente) intactos
     como fallback — o drop é fora do escopo desta task.
+
+    CONSERTO DE 30/07: aquele "o drop é fora do escopo desta task" venceu. As
+    quatro colunas texto FORAM removidas depois, e o passo 4 continuou
+    selecionando `cliente_nome` — `column "cliente_nome" does not exist`. Como
+    a falha era registrada e o número nunca entrava no cache de aplicadas,
+    esta migração REEXECUTAVA E FALHAVA EM TODO BOOT de worker, deixando dois
+    `ERROR` no log e uma linha mentirosa no `migration_history` — enquanto o
+    schema que ela existe para garantir (passos 1 a 3) já estava lá.
+
+    Agora o backfill se monta a partir das colunas legadas que AINDA existem:
+    num banco antigo ele roda como sempre; num banco onde a origem já foi
+    removida não há de onde fazer backfill, e a migração termina tendo
+    garantido coluna, índice e FK. O que não pode voltar a acontecer é a
+    migração morrer por causa de uma origem de dados que não existe mais.
     """
     connection = None
     try:
@@ -11127,20 +11151,56 @@ def migration_132_obra_cliente_id_fk():
         )
 
         # 4) Backfill — uma obra por vez (datasets pequenos por tenant).
+        #
+        # A ORIGEM do backfill são as colunas texto legadas, e elas podem já
+        # ter sido removidas (ver o conserto de 30/07 no docstring). Descobre
+        # quais sobraram antes de montar o SELECT: referenciar uma coluna que
+        # não existe derruba a migração inteira, e o passo que importa (1 a 3)
+        # já rodou.
         cursor.execute(
             """
+            SELECT column_name FROM information_schema.columns
+             WHERE table_name = 'obra'
+               AND column_name IN ('cliente_nome', 'cliente',
+                                   'cliente_email', 'cliente_telefone')
+            """
+        )
+        legadas = {r[0] for r in cursor.fetchall()}
+
+        fontes_nome = [c for c in ('cliente_nome', 'cliente') if c in legadas]
+        tem_email = 'cliente_email' in legadas
+
+        if not fontes_nome and not tem_email:
+            # Nada de onde inferir o cliente. Não é falha: é uma migração
+            # antiga cuja origem de dados o próprio sistema já aposentou.
+            connection.commit()
+            cursor.close()
+            connection.close()
+            logger.info(
+                "MIGRACAO 132: obra.cliente_id/índice/FK garantidos; backfill "
+                "PULADO — as colunas texto legadas (cliente_nome/cliente/"
+                "cliente_email) não existem mais neste banco"
+            )
+            return True
+
+        expr_nome = (
+            'COALESCE(%s)' % ', '.join(f"NULLIF(TRIM({c}), '')" for c in fontes_nome)
+            if fontes_nome else 'NULL::text'
+        )
+        expr_email = "NULLIF(TRIM(cliente_email), '')" if tem_email else 'NULL::text'
+        expr_tel = ("NULLIF(TRIM(cliente_telefone), '')"
+                    if 'cliente_telefone' in legadas else 'NULL::text')
+
+        cursor.execute(
+            f"""
             SELECT id, admin_id,
-                   COALESCE(NULLIF(TRIM(cliente_nome), ''), NULLIF(TRIM(cliente), '')) AS nome,
-                   NULLIF(TRIM(cliente_email), '') AS email,
-                   NULLIF(TRIM(cliente_telefone), '') AS telefone
+                   {expr_nome} AS nome,
+                   {expr_email} AS email,
+                   {expr_tel} AS telefone
               FROM obra
              WHERE cliente_id IS NULL
                AND admin_id IS NOT NULL
-               AND (
-                   COALESCE(NULLIF(TRIM(cliente_nome), ''),
-                            NULLIF(TRIM(cliente), '')) IS NOT NULL
-                   OR NULLIF(TRIM(cliente_email), '') IS NOT NULL
-               )
+               AND ({expr_nome} IS NOT NULL OR {expr_email} IS NOT NULL)
             """
         )
         obras = cursor.fetchall()
