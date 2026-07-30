@@ -110,7 +110,15 @@ ENTRYPOINT ["/app/docker-entrypoint.sh"]
 # EasyPanel coleta. Sem isso o default do gunicorn é `accesslog = None`:
 # NENHUMA requisição bem-sucedida era registrada em lugar nenhum.
 # O formato acrescenta o tempo de resposta (%(D)s, em microssegundos).
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", \
+#
+# --timeout 600 (era 120) — 30/07: o import físico-financeiro da Baia pela
+# tela processa 132 fotos com WebP method=6 e leva mais de 120s; o worker
+# morria por SIGKILL DUAS vezes seguidas na mesma tarde, a primeira na
+# ÚLTIMA foto do último RDO. Com 2 workers sync, um request lento não
+# derruba a app inteira — o outro worker segue atendendo. O timeout é
+# rede de segurança contra worker TRAVADO, não orçamento de request; 600s
+# cobre o import inteiro com folga.
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "600", \
      "--keep-alive", "2", "--worker-connections", "1000", \
      "--access-logfile", "-", \
      "--access-logformat", "%(h)s %(l)s %(u)s %(t)s \"%(r)s\" %(s)s %(b)s %(D)s \"%(f)s\" \"%(a)s\"", \
