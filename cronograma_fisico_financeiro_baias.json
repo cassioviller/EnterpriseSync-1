@@ -2752,34 +2752,6 @@
     {
      "arquivo": "5.jpg",
      "legenda": "Execução de armação da calçada do Galpão B"
-    },
-    {
-     "arquivo": "6.jpg",
-     "legenda": "Chegada material calçada Galpão A"
-    },
-    {
-     "arquivo": "7.jpg",
-     "legenda": "Aplicação de lona da calçada do Galpão B"
-    },
-    {
-     "arquivo": "8.jpg",
-     "legenda": "Execução de armação das calçadas do Galpão B"
-    },
-    {
-     "arquivo": "9.jpg",
-     "legenda": "Execução de armação das calçadas do Galpão B"
-    },
-    {
-     "arquivo": "10.jpg",
-     "legenda": "Execução de armação das calçadas do Galpão B"
-    },
-    {
-     "arquivo": "11.jpg",
-     "legenda": "Aplicação de lona da calçada do Galpão B"
-    },
-    {
-     "arquivo": "12.jpg",
-     "legenda": "Aplicação de lona da calçada do Galpão B"
     }
    ],
    "apontamentos": [
@@ -2803,6 +2775,36 @@
    "precipitacao": "Não informado",
    "comentario": "Efetivo: 05 colaboradores\n\nAtividades executadas:\n• Foi concluída a armação das ferragens das calçadas do Galpão B.\n• Foi realizada a aplicação de lona sobre uma das calçadas do Galpão B, visando a proteção da área preparada para as próximas etapas de execução.\n\nObservações:\n• Ao final do expediente, o Eng. Gustavo informou que o Grupo Mônica definiu pela execução dos cochos de alimentação e dos bebedouros em alvenaria. Em razão dessa definição, será necessária a revisão dos projetos estruturais das fundações para avaliação dos impactos técnicos, financeiros e de prazo decorrentes da alteração do sistema construtivo.\n• Ressalta-se que a proposta contendo os cenários técnicos para continuidade da obra foi encaminhado em 10/07, com prazo de validade de 10 dias para definição do sistema construtivo. Como a decisão foi formalizada apenas em 27/07, será necessário reavaliar o planejamento executivo e recalcular os impactos gerados pelo período de indefinição.\n• Com o objetivo de evitar a paralisação da obra, permanecem em execução as atividades que não dependem da revisão estrutural, visando manter a preparação para a concretagem das vigas longitudinais. Entretanto, considerando a opção pelo sistema em alvenaria, o Eng. Gustavo estimou que a carga dos cochos passará de aproximadamente 40 kg/m linear (carga estimada pela projetista de LSF) para cerca de 700 kg/m linear (alvenaria), tornando necessária a verificação estrutural das vigas longitudinais e dos blocos de coroamento antes da concretagem, de forma a garantir que as fundações atendam às novas solicitações de carga.\n\nPróximas atividades (28/07):\n-Continuação da aplicação de lona na calçada do Galpão B\n-Início de armação da calçada do Galpão A",
    "mao_de_obra": 0,
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Chegada material calçada Galpão A"
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Aplicação de lona da calçada do Galpão B"
+    },
+    {
+     "arquivo": "3.jpg",
+     "legenda": "Execução de armação das calçadas do Galpão B"
+    },
+    {
+     "arquivo": "4.jpg",
+     "legenda": "Execução de armação das calçadas do Galpão B"
+    },
+    {
+     "arquivo": "5.jpg",
+     "legenda": "Execução de armação das calçadas do Galpão B"
+    },
+    {
+     "arquivo": "6.jpg",
+     "legenda": "Aplicação de lona da calçada do Galpão B"
+    },
+    {
+     "arquivo": "7.jpg",
+     "legenda": "Aplicação de lona da calçada do Galpão B"
+    }
+   ],
    "apontamentos": [
     {
      "tarefa_mpp": 21,

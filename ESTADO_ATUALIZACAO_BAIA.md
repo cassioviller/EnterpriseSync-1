@@ -78,8 +78,19 @@ Consequências que este documento registra e o cronograma ainda não reflete:
 `cronograma_fisico_financeiro_baias.json` (e o symlink em `tests/fixtures/`)
 passou de 26 para **31 RDOs**; o diff é de 184 linhas, **todas inserções** —
 nenhum dia anterior foi tocado. Fotos novas em `fotos_rdos/2026-07-23`, `-24`,
-`-28` e `-29` (**26 arquivos, +6,3 MB**; a pasta vai a 37 MB). O dia 27/07 não
-tem foto no grupo.
+`-27`, `-28` e `-29` (**26 arquivos, +6,3 MB**; a pasta vai a 37 MB).
+
+> **Correção de 30/07 — as fotos de 27/07 tinham caído em 24/07.** No grupo, o
+> engenheiro postou as fotos do dia 27 **antes** do texto do RDO, e o parser as
+> atribuiu ao bloco anterior. As 7 últimas fotos que estavam em
+> `fotos_rdos/2026-07-24` (`6.jpg`…`12.jpg`, a começar pela legendada "Chegada
+> material calçada Galpão A") são de 27/07 e foram movidas para
+> `fotos_rdos/2026-07-27/1.jpg`…`7.jpg`, com as legendas na mesma ordem. Confere
+> com o texto de cada dia: 24/07 fala de compactação e início da armação (fotos
+> em dia nublado), 27/07 fala de conclusão da armação e aplicação de lona (fotos
+> de fim de tarde). O dia 24 fica com 5 fotos e o 27 com 7. **Atenção no
+> reimport:** a pasta do dia manda no conjunto inteiro, então subir o JSON com as
+> duas pastas assim já corrige o dia 24 no banco.
 
 Duas regras novas em `docs/rdo/regras_apontamento_baia.json`: `ferragem-calcada-b`
 e `malhas-calcada-b`, ambas para a tarefa 21. Nesta rodada os três bullets de
