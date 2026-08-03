@@ -1,4 +1,4 @@
-"""Migração 270 — editor de cronograma v2 ligado em todo o parque (03/08/2026).
+"""Migração 277 — editor de cronograma v2 ligado em todo o parque (03/08/2026).
 
 O que precisa valer, na ordem em que importa:
 
@@ -39,7 +39,7 @@ from models import (
     TipoUsuario,
     Usuario,
 )
-from migrations import _migration_270_editor_v2_em_todo_o_parque as migrar_270
+from migrations import _migration_277_editor_v2_em_todo_o_parque as migrar_277
 
 pytestmark = pytest.mark.integration
 
@@ -139,7 +139,7 @@ def test_congela_a_linha_de_base_e_liga_a_flag():
     a = _tarefa(obra, admin, 'Fundação')
     b = _tarefa(obra, admin, 'Estrutura', ordem=1)
 
-    migrar_270()
+    migrar_277()
 
     linhas = _baselines(obra.id)
     assert len(linhas) == 1, 'a obra datada tinha de sair com UMA linha de base ativa'
@@ -160,7 +160,7 @@ def test_obra_sem_datas_nao_gera_linha_de_base_mas_o_tenant_liga():
     admin, obra = _ambiente(flag=False)
     _tarefa(obra, admin, 'Sem datas', datada=False)
 
-    migrar_270()
+    migrar_277()
 
     assert _baselines(obra.id) == []
     db.session.expire_all()
@@ -174,7 +174,7 @@ def test_cronograma_do_cliente_fica_fora_do_congelamento():
     interna = _tarefa(obra, admin, 'Interna')
     _tarefa(obra, admin, 'Do cliente', ordem=1, is_cliente=True)
 
-    migrar_270()
+    migrar_277()
 
     (linha,) = _baselines(obra.id)
     itens = CronogramaBaselineItem.query.filter_by(baseline_id=linha.id).all()
@@ -197,7 +197,7 @@ def test_linha_de_base_existente_nao_e_recongelada():
         duracao_dias=8))
     db.session.commit()
 
-    migrar_270()
+    migrar_277()
 
     linhas = _baselines(obra.id)
     assert len(linhas) == 1 and linhas[0].id == antiga.id
@@ -214,7 +214,7 @@ def test_tenant_com_cronograma_e_sem_configuracao_ganha_uma_ligada():
     _tarefa(obra, admin, 'Fundação')
     assert _config(admin.id) is None
 
-    migrar_270()
+    migrar_277()
 
     db.session.expire_all()
     config = _config(admin.id)
@@ -226,7 +226,7 @@ def test_tenant_com_cronograma_e_sem_configuracao_ganha_uma_ligada():
 def test_tenant_sem_cronograma_nao_ganha_configuracao_inventada():
     admin, _obra = _ambiente(com_config=False)  # obra sem nenhuma tarefa
 
-    migrar_270()
+    migrar_277()
 
     db.session.expire_all()
     assert _config(admin.id) is None
@@ -236,7 +236,7 @@ def test_flag_ja_ligada_continua_ligada():
     admin, obra = _ambiente(flag=True)
     _tarefa(obra, admin, 'Fundação')
 
-    migrar_270()
+    migrar_277()
 
     db.session.expire_all()
     assert _config(admin.id).cronograma_editor_v2 is True
@@ -248,7 +248,7 @@ def test_tenant_v1_liga_a_flag_mesmo_inerte():
     admin, obra = _ambiente(flag=False, versao='v1')
     _tarefa(obra, admin, 'Fundação')
 
-    migrar_270()
+    migrar_277()
 
     db.session.expire_all()
     assert _config(admin.id).cronograma_editor_v2 is True
@@ -262,11 +262,11 @@ def test_rodar_duas_vezes_nao_duplica_nada():
     admin, obra = _ambiente(flag=False)
     a = _tarefa(obra, admin, 'Fundação')
 
-    migrar_270()
+    migrar_277()
     (linha,) = _baselines(obra.id)
     itens_1 = CronogramaBaselineItem.query.filter_by(baseline_id=linha.id).count()
 
-    migrar_270()
+    migrar_277()
 
     linhas = _baselines(obra.id)
     assert len(linhas) == 1 and linhas[0].id == linha.id
@@ -279,7 +279,7 @@ def test_default_da_coluna_virou_true():
     """Sem isto o "todos" duraria até a próxima empresa cadastrada."""
     from sqlalchemy import text as sa_text
 
-    migrar_270()
+    migrar_277()
     with db.engine.connect() as conn:
         linha = conn.execute(sa_text("""
             SELECT is_nullable, column_default FROM information_schema.columns
@@ -294,6 +294,6 @@ def test_default_da_coluna_virou_true():
 def test_nenhum_tenant_fica_desligado():
     """A prova que a própria migração faz — repetida aqui porque é o
     enunciado do pedido de 03/08."""
-    migrar_270()
+    migrar_277()
     assert ConfiguracaoEmpresa.query.filter(
         ConfiguracaoEmpresa.cronograma_editor_v2.isnot(True)).count() == 0

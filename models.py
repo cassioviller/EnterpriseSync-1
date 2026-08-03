@@ -4275,7 +4275,7 @@ class ConfiguracaoEmpresa(db.Model):
     # (multi-predecessoras via tarefa_vinculo, caminho crítico) mais a grade
     # tipo planilha com menu de botão direito. Nasceu como flag de rollout
     # com default FALSE (migração 222); desde 03/08/2026 o default é TRUE e a
-    # migração 270 ligou a flag em TODOS os tenants — o editor v2 é o
+    # migração 277 ligou a flag em TODOS os tenants — o editor v2 é o
     # formato do cronograma, não mais um piloto. Continua sendo coluna, e
     # não constante, porque desligar por tenant segue sendo o rollback:
     # scripts/flag_cronograma_editor_v2.py <admin_id> --desligar.

@@ -489,6 +489,15 @@ sem colisão: 214-216 (F1), 220-221 (F1.5), 230-232 (F2), 240-247 (F3),
 300-307 (F9). A **Fase 0.6 usou 217-219**, fora de todas as faixas.
 🔬 Maior aplicada hoje: **219**. A Fase 1 aplicou 214, 215 e 216.
 
+> ⚠️ **A reserva já foi furada duas vezes — confira o registro real em
+> `migrations.py`, não esta tabela.** A **Fase 9a** usou **267-269** (dentro da
+> faixa da F5, não da sua 300-307), e o rollout do editor v2 em todo o parque
+> (03/08) usou o **277** — número escolhido no vão livre entre a faixa da F6
+> (270-276, intacta) e a da F7 (280-283) justamente para não colidir. Numerar
+> por faixa sem olhar o registro é receita para duas migrações com o mesmo
+> número: a segunda nunca roda, porque `is_migration_executed` já viu a
+> primeira.
+
 > **Os planos das Fases 6-9 têm validade menor.** Foram escritos sobre o schema
 > de hoje, e as Fases 1-5 vão mudá-lo. Cada um tem seção *"Premissas a
 > reconfirmar antes de executar"* — abra por ela, não pelo início.

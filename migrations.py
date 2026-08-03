@@ -5698,15 +5698,15 @@ def _migration_269_remover_indice_unico_antigo_de_assinatura():
         raise
 
 
-# Tamanho do lote da linha de base (passo 1 da 270). A migração roda dentro
+# Tamanho do lote da linha de base (passo 1 da 277). A migração roda dentro
 # do timeout do entrypoint (MIGRATION_TIMEOUT, 300s por padrão): congelar
 # milhares de obras num único INSERT arrisca estourar o relógio e perder o
 # trabalho inteiro. Em lotes, cada commit é progresso que a próxima
 # execução não refaz.
-_LOTE_BASELINE_270 = 200
+_LOTE_BASELINE_277 = 200
 
 
-def _migration_270_editor_v2_em_todo_o_parque():
+def _migration_277_editor_v2_em_todo_o_parque():
     """Liga o editor de cronograma v2 em TODOS os tenants — decisão de 03/08/2026.
 
     O editor v2 (grade tipo planilha, menu de botão direito, aninhar por
@@ -5796,13 +5796,13 @@ def _migration_270_editor_v2_em_todo_o_parque():
         with db.engine.connect() as conn:
             pendentes = [r[0] for r in
                          conn.execute(sa_text(sql_obras_pendentes)).fetchall()]
-        logger.info("[Migration 270] %s obra(s) com cronograma datado e sem "
+        logger.info("[Migration 277] %s obra(s) com cronograma datado e sem "
                     "linha de base ativa — congelando antes de ligar a flag",
                     len(pendentes))
 
         obras_congeladas = tarefas_congeladas = 0
-        for inicio in range(0, len(pendentes), _LOTE_BASELINE_270):
-            lote = pendentes[inicio:inicio + _LOTE_BASELINE_270]
+        for inicio in range(0, len(pendentes), _LOTE_BASELINE_277):
+            lote = pendentes[inicio:inicio + _LOTE_BASELINE_277]
             with db.engine.begin() as conn:
                 # Um statement por lote: a linha de base nasce e seus itens
                 # saem do RETURNING dela, sem segundo passo capaz de deixar
@@ -5842,7 +5842,7 @@ def _migration_270_editor_v2_em_todo_o_parque():
                 """), {'obras': lote, 'nome': nome_baseline})
                 tarefas_congeladas += res.rowcount or 0
                 obras_congeladas += len(lote)
-            logger.info("[Migration 270] linha de base: %s/%s obra(s) — %.0fs",
+            logger.info("[Migration 277] linha de base: %s/%s obra(s) — %.0fs",
                         obras_congeladas, len(pendentes),
                         time.time() - inicio_em)
 
@@ -5865,7 +5865,7 @@ def _migration_270_editor_v2_em_todo_o_parque():
                                 AND b.ativa IS TRUE)) x
             """)).scalar() or 0
         if restantes:
-            logger.warning("[Migration 270] %s obra(s) seguem sem linha de "
+            logger.warning("[Migration 277] %s obra(s) seguem sem linha de "
                            "base — tarefa em tenant diferente do dono da obra "
                            "(mesma sujeira da 266). O plano delas não tem "
                            "apólice contra o recálculo.", restantes)
@@ -5954,18 +5954,18 @@ def _migration_270_editor_v2_em_todo_o_parque():
                 default_ok = True
                 break
             except Exception as e:
-                logger.warning("[Migration 270] tentativa %s de virar o "
+                logger.warning("[Migration 277] tentativa %s de virar o "
                                "default da coluna não pegou o lock: %s",
                                tentativa, e)
 
-        logger.info("[Migration 270] %s tarefa(s) congelada(s) em %s linha(s) "
+        logger.info("[Migration 277] %s tarefa(s) congelada(s) em %s linha(s) "
                     "de base; %s configuração(ões) criada(s); %s flag(s) "
                     "ligada(s); default da coluna agora é %s",
                     tarefas_congeladas, obras_congeladas, criadas, ligadas,
                     'TRUE' if default_ok else 'INALTERADO')
         if not default_ok:
             logger.warning(
-                "[Migration 270] O default da coluna NÃO foi virado — alguém "
+                "[Migration 277] O default da coluna NÃO foi virado — alguém "
                 "segurava a tabela. Nada do que já foi feito se perde (a flag "
                 "está ligada em todos os tenants); só falta o default, que "
                 "pode ser aplicado a frio com:  ALTER TABLE "
@@ -6001,31 +6001,31 @@ def _migration_270_editor_v2_em_todo_o_parque():
             """)).scalar() or 0
 
         if fds:
-            logger.warning("[Migration 270] %s tenant(s) com cronograma têm "
+            logger.warning("[Migration 277] %s tenant(s) com cronograma têm "
                            "calendário que considera sábado e/ou domingo — o "
                            "motor novo é seg–sex fixo e a PRIMEIRA EDIÇÃO vai "
                            "mover as datas desses cronogramas para dias úteis:",
                            len(fds))
             for admin_id, nome in fds[:20]:
-                logger.warning("[Migration 270]   - tenant %s (%s)",
+                logger.warning("[Migration 277]   - tenant %s (%s)",
                                admin_id, nome or 's/ nome')
             if len(fds) > 20:
-                logger.warning("[Migration 270]   … e mais %s.", len(fds) - 20)
-            logger.warning("[Migration 270] Para tirar um deles do formato "
+                logger.warning("[Migration 277]   … e mais %s.", len(fds) - 20)
+            logger.warning("[Migration 277] Para tirar um deles do formato "
                            "novo: python scripts/flag_cronograma_editor_v2.py "
                            "<admin_id> --desligar")
 
         if v1:
-            logger.warning("[Migration 270] %s tenant(s) com cronograma não "
+            logger.warning("[Migration 277] %s tenant(s) com cronograma não "
                            "são versao_sistema='v2' — a flag ficou ligada mas "
                            "inerte para eles (utils/tenant.py:139). Trocar a "
                            "versão do sistema é outra decisão.", v1)
 
-        logger.info("[Migration 270] Concluída com sucesso em %.0fs",
+        logger.info("[Migration 277] Concluída com sucesso em %.0fs",
                     time.time() - inicio_em)
     except Exception as e:
         db.session.rollback()
-        logger.error(f"[Migration 270] Falha: {e}", exc_info=True)
+        logger.error(f"[Migration 277] Falha: {e}", exc_info=True)
         raise
 
 
@@ -6311,7 +6311,7 @@ def executar_migracoes():
             (267, "Fase 9a — obra_signatario_cliente + rdo_assinatura.signatario_cliente_id", _migration_267_signatario_cliente),
             (268, "Fase 9a — unicidade de assinatura por signatário (dois índices parciais)", _migration_268_unicidade_assinatura_por_signatario),
             (269, "Fase 9a — remove uq_rdo_assinatura_papel também quando é ÍNDICE (a 268 só tratava constraint)", _migration_269_remover_indice_unico_antigo_de_assinatura),
-            (270, "Editor de cronograma v2 em todo o parque — linha de base primeiro, flag ligada em todos os tenants, default da coluna vira TRUE", _migration_270_editor_v2_em_todo_o_parque),
+            (277, "Editor de cronograma v2 em todo o parque — linha de base primeiro, flag ligada em todos os tenants, default da coluna vira TRUE", _migration_277_editor_v2_em_todo_o_parque),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

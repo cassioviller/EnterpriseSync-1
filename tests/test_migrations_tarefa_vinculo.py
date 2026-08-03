@@ -145,9 +145,9 @@ def test_migration_222_tabela_e_colunas_existem():
         """)).fetchone() is not None, 'coluna folga_dias não existe'
 
         # O default desta coluna era FALSE quando a 222 a criou (rollout por
-        # tenant). A migração 270 (03/08/2026) ligou o editor v2 em todo o
+        # tenant). A migração 277 (03/08/2026) ligou o editor v2 em todo o
         # parque e virou o default para TRUE — aqui só resta o contrato que
-        # a 222 garante e a 270 não mexeu: a coluna existe, NOT NULL e com
+        # a 222 garante e a 277 não mexeu: a coluna existe, NOT NULL e com
         # default. O valor do default é asserido em
         # tests/test_migrations_editor_v2_parque.py.
         linha = conn.execute(sa_text("""

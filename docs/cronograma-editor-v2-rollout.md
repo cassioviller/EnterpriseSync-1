@@ -13,9 +13,9 @@
 > que pode editar no botão direito."
 
 O rollout piloto-a-piloto descrito abaixo **não é mais o caminho do dia a
-dia** — ele foi executado de uma vez pela **migração 270**, que roda no boot
+dia** — ele foi executado de uma vez pela **migração 277**, que roda no boot
 do deploy (`docker-entrypoint-easypanel-auto.sh` → `pre_start.py`). O que a
-270 faz, nesta ordem:
+277 faz, nesta ordem:
 
 1. **congela a linha de base** de toda obra com cronograma interno datado que
    ainda não tinha uma ativa (o passo 4 desta lista, em massa e em lotes de
@@ -34,7 +34,7 @@ do deploy (`docker-entrypoint-easypanel-auto.sh` → `pre_start.py`). O que a
 Duas consequências que valem repetir:
 
 - **O guard de calendário virou aviso.** O `--ligar` do script recusa tenant
-  com sábado/domingo no `CalendarioEmpresa`; a 270 liga assim mesmo, por
+  com sábado/domingo no `CalendarioEmpresa`; a 277 liga assim mesmo, por
   decisão, com a linha de base do passo 1 como apólice. Confira no log do
   deploy quais tenants saíram nominalmente citados.
 - **Ligar a flag não recalcula nada sozinho.** A tela do cronograma só lê. O
