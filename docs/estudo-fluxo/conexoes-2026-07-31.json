@@ -1,0 +1,1671 @@
+{
+ "data": "2026-07-31",
+ "tipo": "levantamento-conexoes",
+ "metodo": "3 catalogos de tecido (eventos, listeners, canais) + 8 arestas ponta-a-ponta + 1 matriz",
+ "tecido": [
+  {
+   "catalogo_id": "eventos-handlers",
+   "resumo": "O sistema tem duas camadas de eventos: (1) eventos legados snake_case com handlers de negócio registrados por decorator em event_manager.py + handlers/ (importados com efeito colateral em app.py:410/422/428), que escrevem custos, contabilidade e obra; (2) catálogo `dominio.acao` (utils/catalogo_eventos.py) cujo ÚNICO listener é o webhook universal n8n (utils/webhook_dispatcher.py:487-507, bootstrap app.py:437) — no-op silencioso sem N8N_WEBHOOK_URL. EventManager.emit engole exceções de handler por default (event_manager.py:44-55) e quase todos os call-sites embrulham o emit em try/except que só loga; apenas proposta_aprovada usa raise_on_error=True (modo atômico). Achados: nota_fiscal_paga é handler órfão (zero emissores); material_saida tem handler que não escreve nada (só log) e um emissor que manda movimento_id=0; a finalização de RDO tem escrita dupla (gerar_custos_mao_obra_rdo chamado direto ANTES de emitir rdo_finalizado→lancar_custos_rdo, com dedup que não cruza as origens v2); e emit_obra_cronograma_atualizado/emit_obra_concluida GANHARAM callers vivos em views/obras.py — o achado anterior de \"zero callers\" está desatualizado.",
+   "itens": [
+    {
+     "nome": "ponto_registrado",
+     "origem": "ponto_service.py:145 (mobile, pós-commit); ponto_views.py:1514 (import Excel, só diaristas); ponto_views.py:1735 (facial, se tipo_ponto_canonico); views/admin.py:185 (manual, só se hora_entrada); views/api.py:419 (lançamento múltiplo diaristas)",
+     "destino": "calcular_horas_folha, event_manager.py:302",
+     "materializa": "Diarista: GestaoCustoPai/Filho SALARIO (diária) + ALIMENTACAO (VA) + TRANSPORTE (VT) via registrar_custo_automatico (event_manager.py:380-455). Horista: CustoObra tipo mao_obra categoria PONTO_ELETRONICO (event_manager.py:487-503)",
+     "estado": "vivo",
+     "evidencia": "event_manager.py:302; ponto_service.py:145",
+     "nota": "Todos os 5 emissores embrulham em try/except que só loga warning (ex. ponto_service.py:149-150). Handler engole exceção com rollback+log (event_manager.py:508-513). Só cria custo se registro tem obra_id; diarista só na 'entrada'. Idempotência dupla por origem_tabela registro_ponto/_va/_vt."
+    },
+    {
+     "nome": "rdo_finalizado",
+     "origem": "views/rdo.py:1756 (finalizar_rdo), views/rdo.py:2153 (atualizar_rdo), views/rdo.py:4498 (salvar_rdo_flexivel); scripts/seed_demo_alfa.py:1270,2952,3992 (seed, não produção)",
+     "destino": "DOIS handlers em sequência: lancar_custos_rdo (event_manager.py:589) e recalcular_medicao_apos_rdo (event_manager.py:1418)",
+     "materializa": "lancar_custos_rdo: CustoObra categoria RDO (1 diária/funcionário) + GestaoCustoPai/Filho SALARIO + VA/VT (origem rdo_mao_obra*). recalcular_medicao_apos_rdo: ContaReceber única da obra via services.medicao_service.recalcular_medicao_obra (lê ItemMedicaoComercial.valor_executado_acumulado)",
+     "estado": "vivo",
+     "evidencia": "event_manager.py:589; event_manager.py:1418; views/rdo.py:2144-2160",
+     "nota": "DUPLICAÇÃO ESTRUTURAL: em atualizar_rdo (views/rdo.py:2145-2146) e salvar_rdo_flexivel (4487-4488) a rota chama gerar_custos_mao_obra_rdo (services/rdo_custos.py:316, cria GestaoCustoFilho origem rdo_custo_diario, commit próprio, engole exceção em rdo_custos.py:492-494) E depois emite rdo_finalizado → lancar_custos_rdo. O dedup de SALARIO em lancar_custos_rdo filtra APENAS origem_tabela='rdo_mao_obra' (event_manager.py:737) e não enxerga 'rdo_custo_diario' escrito pelo service (rdo_custos.py:384) — proteção real vem do dedup por CustoObra e do filtro por funcionário+data. Assimetria: crud_rdo_completo.py:468,578, rdo_editar_sistema.py:550 e views/rdo.py:3422 (rdo_salvar_unificado) chamam gerar_custos_mao_obra_rdo SEM emitir rdo_finalizado → nesses caminhos a medição (ContaReceber) NÃO recalcula. Todos os emits em try/except que só loga."
+    },
+    {
+     "nome": "proposta_aprovada",
+     "origem": "propostas_consolidated.py:1023 (alterar_status→APROVADA), :2362 (rota aprovar, admin), :2544 (portal do cliente); services/importacao_fisico_financeiro.py:572 (import físico-financeiro, skip_contabil=True). Todos com raise_on_error=True",
+     "destino": "DOIS handlers na ordem de import de app.py (410 antes de 422): propagar_proposta_para_obra (event_manager.py:882) e handle_proposta_aprovada (handlers/propostas_handlers.py:179)",
+     "materializa": "1º handler: Obra (código OBRxxxx) + Cliente (dedup ou sintético fallback Task #195) + ObraTransicaoEstado + token_cliente + atualiza Obra.valor_contrato congelando MedicaoContrato.valor_base (event_manager.py:1090-1104). 2º handler: LancamentoContabil+PartidaContabil pelo DELTA da linhagem de versões (1.1.02.001 × 4.1.01.001, estorno via 4.2.01.001), ItemMedicaoComercial reconciliado por linhagem (propostas_handlers.py:54-176; listener after_insert cria ObraServicoCusto pareado), cronograma materializado + versão inicial se cronograma_default_json",
+     "estado": "vivo",
+     "evidencia": "event_manager.py:882; handlers/propostas_handlers.py:179; propostas_consolidated.py:2362-2373",
+     "nota": "Único evento em modo atômico: handlers NÃO commitam, a rota é dona da transação e faz rollback se o emit propagar exceção (Task #102). Dependência de ORDEM DE REGISTRO não declarada — comentário em event_manager.py:1052-1057 admite que registrar um 3º handler seria frágil. Handler 1 tem returns silenciosos se proposta não encontrada."
+    },
+    {
+     "nome": "material_entrada",
+     "origem": "views/almoxarifado/movimentos.py:138 e 189 (entrada manual), :347 e :391 (entrada em lote) — todos condicionais a fornecedor_id presente",
+     "destino": "criar_conta_pagar_entrada_material, event_manager.py:128",
+     "materializa": "GestaoCustoPai MATERIAL + GestaoCustoFilho (obra_id=None, centro de custo administrativo, event_manager.py:203-244) + LancamentoContabil/PartidaContabil D 1.1.05.001 Estoque / C 2.1.01.001 Fornecedores (event_manager.py:249-289)",
+     "estado": "parcial",
+     "evidencia": "event_manager.py:128; views/almoxarifado/movimentos.py:136-142",
+     "nota": "Handler pula silenciosamente: se movimento tem pedido_compra_id (custo já registrado na compra — T4), sem fornecedor, valor zero, ou GestaoCusto duplicado. Lançamento contábil pulado com warning se plano de contas não configurado (event_manager.py:256-257), e sua falha é engolida com rollback isolado (event_manager.py:291-293). Sem fornecedor_id o evento nem é emitido."
+    },
+    {
+     "nome": "material_saida",
+     "origem": "views/almoxarifado/movimentos.py:600 (saída consumível, movimento.id or 0) e :891 (saída serializada — movimento_id=0 FIXO no payload)",
+     "destino": "lancar_custo_material_obra, event_manager.py:87",
+     "materializa": "NADA — handler só loga (reengenharia suprimentos: custo de material é reconhecido uma única vez na compra; saída é controle físico). Zero tabelas escritas (event_manager.py:101-122)",
+     "estado": "parcial",
+     "evidencia": "event_manager.py:87-122; views/almoxarifado/movimentos.py:891",
+     "nota": "Como travessia de DADOS o evento é efetivamente morto: handler vivo, mas write-nothing por decisão explícita. No emissor de saída serializada o movimento_id vai como 0 e o handler nem localiza o movimento (filter_by id=0 → log 'não encontrado'). Rastreabilidade obra (T5 TRANSFERENCIA) declarada como pendente no docstring."
+    },
+    {
+     "nome": "veiculo_usado",
+     "origem": "frota_views.py:517 (registro de uso de veículo, pós-commit)",
+     "destino": "lancar_custo_combustivel, event_manager.py:516",
+     "materializa": "CustoObra tipo 'veiculo' categoria FROTA — km_percorrido × R$ 0,80 hardcoded (event_manager.py:550-576)",
+     "estado": "vivo",
+     "evidencia": "event_manager.py:516; frota_views.py:514-525",
+     "nota": "Valor unitário R$ 0,80/km fixo no código (event_manager.py:550), não configurável. Pula se sem obra_id ou km<=0. Emit em try/except 'não crítico' que só loga (frota_views.py:524-525). NÃO escreve em GestaoCustoPai/Filho — só CustoObra legado."
+    },
+    {
+     "nome": "folha_processada",
+     "origem": "folha_pagamento_views.py:198 (processar folha, após db.session.flush por funcionário)",
+     "destino": "criar_lancamento_folha_pagamento, event_manager.py:1135",
+     "materializa": "LancamentoContabil origem FOLHA_PAGAMENTO + PartidaContabil: D 5.1.01.001 (proventos+FGTS), C 2.1.02.001 (líquido), C 2.1.02.002 (INSS), C 2.1.03.001 (IRRF), C 2.1.02.003 (FGTS) — event_manager.py:1231-1316",
+     "estado": "parcial",
+     "evidencia": "event_manager.py:1135; folha_pagamento_views.py:196-202",
+     "nota": "Retorna sem criar NADA se plano de contas incompleto (event_manager.py:1204-1208, só warning). Idempotente por origem+origem_id. Emit engolido no caller (folha_pagamento_views.py:201-202). Handler commita no meio da transação da rota (event_manager.py:1316) — mistura de donos de transação. A rota AINDA grava Gestão de Custos V2 em paralelo por fora do evento (folha_pagamento_views.py:204-209)."
+    },
+    {
+     "nome": "alimentacao_lancamento_criado",
+     "origem": "alimentacao_views.py:257 e :555 (criação de lançamento de alimentação, pós-commit)",
+     "destino": "criar_conta_pagar_alimentacao, event_manager.py:1329",
+     "materializa": "Fornecedor auto-criado a partir do Restaurante se CNPJ não casa (event_manager.py:1372-1384) + ContaPagar origem_tipo=ALIMENTACAO vencimento +7d (event_manager.py:1389-1406)",
+     "estado": "vivo",
+     "evidencia": "event_manager.py:1329; alimentacao_views.py:254-265",
+     "nota": "Escreve no modelo ContaPagar que o próprio event_manager.py:132 declara 'descontinuado' em favor de GestaoCustoPai — inconsistência de destino entre handlers. Sem verificação de duplicata (re-emitir cria segunda ContaPagar). Falha engolida com rollback e log."
+    },
+    {
+     "nome": "nota_fiscal_paga",
+     "origem": "NENHUM emissor em código de produção (grep repo inteiro: só o próprio handler e strings de log). Registrado no boot via app.py:428",
+     "destino": "handle_nota_fiscal_paga, handlers/financeiro_handlers.py:15",
+     "materializa": "Materializaria LancamentoContabil origem FINANCEIRO + partidas D conta-de-despesa-por-categoria / C 1.1.01.002 (financeiro_handlers.py:67-109) — nunca roda",
+     "estado": "orfao_sem_caller",
+     "evidencia": "handlers/financeiro_handlers.py:15; app.py:428",
+     "nota": "Handler órfão confirmado: estrutura completa (mapeamento de categorias→contas, gerador de número) carregada em todo boot e jamais disparada. Candidato a código morto ou a integração nunca concluída do fluxo de pagamento de NF."
+    },
+    {
+     "nome": "proposta.enviada",
+     "origem": "propostas_consolidated.py:170, dentro de _notificar_envio_proposta (def :114), chamada na rota enviar em :1449",
+     "destino": "webhook_emit_proposta_enviada — listener universal fabricado em utils/webhook_dispatcher.py:475-484, registrado para toda a allowlist em register_universal_listener (:487-507) no boot (app.py:437-438)",
+     "materializa": "WebhookEntrega (auditoria/retry, status pendente→enviado/falha) + POST HMAC ao n8n (dispatch_webhook, webhook_dispatcher.py:203-265). A rota também grava PropostaHistorico 'notificacao_disparada' por fora do evento (propostas_consolidated.py:178-185)",
+     "estado": "parcial",
+     "evidencia": "propostas_consolidated.py:170; utils/webhook_dispatcher.py:224-231",
+     "nota": "Sem N8N_WEBHOOK_URL o dispatch retorna False sem persistir NADA (webhook_dispatcher.py:228-231) — canal externo desligado = evento invisível. Handler engole tudo (best-effort). Vale para TODOS os eventos dominio.acao abaixo."
+    },
+    {
+     "nome": "proposta.aprovada",
+     "origem": "propostas_consolidated.py:2396 (admin) e :2574 (cliente) via emit_proposta_aprovada (utils/catalogo_eventos.py:137), APÓS o commit do fluxo legado proposta_aprovada",
+     "destino": "webhook_emit_proposta_aprovada (listener universal, webhook_dispatcher.py:503)",
+     "materializa": "WebhookEntrega + POST n8n (payload com portal_url, valor, obra_id)",
+     "estado": "parcial",
+     "evidencia": "utils/catalogo_eventos.py:137-146; propostas_consolidated.py:2394-2398",
+     "nota": "Emitido em paralelo ao legado (dupla emissão intencional Task #45). _safe_emit engole qualquer exceção (catalogo_eventos.py:110-116). Condicionado a N8N_WEBHOOK_URL."
+    },
+    {
+     "nome": "proposta.rejeitada",
+     "origem": "propostas_consolidated.py:2439 (admin) e :2616 (cliente) via emit_proposta_rejeitada (utils/catalogo_eventos.py:149)",
+     "destino": "webhook_emit_proposta_rejeitada (listener universal)",
+     "materializa": "WebhookEntrega + POST n8n",
+     "estado": "parcial",
+     "evidencia": "utils/catalogo_eventos.py:149-159; propostas_consolidated.py:2438-2439",
+     "nota": "Best-effort, condicionado a N8N_WEBHOOK_URL. Sem handler de negócio interno — rejeição não materializa nada no banco além do status da proposta (feito pela rota)."
+    },
+    {
+     "nome": "proposta.expirando",
+     "origem": "notificacoes_cli.py:124 via CLI `flask emitir-propostas-expirando` (comando registrado em app.py:990-991) — depende de CRON EXTERNO agendar a chamada",
+     "destino": "webhook_emit_proposta_expirando (listener universal)",
+     "materializa": "WebhookEntrega + POST n8n (lembrete pré-expiração)",
+     "estado": "parcial",
+     "evidencia": "notificacoes_cli.py:124; app.py:990-991",
+     "nota": "Semiautomático em dois níveis: exige cron configurado fora do repo (docstring notificacoes_cli.py:19 sugere `0 8 * * *`) E N8N_WEBHOOK_URL. Sem os dois, nunca dispara."
+    },
+    {
+     "nome": "obra.rdo_publicado",
+     "origem": "views/rdo.py:1769, :2165, :4510 via emit_obra_rdo_publicado (utils/catalogo_eventos.py:242) — mesmos 3 pontos que emitem rdo_finalizado, logo após",
+     "destino": "webhook_emit_obra_rdo_publicado (listener universal)",
+     "materializa": "WebhookEntrega + POST n8n com resumo de equipe/subatividades (_resumo_rdo, catalogo_eventos.py:216-239)",
+     "estado": "parcial",
+     "evidencia": "utils/catalogo_eventos.py:242-258; views/rdo.py:1767-1771",
+     "nota": "Dupla emissão intencional com rdo_finalizado (canal interno × externo). views/rdo.py:1972-1973 documenta bug histórico onde um caminho chamava só o webhook sem o evento de custos. Condicionado a N8N_WEBHOOK_URL."
+    },
+    {
+     "nome": "obra.medicao_publicada",
+     "origem": "services/medicao_service.py:200 em fechar_medicao (quando MedicaoObra→APROVADO)",
+     "destino": "webhook_emit_obra_medicao_publicada (listener universal)",
+     "materializa": "WebhookEntrega + POST n8n (valores medidos/a faturar). A ContaReceber é atualizada ANTES por chamada direta a recalcular_medicao_obra (medicao_service.py:191), não pelo evento",
+     "estado": "parcial",
+     "evidencia": "services/medicao_service.py:196-202",
+     "nota": "Best-effort, condicionado a N8N_WEBHOOK_URL."
+    },
+    {
+     "nome": "obra.cronograma_atualizado",
+     "origem": "views/obras.py:2676 — POST de revisão do cronograma (revisão inicial E replanejamento via cronograma_revisar_reset), via emit_obra_cronograma_atualizado (utils/catalogo_eventos.py:276)",
+     "destino": "webhook_emit_obra_cronograma_atualizado (listener universal)",
+     "materializa": "WebhookEntrega + POST n8n (tarefas_geradas, motivo)",
+     "estado": "parcial",
+     "evidencia": "views/obras.py:2674-2682; utils/catalogo_eventos.py:276-286",
+     "nota": "CORREÇÃO ao estudo anterior: o helper TEM caller de produção vivo em views/obras.py:2676 (as linhas deslocaram). Não é mais órfão. Estado parcial apenas pela dependência de N8N_WEBHOOK_URL, comum a todo o catálogo."
+    },
+    {
+     "nome": "obra.concluida",
+     "origem": "views/obras.py:3683 via _notificar_transicao (def :3665, chamada na rota POST /obras/<id>/estado em :3775), somente quando destino is EstadoObra.CONCLUIDA",
+     "destino": "webhook_emit_obra_concluida (listener universal)",
+     "materializa": "WebhookEntrega + POST n8n (datas, valor_contrato)",
+     "estado": "parcial",
+     "evidencia": "views/obras.py:3682-3683; views/obras.py:3775",
+     "nota": "CORREÇÃO ao estudo anterior: caller vivo existe — a conclusão agora é fato da máquina de estados (Fase 2), não mais comparação de string em editar_obra. Best-effort (try/except em :3684-3686), condicionado a N8N_WEBHOOK_URL."
+    },
+    {
+     "nome": "obra.estado_alterado",
+     "origem": "views/obras.py:3678 (_notificar_transicao ← rota :3775) e :3695 (_notificar_handoff ← rota :3886) — toda transição da máquina de estados da obra",
+     "destino": "webhook_emit_obra_estado_alterado (listener universal)",
+     "materializa": "WebhookEntrega + POST n8n (estado_de/para com rótulos, motivo, usuario). O registro interno ObraTransicaoEstado é gravado pela rota/serviço, não por este evento",
+     "estado": "parcial",
+     "evidencia": "views/obras.py:3678-3681; utils/catalogo_eventos.py:301-329",
+     "nota": "Complementa (não substitui) obra.concluida — na conclusão saem DOIS webhooks. Best-effort, condicionado a N8N_WEBHOOK_URL."
+    },
+    {
+     "nome": "obra.handoff",
+     "origem": "views/obras.py:3699 via _notificar_handoff (def :3689, chamada :3886 na rota de handoff ao GP)",
+     "destino": "webhook_emit_obra_handoff (listener universal)",
+     "materializa": "WebhookEntrega + POST n8n com dossiê completo (services/obra_handoff.dossie_handoff embutido no payload, catalogo_eventos.py:342-360)",
+     "estado": "parcial",
+     "evidencia": "views/obras.py:3689-3705; utils/catalogo_eventos.py:332-361",
+     "nota": "Falha do dossiê é engolida e o evento sai com dossie={} (catalogo_eventos.py:343-348). Condicionado a N8N_WEBHOOK_URL."
+    }
+   ]
+  },
+  {
+   "catalogo_id": "listeners-sqlalchemy",
+   "resumo": "O tecido de listeners SQLAlchemy está todo vivo e concentrado em models.py (10 listeners de mapper/sessão) mais dois listeners de sessão instalados em runtime (auto-vínculo de mão de obra e guarda de imutabilidade de RDO) e dois ganchos manuais de pós-commit no serviço de versão de cronograma. Os pontos perigosos: o after_insert de ItemMedicaoComercial grava valor de VENDA como orçado de CUSTO em ObraServicoCusto; o autoclone operacional do RDO roda em thread separada via Timer(0) fora da transação; e quase todos os listeners engolem exceção com warning — falha de recálculo/snapshot fica silenciosa. O dual-write do editor v2 (tarefa_vinculo) NÃO é listener: são chamadas explícitas nas views, condicionadas à flag, com commit próprio e falha engolida.",
+   "itens": [
+    {
+     "nome": "_auto_fill_produtividade_snapshot (RDOServicoSubatividade before_insert/before_update)",
+     "origem": "qualquer flush que insira/atualize RDOServicoSubatividade com subatividade_mestre_id — todas as rotas de salvamento de RDO",
+     "destino": "models.py:1990-2013 (SELECT direto em subatividade_mestre via connection)",
+     "materializa": "meta_produtividade_snapshot e unidade_medida_snapshot copiados do catálogo SubatividadeMestre para a linha do RDO (só quando estão None)",
+     "estado": "vivo",
+     "evidencia": "models.py:1990",
+     "nota": "try/except engole falha com logging.warning — RDO salva sem snapshot e ninguém percebe; automático (nenhum humano digita)"
+    },
+    {
+     "nome": "_auto_calc_homem_hora (RDOSubempreitadaApontamento before_insert/before_update)",
+     "origem": "insert/update de apontamento de subempreitada em RDO",
+     "destino": "models.py:7020-7023 → RDOSubempreitadaApontamento.calcular_homem_hora (models.py:7002-7011)",
+     "materializa": "campo homem_hora = quantidade_produzida / (qtd_pessoas × horas_trabalhadas), recalculado a cada save",
+     "estado": "vivo",
+     "evidencia": "models.py:7020",
+     "nota": "except interno zera para None em erro; automático e inofensivo"
+    },
+    {
+     "nome": "_equipe_planejada_changed (ObraServicoEquipePlanejada after_insert/after_update/after_delete)",
+     "origem": "CRUD de equipe planejada por serviço (Task #70, resumo de custos)",
+     "destino": "models.py:7286-7290 → _agendar_via_target (models.py:7265) — só marca id no bag da session.info",
+     "materializa": "agenda recálculo de ObraServicoCusto (mao_obra_a_realizar etc.) para o after_flush_postexec",
+     "estado": "vivo",
+     "evidencia": "models.py:7286",
+     "nota": "não faz query no ciclo de flush — só coleta em memória; falha ao agendar vira warning"
+    },
+    {
+     "nome": "_cotacao_interna_changed (ObraServicoCotacaoInterna after_insert/after_update)",
+     "origem": "CRUD de cotação interna de serviço (Task #70)",
+     "destino": "models.py:7293-7297 → _agendar_via_target",
+     "materializa": "agenda recálculo do serviço de custo quando a cotação está selecionada",
+     "estado": "parcial",
+     "evidencia": "models.py:7293",
+     "nota": "NÃO tem after_delete (diferente da equipe planejada): deletar a cotação selecionada não dispara recálculo — snapshot de a_realizar fica stale até o próximo save"
+    },
+    {
+     "nome": "_gestao_custo_filho_changed (GestaoCustoFilho after_insert/after_update/after_delete)",
+     "origem": "lançamentos de custo real (material/mão de obra/outros) da gestão de custos",
+     "destino": "models.py:7300-7305 → _agendar_via_target(obra=True)",
+     "materializa": "agenda recálculo da obra inteira (recalcular_obra) para consolidar realizado_* nos ObraServicoCusto",
+     "estado": "vivo",
+     "evidencia": "models.py:7300",
+     "nota": "condicionado a target.obra_id preenchido; custo sem obra não dispara nada"
+    },
+    {
+     "nome": "_resumo_custos_after_flush (db.session after_flush_postexec)",
+     "origem": "drenagem do bag agendado pelos 3 listeners acima, dentro do próprio commit",
+     "destino": "models.py:7308-7357 → services/resumo_custos_obra.py:46 (recalcular_servico) e :108 (recalcular_obra)",
+     "materializa": "sobrescreve as colunas-snapshot realizado_material/realizado_mao_obra/realizado_outros e *_a_realizar de ObraServicoCusto com agregados de GestaoCustoFilho — persiste na mesma transação",
+     "estado": "vivo",
+     "evidencia": "models.py:7308",
+     "nota": "PERIGO: sync sobrescreve snapshot com agregado a cada flush (respeita override_realizado_manual dentro do serviço); toda exceção vira warning e o commit segue com snapshot inconsistente; guarda reentrante _RESUMO_REENTRANT_KEY evita loop"
+    },
+    {
+     "nome": "_proposta_item_before_save (PropostaItem before_insert/before_update)",
+     "origem": "qualquer save de item de proposta",
+     "destino": "models.py:7438-7441 → _calc_proposta_item_snapshot (models.py:7405)",
+     "materializa": "subtotal = quantidade × preco_unitario quando subtotal é None",
+     "estado": "vivo",
+     "evidencia": "models.py:7438",
+     "nota": "except: pass NU — falha 100% silenciosa (nem warning)"
+    },
+    {
+     "nome": "_item_medicao_before_save (ItemMedicaoComercial before_insert/before_update)",
+     "origem": "qualquer save de item de medição comercial",
+     "destino": "models.py:7444-7447 → _calc_item_medicao_snapshot (models.py:7416)",
+     "materializa": "deriva preco_unitario = valor_comercial/quantidade e subtotal = valor_comercial quando faltam",
+     "estado": "vivo",
+     "evidencia": "models.py:7444",
+     "nota": "dois except: pass nus aninhados — silêncio total em falha"
+    },
+    {
+     "nome": "_item_medicao_auto_cria_custo (ItemMedicaoComercial after_insert)",
+     "origem": "principalmente handlers/propostas_handlers.py:54+ (_propagar_proposta_para_obra, na aprovação da proposta) — mas dispara em QUALQUER insert de ItemMedicaoComercial",
+     "destino": "models.py:7450-7487 (INSERT direto na tabela obra_servico_custo via connection)",
+     "materializa": "ObraServicoCusto pareado 1-pra-1: valor_orcado = valor_comercial, servico_catalogo_id = servico_id, realizados zerados",
+     "estado": "vivo",
+     "evidencia": "models.py:7450",
+     "nota": "PERIGO DUPLO: (1) copia valor de VENDA para o campo de orçamento de CUSTO — a margem some do planejamento até o gestor redigitar; (2) já causou duplicação de custo em revisão de proposta (bug medido 21/07: v1+v2 = R$220k para contrato de R$120k, corrigido pela reconciliação em handlers/propostas_handlers.py, Fase 0.6/D1); exceção é engolida com log.exception"
+    },
+    {
+     "nome": "_rdo_after_insert_autoclone_operacional (RDO after_insert + after_commit one-shot + Timer)",
+     "origem": "todo insert de RDO (models.py:8205); cadeia: after_insert → registra after_commit once=True na sessão (models.py:8216) → threading.Timer(0) com app_context novo (models.py:8238)",
+     "destino": "services/orcamento_operacional.py:58 (garantir_operacional)",
+     "materializa": "ObraOrcamentoOperacional clonado do orçamento aprovado da obra na primeira criação de RDO (idempotente; cria vazio se não há orçamento aprovado)",
+     "estado": "vivo",
+     "evidencia": "models.py:8205",
+     "nota": "PERIGO: roda em THREAD separada fora da transação e da request — race com dois RDOs simultâneos é tratada só por UniqueViolation+rollback no serviço; falha vira warning e o operacional simplesmente não existe; seeds precisam de get-or-create defensivo (scripts/seed_demo_alfa.py:1308,2970)"
+    },
+    {
+     "nome": "auto-link mão de obra (db.session before_flush, Task #62)",
+     "origem": "instalado em app.py:914-915 (install_auto_link_listener); dispara em todo flush com RDOMaoObra nova/dirty com vinculo_status None",
+     "destino": "services/vinculo_mao_obra.py:184-198 → resolver_vinculo (Funcao → ComposicaoServico)",
+     "materializa": "composicao_servico_id e vinculo_status na linha RDOMaoObra — vínculo custo de MO ↔ composição de serviço sem intervenção do caller",
+     "estado": "vivo",
+     "evidencia": "services/vinculo_mao_obra.py:184",
+     "nota": "idempotente (pula status preenchido, respeita 'manual'); falha por linha engolida com warning; views/rdo.py:1002 e rdo_editar_sistema.py:530 ainda chamam a aplicação manual por cima, redundância assumida"
+    },
+    {
+     "nome": "guarda de imutabilidade de RDO (db.session before_flush, Fase 5)",
+     "origem": "registrada no import do módulo (services/rdo_ciclo_vida.py:304), disparado por app.py:1074; vê new+dirty+deleted de RDO e 7 modelos-filho (rdo_ciclo_vida.py:242-246)",
+     "destino": "services/rdo_ciclo_vida.py:262-299 (_guarda_imutabilidade) — levanta RDOImutavel",
+     "materializa": "nada — é guarda negativa: BARRA escrita em RDO cujo estado PERSISTIDO é assinado/aprovado/retificado (lê history do atributo para ignorar estado recém-atribuído)",
+     "estado": "vivo",
+     "evidencia": "services/rdo_ciclo_vida.py:262",
+     "nota": "bypass legítimo via contextvar _BYPASS (rdo_ciclo_vida.py:109,120) para as transições oficiais; PERIGO: um RDO imutável num batch derruba a transação inteira — services/atualizacao_rdos.py:23 pula esses RDOs de propósito; se o import de app.py:1074 falhar, a guarda simplesmente não existe (só loga ERRO)"
+    },
+    {
+     "nome": "gancho manual pós-commit: _motor_pos_commit (aplicar/restaurar versão de cronograma)",
+     "origem": "services/cronograma_versao_service.py:424-426 (aplicar_versao) e :704 (restauração) — só quando a obra tem RDO (gate tem_rdo)",
+     "destino": "services/cronograma_versao_service.py:431-457 → recalcular_cronograma + replanejar_curvas_obra (utils/cronograma_engine.py:1057)",
+     "materializa": "reescreve RDOApontamentoCronograma.percentual_planejado de TODA a obra com as datas vigentes; grava CronogramaImportacaoEvento 'replanejado' com o relatório",
+     "estado": "vivo",
+     "evidencia": "services/cronograma_versao_service.py:431",
+     "nota": "sync plano-sobre-histórico deliberadamente limitado: NUNCA toca realizado (quantidade_executada_dia etc. byte-idênticos); falha pós-commit não desfaz a versão — loga e segue, curvas podem ficar stale sem sinal na UI; obra SEM RDO pula o motor para não zerar pct_projeto da carga inicial"
+    },
+    {
+     "nome": "gancho manual pós-commit: _sincronizar_vinculos_pos_commit (editor v2, plano C5)",
+     "origem": "services/cronograma_versao_service.py:427 e :706, após aplicar/restaurar versão",
+     "destino": "services/cronograma_versao_service.py:460-474 → sincronizar_vinculos_de_predecessora_id (services/cronograma_scheduler.py:629)",
+     "materializa": "linhas TarefaVinculo TI/lag 0 a partir dos predecessora_id legados que ainda não têm vínculo — mantém tarefa_vinculo em dia com a flag do editor v2 desligada",
+     "estado": "vivo",
+     "evidencia": "services/cronograma_versao_service.py:460",
+     "nota": "pula auto-referência e predecessora fora da obra/tenant com warning (dado sujo conhecido); falha pós-commit = rollback+log, versão permanece aplicada"
+    },
+    {
+     "nome": "dual-write editor v2: _dual_write_vinculo_legado (flag OFF)",
+     "origem": "cronograma_views.py:719 (criar tarefa) e :1127 (atualizar tarefa), só quando _editor_v2_on() é False e predecessora_id veio no payload",
+     "destino": "cronograma_views.py:202-225 — delete dos vínculos da sucessora + insert TarefaVinculo TI/0, com commit PRÓPRIO",
+     "materializa": "espelho silencioso do predecessora_id legado em tarefa_vinculo (para a tabela não ficar obsoleta enquanto a flag não liga)",
+     "estado": "vivo",
+     "evidencia": "cronograma_views.py:202",
+     "nota": "NÃO é listener SQLAlchemy — chamada explícita pós-commit da view; qualquer erro = rollback + warning, NUNCA falha a request → tarefa_cronograma e tarefa_vinculo podem divergir em silêncio; semiautomático (depende da view chamar)"
+    },
+    {
+     "nome": "dual-write editor v2: escrita direta em TarefaVinculo (flag ON)",
+     "origem": "cronograma_views.py:723-753 (criação: predecessora_id do modal vira TI/0; predecessoras_texto vence e faz delete+insert) e :1018-1043 (edição via texto)",
+     "destino": "tabela tarefa_vinculo (models.py:5952, TarefaVinculo) — motor de scheduling lê SÓ ela com a flag ON (cronograma_views.py:726)",
+     "materializa": "vínculos multi-predecessora TI/II/TT/IT com lag; a coluna legada predecessora_id fica congelada",
+     "estado": "vivo",
+     "evidencia": "cronograma_views.py:727",
+     "nota": "na mesma transação da tarefa (flush antes para ter id) — este caminho é atômico, ao contrário do dual-write flag-OFF; parse inválido de predecessoras_texto faz rollback com 400"
+    }
+   ]
+  },
+  {
+   "catalogo_id": "canais-saida",
+   "resumo": "Toda a saída externa do SIGE converge para UM canal: o despachante de webhook n8n (opt-in por N8N_WEBHOOK_URL — não configurada neste ambiente, logo hoje NADA sai do sistema automaticamente; o dispatcher vira no-op silencioso sem sequer gravar WebhookEntrega). Não existe SMTP funcional em lugar nenhum (o único smtplib vivo, em exportacao_relatorios.py, não tem MAIL_SERVER configurado nem template — rota 500); e-mail ao cliente é delegado ao n8n. Os fluxos voltados ao cliente (convite de acesso, cobrança de ciência do RDO de 29-30/07, proposta via WhatsApp) são todos copiar-e-colar manual; NotificacaoCliente confirmado morto (nenhum código de produção cria registros) e o e-mail do ObraSignatarioCliente é gravado mas jamais usado para enviar nada.",
+   "itens": [
+    {
+     "nome": "Despachante n8n (canal único de saída externa)",
+     "origem": "listener universal registrado para cada evento da allowlist — utils/webhook_dispatcher.py:487-507, bootstrap em app.py:437-439",
+     "destino": "HTTP POST para N8N_WEBHOOK_URL — _post_to_n8n, utils/webhook_dispatcher.py:187-196; consumidor é o n8n externo",
+     "materializa": "WebhookEntrega (models.py:8087) status pendente→enviado/falha, com retry 60s/5m/15m em thread daemon (utils/webhook_dispatcher.py:84-85,510-519)",
+     "estado": "parcial",
+     "evidencia": "utils/webhook_dispatcher.py:228-231",
+     "nota": "Opt-in: sem N8N_WEBHOOK_URL o evento é IGNORADO sem persistir nada (utils/webhook_dispatcher.py:229-231). `env | grep N8N` vazio neste ambiente — canal desligado. Allowlist de 10 eventos em utils/webhook_dispatcher.py:59-74. Tudo best-effort, exceções engolidas."
+    },
+    {
+     "nome": "proposta.enviada (e-mail/WhatsApp ao cliente via n8n — Task #44)",
+     "origem": "EventManager.emit em _notificar_envio_proposta — propostas_consolidated.py:170, chamado na rota de envio em propostas_consolidated.py:1449",
+     "destino": "listener universal do webhook → n8n (que decide e-mail vs WhatsApp via Switch, propostas_consolidated.py:117-119)",
+     "materializa": "WebhookEntrega + PropostaHistorico('notificacao_disparada') listando canais tentados (propostas_consolidated.py:180-186); flash amarelo se faltar e-mail/telefone (propostas_consolidated.py:135-146)",
+     "estado": "parcial",
+     "evidencia": "propostas_consolidated.py:170",
+     "nota": "É o ÚNICO 'e-mail ao cliente' do sistema — 100% delegado ao n8n. Sem N8N_WEBHOOK_URL o cliente não recebe nada e o histórico ainda registra 'notificacao_disparada' (registro otimista)."
+    },
+    {
+     "nome": "proposta.aprovada / proposta.rejeitada",
+     "origem": "emit_proposta_aprovada/rejeitada — propostas_consolidated.py:2395,2438 (decisão do cliente no portal) e 2573,2615 (decisão do admin); helpers em utils/catalogo_eventos.py:137-159",
+     "destino": "listener universal do webhook → n8n",
+     "materializa": "WebhookEntrega com payload proposta+cliente+portal_url (utils/catalogo_eventos.py:122-134)",
+     "estado": "parcial",
+     "evidencia": "propostas_consolidated.py:2395",
+     "nota": "Emitido em paralelo ao evento legado interno 'proposta_aprovada' (handlers em handlers/propostas_handlers.py:179 e event_manager.py:882). Best-effort via _safe_emit (utils/catalogo_eventos.py:110-116)."
+    },
+    {
+     "nome": "proposta.expirando (lembrete D-3 a D)",
+     "origem": "CLI `flask emitir-propostas-expirando` — notificacoes_cli.py:84, comando registrado em app.py:990",
+     "destino": "listener universal do webhook → n8n",
+     "materializa": "WebhookEntrega, com dedup por (proposta_id, dia) consultando WebhookEntrega (notificacoes_cli.py:37-73)",
+     "estado": "orfao_sem_caller",
+     "evidencia": "notificacoes_cli.py:84",
+     "nota": "O docstring prevê cron '0 8 * * *' (notificacoes_cli.py:19-20), mas NENHUM cron está configurado (.replit sem schedule, sem Procfile). Só dispara se alguém rodar o comando à mão — e mesmo assim depende de N8N_WEBHOOK_URL."
+    },
+    {
+     "nome": "obra.rdo_publicado",
+     "origem": "emit_obra_rdo_publicado — views/rdo.py:1768 (finalizar), views/rdo.py:2164 (atualizar), views/rdo.py:4509 (salvar_rdo_flexivel); helper utils/catalogo_eventos.py:242-258",
+     "destino": "listener universal do webhook → n8n",
+     "materializa": "WebhookEntrega com dossiê rico (resumo equipe/subatividades, utils/catalogo_eventos.py:216-239) para o n8n montar mensagem sem round-trip",
+     "estado": "parcial",
+     "evidencia": "views/rdo.py:1768",
+     "nota": "Emitido em paralelo ao legado 'rdo_finalizado' (handlers internos em event_manager.py:589 e 1418). Try/except engole falha em cada ponto de emissão."
+    },
+    {
+     "nome": "obra.medicao_publicada",
+     "origem": "emit_obra_medicao_publicada ao fechar medição — services/medicao_service.py:199-201; helper utils/catalogo_eventos.py:261-273",
+     "destino": "listener universal do webhook → n8n",
+     "materializa": "WebhookEntrega com valores medidos/a faturar do período",
+     "estado": "parcial",
+     "evidencia": "services/medicao_service.py:199",
+     "nota": "Best-effort explícito: 'nunca propaga exceção (webhook é canal externo)' — services/medicao_service.py:197."
+    },
+    {
+     "nome": "obra.cronograma_atualizado",
+     "origem": "emit_obra_cronograma_atualizado após revisão do cronograma — views/obras.py:2675-2681; helper utils/catalogo_eventos.py:276-286",
+     "destino": "listener universal do webhook → n8n",
+     "materializa": "WebhookEntrega com tarefas_geradas e motivo",
+     "estado": "parcial",
+     "evidencia": "views/obras.py:2675",
+     "nota": "Cobre primeira revisão e replanejamento (mesmo POST)."
+    },
+    {
+     "nome": "obra.estado_alterado + obra.concluida (máquina de estados Fase 2)",
+     "origem": "_notificar_transicao — views/obras.py:3675-3686 (emite estado_alterado sempre, concluida quando destino=CONCLUIDA); helpers utils/catalogo_eventos.py:289-329",
+     "destino": "listener universal do webhook → n8n",
+     "materializa": "WebhookEntrega com estado_de/estado_para/rótulos/motivo",
+     "estado": "parcial",
+     "evidencia": "views/obras.py:3678-3683",
+     "nota": "Substituiu a detecção de conclusão por comparação de string pós-commit (comentário em views/obras.py:3668-3672)."
+    },
+    {
+     "nome": "obra.handoff (avisar o GP)",
+     "origem": "_notificar_handoff — views/obras.py:3695-3703; helper utils/catalogo_eventos.py:332-361 carrega dossiê inteiro + contato do GP (nome/email/telefone do Funcionario)",
+     "destino": "listener universal do webhook → n8n (que montaria e-mail/WhatsApp para o GP)",
+     "materializa": "WebhookEntrega com payload gerente_projeto + dossie",
+     "estado": "parcial",
+     "evidencia": "views/obras.py:3699",
+     "nota": "O 'aviso ao GP' inteiro depende do n8n; sem N8N_WEBHOOK_URL o handoff acontece no banco mas ninguém é avisado por canal nenhum."
+    },
+    {
+     "nome": "Painel admin de webhooks (reentrega manual)",
+     "origem": "GET /admin/webhooks e POST /admin/webhooks/<id>/reenviar — views/admin.py:262-336, usando reentregar_uma (utils/webhook_dispatcher.py:~430-469)",
+     "destino": "re-POST para o n8n da entrega escolhida",
+     "materializa": "WebhookEntrega resetada para pendente e reenviada; template admin/webhooks.html",
+     "estado": "vivo",
+     "evidencia": "views/admin.py:322",
+     "nota": "Manual por definição. Recusa reenvio se webhook desligado (views/admin.py:323-325). Tenant scoping por admin_id."
+    },
+    {
+     "nome": "E-mail SMTP de relatórios de veículos (exportacao_relatorios.py)",
+     "origem": "POST /exportacao/enviar-email — exportacao_relatorios.py:681-728; SistemaEmailRelatorios.enviar_relatorio_email com smtplib em exportacao_relatorios.py:578-585; blueprint registrado em main.py:157-158",
+     "destino": "destinatários digitados no request JSON (nenhum vínculo com cadastro)",
+     "materializa": "nada — MAIL_SERVER/MAIL_USERNAME não existem em config alguma (grep sem hits fora deste arquivo); smtplib.SMTP('localhost',587) falharia; e o painel que chamaria a rota (templates/relatorios/exportacao/painel.html) NÃO EXISTE — a rota GET / do blueprint dá 500",
+     "estado": "morto",
+     "evidencia": "exportacao_relatorios.py:534",
+     "nota": "Único smtplib fora de archive. Exceção engolida com return False (exportacao_relatorios.py:590-592). SistemaAgendamentoRelatorios (exportacao_relatorios.py:759-805) 'agenda' em dict em memória e nunca executa nada — morto também."
+    },
+    {
+     "nome": "NotificacaoCliente (notificações do portal do cliente)",
+     "origem": "NINGUÉM — confirmado: `NotificacaoCliente(` só aparece na definição do modelo (models.py:3039); nenhum código de produção cria registros",
+     "destino": "NINGUÉM lê — nenhuma query de leitura no portal ou em views; só DELETE ao excluir RDO (views/rdo.py:554, crud_rdo_completo.py:523) e anulação de FK no import (services/importacao_fisico_financeiro.py:368-369)",
+     "materializa": "nada, nunca",
+     "estado": "morto",
+     "evidencia": "models.py:3039",
+     "nota": "Docstring promete 'notificações automáticas para clientes via portal' com tipos novo_rdo/marco_atingido/atraso — tudo aspiracional. O único uso vivo do modelo é limpá-lo para não quebrar FK."
+    },
+    {
+     "nome": "NotificacaoOrcamento (alerta interno de estouro de orçamento)",
+     "origem": "verificar_estouros_obra (upsert em utils/notifications.py:63-100), disparado ao abrir detalhes da obra (views/obras.py:2145-2149) e no painel de planejamento (views/planejamento_custos_views.py:98)",
+     "destino": "tela de detalhes da obra — passada como notificacoes_orcamento ao template (views/obras.py:2244)",
+     "materializa": "linha NotificacaoOrcamento (models.py:7360) ativa por serviço estourado, idempotente",
+     "estado": "vivo",
+     "evidencia": "utils/notifications.py:79",
+     "nota": "Semiautomático: só materializa quando um humano abre a tela (não há job); é notificação on-screen, nunca sai do sistema."
+    },
+    {
+     "nome": "WhatsApp de proposta (botão wa.me — Task #44)",
+     "origem": "_whatsapp_url_proposta monta https://wa.me/<fone>?text=<msg> — propostas_consolidated.py:91-111; injetada no template em propostas_consolidated.py:922-937",
+     "destino": "admin clica e o WhatsApp Web/app abre com a mensagem pronta; clique registrado por POST /<id>/whatsapp/registrar (propostas_consolidated.py:1470-1494)",
+     "materializa": "PropostaHistorico(acao='whatsapp_aberto') — propostas_consolidated.py:1485-1488",
+     "estado": "vivo",
+     "evidencia": "propostas_consolidated.py:91",
+     "nota": "Manual: humano clica e envia. NÃO existe Evolution API/Twilio/Z-API em lugar nenhum do repo (grep vazio fora de scripts/whatsapp_para_rdos.py, que é IMPORT de conversa, não envio). Registro do clique engole exceção (propostas_consolidated.py:1493-1494)."
+    },
+    {
+     "nome": "Convite de acesso do signatário do cliente (Fase 9a, 29-30/07)",
+     "origem": "POST criar_signatario_cliente (views/obras.py:3984-4009) ou gerar_senha_signatario_cliente (views/obras.py:4023-4058) geram senha temporária; a tela de detalhes monta a mensagem pronta (views/obras.py:2204-2274)",
+     "destino": "textarea #msgConvite + botão 'Copiar mensagem do convite' — templates/obras/detalhes_obra_profissional.html:1526-1535; a construtora COLA no WhatsApp dela",
+     "materializa": "ObraSignatarioCliente com password_hash/senha_temporaria (services/portal_signatario_auth.py:54-73); senha em claro existe UMA vez, via sessão (_consumir_senha_gerada, views/obras.py:2274)",
+     "estado": "vivo",
+     "evidencia": "templates/obras/detalhes_obra_profissional.html:1526",
+     "nota": "Manual por decisão de projeto: 'não existe SMTP no sistema' (services/portal_signatario_auth.py:97-99; models.py docstring do ObraSignatarioCliente). O ícone fa-envelope do botão é só ícone — nenhum e-mail sai."
+    },
+    {
+     "nome": "Cobrança de ciência do RDO (botão 'Cobrar', 29-30/07)",
+     "origem": "views/obras.py:2214-2233 calcula por signatário ativo o RDO mais recente elegível (motivo_inelegivel, services/rdo_ciencia_cliente.py:73-88) e sem a assinatura dele",
+     "destino": "botão 'Cobrar' copia mensagem com link direto /portal/obra/<token>/rdo/<id> — templates/obras/detalhes_obra_profissional.html:1573-1583 e função copiarCobrancaCiencia (:1620-1634); colada manualmente no WhatsApp",
+     "materializa": "nada no banco ao cobrar (só clipboard); a ciência em si vira RDOAssinatura papel=cliente com hash sha256 (services/rdo_ciencia_cliente.py:236-253)",
+     "estado": "vivo",
+     "evidencia": "views/obras.py:2232",
+     "nota": "Manual. O fluxo inverso 'esqueci minha senha' também não envia nada: pedir_recuperacao só grava recuperacao_pedida_em (services/portal_signatario_auth.py:94-104) que vira badge amarelo na tela da obra (template :1511-1516)."
+    },
+    {
+     "nome": "E-mail do ObraSignatarioCliente (campo email no banco)",
+     "origem": "gravado no cadastro — views/obras.py:4003 (request.form.get('email')); coluna em models.py (email = db.Column, dentro de ObraSignatarioCliente, models.py:1583+)",
+     "destino": "NENHUM — nenhum código lê signatario.email para enviar, exibir em mensagem ou compor payload; nem os payloads n8n o incluem (catálogo usa cliente.email da Obra, utils/catalogo_eventos.py:210)",
+     "materializa": "só a coluna preenchida",
+     "estado": "morto",
+     "evidencia": "views/obras.py:4003",
+     "nota": "Campo gravado e nunca consumido: convite e cobrança saem por clipboard/WhatsApp, recuperação de senha é mediada pela tela. Candidato claro a 'estrutura existe, produção não usa'."
+    },
+    {
+     "nome": "notification_system.py legado (smtplib arquivado)",
+     "origem": "archive/legacy_cleanup/passo_10/notification_system.py:12",
+     "destino": "nenhum — nada em produção importa notification_system (grep fora de archive vazio)",
+     "materializa": "nada",
+     "estado": "morto",
+     "evidencia": "archive/legacy_cleanup/passo_10/notification_system.py:12",
+     "nota": "Já removido para archive/ na limpeza legada; listado só para fechar o inventário de smtplib."
+    }
+   ]
+  }
+ ],
+ "arestas": [
+  {
+   "aresta_id": "crm-proposta-obra",
+   "resumo": "A cadeia tem uma espinha automática e transacional no trecho Proposta→Obra/Cliente (evento proposta_aprovada com raise_on_error, dedup conservador de Cliente e reconciliação por cadeia de versões), mas o CRM está pendurado nela por redirects que descartam os IDs na chegada e por duas FKs (Lead.proposta_id, Lead.obra_id) que nenhum código de produção escreve. Proposta manual carrega o cliente como texto livre até a aprovação, quando o cliente_resolver fecha o elo; CPF/CNPJ digitado no formulário morre numa variável local nunca persistida.",
+   "estado_geral": "parcial",
+   "elos": [
+    {
+     "dado": "identidade do cliente do lead ao abrir nova proposta (cliente_id e lead_id na query string)",
+     "de": "CRM Lead (crm.gerar_proposta)",
+     "para": "tela Nova Proposta (propostas.nova)",
+     "mecanismo": "nenhum",
+     "automacao": "manual_redigitado",
+     "evidencia": "crm_views.py:937-939 (redirect com cliente_id/lead_id) → propostas_consolidated.py:1186-1188 (alias nova_proposta redireciona para propostas.nova descartando a query string) e propostas_consolidated.py:507-540 (nova() nunca lê request.args; templates/propostas/nova_proposta.html sem pré-preenchimento)",
+     "o_que_falta": "nova() ler ?cliente_id=&lead_id= (ou o alias repassar a query string) e pré-preencher cliente_nome/email/telefone a partir do Cliente; hoje o usuário redigita tudo"
+    },
+    {
+     "dado": "cadastro do cliente derivado do lead (nome, telefone, e-mail, endereço) com dedup por telefone normalizado/e-mail",
+     "de": "CRM Lead",
+     "para": "Cliente (FK lead.cliente_id)",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "crm_views.py:218-277 (vincular_ou_criar_cliente, dedup por telefone/e-mail, completa campos vazios) chamado em crm_views.py:918-926 (gerar_proposta) e crm_views.py:957-967 (criar_obra); grava lead.cliente_id em crm_views.py:262 e 276",
+     "o_que_falta": "nada"
+    },
+    {
+     "dado": "desfecho da proposta (aprovada/rejeitada) de volta para o lead — fechar o card do kanban",
+     "de": "Proposta (aprovar/rejeitar)",
+     "para": "CRM Lead (status ganho/perdido + Lead.proposta_id)",
+     "mecanismo": "nenhum",
+     "automacao": "morto",
+     "evidencia": "propostas_consolidated.py:2332-2453 (aprovar/rejeitar não referenciam Lead; grep de Lead em handlers/, services/ e event_manager.py só encontra dropdown_service); models.py:7965-7972 (FKs Lead.proposta_id e Lead.obra_id comentadas como 'Vínculos automáticos' mas sem nenhuma escrita em produção — templates/crm/lead_form.html não tem campo); fechamento real é manual via crm_views.py:840 (mudar_status drag-and-drop)",
+     "o_que_falta": "handler de proposta_aprovada/rejeitada que localize o Lead (via Lead.proposta_id, que por sua vez precisaria ser gravado na criação da proposta) e mova o status; a flash em crm_views.py:930-934 até instrui o usuário a 'vincular pela edição do lead', mas o formulário não tem esse campo"
+    },
+    {
+     "dado": "vínculo Cliente na proposta criada manualmente",
+     "de": "formulário Nova Proposta",
+     "para": "Proposta.cliente_id",
+     "mecanismo": "string_digitada",
+     "automacao": "manual_redigitado",
+     "evidencia": "propostas_consolidated.py:556-560 e 651-654 (criar() grava apenas cliente_nome/email/telefone/endereco como texto; proposta.cliente_id nunca é atribuído — models.py:3549 nota 'FK adicionada pela Migração 43'); o FK só é preenchido a posteriori pelo resolver na aprovação (event_manager.py:923-929)",
+     "o_que_falta": "select/autocomplete de Cliente no formulário manual gravando proposta.cliente_id na criação (a rota /propostas/api/clientes em propostas_consolidated.py:2635 existe para busca, mas o form não persiste o id)"
+    },
+    {
+     "dado": "vínculo Cliente na proposta gerada de Orçamento",
+     "de": "Orcamento (orcamento.cliente_id)",
+     "para": "Proposta.cliente_id",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "views/orcamentos_views.py:633 (proposta.cliente_id = orc.cliente_id) e :639 (proposta.orcamento_id = orc.id); models.py:7708 (Orcamento.cliente_id FK) e models.py:3628 (Proposta.orcamento_id FK); versões herdam o FK em propostas_consolidated.py:1287",
+     "o_que_falta": "nada"
+    },
+    {
+     "dado": "CPF/CNPJ digitado no formulário de proposta",
+     "de": "formulário Nova Proposta (input cliente_cpf_cnpj)",
+     "para": "Proposta / Cliente.cnpj",
+     "mecanismo": "nenhum",
+     "automacao": "morto",
+     "evidencia": "templates/propostas/nova_proposta.html:94 (input) → propostas_consolidated.py:559 (lido para variável local cliente_documento e nunca mais usado; Proposta não tem coluna de documento); eventos emitem 'cliente_cpf_cnpj': None hardcoded em propostas_consolidated.py:1026, 2365 e 2547 e nenhum handler lê a chave; Cliente.cnpj existe (models.py:3332) mas o cliente_resolver não recebe documento",
+     "o_que_falta": "persistir o documento (coluna na Proposta ou repasse ao cliente_resolver para gravar Cliente.cnpj e usar como chave de dedup); hoje o dado digitado é descartado na própria requisição"
+    },
+    {
+     "dado": "aprovação da proposta → Cliente resolvido com dedup + Obra criada/reconciliada (a espinha de referência)",
+     "de": "Proposta (aprovar admin, alterar_status APROVADA ou portal do cliente por token)",
+     "para": "Cliente (FK) + Obra (codigo OBRnnnn, estado PLANEJAMENTO, proposta_origem_id, token portal) + back-link Proposta.obra_id",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "propostas_consolidated.py:2360-2368 (emit proposta_aprovada com raise_on_error=True, transação única da rota) → event_manager.py:882-1128 (propagar_proposta_para_obra: dedup via services/cliente_resolver.py:45-140 com cliente_id vencendo sempre, fallback de cliente sintético em event_manager.py:937-957, reconciliação de obra por obra_id/proposta_origem_id/cadeia de versões em 960-991, criação da Obra com cliente_id NOT NULL em 1023-1045, atualização de valor_contrato em aditivo com congelamento de medições emitidas em 1080-1104, back-link em 1117-1118)",
+     "o_que_falta": "nada — nenhum humano redigita nada; idempotente entre versões (v2 reconcilia em vez de duplicar) e atômico (rota faz rollback se obra_id não materializar, propostas_consolidated.py:2375-2379)"
+    },
+    {
+     "dado": "itens da proposta aprovada → itens de medição comercial, lançamento contábil por delta e cronograma da obra",
+     "de": "PropostaItem / cronograma_default_json",
+     "para": "ItemMedicaoComercial + ObraServicoCusto (via listener after_insert) + LancamentoContabil + TarefaCronograma",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "handlers/propostas_handlers.py:179-383 (handle_proposta_aprovada: delta contábil sobre a linhagem em 300-311, partidas em 359-370) e :54-176 (_propagar_proposta_para_obra: reconcilia IMC por linhagem de item em vez de acumular); cronograma em handlers/propostas_handlers.py:224-268",
+     "o_que_falta": "nada — segundo handler da mesma emissão, ordem garantida pela ordem de import em app.py (comentado em event_manager.py:1052-1057)"
+    },
+    {
+     "dado": "cliente da obra criada manualmente (sem proposta)",
+     "de": "formulário Nova Obra (select de cadastro ou texto livre)",
+     "para": "Obra.cliente_id",
+     "mecanismo": "FK",
+     "automacao": "semiautomatico",
+     "evidencia": "views/obras.py:293-430 (nova_obra: obter_ou_criar_cliente em 375-395 com fallback de tenant, obra recusada sem cliente em 392-394, FK gravada em 423)",
+     "o_que_falta": "nada quanto ao Cliente (não nasce órfã de cliente); mas nasce órfã de comercial: proposta_origem_id fica NULL, sem PropostaItem não há ItemMedicaoComercial e valor_contrato é digitado à mão (views/obras.py:330)"
+    },
+    {
+     "dado": "vínculo lead → obra ao usar o atalho 'criar obra' do CRM",
+     "de": "CRM Lead (crm.criar_obra)",
+     "para": "tela Nova Obra (main.nova_obra)",
+     "mecanismo": "nenhum",
+     "automacao": "manual_redigitado",
+     "evidencia": "crm_views.py:974-977 (redirect com cliente_id/lead_id na query string) → views/obras.py:488-502 (branch GET de nova_obra não lê request.args; nenhum pré-preenchimento) e Lead.obra_id (models.py:7969-7972) nunca escrito",
+     "o_que_falta": "nova_obra ler ?cliente_id= para pré-selecionar o Cliente e gravar lead.obra_id na criação; hoje o único efeito real do atalho é o Cliente criado/vinculado no lado do lead antes do redirect (crm_views.py:957-967)"
+    }
+   ]
+  },
+  {
+   "aresta_id": "proposta-servicos-cronograma-pesos",
+   "resumo": "A aprovação da proposta dispara o evento proposta_aprovada (propostas_consolidated.py:1021-1030), cujo handler materializa a cadeia comercial inteira em transação atômica: PropostaItem vira ItemMedicaoComercial (com reconciliação de revisões por linhagem), o listener after_insert cria o ObraServicoCusto pareado, e materializar_cronograma gera TarefaCronograma + pesos ItemMedicaoCronogramaTarefa quando há snapshot pré-configurado. A cadeia é automática no lado comercial/cronograma, mas tem dois buracos: a obra nasce sem nenhum ServicoObraReal (o RDO lista serviços dessa tabela, que só é populada por redigitação manual) e o cronograma importado de .mpp/.xml entra órfão da cadeia comercial (sem gerada_por_proposta_item_id nem vínculo IMC, fechável só à mão). O preço do catálogo congela como snapshot na aprovação e nunca recalcula automaticamente.",
+   "estado_geral": "parcial",
+   "elos": [
+    {
+     "dado": "itens comerciais da proposta (nome, valor, quantidade, servico_id)",
+     "de": "PropostaItem (models.py:3787)",
+     "para": "ItemMedicaoComercial da obra (models.py:6611)",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "propostas_consolidated.py:1021-1030 (emit proposta_aprovada) → handlers/propostas_handlers.py:54-151 (_propagar_proposta_para_obra; criação em 141-151, atualização de revisão em 131-139 via linhagem proposta_item_origem_id)",
+     "o_que_falta": "nada — inclusive reconcilia revisões (Fase 0.6/D1): item da v2 ATUALIZA o IMC da v1 em vez de duplicar; itens removidos da revisão são mantidos com warning (propostas_handlers.py:161-167)"
+    },
+    {
+     "dado": "valor orçado e vínculo com catálogo (valor_comercial → valor_orcado, servico_id → servico_catalogo_id)",
+     "de": "ItemMedicaoComercial",
+     "para": "ObraServicoCusto (planejamento de custo, models.py:7030)",
+     "mecanismo": "listener",
+     "automacao": "automatico",
+     "evidencia": "models.py:7450-7487 (@listens_for ItemMedicaoComercial 'after_insert' → _item_medicao_auto_cria_custo, idempotente por item_medicao_comercial_id)",
+     "o_que_falta": "nada na criação; mas o listener engole exceção com log (models.py:7485-7487) — falha silenciosa deixaria IMC sem OSC pareado"
+    },
+    {
+     "dado": "estrutura de tarefas do cronograma (árvore 3 níveis com datas, durações, predecessoras)",
+     "de": "PropostaItem + Proposta.cronograma_default_json",
+     "para": "TarefaCronograma (models.py:5798) com linhagem gerada_por_proposta_item_id (models.py:5882)",
+     "mecanismo": "evento",
+     "automacao": "semiautomatico",
+     "evidencia": "handlers/propostas_handlers.py:224-267 (_materializar_cronograma_se_houver) → services/cronograma_proposta.py:483-798 (materializar_cronograma; gerada_por_proposta_item_id setado em 634 e 705; idempotência dupla em 509-529)",
+     "o_que_falta": "só materializa automaticamente se o admin pré-configurou cronograma_default_json ANTES da aprovação (Task #200); sem snapshot a obra nasce em 'cronograma pendente' e cai no gate de revisão na primeira visita (propostas_handlers.py:264-267 — log explícito)"
+    },
+    {
+     "dado": "peso de medição de cada tarefa-folha (criador 1: aprovação — peso proporcional a duracao_estimada_horas da SubatividadeMestre, fallback divisão igual)",
+     "de": "PropostaItem/IMC via materializar_cronograma",
+     "para": "ItemMedicaoCronogramaTarefa (models.py:6644)",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "services/cronograma_proposta.py:730-773 (vínculo em 760-773; warning de fallback #102 em 737-749 quando nenhuma folha tem horas)",
+     "o_que_falta": "nada — auto-casamento IMC↔tarefa fecha na aprovação; reusa vínculo existente e só atualiza peso (Task #144, linha 758-765)"
+    },
+    {
+     "dado": "peso de medição (criador 2: import JSON físico-financeiro — peso = dias da tarefa do .mpp)",
+     "de": "payload JSON (eap[].cronograma.tarefas_mpp) via evento proposta_aprovada com skip_contabil=True",
+     "para": "ItemMedicaoCronogramaTarefa",
+     "mecanismo": "arquivo_import",
+     "automacao": "semiautomatico",
+     "evidencia": "services/importacao_fisico_financeiro.py:225-242 (_vincular_etapa_tarefas, add em 240-242, peso=dias) + 572-578 (emit canônico que cria IMC antes) + 182-223 (_materializar_cronograma_mpp cria as tarefas fiéis ao outline)",
+     "o_que_falta": "nada no elo em si; etapa de PERÍODO (sem tarefas_mpp) deliberadamente não vincula — é custo, não medição física; tarefa não encontrada vira aviso, não erro (linha 236-238)"
+    },
+    {
+     "dado": "peso de medição (criador 3: vínculo manual na tela de gestão de itens)",
+     "de": "formulário (tarefa_id + peso digitados pelo operador)",
+     "para": "ItemMedicaoCronogramaTarefa",
+     "mecanismo": "string_digitada",
+     "automacao": "manual_redigitado",
+     "evidencia": "medicao_views.py:342-397 (vincular_tarefa; valida peso ≤100 e soma dos pesos do item ≤100 em 372-383)",
+     "o_que_falta": "nada estruturalmente — é a válvula de escape para tarefas órfãs (elo do .mpp abaixo); mas o operador digita peso a peso"
+    },
+    {
+     "dado": "percentual executado do item comercial (consumo dos pesos: % ponderado das tarefas)",
+     "de": "TarefaCronograma.percentual_concluido × ItemMedicaoCronogramaTarefa.peso",
+     "para": "medição comercial / faturamento (calcular_percentual_item)",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "services/medicao_service.py:48-65 (soma ponderada) e 88-92 (exige soma de pesos = 100% para gerar medição)",
+     "o_que_falta": "calcular_percentual_item NÃO filtra TarefaCronograma.ativa — tarefa arquivada por um import de .mpp posterior continua pesando no % do item (medicao_service.py:59-63 usa query.get sem filtro)"
+    },
+    {
+     "dado": "serviços da obra para o RDO (lista de serviços apontáveis)",
+     "de": "PropostaItem (deveria nascer da proposta aprovada)",
+     "para": "ServicoObraReal (models.py:603) — fonte da lista de serviços do RDO (views/rdo.py:646-651, 1407)",
+     "mecanismo": "nenhum",
+     "automacao": "manual_redigitado",
+     "evidencia": "grep confirma zero referência a proposta em todos os criadores de ServicoObraReal: views/api.py:889 (POST manual), crud_servico_obra_real.py:105, api_servicos_obra_limpa.py:127 — a obra aprovada nasce com IMC/OSC/cronograma mas ZERO ServicoObraReal",
+     "o_que_falta": "um handler/passo na aprovação que crie ServicoObraReal a partir dos PropostaItem com servico_id — hoje o operador re-adiciona serviço por serviço via tela/API para o RDO poder apontar"
+    },
+    {
+     "dado": "tarefas do cronograma importado (.mpp/.xml) → vínculo com a cadeia comercial",
+     "de": "arquivo .mpp/.xml via views/cronograma_importacao.py:114 (upload) e :515 (aplicar)",
+     "para": "TarefaCronograma sem gerada_por_proposta_item_id e sem ItemMedicaoCronogramaTarefa (órfã)",
+     "mecanismo": "arquivo_import",
+     "automacao": "manual_redigitado",
+     "evidencia": "services/cronograma_versao_service.py:552-570 (INSERT de TarefaCronograma no _aplicar — campos não incluem gerada_por_proposta_item_id nem criam vínculo IMC); :369-397 (_transferir_fusao migra quantidade/percentual mas NÃO os vínculos ItemMedicaoCronogramaTarefa das tarefas arquivadas)",
+     "o_que_falta": "sim, entra órfã: casamento automático tarefa-importada↔IMC não existe (a reconciliação casa tarefa↔tarefa, cronograma_reconciliacao.py:298, nunca tarefa↔item comercial); fechamento só manual via medicao_views.py:342-397; e vínculo de tarefa arquivada fica apontando para tarefa inativa (ver elo do percentual)"
+    },
+    {
+     "dado": "preço do catálogo na obra (Servico.preco_venda_unitario → valor comercial/orçado)",
+     "de": "Servico (catálogo)",
+     "para": "PropostaItem.preco_unitario (snapshot, models.py:3808-3809), IMC.valor_comercial, OSC.valor_orcado",
+     "mecanismo": "FK",
+     "automacao": "semiautomatico",
+     "evidencia": "models.py:3808-3809 (comentário: 'vínculo com catálogo... snapshot fica em preco_unitario'); congela na aprovação via elos 1-2; recálculo SÓ sob ação explícita: catalogo_views.py:871-887 (flag atualizar_preco no vínculo IMC↔serviço recalcula qtd×preco_venda_unitario e propaga ao OSC) e medicao_views.py:267-276 (fallback qtd×preço ao editar item sem valor)",
+     "o_que_falta": "confirma-se: congela e nunca recalcula automaticamente — mudar o preço no catálogo não repropaga a nenhuma obra; o recálculo existe mas exige o operador acionar item a item (checkbox atualizar_preco); o snapshot congelado é decisão de projeto (proposta é contrato), o buraco é não haver aviso de defasagem"
+    }
+   ]
+  },
+  {
+   "aresta_id": "ponto-alocacao-rdo-custo",
+   "resumo": "Conexão fragmentada em dois trilhos paralelos que não se falam: (a) alocação→ponto só roda por botão manual e está quebrada para registros novos (RegistroPonto criado sem admin_id NOT NULL) e, quando roda sobre registro existente, sobrescreve a batida real pelo turno planejado; (b) o RDO não lê nada do ponto/alocação — funcionários são reselecionados no formulário (prefill vem do último RDO, não da alocação). O custo de mão de obra chega automaticamente por dois caminhos concorrentes (handler ponto_registrado a cada batida e finalização de RDO, esta com DOIS mecanismos simultâneos: evento rdo_finalizado + chamada direta gerar_custos_mao_obra_rdo), com anti-duplicação parcial; encargos patronais são calculados mas nunca chegam ao custo da obra.",
+   "estado_geral": "parcial",
+   "elos": [
+    {
+     "dado": "presença/turno planejado do funcionário alocado no dia",
+     "de": "Allocation/AllocationEmployee (tela alocação semanal, equipe_views.py:977)",
+     "para": "RegistroPonto",
+     "mecanismo": "nenhum",
+     "automacao": "semiautomatico",
+     "evidencia": "models.py:4532-4592 (sincronizar_com_ponto); equipe_views.py:1216-1236 (único gatilho: endpoint manual api_sincronizar_ponto_manual → models.py:4683-4712); equipe_views.py:1013 (salvar alocação NÃO chama sync)",
+     "o_que_falta": "chamada automática do sync ao salvar alocação (ou cron real — nenhum scheduler registra processar_lancamentos_automaticos em app.py/main.py); corrigir criação de RegistroPonto sem admin_id (models.py:4562-4570 viola NOT NULL de models.py:797 → IntegrityError/rollback, caminho de criação está morto); parar de sobrescrever batida real: models.py:4544-4559 troca hora_entrada/hora_saida reais pelo turno planejado quando o registro já existe"
+    },
+    {
+     "dado": "funcionários presentes e horas do dia (do ponto/alocação) para pré-carregar a mão de obra do RDO",
+     "de": "RegistroPonto / Allocation",
+     "para": "RDOMaoObra (form novo RDO)",
+     "mecanismo": "nenhum",
+     "automacao": "manual_redigitado",
+     "evidencia": "views/rdo.py não contém nenhuma referência a RegistroPonto/Allocation (grep vazio); RDOMaoObra nasce do form: views/rdo.py:837-844, crud_rdo_completo.py:405; prefill vem do ÚLTIMO RDO, não do ponto: views/rdo.py:4550-4583, views/rdo.py:2261-2308",
+     "o_que_falta": "endpoint/serviço que leia RegistroPonto (ou AllocationEmployee) da obra+data e pré-carregue a lista de RDOMaoObra; hoje o encarregado redigita quem trabalhou"
+    },
+    {
+     "dado": "horas trabalhadas/diária do funcionário viram custo de mão de obra da obra",
+     "de": "RegistroPonto (batida facial ponto_views.py:1735, manual views/admin.py:185, ponto_service.py:145, import ponto_views.py:1514, api views/api.py:419)",
+     "para": "CustoObra (categoria PONTO_ELETRONICO) + GestaoCustoPai/Filho (diaristas)",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "ponto_service.py:141-150 emite ponto_registrado a CADA batida (entrada/saida_almoco/volta_almoco/saida); handler calcular_horas_folha event_manager.py:302-506 — diarista: GestaoCustoFilho só na 'entrada' com idempotência dupla (event_manager.py:344-373); horista: CustoObra event_manager.py:487-503",
+     "o_que_falta": "nada para diaristas; para horistas falta chave de idempotência no CustoObra (event_manager.py:487-503 cria sem checar existente — cada emissão com horas>0 pode duplicar); registros criados por sincronizar_com_ponto não emitem o evento (models.py:4532-4592 sem EventManager) — ponto vindo da alocação não gera custo"
+    },
+    {
+     "dado": "diária/horas dos funcionários do RDO viram custo de mão de obra (caminho 1: evento)",
+     "de": "RDO finalizado (views/rdo.py)",
+     "para": "CustoObra (categoria RDO) + GestaoCustoFilho (origem rdo_mao_obra)",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "views/rdo.py:1756, 2153, 4498 emitem rdo_finalizado; handler lancar_custos_rdo event_manager.py:589-780 — CustoObra idempotente por rdo_id+func+data (event_manager.py:707-729), GestaoCustoFilho dedup por origem+data+entidade (event_manager.py:734-750); só lança se funcionario.valor_diaria>0 (event_manager.py:649-652)",
+     "o_que_falta": "cobertura de horista sem valor_diaria (skip silencioso no handler); nada mais — automático após o clique manual de finalizar"
+    },
+    {
+     "dado": "diária/horas dos funcionários do RDO viram custo (caminho 2: chamada direta, paralelo ao caminho 1)",
+     "de": "RDO salvo/finalizado (crud_rdo_completo.py, rdo_editar_sistema.py, views/rdo.py)",
+     "para": "GestaoCustoFilho (origem rdo_custo_diario ou rdo_mao_obra)",
+     "mecanismo": "listener",
+     "automacao": "automatico",
+     "evidencia": "crud_rdo_completo.py:468-469 e 578-579, views/rdo.py:2145-2146, 3422-3423, 4487-4488, rdo_editar_sistema.py:550-551 chamam services/rdo_custos.py:316 (gerar_custos_mao_obra_rdo); anti-dup contra o ponto em rdo_custos.py:368-373 (pula se existe RegistroPonto no dia); só tenant V2 e status Finalizado (rdo_custos.py:334-344)",
+     "o_que_falta": "unificação com o caminho 1: views/rdo.py:2145+2153 executa AMBOS no mesmo request; dedup entre caminhos depende de origem_tabela coincidir — quando existe RDOCustoDiario a origem vira 'rdo_custo_diario' (rdo_custos.py:383-386) e a checagem do handler (event_manager.py:737, só 'rdo_mao_obra') não a enxerga → risco de custo duplicado; crud_rdo_completo NÃO emite rdo_finalizado (nenhum CustoObra categoria RDO nesse fluxo)"
+    },
+    {
+     "dado": "vínculo alocação de equipe → RDO gerado",
+     "de": "AlocacaoEquipe",
+     "para": "RDO (rdo_gerado_id)",
+     "mecanismo": "FK",
+     "automacao": "morto",
+     "evidencia": "models.py:2107 (FK), models.py:2108 (flag rdo_gerado); nunca atribuída em produção — grep só acha limpeza defensiva (crud_rdo_completo.py:532, views/rdo.py:551-552, services/importacao_fisico_financeiro.py:372-373) e uma leitura sempre-nula (almoxarifado_utils.py:419); AlocacaoEquipe( jamais instanciada fora de models/tests (grep vazio)",
+     "o_que_falta": "todo o fluxo: nenhum código cria AlocacaoEquipe nem gera RDO a partir de alocação; a tela viva de alocação usa Allocation/AllocationEmployee (equipe_views.py), modelo distinto sem ponte com RDO"
+    },
+    {
+     "dado": "encargos patronais (FGTS + INSS patronal 20%) calculados na folha",
+     "de": "services/folha_service.py:966 (calcular_encargos_patronais, chamado em folha_service.py:1044)",
+     "para": "custo da obra (CustoObra/GestaoCustoFilho/FolhaProcessada)",
+     "mecanismo": "nenhum",
+     "automacao": "morto",
+     "evidencia": "folha_pagamento_views.py:176-188 persiste FolhaPagamento só com fgts — 'encargos_patronais' e 'custo_total_empresa' do dict (folha_service.py:1092-1094) são descartados (FolhaPagamento não tem campo, models.py:2762+); FolhaProcessada tem os campos (models.py:5347-5348) mas salvar_folha_processada (folha_service.py:1105) só é chamada por processar_e_salvar_folha_obra (folha_service.py:1378) que NÃO tem nenhum chamador (grep vazio); views/obras.py:1891-1892 lê obter_dados_folha_obra de tabela nunca populada; handler folha_processada (event_manager.py:1135) gera LancamentoContabil, não custo de obra",
+     "o_que_falta": "chamador de processar_e_salvar_folha_obra (o pipeline inteiro existe e está desligado) ou lançamento dos encargos em GestaoCustoFilho/CustoObra por obra"
+    },
+    {
+     "dado": "equipamento usado no dia (nome, quantidade, horas)",
+     "de": "RDOEquipamento (form do RDO)",
+     "para": "frota (Veiculo/UsoVeiculo/custo FROTA)",
+     "mecanismo": "string_digitada",
+     "automacao": "manual_redigitado",
+     "evidencia": "models.py:1347 nome_equipamento String(100) sem FK; digitado livre no form (crud_rdo_completo.py:424-431); consumidores só exibem (portal_obras_views.py:959, services/rdo_pdf_service.py:498, rdo_hash.py:130); custo FROTA vem de outro fluxo: evento veiculo_usado → event_manager.py:516-579 via UsoVeiculo, sem ligação com RDOEquipamento",
+     "o_que_falta": "FK para Veiculo (ou lookup por nome) e handler que converta horas_uso em custo; bônus quebrado: crud_rdo_completo.py:428-430 passa kwargs horas_utilizacao/observacoes inexistentes no modelo (campo real é horas_uso, models.py:1349) → TypeError no construtor, derrubando o salvamento do RDO quando há equipamentos nesse caminho"
+    }
+   ]
+  },
+  {
+   "aresta_id": "rdo-cronograma-medicao",
+   "resumo": "O apontamento de RDO atravessa para o cronograma de forma totalmente automática (FK + rollup síncrono em atualizar_percentual_tarefa) e daí para a medição por dois caminhos concorrentes: o ponderado por pesos ItemMedicaoCronogramaTarefa (gate soma==100) e a média simples do portal que vira dinheiro direto em MedicaoObra.valor_medido. O trilho V1 (RDOServicoSubatividade.percentual_conclusao) segue vivo em paralelo, só encostando na medição como fallback; o elo subatividade_mestre_id entre os dois trilhos existe nos dois modelos mas está morto como ponte de progresso. As curvas planejadas só são replanejadas ao aplicar/restaurar versão — o editor v2 recalcula datas sem replanejar curvas.",
+   "estado_geral": "parcial",
+   "elos": [
+    {
+     "dado": "producao do dia apontada no RDO (quantidade ou % acumulado) por tarefa do cronograma",
+     "de": "tela de apontamento do RDO (apontar_producao / salvar_rdo_flexivel / import de atualizacao)",
+     "para": "RDOApontamentoCronograma (dupla escrita legado+semantico M02)",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "services/cronograma_apontamento_service.py:311-498 (servico unico, UPSERT por rdo+tarefa); callers: cronograma_views.py:2686-2699, services/atualizacao_rdos.py:283; views/rdo.py:968-987 ainda constroi o modelo DIRETO sem passar pelo servico (formula duplicada)",
+     "o_que_falta": "nada para o elo em si; a rota views/rdo.py:924-993 deveria delegar ao servico unico — hoje replica acumulado/clamp/snapshot em linha"
+    },
+    {
+     "dado": "percentual_concluido da tarefa (rollup do ultimo apontamento + producao de subempreitada)",
+     "de": "RDOApontamentoCronograma + RDOSubempreitadaApontamento",
+     "para": "TarefaCronograma.percentual_concluido (persistido)",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "utils/cronograma_engine.py:1161-1253 (atualizar_percentual_tarefa, 4 ramos: percentual_livre / quantitativo / zero / percentual); chamado sincronamente em cronograma_views.py:2716 e views/rdo.py:993 apos cada gravacao; recomputo retroativo em services/cronograma_apontamento_service.py:182-308 (recomputar_cadeia) disparado por exclusao de RDO em views/rdo.py:594-596",
+     "o_que_falta": "nada"
+    },
+    {
+     "dado": "percentual de conclusao da subatividade (trilho V1, digitado como % no form do RDO)",
+     "de": "form do RDO (campos subatividade_<id>_percentual)",
+     "para": "RDOServicoSubatividade.percentual_conclusao",
+     "mecanismo": "string_digitada",
+     "automacao": "semiautomatico",
+     "evidencia": "escrita: crud_rdo_completo.py:345-371 e rdo_editar_sistema.py:287/313 (delete-and-recreate por edicao), views/rdo.py:1476-1546; leitura: views/rdo.py:1309/1349 (progresso do dia), views/rdo.py:2524-2539 (progresso geral V1 = max por nome_subatividade + media), portal_obras_views.py:886 (exibicao)",
+     "o_que_falta": "nenhum handler leva percentual_conclusao para TarefaCronograma — o trilho V1 nunca alimenta o cronograma; quem opera nos dois trilhos digita o avanco duas vezes"
+    },
+    {
+     "dado": "avanco da subatividade como fallback da medicao (max percentual_conclusao em RDOs Finalizados por servico_id)",
+     "de": "RDOServicoSubatividade.percentual_conclusao",
+     "para": "ItemMedicaoComercial.percentual_executado_acumulado (quando o IMC nao tem vinculos de cronograma)",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "services/medicao_service.py:234-248 (_recalcular_imc_avanco, fallback por item.servico_id, filtro RDO.status in Finalizado), acionado por recalcular_medicao_obra (services/medicao_service.py:275-386)",
+     "o_que_falta": "nada — e o unico ponto de producao onde o trilho V1 encosta na medicao, e so na ausencia de vinculos ItemMedicaoCronogramaTarefa"
+    },
+    {
+     "dado": "identidade da subatividade do catalogo compartilhada pelos dois trilhos (subatividade_mestre_id)",
+     "de": "TarefaCronograma.subatividade_mestre_id (models.py:5853-5857)",
+     "para": "RDOServicoSubatividade.subatividade_mestre_id (models.py:1952)",
+     "mecanismo": "FK",
+     "automacao": "morto",
+     "evidencia": "nenhum join TC<->RSS por subatividade_mestre_id em codigo de producao (grep exaustivo); usos reais sao laterais: services/vinculo_mao_obra.py:99-111 (resolver composicao de custo a partir de qualquer trilho), cronograma_views.py:3813-3856 (produtividade, so lado RSS), services/cronograma_dedup.py:80 (chave de dedupe), listener de snapshot models.py:1990-2012",
+     "o_que_falta": "a leitura que fecharia o elo: sincronizar/derivar progresso entre RSS.percentual_conclusao e a TarefaCronograma de mesmo subatividade_mestre_id — a chave existe dos dois lados e ninguem a usa para isso"
+    },
+    {
+     "dado": "percentual_concluido das tarefas ponderado por pesos por item comercial (gate soma pesos == 100)",
+     "de": "TarefaCronograma.percentual_concluido",
+     "para": "MedicaoObraItem / ItemMedicaoComercial (medicao quinzenal)",
+     "mecanismo": "FK",
+     "automacao": "semiautomatico",
+     "evidencia": "services/medicao_service.py:48-65 (calcular_percentual_item, media ponderada por ItemMedicaoCronogramaTarefa.peso), gate ==100 em services/medicao_service.py:87-92; pesos digitados manualmente em medicao_views.py:372-396 (com validacao <=100) ou gerados por services/cronograma_proposta.py:730-770 e services/importacao_fisico_financeiro.py:231-240; geracao disparada por botao em medicao_views.py:469-470",
+     "o_que_falta": "nada estrutural; o disparo da quinzenal e manual (botao) e os pesos sao digitados — nao ha geracao agendada"
+    },
+    {
+     "dado": "avanco medido acumulado convertido em dinheiro (ContaReceber unica OBRA_MEDICAO)",
+     "de": "ItemMedicaoComercial.valor_executado_acumulado",
+     "para": "ContaReceber (origem_tipo=OBRA_MEDICAO) via recalcular_medicao_obra",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "views/rdo.py:1756 emite rdo_finalizado -> event_manager.py:1418-1433 (recalcular_medicao_apos_rdo) -> services/medicao_service.py:275-386 (UPSERT da CR, status PENDENTE/PARCIAL/QUITADA); tambem chamado ao gerar/fechar medicao (services/medicao_service.py:171,191)",
+     "o_que_falta": "nada — este e o unico elo por evento do nucleo e fecha sozinho a cada RDO finalizado"
+    },
+    {
+     "dado": "medicao do portal por media simples (percentual x valor_contrato vira valor_medido)",
+     "de": "TarefaCronograma.percentual_concluido (tarefas responsavel=empresa, cronograma interno)",
+     "para": "MedicaoObra.percentual_executado / valor_medido persistidos",
+     "mecanismo": "FK",
+     "automacao": "semiautomatico",
+     "evidencia": "portal_obras_views.py:750-774: media simples (linha 754) x obra.valor_contrato (757-758) gravada em MedicaoObra (760-774) com status PENDENTE — SIM, vira dinheiro persistido, mas SEM itens, sem pesos e sem ContaReceber propria; formula concorrente da ponderada de services/medicao_service.py:48-65",
+     "o_que_falta": "unificacao com o trilho ponderado: duas rotas geram MedicaoObra com formulas diferentes para a mesma obra (o comentario em 745-749 documenta divergencia de 25% ja observada)"
+    },
+    {
+     "dado": "progresso da obra exibido em dashboards/portal/listagens",
+     "de": "TarefaCronograma.percentual_concluido + RDOApontamentoCronograma + RDOServicoSubatividade",
+     "para": "cards de RDO, header do cronograma, portal do cliente, detalhe da obra",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "pelo menos 5 formulas distintas em ~20 call-sites: (a) calcular_progresso_geral_obra_v2 (ponderada por duracao) em portal_obras_views.py:178 (4 usos no arquivo), crud_rdo_completo.py:125, cronograma_views.py:474, views/rdo.py (12 usos); (b) avg simples de percentual_concluido em cronograma_views.py:358; (c) media simples da medicao do portal em portal_obras_views.py:754; (d) V1 max-por-subatividade + media em views/rdo.py:2524-2539; (e) soma de pontos por RDO em views/rdo.py:1349",
+     "o_que_falta": "consolidacao: as leituras sao automaticas mas cada tela pode exibir um numero diferente para a mesma obra"
+    },
+    {
+     "dado": "datas recalculadas a partir dos vinculos tipados TI/II/TT/IT (scheduler v2)",
+     "de": "TarefaVinculo + apontamentos (ancoras de tarefa iniciada)",
+     "para": "TarefaCronograma.data_inicio/data_fim + rollup de percentuais",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "services/cronograma_scheduler.py:522-585 (recalcular_obra: 3 queries — tarefas, TarefaVinculo, apontamentos IN; ancora via ids_tarefas_iniciadas em :486-494 que le apontamento OU data_entrega_real OU percentual_concluido>0); 6 call-sites em cronograma_views.py:824,1108,1218,1265,1374,1639",
+     "o_que_falta": "nada para datas; ver elo seguinte para as curvas"
+    },
+    {
+     "dado": "curvas planejadas (percentual_planejado dos apontamentos) replanejadas apos mudanca de datas",
+     "de": "TarefaCronograma (datas vigentes)",
+     "para": "RDOApontamentoCronograma.percentual_planejado",
+     "mecanismo": "FK",
+     "automacao": "semiautomatico",
+     "evidencia": "utils/cronograma_engine.py:1057-1125 (replanejar_curvas_obra — nunca toca o realizado); UNICO caller de producao: services/cronograma_versao_service.py:443 (apos aplicar/restaurar versao); os 6 recalculos do editor v2 (cronograma_views.py:824-1639) e recalcular_cronograma (utils/cronograma_engine.py:616) NAO o chamam",
+     "o_que_falta": "chamada a replanejar_curvas_obra (ou equivalente) apos recalcular_obra do editor v2 — editar datas pela UI deixa percentual_planejado dos apontamentos orfao ate alguem aplicar uma versao"
+    }
+   ]
+  },
+  {
+   "aresta_id": "medicao-receber-caixa-contabilidade",
+   "resumo": "A medição alimenta automaticamente uma ContaReceber única por obra (OBR-MED, upsert em recalcular_medicao_obra, disparado por gerar/fechar medição e pelo evento rdo_finalizado). Dali em diante a cadeia degrada: a baixa manual da CR não cria FluxoCaixa nem lançamento contábil (o campo conta_contabil_codigo nasce vazio na CR de medição), o import de extrato cria CR nova em vez de baixar a OBR-MED, transferências entre contas são detectadas no preview mas descartadas no confirm, e o pagamento de custos V2 chama a contabilidade com tipo 'DESPESA_GERAL' que não existe no MAPEAMENTO_CONTABIL — retorna False em silêncio.",
+   "estado_geral": "parcial",
+   "elos": [
+    {
+     "dado": "valor medido acumulado da obra vira saldo a faturar (CR OBR-MED)",
+     "de": "MedicaoObra / RDO finalizado",
+     "para": "ContaReceber (origem_tipo='OBRA_MEDICAO')",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "services/medicao_service.py:275-380 (upsert, numero_documento OBR-MED em :336); disparos: services/medicao_service.py:171 (gerar), :191 (fechar_medicao), event_manager.py:1418-1433 (handler rdo_finalizado)",
+     "o_que_falta": "nada"
+    },
+    {
+     "dado": "recebimento da CR entra no caixa (FluxoCaixa ENTRADA)",
+     "de": "financeiro_views.py:633 receber_conta (baixa manual)",
+     "para": "FluxoCaixa",
+     "mecanismo": "nenhum",
+     "automacao": "manual_redigitado",
+     "evidencia": "financeiro_views.py:633-673 e financeiro_service.py:297-395 — nenhum FluxoCaixa() criado; o lado pagar tem checkbox criar_fluxo_caixa (financeiro_views.py:391 e FC em :407), o lado receber não tem equivalente; para aparecer no caixa o usuário redigita via novo_fluxo_caixa (financeiro_views.py:776)",
+     "o_que_falta": "criar FluxoCaixa(tipo_movimento='ENTRADA', referencia_tabela='conta_receber') na baixa, espelhando o que pagar_conta já faz"
+    },
+    {
+     "dado": "entrada do extrato bancário reconhecida como recebimento da obra",
+     "de": "Import de extrato (ImportacaoFluxoCaixa.importar)",
+     "para": "ContaReceber",
+     "mecanismo": "arquivo_import",
+     "automacao": "semiautomatico",
+     "evidencia": "services/importacao_excel.py:2469-2483 cria SEMPRE ContaReceber nova (dedupe só por cliente+valor+data em :2205-2213); nunca consulta a CR OBRA_MEDICAO de services/medicao_service.py:336 — se PAGO, cria FluxoCaixa em :2489-2503",
+     "o_que_falta": "matching da entrada contra a CR OBR-MED da obra (baixa parcial via baixar_recebimento) em vez de criar CR paralela — hoje a receita da obra fica duplicada entre OBR-MED e a CR do import"
+    },
+    {
+     "dado": "baixa (pagamento/recebimento) vira partidas dobradas (LancamentoContabil)",
+     "de": "baixar_recebimento / baixar_pagamento",
+     "para": "LancamentoContabil + PartidaContabil",
+     "mecanismo": "string_digitada",
+     "automacao": "manual_redigitado",
+     "evidencia": "financeiro_service.py:332 (recebimento) e :121 (pagamento) — gate 'if conta.conta_contabil_codigo'; a CR OBR-MED nasce sem esse campo (services/medicao_service.py:333-352) e a CR do import também (services/importacao_excel.py:2469-2483), logo a baixa de medição não gera partida nenhuma; V2 auto só cobre o lado pagar (financeiro_service.py:178-196, origem COMPRA/FOLHA) e o MAPEAMENTO_CONTABIL não tem nenhuma operação de receita (contabilidade_utils.py:1536-1543)",
+     "o_que_falta": "preencher conta_contabil_codigo (ex.: 4.1.01.001) na CR OBR-MED no upsert, ou criar operação V2 'recebimento_cliente' no MAPEAMENTO_CONTABIL"
+    },
+    {
+     "dado": "saldo da conta bancária (BancoEmpresa.saldo_atual)",
+     "de": "baixas e movimentos de caixa",
+     "para": "BancoEmpresa.saldo_atual (models.py:2415)",
+     "mecanismo": "FK",
+     "automacao": "semiautomatico",
+     "evidencia": "atualiza SÓ em financeiro_service.py:114 (baixar_pagamento -=) e :325 (baixar_recebimento +=), e só quando o usuário escolhe banco_id no form; NÃO atualizam: import de extrato (services/importacao_excel.py:2489), lançamento manual novo_fluxo_caixa (financeiro_views.py:776), pagamento de GCP com banco_id (gestao_custos_views.py:812 e :957); o dashboard soma saldo_atual como saldo_inicial (financeiro_service.py:457)",
+     "o_que_falta": "atualizar saldo_atual em todos os caminhos que criam FluxoCaixa com banco_id (import, GCP, lançamento manual) — hoje o saldo diverge do extrato importado"
+    },
+    {
+     "dado": "transferência interna entre contas do extrato",
+     "de": "Import de extrato (preview)",
+     "para": "FluxoCaixa / saldos dos dois bancos",
+     "mecanismo": "arquivo_import",
+     "automacao": "morto",
+     "evidencia": "detectada em services/importacao_excel.py:1961-1973 (_eh_transferencia_interna em :1357, com banco_origem_id/banco_destino_id) e devolvida no preview (:2122); atravessa o payload assinado (importacao_views.py:453, :473, :550, :701) mas o confirm passa só entradas+saidas para importar (importacao_views.py:942-947) e importar() nunca lê dados['transferencias'] (services/importacao_excel.py:2129-2553)",
+     "o_que_falta": "consumir a lista no importar(): criar par SAIDA/ENTRADA de FluxoCaixa (ou ajuste de saldo) usando banco_origem_id/banco_destino_id já resolvidos no preview — a estrutura existe e morre no descarte"
+    },
+    {
+     "dado": "operação contábil 'DESPESA_GERAL' (pagamento de custo V2 genérico)",
+     "de": "gestao_custos_views (aprovar+pagar e pagar GCP)",
+     "para": "MAPEAMENTO_CONTABIL / partidas dobradas",
+     "mecanismo": "nenhum",
+     "automacao": "morto",
+     "evidencia": "gestao_custos_views.py:838-847 e :986-995 chamam gerar_lancamento_contabil_automatico(tipo_operacao='DESPESA_GERAL'); MAPEAMENTO_CONTABIL (contabilidade_utils.py:1536-1543) só tem compra_material, pagamento_fornecedor, despesa_alimentacao, despesa_transporte, folha_pagamento, pagamento_salario — a chave inexistente cai no return False com warning (contabilidade_utils.py:1685-1687)",
+     "o_que_falta": "adicionar 'DESPESA_GERAL' ao MAPEAMENTO_CONTABIL (ex.: D 6.1.02.x / C 1.1.01.002) ou mapear por tipo_categoria do GCP — hoje todo pagamento pela tela Gestão de Custos falha em silêncio na contabilidade"
+    },
+    {
+     "dado": "custo V2 (GestaoCustoFilho/GCP) refletido na contabilidade",
+     "de": "módulos que criam GCF",
+     "para": "LancamentoContabil via gerar_lancamento_contabil_automatico (contabilidade_utils.py:1668)",
+     "mecanismo": "listener",
+     "automacao": "semiautomatico",
+     "evidencia": "chamadores efetivos: alimentacao_views.py:519 (despesa_alimentacao, gate v2 em :518), compras_views.py:775 (compra_material, só tipo_compra normal), folha_pagamento_views.py:281 (folha_pagamento, gate is_v2_active :280), transporte_views.py:254 (despesa_transporte), financeiro_service.py:188 (pagamento_fornecedor/pagamento_salario). FICAM DE FORA (criam GCF sem nenhuma chamada contábil): frota_views.py:632 e reembolso_views.py:14 (via registrar_custo_automatico, utils/financeiro_integration.py:208 — a função não chama contabilidade), diárias em event_manager.py:379-385, almoxarifado em event_manager.py:230-241, lançamento manual de GCF em gestao_custos_views.py:308/:1108/:1393, e os dois imports (services/importacao_excel.py:1154 e :2368)",
+     "o_que_falta": "mover a chamada contábil para dentro de registrar_custo_automatico (ou um listener de GCF) em vez de replicá-la view a view — frota, reembolso, diárias, almoxarifado, gestão manual e importações nunca chegam à contabilidade"
+    }
+   ]
+  },
+  {
+   "aresta_id": "compras-estoque-custo-pagar",
+   "resumo": "A cadeia tem um núcleo transacional forte: o pedido de compra gera, num único commit, GestaoCustoPai/Filho + ContaPagar por parcela + entrada (e saída imediata se houver obra) no almoxarifado, com dedup por pedido_compra_id. Nas bordas ela degrada: o mapa de cotação só serve de trava de alçada (a proposta vencedora é redigitada no pedido), a entrada manual com a mesma NF duplica custo, a saída central→obra não move custo nenhum, e a frota soma três camadas de custo divergentes (R$0,80/km estimado + despesa real + GCP) sem conciliação, enquanto o equipamento do RDO é string solta sem ponte com a frota.",
+   "estado_geral": "parcial",
+   "elos": [
+    {
+     "dado": "vínculo requisição ↔ mapa de cotação (trava de alçada)",
+     "de": "MapaConcorrenciaV2 (tela de cotação)",
+     "para": "RequisicaoCompra / aprovação por alçada",
+     "mecanismo": "FK",
+     "automacao": "semiautomatico",
+     "evidencia": "models.py:5533-5535 (FK mapa_v2_id); compras_views.py:1302-1311,1344 (id vem digitado/selecionado no form); services/alcada_compras.py:146-158,179-181 (gate: mapa concluído com >=2 fornecedores)",
+     "o_que_falta": "nada para a trava; mas o vínculo é escolhido à mão no form da requisição, sem sugestão a partir da obra"
+    },
+    {
+     "dado": "proposta vencedora (fornecedor escolhido + preço cotado) → pedido de compra",
+     "de": "MapaItemCotacao.fornecedor_escolhido_id / MapaCotacao.selecionado (models.py:6842-6849,6868)",
+     "para": "PedidoCompra (emissão a partir da requisição)",
+     "mecanismo": "string_digitada",
+     "automacao": "manual_redigitado",
+     "evidencia": "compras_views.py:1643-1645 (fornecedor_id vem do form, não do mapa); compras_views.py:1672-1692 (preço real vem de item_preco_real[] digitado ou cai no preco_estimado da requisição)",
+     "o_que_falta": "leitura de mapa_v2 na emissão: pré-preencher fornecedor_id com fornecedor_escolhido e preço com MapaCotacao.valor_unitario selecionado; hoje a cotação fechada é redigitada"
+    },
+    {
+     "dado": "compra aprovada → custo (GCP/GCF) + obrigação (ContaPagar) + estoque (entrada/saída) — a transação modelo",
+     "de": "PedidoCompra (form nova_post ou emissão de requisição)",
+     "para": "GestaoCustoPai/Filho, ContaPagar, AlmoxarifadoMovimento/Estoque",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "compras_views.py:176-293 (processar_compra_normal: GCP:207, GCF:233, ContaPagar:256 com pedido_compra_id:270, por parcela via _vencimentos:407); compras_views.py:94-139 (entrada com pedido_compra_id=119) e 142-173/283-288 (saída imediata se obra_id); compras_views.py:1743-1747 (tudo num único commit)",
+     "o_que_falta": "nada — é o elo mais fechado da cadeia; duas camadas deliberadas (GCP=custo, CP=payable) com exclusão mútua na tela (financeiro_views.py:196-208)"
+    },
+    {
+     "dado": "mesma NF lançada duas vezes (compra + entrada manual de almoxarifado)",
+     "de": "tela de entrada manual (views/almoxarifado/movimentos.py:37-193, NF é texto livre linha 47)",
+     "para": "GestaoCustoPai MATERIAL duplicado + lançamento contábil duplicado",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "event_manager.py:162-165 (dedup SÓ por movimento.pedido_compra_id); event_manager.py:180-187 (dedup só por movimento_id de origem); event_manager.py:203-244 (cria 2º GCP) e 262-288 (2º lançamento contábil)",
+     "o_que_falta": "dedup por (fornecedor_id, nota_fiscal): entrada manual redigitando a NF de um pedido já processado gera custo em dobro — nada confere o número da NF"
+    },
+    {
+     "dado": "custo do material transferido do estoque central para a obra",
+     "de": "AlmoxarifadoMovimento SAIDA com obra_id (views/almoxarifado/movimentos.py:580-608)",
+     "para": "custo da obra (GestaoCustoFilho.obra_id)",
+     "mecanismo": "evento",
+     "automacao": "morto",
+     "evidencia": "event_manager.py:87-125 (handler material_saida só loga: 'controle físico... nenhum lançamento financeiro'); event_manager.py:230-237 (entrada sem pedido nasce no centro administrativo, obra_id=None); event_manager.py:97-99 (docstring: fluxo de transferência 'deve ser implementado')",
+     "o_que_falta": "handler de transferência que reatribua o GCF do centro administrativo para a obra na saída; hoje o custo de compra central fica preso no administrativo para sempre"
+    },
+    {
+     "dado": "vencimento digitado da despesa de frota → contas a pagar",
+     "de": "form novo_custo da frota (frota_views.py:618, data_vencimento digitada em CustoVeiculo)",
+     "para": "ContaPagar / tela Contas a Pagar",
+     "mecanismo": "nenhum",
+     "automacao": "manual_redigitado",
+     "evidencia": "frota_views.py:637-648 (registrar_custo_automatico VEICULO não recebe data_vencimento); grep ContaPagar( — nenhum site em frota_views/veiculos_services; financeiro_views.py:204-208,230-231 (GCP VEICULO aparece na tela via custos_v2 mas com vencimento do GCP/data_criacao, não o digitado)",
+     "o_que_falta": "passar CustoVeiculo.data_vencimento ao GCP (ou criar ContaPagar); o vencimento digitado fica preso na tela da frota e o card de 'vencidas' usa outra data"
+    },
+    {
+     "dado": "custo de uso de veículo por km (tarifa estimada)",
+     "de": "UsoVeiculo (form novo_uso, frota_views.py:476-507)",
+     "para": "CustoObra tipo=veiculo categoria=FROTA",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "frota_views.py:517-523 (emit veiculo_usado); event_manager.py:516-576 (handler: R$0,80/km hardcoded linha 549-551, CustoObra linhas 562-576)",
+     "o_que_falta": "tarifa parametrizável por veículo/tenant; e conciliação com o combustível real — ver elo seguinte"
+    },
+    {
+     "dado": "dupla contagem: km estimado (0,80/km) + combustível real + GCP VEICULO na mesma viagem",
+     "de": "UsoVeiculo (handler) e CustoVeiculo (despesa real com obra_id)",
+     "para": "custo da obra (três camadas somadas em telas diferentes)",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "event_manager.py:549-576 (camada 1: CustoObra 0,80/km); views/obras.py:1714-1722,1789 (camada 2: VehicleExpense/CustoVeiculo com obra_id somado em detalhes_obra); services/resumo_custos_obra.py:25,273-278 (camada 3: GCP VEICULO entra no Realizado via GestaoCustoFilho)",
+     "o_que_falta": "regra de exclusão: abastecer o veículo da viagem lançada gera custo estimado + custo real + GCP para a mesma obra, sem nenhum código que marque uma camada como espelho da outra"
+    },
+    {
+     "dado": "lançamento de transporte: camada individual × camada em massa divergem",
+     "de": "transporte_views.novo_post (individual) e novo_massa_post (lote)",
+     "para": "CustoObra + contabilidade + GestaoCusto TRANSPORTE",
+     "mecanismo": "FK",
+     "automacao": "semiautomatico",
+     "evidencia": "individual: transporte_views.py:236-246 (CustoObra), 252-260 (lançamento contábil), 290-305 (GCP líquido de reembolso, com origem_id e osc/centro_custo); massa: transporte_views.py:419-431 (só LancamentoTransporte) + 437-452 (GCP agregado por funcionário, data=date.today() linha 447, SEM origem_id linha 451-452, sem CustoObra, sem contábil, sem reembolso)",
+     "o_que_falta": "o lote não cria CustoObra nem contábil, agrega N dias num GCP datado de hoje e sem origem_id — o mesmo dado (transporte do funcionário no dia) produz camadas diferentes conforme a tela usada"
+    },
+    {
+     "dado": "equipamento usado no dia (RDO) → frota/UsoVeiculo/custo",
+     "de": "RDOEquipamento (models.py:1341-1350, nome_equipamento string livre, horas_uso)",
+     "para": "Veiculo/UsoVeiculo/CustoObra",
+     "mecanismo": "nenhum",
+     "automacao": "morto",
+     "evidencia": "models.py:1344-1350 (sem FK a veiculo, sem tarifa); crud_rdo_completo.py:416-432 (gravado de JSON do form); consumo: só exibição no portal (portal_obras_views.py:959) e dropdown de estado (services/dropdown_service.py:458) — nenhum join com Veiculo nem lançamento de custo em produção",
+     "o_que_falta": "FK veiculo_id em RDOEquipamento (ou emissão de veiculo_usado a partir do RDO) e horas_uso × tarifa; hoje o equipamento do RDO é texto que morre na tela de exibição"
+    }
+   ]
+  },
+  {
+   "aresta_id": "perifericos-custo-folha",
+   "resumo": "O ledger GestaoCustoPai/Filho recebe custos por três vias de qualidade desigual: integração automática via registrar_custo_automatico (folha, RDO, alimentação form v2, transporte form, reembolso), eventos para a contabilidade (folha_processada) e imports de planilha que redigitam dados que o RDO+cadastro já produzem. Os furos principais: reprocessar folha deleta FolhaPagamento mas não os GCP FOLHA-* nem os lançamentos contábeis (duplicação a cada reprocesso); adiantamento aprovado nunca vira desconto (coluna FolhaPagamento.adiantamentos morta); o import de alimentação não gera nenhum efeito financeiro (diverge do form v2); VA do cadastro e refeição do módulo alimentação caem ambos em GCP ALIMENTACAO na mesma obra/dia sem checagem cruzada; subempreiteiro tem produção medida no RDO mas o valor a pagar é digitado à parte; custo de escritório para em ContaPagar e nunca chega ao DRE.",
+   "estado_geral": "parcial",
+   "elos": [
+    {
+     "dado": "custo mensal de salário líquido por funcionário (folha processada)",
+     "de": "FolhaPagamento (folha_pagamento_views.processar_folha_mes)",
+     "para": "GestaoCustoPai/Filho FOLHA-{ano}-{mes}-{func_id}",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "folha_pagamento_views.py:226-262 (gcp com numero_documento FOLHA-* na linha 237; gcf origem_tabela='folha_pagamento', origem_id=folha.id nas linhas 252-262) ← models.py:6462 GestaoCustoFilho",
+     "o_que_falta": "reprocessar deleta só FolhaPagamento (folha_pagamento_views.py:148-152) e recria os GCP sem dedup por numero_documento — cada reprocesso duplica o documento FOLHA-* no ledger; falta deletar/atualizar os GCP com origem_tabela='folha_pagamento' do mês antes de recriar"
+    },
+    {
+     "dado": "partidas contábeis da folha (D 5.1.01.001 / C 2.1.02.x)",
+     "de": "FolhaPagamento",
+     "para": "LancamentoContabil/PartidaContabil",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "folha_pagamento_views.py:198-200 (EventManager.emit 'folha_processada') → event_manager.py:1135-1146 (handler criar_lancamento_folha_pagamento); consolidado extra em folha_pagamento_views.py:278-287",
+     "o_que_falta": "estorno no reprocesso: os lançamentos contábeis do processamento anterior não são removidos quando a folha é deletada e reprocessada (folha_pagamento_views.py:148-152 apaga só FolhaPagamento)"
+    },
+    {
+     "dado": "parcela de adiantamento aprovado como desconto na folha do mês",
+     "de": "Adiantamento (status APROVADO)",
+     "para": "FolhaPagamento.adiantamentos",
+     "mecanismo": "nenhum",
+     "automacao": "morto",
+     "evidencia": "models.py:2796 (coluna adiantamentos existe); folha_pagamento_views.py:842-846 (aprovar só muda status/data); services/folha_service.py não importa Adiantamento (grep vazio); único escritor está em archive/legacy_cleanup/passo_9/folha_pagamento_utils.py:510; parcelas_pagas só recebe 0 na criação (folha_pagamento_views.py:795)",
+     "o_que_falta": "leitura de Adiantamento APROVADO em processar_folha_funcionario (services/folha_service.py:998), preenchimento de FolhaPagamento.adiantamentos, incremento de parcelas_pagas e transição para QUITADO — o workflow inteiro pós-aprovação não existe"
+    },
+    {
+     "dado": "despesa de refeição lançada no form v2",
+     "de": "tela /alimentacao/lancamento (form v2)",
+     "para": "CustoObra + GCP ALIMENTACAO + LancamentoContabil + evento",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "alimentacao_views.py:501-513 (CustoObra por centro de custo), 519-525 (gerar_lancamento_contabil_automatico), 533-546 (registrar_custo_automatico origem_tabela='alimentacao_lancamento'), 574-580 (evento alimentacao_lancamento_criado); reembolsos em 567-573",
+     "o_que_falta": "nada — a travessia form→ledger é fechada na mesma transação"
+    },
+    {
+     "dado": "despesa de refeição importada de planilha",
+     "de": "importacao/alimentacao (xlsx)",
+     "para": "ledger de custo",
+     "mecanismo": "arquivo_import",
+     "automacao": "manual_redigitado",
+     "evidencia": "services/importacao_excel.py:883-920 (importar cria só AlimentacaoLancamento + assoc M2M; nenhuma chamada a registrar_custo_automatico, CustoObra, gerar_lancamento_contabil ou EventManager) vs alimentacao_views.py:501-546 (form v2 gera os 4 efeitos)",
+     "o_que_falta": "o import não tem NENHUM efeito financeiro: refeição importada não vira GCP ALIMENTACAO, nem CustoObra, nem lançamento contábil — mesma refeição tem custo diferente conforme a porta de entrada; falta chamar registrar_custo_automatico no ImportacaoAlimentacao.importar"
+    },
+    {
+     "dado": "VA do cadastro (funcionario.valor_va) por dia trabalhado no RDO",
+     "de": "RDOCustoDiario.componente_va (models.py:1299)",
+     "para": "GCP categoria ALIMENTACAO",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "services/custo_funcionario_dia.py:77,88 (componente_va = valor_va do cadastro rateado) → services/rdo_custos.py:456-484 (tag 'VA' → registrar_custo_automatico tipo_categoria='ALIMENTACAO', origem rdo_custo_diario_va)",
+     "o_que_falta": "checagem cruzada com o módulo alimentação: refeição do mesmo funcionário/obra/dia lançada em alimentacao_views.py:533 também cai em GCP ALIMENTACAO — nenhum dos dois caminhos consulta o outro (custo_funcionario_dia.py não lê AlimentacaoLancamento), então VA de cadastro + marmita real somam em dobro na mesma obra/dia"
+    },
+    {
+     "dado": "reembolso a funcionário (avulso e embutido em forms)",
+     "de": "ReembolsoFuncionario",
+     "para": "GCP categoria REEMBOLSO→OUTROS",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "reembolso_views.py:204-223 (registrar_custo_automatico + reembolso.gestao_custo_pai_id = filho.pai_id); utils/financeiro_integration.py:244-315 (processar_reembolsos_form chamado pelos forms de alimentação/transporte); status lido de volta em reembolso_views.py:63-78",
+     "o_que_falta": "nada — elo fechado nos dois sentidos (criação e consulta de status); exclusão também limpa o GCP (reembolso_views.py:325-330)"
+    },
+    {
+     "dado": "produção do subempreiteiro (qtd produzida no RDO) → valor a pagar",
+     "de": "RDOSubempreitadaApontamento (models.py:6966-6984: qtd_pessoas, horas, quantidade_produzida — sem preço)",
+     "para": "GCP categoria SUBEMPREITADA",
+     "mecanismo": "string_digitada",
+     "automacao": "manual_redigitado",
+     "evidencia": "gestao_custos_views.py:241-284 (valor digitado no form; subempreiteiro_id só vincula o favorecido quando categoria=SUBEMPREITADA); ponte só analítica em subempreiteiros_views.py:56-62 (custo médio/unidade = soma GCP ÷ qtd apontada)",
+     "o_que_falta": "não existe preço unitário contratado (nem em Subempreiteiro models.py:6939-6963 nem no apontamento) nem cálculo qtd×preço: o gestor digita o valor a pagar à parte, e a produção medida no RDO serve apenas de KPI a posteriori"
+    },
+    {
+     "dado": "despesa de escritório (aluguel, luz, água) → DRE",
+     "de": "DespesaEscritorioOcorrencia → ContaPagar origem_tipo='CUSTO_ESCRITORIO'",
+     "para": "DRE / LancamentoContabil",
+     "mecanismo": "nenhum",
+     "automacao": "morto",
+     "evidencia": "custos_escritorio_views.py:23-38 (_criar_conta_pagar sem conta_contabil_codigo); financeiro_service.py:119 (lançamento só se conta.conta_contabil_codigo) e 180-186 (mapa V2 só COMPRA/FOLHA/SALARIO → CUSTO_ESCRITORIO cai em op=None); DRE lê apenas partidas contábeis (contabilidade_utils.py:534-560)",
+     "o_que_falta": "ContaPagar de escritório nasce sem conta contábil e o pagamento não gera lançamento (nem V1 nem V2) — a despesa administrativa nunca aparece no DRE nem no ledger GCP; falta mapear CUSTO_ESCRITORIO em financeiro_service.py:181-186 ou setar conta_contabil_codigo na criação"
+    },
+    {
+     "dado": "diária + VA + VT por funcionário/dia (import planilha 2_diarias)",
+     "de": "importacao/diarias (xlsx)",
+     "para": "GCP SALARIO/ALIMENTACAO/TRANSPORTE",
+     "mecanismo": "arquivo_import",
+     "automacao": "manual_redigitado",
+     "evidencia": "services/importacao_excel.py:747-793 (registrar_custo_automatico ×3, origem_tabela='importacao_diaria*', origem_id=func_id — não único por dia); mesmo dado gerado automaticamente por services/rdo_custos.py:316-484 a partir da presença no RDO + valor_diaria/valor_va/valor_vt do cadastro",
+     "o_que_falta": "redigita presença e valores que RDO+cadastro já produzem; nenhum dedup contra o caminho RDO (origem_id=func_id colide entre dias e não casa com rdo_custo_diario_*) — dia lançado nas duas vias soma em dobro; cria funcionário com CPF 'TMP...' aleatório (linhas 683-717) que o cadastro depois precisa corrigir"
+    },
+    {
+     "dado": "VT/combustível e contas a pagar avulsas (imports 4_transporte e 5_custos)",
+     "de": "importacao/transporte e importacao/custos (xlsx)",
+     "para": "GCP TRANSPORTE / GestaoCustoPai direto",
+     "mecanismo": "arquivo_import",
+     "automacao": "manual_redigitado",
+     "evidencia": "services/importacao_excel.py:1017-1046 (transporte → registrar_custo_automatico, origem_id=linha da planilha) e 1128-1168 (custos → GestaoCustoPai/Filho diretos, entidade_id=None, sem fornecedor_id); os mesmos dados entram por transporte_views.py:277-306 (form com GCP + contábil) e gestao_custos_views.py:241-284 (form completo)",
+     "o_que_falta": "transporte importado redigita o VT que o cadastro (valor_vt) + presença no RDO já geram via rdo_custo_diario_vt (rdo_custos.py:458-484) sem checagem de duplicidade; custos importados perdem o vínculo fornecedor_id/entidade_id e o lançamento contábil que o form gera (gestao_custos_views.py:838-839); origem_id=linha da planilha impede rollback confiável em reimports"
+    },
+    {
+     "dado": "cadastro de funcionário (import planilha 1_funcionarios)",
+     "de": "importacao/funcionarios (xlsx)",
+     "para": "Funcionario",
+     "mecanismo": "arquivo_import",
+     "automacao": "manual_redigitado",
+     "evidencia": "services/importacao_excel.py:186-306 (processar com defaults digitados no upload: data_admissao, tipo_remuneracao, valor — importacao_views.py:227-232) e 308-400 (importar cria Funcionario)",
+     "o_que_falta": "redigita em planilha o mesmo cadastro que o form de funcionários coleta; os defaults globais (mesma data de admissão e mesmo salário para o lote inteiro) achatam dados individuais que depois alimentam folha e custo/dia — é muleta de migração, não de operação"
+    }
+   ]
+  },
+  {
+   "aresta_id": "obra-portal-cliente",
+   "resumo": "O portal é anônimo por token da obra (Obra.token_cliente, portal_obras_views.py:147) e a LEITURA é toda automática no render: cronograma-cliente, anel de progresso, últimos 20 RDOs, medições, compras e mapas saem de queries diretas. A identidade só aparece no ATO de assinar (ciência de RDO, redesenho de 29-30/07: checkbox por responsável + POST atômico senha+assinatura, sem sessão de login). As travessias que dependem de gente são o gargalo: convite e cobrança de ciência viram texto para colar no WhatsApp (não há SMTP), o comprovante enviado pelo cliente não avisa ninguém, NotificacaoCliente nunca é criada e o capítulo comercial (proposta/contrato) vive em OUTRO portal com token próprio, sem ponte com o portal da obra.",
+   "estado_geral": "parcial",
+   "elos": [
+    {
+     "dado": "cronograma interno da obra → cronograma-cliente (clone para apresentação)",
+     "de": "TarefaCronograma is_cliente=False",
+     "para": "TarefaCronograma is_cliente=True → árvore do portal (portal_obras_views.py:181-233)",
+     "mecanismo": "string_digitada",
+     "automacao": "semiautomatico",
+     "evidencia": "views/obras.py:3072-3175 (gerar_cronograma_cliente: apaga TODAS as is_cliente=True — sobrescrita total — e clona campo a campo, remapeando pai/predecessora via dict old_to_new em memória); portal_obras_views.py:199-211 (_sync_por_nome: % real da tarefa interna casado por nome_tarefa, string); portal_obras_views.py:178 e :230-232 (raiz única recebe perc_geral)",
+     "o_que_falta": "FK tarefa_origem_id NÃO existe (grep vazio em models.py/views). O vínculo clone↔origem morre no commit; depois o portal só reconcilia % por igualdade de nome_tarefa — renomear a tarefa interna congela o % no portal. Regenerar exige clique do admin e destrói edições do cronograma-cliente. Legado: tabela CronogramaCliente (models.py:6910) não é mais lida pelo portal, mas a rota editar_cronograma_cliente (views/obras.py:3179-3185) ainda grava nela — edição morta."
+    },
+    {
+     "dado": "progresso físico da obra → anel do hero do portal",
+     "de": "TarefaCronograma.percentual_concluido (sincronizado dos RDOs)",
+     "para": "anel do portal (templates/portal/_portal_hero.html:6-11)",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "portal_obras_views.py:177-179 (perc_geral = calcular_progresso_geral_obra_v2 — média das FOLHAS ponderada por duração, acumulada até hoje)",
+     "o_que_falta": "nada no anel em si; o problema é a coexistência com a fórmula da medição na mesma página (elo seguinte)."
+    },
+    {
+     "dado": "progresso físico → percentual/valor das MEDIÇÕES exibidas no mesmo portal",
+     "de": "TarefaCronograma responsavel='empresa'",
+     "para": "MedicaoObra → templates/portal/_portal_medicoes.html:23",
+     "mecanismo": "FK",
+     "automacao": "semiautomatico",
+     "evidencia": "portal_obras_views.py:720-780 (gerar_medicao, botão interno em detalhes_obra_profissional.html:1643-1651: perc = MÉDIA SIMPLES das tarefas 'empresa', linha 754, × valor_contrato → snapshot congelado); services/medicao_service.py:160-163 (terceira fórmula em outro fluxo: soma_acum/valor_contrato via IMC)",
+     "o_que_falta": "SIM, duas fórmulas na mesma página: anel = folhas ponderadas por duração; medição = média simples no momento do clique. Os números divergem e nada os reconcilia nem recalcula a medição quando o RDO avança."
+    },
+    {
+     "dado": "RDO finalizado → listagem e detalhe no portal",
+     "de": "RDO status='Finalizado' + RDOServicoSubatividade / RDOApontamentoCronograma / RDOFoto",
+     "para": "templates/portal/_portal_rdos.html e portal_rdo_detalhe.html",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "portal_obras_views.py:256-264 (query .limit(20) — SIM, truncado em 20, sem paginação: o 21º RDO some do portal); portal_obras_views.py:874-989 (detalhe com fallback: sem RDOServicoSubatividade deriva atividades dos apontamentos de cronograma, com caminho hierárquico e incremento do dia); portal_obras_views.py:398-399 (placar de ciência por RDO em 2 queries)",
+     "o_que_falta": "Paginação/arquivo dos RDOs além dos 20 mais recentes — hoje é perda silenciosa de visibilidade em obra longa."
+    },
+    {
+     "dado": "ciência do cliente sobre o RDO (fluxo novo de 29-30/07)",
+     "de": "checkbox por responsável na seção 'Ciência do cliente' do detalhe do RDO (templates/portal/_ciencia_placar.html:1-8; emenda 29/07: o ato saiu da tela própria e voltou à seção; a rota GET /ciencia virou redirect para links de WhatsApp não morrerem, portal_obras_views.py:1111-1126)",
+     "para": "RDOAssinatura papel='cliente' com hash sha256, IP, UA e snapshot de nome/cargo (services/rdo_ciencia_cliente.py:207-258)",
+     "mecanismo": "evento",
+     "automacao": "automatico",
+     "evidencia": "portal_obras_views.py:1128-1221 (ciencia_confirmar: POST ATÔMICO — autentica ObraSignatarioCliente por senha no MESMO request que assina, sem sessão; rate-limit 5/15min; trava por 10 falhas; senha temporária desvia para troca obrigatória; IntegrityError do índice uq_rdo_assin_cliente resolve duplo-clique); services/rdo_ciencia_cliente.py:73-90 (desde 30/07 só RETIFICADO bloqueia — rascunho/preenchido aceitam ciência; integridade vem do hash reconferido no placar, que marca 'alterado depois de assinado'); views/obras.py:2214-2233 (a volta: placar alimenta ciencia_cobranca na tela interna da obra)",
+     "o_que_falta": "nada — elo fechado; obs.: RDO editado pós-ciência é só sinalizado, não travado (decisão de 30/07)."
+    },
+    {
+     "dado": "convite de acesso e cobrança de ciência → chegada ao signatário",
+     "de": "geração de senha temporária + montagem da mensagem (views/obras.py:3981-4057; services/portal_signatario_auth.py:54)",
+     "para": "e-mail/WhatsApp do responsável do cliente",
+     "mecanismo": "nenhum",
+     "automacao": "manual_redigitado",
+     "evidencia": "templates/obras/detalhes_obra_profissional.html:1520-1541 (textarea com a mensagem pronta + 'Copiar mensagem do convite') e :1573-1585, 1620-1634 (botão 'Cobrar' copia texto com link direto do RDO para o clipboard); models.py:1603-1606 (docstring: 'não há SMTP configurado no sistema (só o canal n8n, opt-in)')",
+     "o_que_falta": "NÃO envia: o sistema monta a mensagem e o humano cola no WhatsApp. O campo ObraSignatarioCliente.email (models.py:1629) é gravado e NUNCA lido para envio — morto para entrega. Faltaria canal de saída (SMTP/n8n) disparado no convite e na pendência de ciência."
+    },
+    {
+     "dado": "compra 'aprovacao_cliente' pendente → decisão do cliente no portal → custo/estoque materializados",
+     "de": "PedidoCompra tipo_compra='aprovacao_cliente' (listada em portal_obras_views.py:235-247)",
+     "para": "GestaoCustoPai/Filho + MovimentacaoEstoque via processar_compra_aprovada_cliente",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "portal_obras_views.py:452-533 (POST anônimo aprova; guarda D2 impede reabrir recusada; com a flag de governança ativa a aprovação vira SÓ ciência e o custo sai da cadeia interna de alçada); compras_views.py:296-407 (o que materializa: 1 GestaoCustoPai FATURAMENTO_DIRETO status='PAGO' SEM FluxoCaixa, 1 GestaoCustoFilho na obra com origem_tabela='pedido_compra', ENTRADA no almoxarifado por item de catálogo e SAÍDA imediata contra a obra; idempotente por processada_apos_aprovacao; exige obra_id)",
+     "o_que_falta": "Autoria: sem governança, o custo sai atribuído ao admin do tenant que não agiu (portal_obras_views.py:516-519, usuario_id=compra.admin_id) — mitigado só pela trilha PortalAcessoEvento. E ninguém interno é notificado da decisão (aprovada/recusada) — só log."
+    },
+    {
+     "dado": "comprovante de pagamento enviado pelo cliente → conhecimento do financeiro",
+     "de": "upload no portal (portal_obras_views.py:566-611, grava PedidoCompra.comprovante_pagamento_url)",
+     "para": "tela interna de detalhe da compra (templates/compras/detalhe.html:63)",
+     "mecanismo": "FK",
+     "automacao": "semiautomatico",
+     "evidencia": "portal_obras_views.py:608-610 (só logger.info + flash para o PRÓPRIO cliente); templates/compras/detalhe.html:63 (aparece se alguém abrir a compra); serving seguro em portal_obras_views.py:612-646",
+     "o_que_falta": "Ninguém é avisado: nenhum evento, notificação ou e-mail — o arquivo chega sozinho ao registro, mas a descoberta é pull (alguém tem que abrir o detalhe da compra). Falta um aviso interno no upload."
+    },
+    {
+     "dado": "notificações automáticas ao cliente (novo RDO, marco, atraso)",
+     "de": "NotificacaoCliente (models.py:3039-3072, tipos 'novo_rdo', 'marco_atingido', 'atraso', 'conclusao_atividade')",
+     "para": "portal do cliente",
+     "mecanismo": "nenhum",
+     "automacao": "morto",
+     "evidencia": "grep 'NotificacaoCliente(' em produção: ZERO criações. Só destruição: views/rdo.py:554 e crud_rdo_completo.py:523 (delete ao excluir RDO); services/importacao_fisico_financeiro.py:368-369 (anula FK). Nenhum template do portal a lê.",
+     "o_que_falta": "Tudo: nenhum handler/evento cria linhas e nenhuma tela exibe. Modelo 100% morto desde o 'Módulo 2'."
+    },
+    {
+     "dado": "proposta/contrato comercial → portal da obra",
+     "de": "Propostas (propostas_consolidated.py)",
+     "para": "portal do cliente da obra (templates/portal/portal_obra.html)",
+     "mecanismo": "nenhum",
+     "automacao": "morto",
+     "evidencia": "grep 'proposta|contrato' em templates/portal/*.html: vazio — o capítulo comercial NÃO aparece no portal da obra. O comercial tem OUTRO portal com token por proposta: propostas_consolidated.py:2457 (portal_cliente), :2507 (aprovar_proposta_cliente), :2591 (rejeitar), link distribuído por WhatsApp (_whatsapp_url_proposta, :91)",
+     "o_que_falta": "Uma ponte: dois portais desconexos com dois tokens (proposta vs obra.token_cliente); o cliente não encontra a proposta/contrato no portal da obra que nasceu dela, e vice-versa."
+    },
+    {
+     "dado": "trilha das ações do cliente no portal → auditoria interna",
+     "de": "toda mutação por token (aprovar/recusar compra, comprovante, ciência, mapa)",
+     "para": "PortalAcessoEvento (models.py:5692-5709)",
+     "mecanismo": "FK",
+     "automacao": "automatico",
+     "evidencia": "portal_obras_views.py:109 (_registrar_acesso, chamado em :459, :541, :571, :646, :660, :1151, :1160, :1215 com IP/UA e detalhes JSON)",
+     "o_que_falta": "nada no registro; falta consumo — a trilha não alimenta nenhuma tela de pendências, serve só como evidência passiva."
+    }
+   ]
+  }
+ ],
+ "matriz": {
+  "leitura_geral": "O SIGE tem uma espinha dorsal automática e bem construída — proposta aprovada → obra/cliente/medição comercial/contabilidade em transação atômica, compras → custo+pagar+estoque em commit único, RDO → cronograma → ContaReceber por evento — mas essa espinha está cercada de elos meio-construídos que degradam nas bordas: o CRM entrega IDs que os redirects descartam, a obra aprovada nasce sem serviços apontáveis para o RDO, o ponto e a alocação não pré-carregam o RDO, a baixa financeira não gera caixa nem partida contábil, e TODO canal de saída externa converge para um único webhook n8n que está desligado neste ambiente (sem N8N_WEBHOOK_URL nada sai do sistema, nem sequer é persistido). O padrão dominante de risco é triplo: (1) duplicação estrutural de custo por caminhos concorrentes que não se enxergam (RDO com dois mecanismos de custo cujo dedup não cruza origens, NF de compra + entrada manual, VA de cadastro + refeição importada, reprocesso de folha sem estorno, três camadas de custo de frota); (2) exceções engolidas em quase todos os handlers e listeners — falha silenciosa é o modo default; (3) estruturas mortas carregadas em todo boot (handler nota_fiscal_paga órfão, NotificacaoCliente, AlocacaoEquipe, Lead.proposta_id/obra_id, FolhaPagamento.adiantamentos). Os ganhos mais baratos são elos já construídos que morrem a um passo do fim: transferências do extrato detectadas e descartadas no confirm, pipeline de encargos patronais completo sem chamador, replanejamento de curvas que só roda ao aplicar versão, e emissão de rdo_finalizado ausente em metade dos caminhos de salvamento.",
+  "matriz": [
+   {
+    "de": "CRM (Lead)",
+    "para": "Propostas",
+    "estado": "manual",
+    "resumo": "Redirect envia cliente_id/lead_id mas nova() descarta a query string (crm_views.py:937 → propostas_consolidated.py:1186) — o usuário redigita nome/email/telefone do cliente já cadastrado."
+   },
+   {
+    "de": "Propostas",
+    "para": "Obra/Cliente",
+    "estado": "automatico",
+    "resumo": "Evento proposta_aprovada com raise_on_error=True materializa Obra+Cliente com dedup, reconciliação por linhagem e rollback atômico (event_manager.py:882; propostas_consolidated.py:2360) — a espinha de referência."
+   },
+   {
+    "de": "Propostas",
+    "para": "Medição/Custo/Cronograma (IMC+OSC+TarefaCronograma)",
+    "estado": "parcial",
+    "resumo": "IMC e OSC nascem automáticos via handler+listener, mas OSC.valor_orcado herda valor de VENDA (models.py:7450-7487) e o cronograma só materializa se houver cronograma_default_json pré-configurado."
+   },
+   {
+    "de": "Propostas",
+    "para": "CRM (retorno do desfecho)",
+    "estado": "morto",
+    "resumo": "Aprovar/rejeitar não toca o Lead; FKs Lead.proposta_id/obra_id existem e nenhum código de produção as escreve (models.py:7965-7972) — kanban fecha só por drag-and-drop manual."
+   },
+   {
+    "de": "Propostas",
+    "para": "ServicoObraReal (lista de serviços do RDO)",
+    "estado": "morto",
+    "resumo": "Zero criadores de ServicoObraReal referenciam proposta — a obra aprovada nasce sem serviços apontáveis e o operador re-adiciona um a um (views/api.py:889, crud_servico_obra_real.py:105)."
+   },
+   {
+    "de": "Alocação (Allocation)",
+    "para": "Ponto (RegistroPonto)",
+    "estado": "parcial",
+    "resumo": "Sync só por botão manual, criação de registro novo quebrada (admin_id NOT NULL viola, models.py:4562-4570) e sobrescreve batida real pelo turno planejado; registros criados não emitem ponto_registrado."
+   },
+   {
+    "de": "Ponto",
+    "para": "Custo (GestaoCusto/CustoObra)",
+    "estado": "automatico",
+    "resumo": "Handler ponto_registrado cria diária+VA+VT do diarista com idempotência dupla; horista cria CustoObra SEM chave de idempotência (event_manager.py:487-503) — risco de duplicação por reemissão."
+   },
+   {
+    "de": "Ponto/Alocação",
+    "para": "RDO (mão de obra)",
+    "estado": "manual",
+    "resumo": "views/rdo.py não referencia RegistroPonto/Allocation — o encarregado reseleciona quem trabalhou; prefill vem do último RDO, não da presença do dia (views/rdo.py:4550-4583)."
+   },
+   {
+    "de": "RDO",
+    "para": "Custo mão de obra",
+    "estado": "parcial",
+    "resumo": "Dois mecanismos concorrentes no mesmo request (gerar_custos_mao_obra_rdo direto + evento rdo_finalizado) com dedup que não cruza origens rdo_custo_diario×rdo_mao_obra (views/rdo.py:2145-2153; event_manager.py:737)."
+   },
+   {
+    "de": "RDO",
+    "para": "Cronograma",
+    "estado": "automatico",
+    "resumo": "Apontamento vira RDOApontamentoCronograma com UPSERT e rollup síncrono de percentual_concluido (cronograma_apontamento_service.py:311; cronograma_engine.py:1161) — elo mais sólido do núcleo operacional."
+   },
+   {
+    "de": "Cronograma",
+    "para": "Medição comercial",
+    "estado": "parcial",
+    "resumo": "Trilho ponderado por pesos com gate soma==100 convive com a média simples do portal que grava MedicaoObra.valor_medido com fórmula divergente (medicao_service.py:48-92 vs portal_obras_views.py:750-774)."
+   },
+   {
+    "de": "Medição",
+    "para": "Financeiro (ContaReceber)",
+    "estado": "automatico",
+    "resumo": "CR única OBR-MED com upsert idempotente, disparada por gerar/fechar medição e pelo evento rdo_finalizado (medicao_service.py:275-380; event_manager.py:1418)."
+   },
+   {
+    "de": "Financeiro (baixa CR/CP)",
+    "para": "Caixa/Contabilidade",
+    "estado": "manual",
+    "resumo": "Baixa da CR não cria FluxoCaixa (só o lado pagar tem checkbox) e a CR de medição nasce sem conta_contabil_codigo — nenhuma partida dobrada na receita (financeiro_views.py:633-673; financeiro_service.py:332)."
+   },
+   {
+    "de": "Compras (pedido)",
+    "para": "Custo+Pagar+Estoque",
+    "estado": "automatico",
+    "resumo": "Commit único gera GCP/GCF + ContaPagar por parcela + entrada/saída de almoxarifado com dedup por pedido_compra_id (compras_views.py:176-293) — transação modelo."
+   },
+   {
+    "de": "Cotação (MapaConcorrencia)",
+    "para": "Pedido de compra",
+    "estado": "manual",
+    "resumo": "O mapa só serve de trava de alçada; fornecedor vencedor e preço cotado são redigitados no form de emissão (compras_views.py:1643-1692)."
+   },
+   {
+    "de": "Almoxarifado (saída)",
+    "para": "Custo da obra",
+    "estado": "morto",
+    "resumo": "Handler material_saida é write-nothing por decisão (event_manager.py:87-122) e o custo de compra central fica preso no centro administrativo para sempre — transferência declarada 'a implementar' no docstring."
+   },
+   {
+    "de": "Folha",
+    "para": "Contabilidade/Custo",
+    "estado": "parcial",
+    "resumo": "Evento folha_processada gera partidas, mas reprocesso deleta só FolhaPagamento e duplica GCP FOLHA-* sem estorno contábil (folha_pagamento_views.py:148-152); encargos patronais calculados nunca chegam a custo de obra."
+   },
+   {
+    "de": "Obra",
+    "para": "Portal do cliente",
+    "estado": "parcial",
+    "resumo": "Leitura toda automática por token e ciência de RDO fechada; mas convite/cobrança é copiar-e-colar no WhatsApp, comprovante enviado não avisa ninguém e NotificacaoCliente nunca é criada."
+   },
+   {
+    "de": "SIGE",
+    "para": "Mundo externo (n8n/e-mail)",
+    "estado": "parcial",
+    "resumo": "Canal único de saída é o webhook n8n opt-in; sem N8N_WEBHOOK_URL (caso deste ambiente) todo evento dominio.acao vira no-op sem persistir nada (webhook_dispatcher.py:228-231) — hoje nada sai do sistema."
+   },
+   {
+    "de": "Frota/RDOEquipamento",
+    "para": "Custo da obra",
+    "estado": "parcial",
+    "resumo": "Três camadas somam na mesma viagem (R$0,80/km hardcoded + despesa real + GCP) sem conciliação, e o equipamento do RDO é string livre sem FK que morre na exibição (event_manager.py:549-576; models.py:1344-1350)."
+   }
+  ],
+  "backlog": [
+   {
+    "id": "A01",
+    "titulo": "Consumir transferências internas do extrato no confirm do import",
+    "aresta": "medicao-receber-caixa-contabilidade",
+    "acao": "ligar_elo_existente",
+    "esforco": "P",
+    "impacto": "Elimina o ajuste manual de saldo entre contas: a detecção com banco_origem/destino já existe e é descartada a um passo do fim.",
+    "evidencia": "services/importacao_excel.py:1961-1973 detecta; importacao_views.py:942-947 passa só entradas+saidas; importar() nunca lê dados['transferencias']",
+    "pacote_relacionado": "novo"
+   },
+   {
+    "id": "A02",
+    "titulo": "Criar FluxoCaixa ENTRADA na baixa de ContaReceber (espelhar o lado pagar)",
+    "aresta": "medicao-receber-caixa-contabilidade",
+    "acao": "ligar_elo_existente",
+    "esforco": "P",
+    "impacto": "Recebimento da obra passa a aparecer no caixa sem o usuário redigitar via novo_fluxo_caixa.",
+    "evidencia": "financeiro_views.py:633-673 sem FluxoCaixa(); lado pagar já faz em financeiro_views.py:391-407",
+    "pacote_relacionado": "novo"
+   },
+   {
+    "id": "A03",
+    "titulo": "Preencher conta_contabil_codigo na CR OBR-MED no upsert",
+    "aresta": "medicao-receber-caixa-contabilidade",
+    "acao": "ligar_elo_existente",
+    "esforco": "P",
+    "impacto": "Baixa da medição passa a gerar partida dobrada de receita — hoje o gate 'if conta.conta_contabil_codigo' pula tudo em silêncio.",
+    "evidencia": "services/medicao_service.py:333-352 cria CR sem o campo; financeiro_service.py:332 exige o campo",
+    "pacote_relacionado": "novo"
+   },
+   {
+    "id": "A04",
+    "titulo": "Adicionar DESPESA_GERAL ao MAPEAMENTO_CONTABIL [decisão de negócio: qual conta de débito]",
+    "aresta": "medicao-receber-caixa-contabilidade",
+    "acao": "ligar_elo_existente",
+    "esforco": "P",
+    "impacto": "Todo pagamento pela tela Gestão de Custos hoje falha em silêncio na contabilidade (return False com warning).",
+    "evidencia": "gestao_custos_views.py:838-847 e :986-995 chamam tipo inexistente; contabilidade_utils.py:1536-1543 não tem a chave",
+    "pacote_relacionado": "novo"
+   },
+   {
+    "id": "A05",
+    "titulo": "Emitir rdo_finalizado nos caminhos que só chamam gerar_custos_mao_obra_rdo",
+    "aresta": "ponto-alocacao-rdo-custo",
+    "acao": "ligar_elo_existente",
+    "esforco": "P",
+    "impacto": "Fecha a assimetria em que RDO salvo por crud_rdo_completo/rdo_editar_sistema/rdo_salvar_unificado gera custo mas NÃO recalcula a ContaReceber da medição.",
+    "evidencia": "crud_rdo_completo.py:468,578, rdo_editar_sistema.py:550, views/rdo.py:3422 chamam o service sem emitir o evento (nota do catálogo eventos-handlers, rdo_finalizado)",
+    "pacote_relacionado": "p1"
+   },
+   {
+    "id": "A06",
+    "titulo": "Chamar replanejar_curvas_obra após recalcular_obra do editor v2",
+    "aresta": "rdo-cronograma-medicao",
+    "acao": "ligar_elo_existente",
+    "esforco": "P",
+    "impacto": "Editar datas pela UI deixa de deixar percentual_planejado dos apontamentos órfão até alguém aplicar uma versão — a função existe e tem um único caller.",
+    "evidencia": "utils/cronograma_engine.py:1057-1125; único caller cronograma_versao_service.py:443; os 6 recálculos de cronograma_views.py:824-1639 não chamam",
+    "pacote_relacionado": "p2"
+   },
+   {
+    "id": "A07",
+    "titulo": "Repassar cliente_id/lead_id do redirect CRM e pré-preencher Nova Proposta/Nova Obra",
+    "aresta": "crm-proposta-obra",
+    "acao": "ligar_elo_existente",
+    "esforco": "P",
+    "impacto": "O CRM já manda os IDs na query string; hoje o alias/GET os descarta e o usuário redigita cliente inteiro nas duas telas.",
+    "evidencia": "crm_views.py:937-939 e :974-977 enviam; propostas_consolidated.py:1186-1188 e views/obras.py:488-502 descartam",
+    "pacote_relacionado": "novo"
+   },
+   {
+    "id": "A08",
+    "titulo": "Import de alimentação chamar registrar_custo_automatico [decisão de negócio: regra contra dupla contagem com VA do cadastro]",
+    "aresta": "perifericos-custo-folha",
+    "acao": "ligar_elo_existente",
+    "esforco": "P",
+    "impacto": "Refeição importada de planilha passa a ter o mesmo efeito financeiro da lançada no form v2 — hoje o import não gera GCP, CustoObra nem contábil.",
+    "evidencia": "services/importacao_excel.py:883-920 (zero efeitos) vs alimentacao_views.py:501-546 (4 efeitos)",
+    "pacote_relacionado": "novo"
+   },
+   {
+    "id": "A09",
+    "titulo": "Dedup de NF na entrada manual de almoxarifado por (fornecedor_id, nota_fiscal)",
+    "aresta": "compras-estoque-custo-pagar",
+    "acao": "aposentar_duplicata",
+    "esforco": "P",
+    "impacto": "Impede custo e lançamento contábil em dobro quando a NF de um pedido já processado é redigitada na entrada manual.",
+    "evidencia": "event_manager.py:162-165 dedupa só por pedido_compra_id; NF é texto livre em views/almoxarifado/movimentos.py:47",
+    "pacote_relacionado": "p1"
+   },
+   {
+    "id": "A10",
+    "titulo": "Chave de idempotência no CustoObra de horista do handler ponto_registrado",
+    "aresta": "ponto-alocacao-rdo-custo",
+    "acao": "aposentar_duplicata",
+    "esforco": "P",
+    "impacto": "Cada emissão com horas>0 pode duplicar o custo do horista — diarista já tem idempotência dupla, horista não tem nenhuma.",
+    "evidencia": "event_manager.py:487-503 cria sem checar existente",
+    "pacote_relacionado": "p1"
+   },
+   {
+    "id": "A11",
+    "titulo": "Unificar os dois mecanismos de custo de RDO (dedup cruzando origens rdo_custo_diario×rdo_mao_obra)",
+    "aresta": "ponto-alocacao-rdo-custo",
+    "acao": "aposentar_duplicata",
+    "esforco": "M",
+    "impacto": "Elimina o risco estrutural de diária dupla quando gerar_custos_mao_obra_rdo e lancar_custos_rdo rodam no mesmo request com origens que o dedup não cruza.",
+    "evidencia": "views/rdo.py:2145-2153 executa ambos; event_manager.py:737 filtra só 'rdo_mao_obra'; rdo_custos.py:383-386 grava 'rdo_custo_diario'",
+    "pacote_relacionado": "p1"
+   },
+   {
+    "id": "A12",
+    "titulo": "Reprocesso de folha: deletar GCP FOLHA-* e estornar lançamentos antes de recriar",
+    "aresta": "perifericos-custo-folha",
+    "acao": "aposentar_duplicata",
+    "esforco": "M",
+    "impacto": "Cada reprocesso hoje duplica o documento FOLHA-* no ledger e acumula partidas contábeis sem estorno.",
+    "evidencia": "folha_pagamento_views.py:148-152 apaga só FolhaPagamento; GCP recriados em :226-262 sem dedup por numero_documento",
+    "pacote_relacionado": "p1"
+   },
+   {
+    "id": "A13",
+    "titulo": "OSC.valor_orcado deixar de herdar valor de VENDA do IMC",
+    "aresta": "proposta-servicos-cronograma-pesos",
+    "acao": "derivar_em_vez_de_redigitar",
+    "esforco": "M",
+    "impacto": "A margem deixa de sumir do planejamento de custo até o gestor redigitar — bug já medido em 21/07 (R$220k para contrato de R$120k).",
+    "evidencia": "models.py:7450-7487 (_item_medicao_auto_cria_custo: valor_orcado = valor_comercial)",
+    "pacote_relacionado": "p3"
+   },
+   {
+    "id": "A14",
+    "titulo": "Aprovação da proposta semeia ServicoObraReal e fecha o Lead (gravar Lead.proposta_id na criação)",
+    "aresta": "crm-proposta-obra",
+    "acao": "handler_novo",
+    "esforco": "M",
+    "impacto": "Obra aprovada nasce com serviços apontáveis no RDO e o card do kanban fecha sozinho — hoje o operador re-adiciona serviço por serviço e arrasta o lead à mão.",
+    "evidencia": "zero criadores de ServicoObraReal referenciam proposta (views/api.py:889 etc.); Lead.proposta_id/obra_id nunca escritos (models.py:7965-7972)",
+    "pacote_relacionado": "p5"
+   },
+   {
+    "id": "A15",
+    "titulo": "Unificar a medição do portal (média simples) com o trilho ponderado por pesos",
+    "aresta": "rdo-cronograma-medicao",
+    "acao": "aposentar_duplicata",
+    "esforco": "M",
+    "impacto": "Duas fórmulas geram MedicaoObra divergente para a mesma obra na mesma página (divergência de 25% já observada); de quebra filtrar TarefaCronograma.ativa em calcular_percentual_item.",
+    "evidencia": "portal_obras_views.py:750-774 vs services/medicao_service.py:48-65; comentário :745-749 documenta a divergência; medicao_service.py:59-63 sem filtro de ativa",
+    "pacote_relacionado": "p6"
+   },
+   {
+    "id": "A16",
+    "titulo": "Consertar sync alocação→ponto: admin_id na criação, nunca sobrescrever batida real, emitir ponto_registrado",
+    "aresta": "ponto-alocacao-rdo-custo",
+    "acao": "ligar_elo_existente",
+    "esforco": "M",
+    "impacto": "O sync existe mas o caminho de criação está morto (IntegrityError) e o de atualização destrói a batida real; registros criados não geram custo por não emitirem o evento.",
+    "evidencia": "models.py:4562-4570 viola NOT NULL de models.py:797; models.py:4544-4559 sobrescreve hora real; sem EventManager no método",
+    "pacote_relacionado": "p7"
+   },
+   {
+    "id": "A17",
+    "titulo": "Pré-carregar RDOMaoObra do RegistroPonto/Allocation da obra+data",
+    "aresta": "ponto-alocacao-rdo-custo",
+    "acao": "derivar_em_vez_de_redigitar",
+    "esforco": "M",
+    "impacto": "O encarregado deixa de redigitar quem trabalhou — hoje o prefill vem do último RDO, não da presença do dia.",
+    "evidencia": "views/rdo.py sem nenhuma referência a RegistroPonto/Allocation (grep vazio); prefill em views/rdo.py:4550-4583",
+    "pacote_relacionado": "p7"
+   },
+   {
+    "id": "A18",
+    "titulo": "Derivar progresso entre trilhos V1 e cronograma via subatividade_mestre_id",
+    "aresta": "rdo-cronograma-medicao",
+    "acao": "derivar_em_vez_de_redigitar",
+    "esforco": "M",
+    "impacto": "Quem opera nos dois trilhos deixa de digitar o avanço duas vezes — a chave existe dos dois lados e ninguém a lê para progresso.",
+    "evidencia": "models.py:5853-5857 e models.py:1952; nenhum join TC↔RSS por subatividade_mestre_id em produção (grep exaustivo)",
+    "pacote_relacionado": "p8"
+   },
+   {
+    "id": "A19",
+    "titulo": "Fórmula única de progresso da obra (consolidar as 5 fórmulas em ~20 call-sites)",
+    "aresta": "rdo-cronograma-medicao",
+    "acao": "aposentar_duplicata",
+    "esforco": "M",
+    "impacto": "Cada tela deixa de exibir um número diferente para a mesma obra (anel do portal, header do cronograma, cards de RDO, trilho V1).",
+    "evidencia": "5 fórmulas mapeadas: portal_obras_views.py:178/:754, cronograma_views.py:358/:474, views/rdo.py:1349/:2524-2539",
+    "pacote_relacionado": "p4"
+   },
+   {
+    "id": "A20",
+    "titulo": "Pré-preencher pedido de compra com o vencedor do mapa de cotação",
+    "aresta": "compras-estoque-custo-pagar",
+    "acao": "derivar_em_vez_de_redigitar",
+    "esforco": "P",
+    "impacto": "Fornecedor escolhido e preço cotado deixam de ser redigitados na emissão — o mapa já guarda fornecedor_escolhido_id e valor selecionado.",
+    "evidencia": "models.py:6842-6849,6868 têm o dado; compras_views.py:1643-1692 lê tudo do form digitado",
+    "pacote_relacionado": "novo"
+   },
+   {
+    "id": "A21",
+    "titulo": "FK veiculo_id em RDOEquipamento + corrigir TypeError de kwargs no salvamento",
+    "aresta": "compras-estoque-custo-pagar",
+    "acao": "fk_no_lugar_de_string",
+    "esforco": "M",
+    "impacto": "Equipamento do RDO deixa de ser texto que morre na exibição e passa a poder gerar custo (horas_uso × tarifa); de quebra corrige crash com kwargs horas_utilizacao/observacoes inexistentes.",
+    "evidencia": "models.py:1344-1350 sem FK; crud_rdo_completo.py:428-430 passa kwargs inexistentes (campo real horas_uso, models.py:1349)",
+    "pacote_relacionado": "novo"
+   },
+   {
+    "id": "A22",
+    "titulo": "Select de Cliente no form manual de proposta (gravar cliente_id) e persistir CPF/CNPJ no resolver",
+    "aresta": "crm-proposta-obra",
+    "acao": "fk_no_lugar_de_string",
+    "esforco": "P",
+    "impacto": "Cliente deixa de viajar como texto livre até a aprovação e o documento digitado deixa de morrer numa variável local — vira chave de dedup do cliente_resolver.",
+    "evidencia": "propostas_consolidated.py:556-560 (só texto), :559 (cliente_documento descartado), :1026/:2365/:2547 ('cliente_cpf_cnpj': None hardcoded); API de busca já existe em :2635",
+    "pacote_relacionado": "novo"
+   },
+   {
+    "id": "A23",
+    "titulo": "Aviso interno para comprovante enviado e decisão de compra do cliente no portal",
+    "aresta": "obra-portal-cliente",
+    "acao": "notificacao",
+    "esforco": "P",
+    "impacto": "Financeiro deixa de descobrir por acaso: hoje upload de comprovante e aprovação/recusa de compra só geram log, descoberta é pull.",
+    "evidencia": "portal_obras_views.py:608-610 (só logger.info+flash ao próprio cliente); decisão de compra sem notificação em :452-533",
+    "pacote_relacionado": "novo"
+   },
+   {
+    "id": "A24",
+    "titulo": "Ligar processar_e_salvar_folha_obra (pipeline de encargos patronais pronto e desligado) [decisão de negócio: rateio por obra]",
+    "aresta": "ponto-alocacao-rdo-custo",
+    "acao": "ligar_elo_existente",
+    "esforco": "M",
+    "impacto": "FGTS + INSS patronal calculados na folha passam a chegar ao custo da obra — o pipeline inteiro existe (FolhaProcessada tem os campos) e não tem nenhum chamador.",
+    "evidencia": "folha_service.py:1378 sem chamador (grep vazio); models.py:5347-5348 campos prontos; views/obras.py:1891-1892 já lê a tabela nunca populada",
+    "pacote_relacionado": "novo"
+   },
+   {
+    "id": "A25",
+    "titulo": "Agendar cron de proposta.expirando e configurar N8N_WEBHOOK_URL [decisão de negócio/infra: ativar canal externo]",
+    "aresta": "crm-proposta-obra",
+    "acao": "notificacao",
+    "esforco": "P",
+    "impacto": "O lembrete D-3 pronto (com dedup por proposta+dia) passa a disparar — hoje exige cron inexistente E variável de ambiente ausente, dupla condição nunca satisfeita.",
+    "evidencia": "notificacoes_cli.py:84 e :19-20 (cron sugerido, nenhum configurado); webhook_dispatcher.py:228-231 (no-op sem a env var)",
+    "pacote_relacionado": "novo"
+   }
+  ],
+  "mortos_notaveis": [
+   "Handler nota_fiscal_paga órfão: estrutura contábil completa carregada em todo boot, zero emissores no repo (handlers/financeiro_handlers.py:15; app.py:428)",
+   "NotificacaoCliente: modelo nunca criado nem lido em produção — único uso vivo é DELETE para não quebrar FK (models.py:3039; views/rdo.py:554)",
+   "ObraSignatarioCliente.email: gravado no cadastro e jamais consumido para envio, exibição ou payload (views/obras.py:4003)",
+   "SMTP de relatórios de veículos: MAIL_SERVER inexistente, painel que chamaria a rota não existe (GET dá 500), e SistemaAgendamentoRelatorios agenda em dict em memória sem executar nada (exportacao_relatorios.py:534,759-805)",
+   "AlocacaoEquipe + FK rdo_gerado_id: jamais instanciada em produção; a tela viva de alocação usa Allocation/AllocationEmployee (models.py:2107; grep vazio fora de models/tests)",
+   "Lead.proposta_id e Lead.obra_id: FKs comentadas como 'vínculos automáticos' sem nenhuma escrita em produção nem campo no formulário (models.py:7965-7972)",
+   "FolhaPagamento.adiantamentos: coluna cujo único escritor está em archive/ — adiantamento aprovado nunca vira desconto (models.py:2796; archive/legacy_cleanup/passo_9/folha_pagamento_utils.py:510)",
+   "Handler material_saida write-nothing + emissor com movimento_id=0 fixo: como travessia de dados o evento é morto por decisão, e a saída serializada nem localiza o movimento (event_manager.py:87-122; views/almoxarifado/movimentos.py:891)",
+   "CPF/CNPJ do formulário de proposta: lido para variável local e descartado na própria requisição; payloads emitem 'cliente_cpf_cnpj': None hardcoded (propostas_consolidated.py:559,1026,2365,2547)",
+   "Tabela CronogramaCliente: não é mais lida pelo portal, mas a rota editar_cronograma_cliente ainda grava nela — edição morta (models.py:6910; views/obras.py:3179-3185)",
+   "Pipeline FolhaProcessada/encargos patronais: calcular_encargos_patronais roda, o resultado é descartado, e processar_e_salvar_folha_obra não tem chamador (folha_service.py:966,1092-1094,1378)",
+   "subatividade_mestre_id como ponte de progresso TC↔RSS: chave presente nos dois trilhos e nunca usada para sincronizar avanço (models.py:5853-5857 e :1952)"
+  ]
+ }
+}
