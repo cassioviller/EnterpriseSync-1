@@ -415,9 +415,26 @@ def lancar_material_rdo(rdo_id, produto_id, quantidade, usuario_id, observacoes=
     if not produto:
         raise ValueError("Produto não encontrado")
     
-    # Obter dados da obra e funcionário através da alocação
-    alocacao = AlocacaoEquipe.query.filter_by(rdo_gerado_id=rdo_id).first()
-    funcionario_id = alocacao.funcionario_id if alocacao else None
+    # p7 — quem retirou o material.
+    #
+    # Isto consultava `AlocacaoEquipe.rdo_gerado_id`, uma FK que **nada
+    # escreve**: 🔬 03/08 em dev, 33 linhas na tabela e ZERO com
+    # `rdo_gerado_id` preenchido. A consulta devolvia None sempre, e a
+    # movimentação de estoque nascia sem funcionário desde o primeiro dia —
+    # `AlocacaoEquipe` era o único leitor de uma FK morta.
+    #
+    # A autoria que existe de verdade é a do RDO: quem o criou. A cadeia
+    # `Usuario.funcionario_id` (Fase 1) resolve login → pessoa. Sem cadeia,
+    # segue None, como antes — mas agora por falta de dado, não por consultar
+    # a tabela errada.
+    funcionario_id = None
+    try:
+        from models import Usuario
+        autor = db.session.get(Usuario, rdo.criado_por_id) if rdo.criado_por_id else None
+        funcionario_id = getattr(autor, 'funcionario_id', None)
+    except Exception:
+        logger.warning('[p7] não foi possível resolver o funcionário autor do '
+                       'RDO %s para a saída de estoque', rdo_id)
     obra_id = rdo.obra_id
     
     # Criar movimentação de saída

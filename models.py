@@ -2088,7 +2088,29 @@ class SubatividadeMestre(db.Model):
 # ================================
 
 class AlocacaoEquipe(db.Model):
-    """Sistema completo de alocação de equipes - MÓDULO 3 v8.0"""
+    """⚠️ MODELO EM APOSENTADORIA (p7) — não use em código novo.
+
+    O planejamento diário de equipe vive em `Allocation`/`AllocationEmployee`,
+    que têm sync com ponto e são o que a UI escreve. Esta tabela é de outra
+    época e ficou como planejamento paralelo.
+
+    🔬 **03/08, dev:** 33 linhas, e **zero** com `rdo_gerado_id` preenchido —
+    a FK para o RDO nunca foi escrita por caminho nenhum. Ela tinha um único
+    leitor (`almoxarifado_utils`, para descobrir quem retirou material), que
+    por isso recebia `None` desde sempre; esse leitor foi repontado para a
+    autoria do próprio RDO.
+
+    O que ainda a referencia, e por quê:
+
+    * `crud_rdo_completo.py:539` — anula `rdo_gerado_id` ao excluir RDO.
+      Mantido de propósito: é barato e protege bases onde a FK porventura
+      tenha valor, o que dev não consegue provar sobre produção;
+    * `services/importacao_fisico_financeiro.py` — import da tabela no
+      cabeçalho.
+
+    Remover a tabela exige migração destrutiva e conferência em produção — é
+    passo próprio, não carona de outro pacote.
+    """
     __tablename__ = 'alocacao_equipe'
     
     id = db.Column(db.Integer, primary_key=True)
