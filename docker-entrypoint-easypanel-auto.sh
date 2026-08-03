@@ -40,7 +40,14 @@ echo "🎯 Target Database Host: $DB_HOST" | tee -a "$LOG_FILE"
 
 # FASE 3.2: Safety flags e configurações de segurança
 ENABLE_ROLLBACK=${ENABLE_ROLLBACK:-"true"}
-MIGRATION_TIMEOUT=${MIGRATION_TIMEOUT:-300}
+# 03/08/2026: de 300s para 1800s. Até a 269 toda migração era DDL ou reparo
+# pontual e cabia em segundos; a 270 varre o cronograma do parque inteiro
+# para congelar linha de base antes de ligar o editor v2. Ela commita por
+# lote (200 obras), então um timeout no meio não perde trabalho — mas
+# derruba o deploy inteiro, e o deploy seguinte recomeçaria de onde parou só
+# para ser derrubado de novo. O teto alto é para a migração terminar de uma
+# vez; quem quiser o antigo define MIGRATION_TIMEOUT no painel.
+MIGRATION_TIMEOUT=${MIGRATION_TIMEOUT:-1800}
 HEALTH_CHECK_TIMEOUT=${HEALTH_CHECK_TIMEOUT:-60}
 FORCE_MIGRATION=${FORCE_MIGRATION:-"false"}
 

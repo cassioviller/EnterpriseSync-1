@@ -3,11 +3,22 @@
 
 O motor de agendamento novo (multi-predecessoras via `tarefa_vinculo`,
 caminho crítico, recálculo em cascata) só liga para tenant V2 **com**
-`configuracao_empresa.cronograma_editor_v2 = TRUE` (migração 222, default
-FALSE). Com a flag desligada, cada rota do cronograma executa exatamente o
-código de hoje (engine antigo). Este é o instrumento do rollout: liga
-primeiro no tenant de homologação, depois na obra piloto, por último no
-geral.
+`configuracao_empresa.cronograma_editor_v2 = TRUE` (migração 222). Com a
+flag desligada, cada rota do cronograma executa exatamente o código antigo.
+Este é o instrumento do rollout: liga primeiro no tenant de homologação,
+depois na obra piloto, por último no geral.
+
+⚠️ **03/08/2026 — o "por último no geral" já aconteceu.** A migração 270
+ligou a flag em TODOS os tenants (congelando a linha de base antes, como o
+passo 4 do runbook manda) e virou o default da coluna para TRUE. Este script
+deixou de ser o caminho de ligar e passou a ser o de **excluir alguém**:
+
+    python scripts/flag_cronograma_editor_v2.py <admin_id> --desligar
+
+O `--ligar` segue valendo para religar um excluído ou para ambiente novo — e
+seus dois guards (calendário de fim de semana, linha de base ausente)
+continuam intactos, porque é neles que o risco está escrito. Ver
+`docs/cronograma-editor-v2-rollout.md`.
 
 Uso (CLI):
     python scripts/flag_cronograma_editor_v2.py <admin_id> --status

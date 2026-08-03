@@ -5698,6 +5698,337 @@ def _migration_269_remover_indice_unico_antigo_de_assinatura():
         raise
 
 
+# Tamanho do lote da linha de base (passo 1 da 270). A migração roda dentro
+# do timeout do entrypoint (MIGRATION_TIMEOUT, 300s por padrão): congelar
+# milhares de obras num único INSERT arrisca estourar o relógio e perder o
+# trabalho inteiro. Em lotes, cada commit é progresso que a próxima
+# execução não refaz.
+_LOTE_BASELINE_270 = 200
+
+
+def _migration_270_editor_v2_em_todo_o_parque():
+    """Liga o editor de cronograma v2 em TODOS os tenants — decisão de 03/08/2026.
+
+    O editor v2 (grade tipo planilha, menu de botão direito, aninhar por
+    arrasto, desfazer/refazer, linha de base, caminho crítico) estava pronto
+    desde 24/07 atrás de `configuracao_empresa.cronograma_editor_v2`, e a
+    flag nunca foi ligada em nenhum tenant — `docs/rollout-consolidado.md`
+    registra isso como o estado de 27/07. O pedido de 03/08 é que **todo
+    cronograma que já existe em produção passe a abrir no formato novo**, e
+    não um piloto de cada vez.
+
+    Esta migração é o `docs/cronograma-editor-v2-rollout.md` executado no
+    boot, para o parque inteiro, na ordem que aquele runbook exige — e é a
+    ordem que importa:
+
+      1. **congela a linha de base** de toda obra com cronograma datado que
+         ainda não tem uma ativa;
+      2. **só então liga a flag.**
+
+    Inverter os dois passos é o erro que o runbook já cometeu uma vez: com o
+    motor novo no comando, a primeira edição recalcula as datas em cascata,
+    e uma linha de base criada depois congelaria o resultado do recálculo em
+    vez do plano que se queria preservar. Desligar a flag devolve o motor
+    antigo, **nunca as datas** — a `CronogramaBaseline` é o único registro
+    do plano de hoje que sobrevive a isso.
+
+    Ligar a flag **não recalcula nada sozinho**: a tela do cronograma só lê
+    (vínculos, folga, caminho crítico, desvio contra a linha de base). O
+    recálculo acontece na primeira edição — por isso o passo 1 é a rede, e
+    por isso esta migração é segura de rodar num boot.
+
+    ## O que ela deliberadamente NÃO resolve
+
+    * **Tenant que não é `versao_sistema='v2'`.** `utils.tenant.
+      cronograma_editor_v2_ativo` exige V2 **e** a flag; num tenant v1 a flag
+      fica ligada e inerte. Trocar a versão do sistema de um tenant é outra
+      decisão, de outro tamanho — aqui só se conta quantos são, no log.
+
+    * **Calendário com sábado/domingo.** O motor novo é seg–sex fixo nesta
+      fase. Num tenant cujo `CalendarioEmpresa` considera fim de semana, a
+      primeira edição vai mover datas para dias úteis, ignorando aquela
+      configuração. É exatamente o caso que o `--ligar` do
+      `scripts/flag_cronograma_editor_v2.py` recusa — e que este rollout em
+      massa aceita, por decisão, com a linha de base do passo 1 como
+      apólice. Os tenants nessa situação saem nominalmente no log; para
+      excluir um deles depois do deploy:
+
+          python scripts/flag_cronograma_editor_v2.py <admin_id> --desligar
+
+    * **Obra cujas tarefas estão em tenant diferente do dono da obra.** Dado
+      sujo conhecido (mesma família tratada pela 266): essas tarefas ficam de
+      fora do congelamento, e o log diz quantas obras são.
+
+    Idempotente: reexecutar não cria linha de base nova (o `NOT EXISTS` da
+    ativa), não duplica configuração e o UPDATE da flag vira no-op.
+    """
+    import time
+    from datetime import date
+
+    from sqlalchemy import text as sa_text
+
+    inicio_em = time.time()
+    nome_baseline = f"Antes do editor v2 — {date.today().strftime('%d/%m/%Y')}"
+
+    # Obra com cronograma INTERNO ativo e datado, sem linha de base ativa, e
+    # cujas tarefas pertencem ao mesmo tenant do dono da obra.
+    sql_obras_pendentes = """
+        SELECT DISTINCT t.obra_id
+          FROM tarefa_cronograma t
+          JOIN obra o ON o.id = t.obra_id AND o.admin_id = t.admin_id
+         WHERE t.ativa IS TRUE
+           AND t.is_cliente IS FALSE
+           AND t.data_inicio IS NOT NULL
+           AND t.data_fim IS NOT NULL
+           AND NOT EXISTS (
+                 SELECT 1 FROM cronograma_baseline b
+                  WHERE b.obra_id = t.obra_id
+                    AND b.is_cliente IS FALSE
+                    AND b.ativa IS TRUE)
+         ORDER BY t.obra_id
+    """
+
+    try:
+        # ── PASSO 1: congelar o plano de hoje ────────────────────────────
+        # Leituras por conexão própria, não pela `db.session`: a sessão
+        # ficaria com transação aberta durante os lotes e, no passo 4, o
+        # ALTER TABLE (ACCESS EXCLUSIVE) esperaria por ela.
+        with db.engine.connect() as conn:
+            pendentes = [r[0] for r in
+                         conn.execute(sa_text(sql_obras_pendentes)).fetchall()]
+        logger.info("[Migration 270] %s obra(s) com cronograma datado e sem "
+                    "linha de base ativa — congelando antes de ligar a flag",
+                    len(pendentes))
+
+        obras_congeladas = tarefas_congeladas = 0
+        for inicio in range(0, len(pendentes), _LOTE_BASELINE_270):
+            lote = pendentes[inicio:inicio + _LOTE_BASELINE_270]
+            with db.engine.begin() as conn:
+                # Um statement por lote: a linha de base nasce e seus itens
+                # saem do RETURNING dela, sem segundo passo capaz de deixar
+                # baseline vazia se o boot morrer no meio.
+                res = conn.execute(sa_text("""
+                    WITH alvo AS (
+                        SELECT o.id AS obra_id, o.admin_id
+                          FROM obra o
+                         WHERE o.id = ANY(:obras)
+                           AND NOT EXISTS (
+                                 SELECT 1 FROM cronograma_baseline b
+                                  WHERE b.obra_id = o.id
+                                    AND b.is_cliente IS FALSE
+                                    AND b.ativa IS TRUE)
+                    ), nova AS (
+                        INSERT INTO cronograma_baseline
+                               (obra_id, admin_id, nome, criada_em, ativa,
+                                is_cliente)
+                        SELECT a.obra_id, a.admin_id, :nome,
+                               (now() AT TIME ZONE 'utc'), TRUE, FALSE
+                          FROM alvo a
+                        RETURNING id, obra_id, admin_id
+                    )
+                    INSERT INTO cronograma_baseline_item
+                           (baseline_id, tarefa_id, admin_id, data_inicio,
+                            data_fim, duracao_dias)
+                    SELECT n.id, t.id, n.admin_id, t.data_inicio, t.data_fim,
+                           t.duracao_dias
+                      FROM nova n
+                      JOIN tarefa_cronograma t
+                        ON t.obra_id = n.obra_id
+                       AND t.admin_id = n.admin_id
+                       AND t.ativa IS TRUE
+                       AND t.is_cliente IS FALSE
+                       AND t.data_inicio IS NOT NULL
+                       AND t.data_fim IS NOT NULL
+                """), {'obras': lote, 'nome': nome_baseline})
+                tarefas_congeladas += res.rowcount or 0
+                obras_congeladas += len(lote)
+            logger.info("[Migration 270] linha de base: %s/%s obra(s) — %.0fs",
+                        obras_congeladas, len(pendentes),
+                        time.time() - inicio_em)
+
+        # Quem sobrou está fora do alcance do congelamento (tarefa em tenant
+        # diferente do dono da obra). Não bloqueia o rollout, mas precisa
+        # aparecer: são as obras cujo plano NÃO tem apólice.
+        with db.engine.connect() as conn:
+            restantes = conn.execute(sa_text("""
+                SELECT count(*) FROM (
+                    SELECT DISTINCT t.obra_id
+                      FROM tarefa_cronograma t
+                     WHERE t.ativa IS TRUE
+                       AND t.is_cliente IS FALSE
+                       AND t.data_inicio IS NOT NULL
+                       AND t.data_fim IS NOT NULL
+                       AND NOT EXISTS (
+                             SELECT 1 FROM cronograma_baseline b
+                              WHERE b.obra_id = t.obra_id
+                                AND b.is_cliente IS FALSE
+                                AND b.ativa IS TRUE)) x
+            """)).scalar() or 0
+        if restantes:
+            logger.warning("[Migration 270] %s obra(s) seguem sem linha de "
+                           "base — tarefa em tenant diferente do dono da obra "
+                           "(mesma sujeira da 266). O plano delas não tem "
+                           "apólice contra o recálculo.", restantes)
+
+        # ── PASSO 2: tenant com cronograma e sem linha de configuração ───
+        # Sem a linha, `cronograma_editor_v2_ativo` devolve False e o tenant
+        # ficaria de fora do "todos". Só se cria para quem tem cronograma —
+        # inventar configuração para tenant dormente não serve a nada.
+        with db.engine.begin() as conn:
+            # `pre_start.py` sobe o app inteiro antes de migrar, e a sessão
+            # dele pode estar com transação aberta sobre esta tabela. Sem
+            # teto, o UPDATE (e principalmente o ALTER do passo 4) esperaria
+            # por ela para sempre, com todo mundo na fila atrás — boot
+            # travado, não migração lenta. Medido: com a suíte segurando a
+            # sessão, o ALTER ficou 20min parado até o processo morrer.
+            conn.execute(sa_text("SET LOCAL lock_timeout = '60s'"))
+            criadas = conn.execute(sa_text("""
+                INSERT INTO configuracao_empresa
+                       (admin_id, nome_empresa, cronograma_editor_v2)
+                SELECT u.id,
+                       COALESCE(NULLIF(btrim(u.nome), ''),
+                                'Empresa ' || u.id),
+                       TRUE
+                  FROM usuario u
+                 WHERE EXISTS (
+                         SELECT 1 FROM obra o
+                          JOIN tarefa_cronograma t ON t.obra_id = o.id
+                         WHERE o.admin_id = u.id
+                           AND t.ativa IS TRUE
+                           AND t.is_cliente IS FALSE)
+                   AND NOT EXISTS (
+                         SELECT 1 FROM configuracao_empresa c
+                          WHERE c.admin_id = u.id)
+            """)).rowcount or 0
+
+            # ── PASSO 3: ligar a flag ────────────────────────────────────
+            # A tabela não tem unicidade por admin_id, então o alvo é a
+            # tabela inteira: com duas linhas para o mesmo tenant, ligar só
+            # uma deixaria o resultado na sorte do `.first()`.
+            ligadas = conn.execute(sa_text("""
+                UPDATE configuracao_empresa
+                   SET cronograma_editor_v2 = TRUE
+                 WHERE cronograma_editor_v2 IS NOT TRUE
+            """)).rowcount or 0
+
+            # Prova: se sobrou linha desligada, a migração falhou no seu
+            # único propósito e não pode ser carimbada como sucesso.
+            faltando = conn.execute(sa_text("""
+                SELECT count(*) FROM configuracao_empresa
+                 WHERE cronograma_editor_v2 IS NOT TRUE
+            """)).scalar() or 0
+            if faltando:
+                raise RuntimeError(
+                    f'{faltando} tenant(s) seguem com cronograma_editor_v2 '
+                    f'desligado após o UPDATE — investigar antes de anunciar '
+                    f'o formato novo como ligado.')
+
+        # ── PASSO 4: o formato novo passa a ser o padrão ─────────────────
+        # Sem isto, a empresa cadastrada AMANHÃ nasceria no editor antigo e o
+        # "todos" duraria até o próximo cliente. Espelhado em models.py
+        # (server_default='true').
+        #
+        # Transação PRÓPRIA, depois do passo 3 já commitado, e por dois
+        # motivos: (a) `ALTER TABLE` pede ACCESS EXCLUSIVE, o lock que enfileira
+        # todo mundo — mantê-lo junto com o UPDATE alongaria a fila sem
+        # necessidade; (b) se ele não conseguir o lock, o que o pedido de
+        # 03/08 queria JÁ ACONTECEU e está durável. Derrubar o deploy por
+        # causa de um default seria desproporcional: pela ORM
+        # (`models.py`, `default=True`) toda linha nova já nasce ligada, e o
+        # default do banco só vale para INSERT que omita a coluna fora dela.
+        default_ok = False
+        for tentativa in (1, 2, 3):
+            try:
+                # A sessão do app é a suspeita número um de segurar a tabela.
+                # `rollback()` encerra a transação dela (e solta os locks);
+                # `close()` faria o mesmo, mas DESANEXA os objetos vivos —
+                # quem chamar a migração de dentro de um fluxo com ORM
+                # carregado levaria DetachedInstanceError de brinde.
+                db.session.rollback()
+                with db.engine.begin() as conn:
+                    conn.execute(sa_text("SET LOCAL lock_timeout = '15s'"))
+                    conn.execute(sa_text("""
+                        ALTER TABLE configuracao_empresa
+                          ALTER COLUMN cronograma_editor_v2 SET DEFAULT TRUE
+                    """))
+                default_ok = True
+                break
+            except Exception as e:
+                logger.warning("[Migration 270] tentativa %s de virar o "
+                               "default da coluna não pegou o lock: %s",
+                               tentativa, e)
+
+        logger.info("[Migration 270] %s tarefa(s) congelada(s) em %s linha(s) "
+                    "de base; %s configuração(ões) criada(s); %s flag(s) "
+                    "ligada(s); default da coluna agora é %s",
+                    tarefas_congeladas, obras_congeladas, criadas, ligadas,
+                    'TRUE' if default_ok else 'INALTERADO')
+        if not default_ok:
+            logger.warning(
+                "[Migration 270] O default da coluna NÃO foi virado — alguém "
+                "segurava a tabela. Nada do que já foi feito se perde (a flag "
+                "está ligada em todos os tenants); só falta o default, que "
+                "pode ser aplicado a frio com:  ALTER TABLE "
+                "configuracao_empresa ALTER COLUMN cronograma_editor_v2 SET "
+                "DEFAULT TRUE;")
+
+        # ── PASSO 5: o que a flag ligada NÃO resolve, nominalmente ───────
+        with db.engine.connect() as conn:
+            fds = conn.execute(sa_text("""
+                SELECT c.admin_id, u.nome
+                  FROM calendario_empresa c
+                  LEFT JOIN usuario u ON u.id = c.admin_id
+                 WHERE (c.considerar_sabado IS TRUE
+                        OR c.considerar_domingo IS TRUE)
+                   AND EXISTS (
+                         SELECT 1 FROM obra o
+                          JOIN tarefa_cronograma t ON t.obra_id = o.id
+                         WHERE o.admin_id = c.admin_id
+                           AND t.ativa IS TRUE
+                           AND t.is_cliente IS FALSE)
+                 ORDER BY c.admin_id
+            """)).fetchall()
+
+            v1 = conn.execute(sa_text("""
+                SELECT count(*) FROM (
+                    SELECT DISTINCT o.admin_id
+                      FROM obra o
+                      JOIN tarefa_cronograma t ON t.obra_id = o.id
+                      JOIN usuario u ON u.id = o.admin_id
+                     WHERE t.ativa IS TRUE
+                       AND t.is_cliente IS FALSE
+                       AND COALESCE(u.versao_sistema, 'v1') <> 'v2') x
+            """)).scalar() or 0
+
+        if fds:
+            logger.warning("[Migration 270] %s tenant(s) com cronograma têm "
+                           "calendário que considera sábado e/ou domingo — o "
+                           "motor novo é seg–sex fixo e a PRIMEIRA EDIÇÃO vai "
+                           "mover as datas desses cronogramas para dias úteis:",
+                           len(fds))
+            for admin_id, nome in fds[:20]:
+                logger.warning("[Migration 270]   - tenant %s (%s)",
+                               admin_id, nome or 's/ nome')
+            if len(fds) > 20:
+                logger.warning("[Migration 270]   … e mais %s.", len(fds) - 20)
+            logger.warning("[Migration 270] Para tirar um deles do formato "
+                           "novo: python scripts/flag_cronograma_editor_v2.py "
+                           "<admin_id> --desligar")
+
+        if v1:
+            logger.warning("[Migration 270] %s tenant(s) com cronograma não "
+                           "são versao_sistema='v2' — a flag ficou ligada mas "
+                           "inerte para eles (utils/tenant.py:139). Trocar a "
+                           "versão do sistema é outra decisão.", v1)
+
+        logger.info("[Migration 270] Concluída com sucesso em %.0fs",
+                    time.time() - inicio_em)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 270] Falha: {e}", exc_info=True)
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -5980,6 +6311,7 @@ def executar_migracoes():
             (267, "Fase 9a — obra_signatario_cliente + rdo_assinatura.signatario_cliente_id", _migration_267_signatario_cliente),
             (268, "Fase 9a — unicidade de assinatura por signatário (dois índices parciais)", _migration_268_unicidade_assinatura_por_signatario),
             (269, "Fase 9a — remove uq_rdo_assinatura_papel também quando é ÍNDICE (a 268 só tratava constraint)", _migration_269_remover_indice_unico_antigo_de_assinatura),
+            (270, "Editor de cronograma v2 em todo o parque — linha de base primeiro, flag ligada em todos os tenants, default da coluna vira TRUE", _migration_270_editor_v2_em_todo_o_parque),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

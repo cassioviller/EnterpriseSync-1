@@ -1,10 +1,53 @@
 # Editor de cronograma v2 — runbook de rollout
 
-> Flag `configuracao_empresa.cronograma_editor_v2` (migração 222, default
-> `FALSE`). Cinco fases entregues em 24/07: `73f58d3e` → `8fda59f5`.
+> Flag `configuracao_empresa.cronograma_editor_v2` (migração 222). Cinco
+> fases entregues em 24/07: `73f58d3e` → `8fda59f5`; a Fase 6 (menu de botão
+> direito) em 29/07, `fe96d652`.
 >
 > Com a flag desligada, o cronograma se comporta como sempre. Todo o risco
 > está em ligar — e aqui o risco é de **datas mudarem sozinhas**.
+
+## ⚖️ DECISÃO do Cássio — 03/08: liga em todo o parque, de uma vez
+
+> "Todos cronogramas que já estão feitos no deploy virarem no novo formato,
+> que pode editar no botão direito."
+
+O rollout piloto-a-piloto descrito abaixo **não é mais o caminho do dia a
+dia** — ele foi executado de uma vez pela **migração 270**, que roda no boot
+do deploy (`docker-entrypoint-easypanel-auto.sh` → `pre_start.py`). O que a
+270 faz, nesta ordem:
+
+1. **congela a linha de base** de toda obra com cronograma interno datado que
+   ainda não tinha uma ativa (o passo 4 desta lista, em massa e em lotes de
+   200 obras, cada lote commitado — boot que morre no meio não refaz o que já
+   ficou pronto);
+2. **cria `configuracao_empresa`** para o tenant que tem cronograma e nunca
+   teve linha de configuração — sem ela a flag lê FALSE e o tenant ficaria de
+   fora do "todos";
+3. **liga a flag em todas as linhas da tabela** (a tabela não tem unicidade
+   por `admin_id`: ligar só uma deixaria o resultado na sorte do `.first()`);
+4. **vira o default da coluna para TRUE** — espelhado em `models.py` — para a
+   empresa cadastrada amanhã nascer no formato novo;
+5. **denuncia no log** o que ela não resolve: tenants com calendário de fim de
+   semana (nominalmente) e a contagem de tenants que não são `versao_sistema='v2'`.
+
+Duas consequências que valem repetir:
+
+- **O guard de calendário virou aviso.** O `--ligar` do script recusa tenant
+  com sábado/domingo no `CalendarioEmpresa`; a 270 liga assim mesmo, por
+  decisão, com a linha de base do passo 1 como apólice. Confira no log do
+  deploy quais tenants saíram nominalmente citados.
+- **Ligar a flag não recalcula nada sozinho.** A tela do cronograma só lê. O
+  recálculo em cascata acontece na **primeira edição** — é lá que datas de um
+  tenant com calendário de fim de semana vão para dias úteis.
+
+Tirar um tenant do formato novo depois do deploy continua sendo uma linha:
+
+    python scripts/flag_cronograma_editor_v2.py <admin_id> --desligar
+
+O resto deste runbook segue válido como **o procedimento por tenant** — para
+religar quem foi excluído, para ambiente novo, e porque é onde o risco está
+explicado.
 
 ## O que a flag liga
 

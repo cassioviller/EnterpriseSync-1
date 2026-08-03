@@ -47,7 +47,7 @@ sempre: Onda 0 (medir) → Onda 1 (escopo num piloto) → Onda 3 (compras).
 | `escopo_obra_ativo` | Fase 1.5 — RBAC por obra | `fase-1-rollout.md` | ✅ recusa se `usuario_obra` vazia e há usuário não-admin |
 | `compras_governanca_ativa` | Fase 3 — requisição→alçada→pedido | `fase-3-rollout.md` | ✅ recusa sem faixa de alçada; checa o escopo |
 | `cronograma_mpp_ativo` | M08/M09/M10 — importação de cronograma .mpp | ✅ `cronograma-mpp-rollout.md` | — (governa borda visual, não acesso) |
-| `cronograma_editor_v2` | Editor de cronograma v2 (5 fases, 24/07) | ✅ `cronograma-editor-v2-rollout.md` | ✅ recusa calendário com sáb/dom |
+| `cronograma_editor_v2` | Editor de cronograma v2 (5 fases, 24/07; Fase 6 em 29/07) — **ligada em todo o parque em 03/08 pela migração 270** | ✅ `cronograma-editor-v2-rollout.md` | ✅ recusa calendário com sáb/dom (no `--ligar`; a 270 só avisa) |
 | `rdo_percentual_livre` | RDO em porcentagem livre (24/07) | ✅ `rdo-percentual-livre-rollout.md` | ✅ recusa tarefas que perderiam físico |
 
 > 🔬 27/07: as três últimas linhas eram lacunas desta revisão (runbook
@@ -170,7 +170,15 @@ Independentes das ondas 1-3; podem correr em paralelo com a 2. Cada uma tem
 runbook próprio desde 27/07, e o `--ligar` das duas **recusa antes de gravar**.
 
 - **`cronograma_editor_v2`** → `docs/cronograma-editor-v2-rollout.md`.
-  O guard recusa tenant cujo calendário considera sábado/domingo (o motor novo
+  ✅ **LIGADA EM TODO O PARQUE em 03/08** pela migração **270**, por decisão
+  do Cássio ("todos cronogramas que já estão feitos no deploy virarem no novo
+  formato"). A migração congela a linha de base de toda obra datada **antes**
+  de ligar, cria `configuracao_empresa` para o tenant que tem cronograma e não
+  tinha linha, e vira o default da coluna para TRUE. O guard de calendário de
+  fim de semana virou **aviso nominal no log do deploy** em vez de recusa — a
+  linha de base é a apólice. Excluir um tenant: `--desligar`.
+  O guard do `--ligar` segue intacto para religar alguém ou para ambiente
+  novo: recusa tenant cujo calendário considera sábado/domingo (o motor novo
   é seg-sex fixo nesta fase) e — desde 28/07 — tenant com obra datada **sem
   linha de base ativa**: desligar a flag reverte o motor, não as datas que ele
   já gravou, e a linha de base é o único registro do plano que sobrevive.

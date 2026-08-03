@@ -144,6 +144,12 @@ def test_migration_222_tabela_e_colunas_existem():
             WHERE table_name = 'tarefa_cronograma' AND column_name = 'folga_dias'
         """)).fetchone() is not None, 'coluna folga_dias não existe'
 
+        # O default desta coluna era FALSE quando a 222 a criou (rollout por
+        # tenant). A migração 270 (03/08/2026) ligou o editor v2 em todo o
+        # parque e virou o default para TRUE — aqui só resta o contrato que
+        # a 222 garante e a 270 não mexeu: a coluna existe, NOT NULL e com
+        # default. O valor do default é asserido em
+        # tests/test_migrations_editor_v2_parque.py.
         linha = conn.execute(sa_text("""
             SELECT is_nullable, column_default FROM information_schema.columns
             WHERE table_name = 'configuracao_empresa'
@@ -151,7 +157,7 @@ def test_migration_222_tabela_e_colunas_existem():
         """)).fetchone()
         assert linha is not None, 'coluna cronograma_editor_v2 não existe'
         assert linha[0] == 'NO'
-        assert 'false' in str(linha[1]).lower()
+        assert str(linha[1]).lower() in ('false', 'true')
 
 
 def test_constraints_da_tabela_valem():

@@ -4271,14 +4271,16 @@ class ConfiguracaoEmpresa(db.Model):
     compras_governanca_ativa = db.Column(db.Boolean, nullable=False,
                                          default=False, server_default='false')
 
-    # Cronograma editável Fase 1 — flag de rollout do motor de agendamento
-    # novo (multi-predecessoras via tarefa_vinculo, caminho crítico). Default
-    # FALSE: com ela desligada, cada rota do cronograma executa exatamente o
-    # código de hoje (engine antigo). Liga-se por
-    # scripts/flag_cronograma_editor_v2.py. Irmã de cronograma_mpp_ativo
-    # (acima, migration 211); migração espelho: 222.
-    cronograma_editor_v2 = db.Column(db.Boolean, nullable=False, default=False,
-                                     server_default='false')
+    # Cronograma editável Fase 1 — motor de agendamento novo
+    # (multi-predecessoras via tarefa_vinculo, caminho crítico) mais a grade
+    # tipo planilha com menu de botão direito. Nasceu como flag de rollout
+    # com default FALSE (migração 222); desde 03/08/2026 o default é TRUE e a
+    # migração 270 ligou a flag em TODOS os tenants — o editor v2 é o
+    # formato do cronograma, não mais um piloto. Continua sendo coluna, e
+    # não constante, porque desligar por tenant segue sendo o rollback:
+    # scripts/flag_cronograma_editor_v2.py <admin_id> --desligar.
+    cronograma_editor_v2 = db.Column(db.Boolean, nullable=False, default=True,
+                                     server_default='true')
 
     # RDO em porcentagem livre — flag de rollout por tenant. Com ela ligada,
     # TODA tarefa é apontada em percentual acumulado no RDO (o quantitativo
