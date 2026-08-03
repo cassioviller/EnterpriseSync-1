@@ -149,9 +149,12 @@ class MetricasTestRunner:
         )
         obra = self._criar_obra(adm)
         di = date.today().replace(day=1)
-        df = date.today()
         # 5 dias trabalhados, 1 com 2h extras
         dias = [di + timedelta(days=i) for i in range(5)]
+        # A janela precisa cobrir os dias semeados. Com `df = date.today()` o
+        # teste só passava do dia 6 em diante: nos primeiros dias do mês hoje
+        # cai ANTES do último dia semeado e a contagem dava 3/5.
+        df = max(date.today(), dias[-1])
         self._registrar_dias_trabalhados(func, obra, dias[:4])
         self._registrar_dias_trabalhados(func, obra, [dias[4]], extras=2.0)
         db.session.commit()
@@ -189,8 +192,8 @@ class MetricasTestRunner:
         )
         obra = self._criar_obra(adm)
         di = date.today().replace(day=1)
-        df = date.today()
         dias = [di + timedelta(days=i) for i in range(4)]
+        df = max(date.today(), dias[-1])   # ver cenário 1
         # 3 dias trabalhados + 1 falta_justificada (diarista NÃO paga essa)
         self._registrar_dias_trabalhados(diarista, obra, dias[:3])
         db.session.add(RegistroPonto(
@@ -230,8 +233,8 @@ class MetricasTestRunner:
         )
         obra = self._criar_obra(adm)
         di = date.today().replace(day=1)
-        df = date.today()
         dias = [di + timedelta(days=i) for i in range(6)]
+        df = max(date.today(), dias[-1])   # ver cenário 1
         # Diarista: 5 dias normais + 1 falta
         self._registrar_dias_trabalhados(diarista, obra, dias[:5])
         db.session.add(RegistroPonto(
