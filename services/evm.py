@@ -58,12 +58,11 @@ def calcular_evm(obra_id: int, admin_id: int) -> dict:
     """
     from services.cronograma_fisico_financeiro import (curva_realizado,
                                                        montar_fisico_financeiro)
-    from services.custo_orcado import custo_orcado_da_obra
     from utils.cronograma_engine import progresso_ponderado_armazenado
     from models import Obra
 
     vazio = {
-        'bac': 0.0, 'pv': 0.0, 'ev': 0.0, 'ac': 0.0,
+        'bac': 0.0, 'bac_origem': None, 'pv': 0.0, 'ev': 0.0, 'ac': 0.0,
         'cv': 0.0, 'sv': 0.0, 'cpi': None, 'spi': None,
         'eac': 0.0, 'etc': 0.0, 'vac': 0.0,
         'pct_fisico': 0.0, 'tem_dados': False,
@@ -74,7 +73,7 @@ def calcular_evm(obra_id: int, admin_id: int) -> dict:
         if obra is None:
             return vazio
 
-        bac = _d(custo_orcado_da_obra(obra_id, admin_id))
+        bac, origem_bac = _bac_da_obra(obra_id, admin_id)
         if bac <= 0:
             # Sem custo orçado não há EVM: todos os índices dividiriam por
             # zero, e um painel cheio de "0%" seria lido como obra parada.
@@ -103,7 +102,8 @@ def calcular_evm(obra_id: int, admin_id: int) -> dict:
         vac = bac - eac
 
         return {
-            'bac': float(bac), 'pv': float(pv), 'ev': float(ev),
+            'bac': float(bac), 'bac_origem': origem_bac,
+            'pv': float(pv), 'ev': float(ev),
             'ac': float(ac), 'cv': float(cv), 'sv': float(sv),
             'cpi': round(cpi, 4) if cpi is not None else None,
             'spi': round(spi, 4) if spi is not None else None,
@@ -132,3 +132,37 @@ def _pv_ate_hoje(dados: dict) -> Decimal:
             if str(mes) <= hoje:
                 total += _d(valor)
     return total
+
+
+def _bac_da_obra(obra_id: int, admin_id: int):
+    """BAC da obra: o congelado na linha de base, ou o vivo.
+
+    Devolve `(valor, origem)` com origem em `{'baseline', 'vivo'}`.
+
+    A linha de base ATIVA é a preferida — é o retrato do plano contra o qual
+    a obra está sendo medida. Comparar custo real com orçamento vivo faz o
+    CPI melhorar sozinho quando alguém revisa o orçamento para cima, que é o
+    oposto do que um indicador de desempenho deve fazer.
+
+    Cai para o vivo quando não há linha de base, ou quando a que existe é
+    anterior à coluna `bac` (`NULL`) — inclusive as que a migração 277 criou
+    em massa no rollout do editor v2. A origem sai no payload para a UI poder
+    dizer contra o que está comparando.
+    """
+    try:
+        from models import CronogramaBaseline
+
+        baseline = (CronogramaBaseline.query
+                    .filter_by(obra_id=obra_id, admin_id=admin_id,
+                               is_cliente=False, ativa=True)
+                    .first())
+        if baseline is not None and baseline.bac is not None:
+            valor = _d(baseline.bac)
+            if valor > 0:
+                return valor, 'baseline'
+    except Exception:
+        logger.exception('[p10] leitura do BAC da baseline falhou (obra=%s)',
+                         obra_id)
+
+    from services.custo_orcado import custo_orcado_da_obra
+    return _d(custo_orcado_da_obra(obra_id, admin_id)), 'vivo'

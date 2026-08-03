@@ -2132,9 +2132,16 @@ def criar_baseline(obra_id: int):
     if ativar:
         _desativar_baselines(obra_id, admin_id, cliente_mode)
 
+    # p10 — congela o BAC junto com as datas. Sem isto, o EVM compara custo
+    # real contra orçamento vivo, e revisar o orçamento para cima melhoraria
+    # o CPI sozinho.
+    from services.custo_orcado import custo_orcado_da_obra
+    bac_congelado = custo_orcado_da_obra(obra_id, admin_id)
+
     baseline = CronogramaBaseline(
         obra_id=obra_id, admin_id=admin_id, nome=nome[:120],
-        criada_por=current_user.id, ativa=ativar, is_cliente=cliente_mode)
+        criada_por=current_user.id, ativa=ativar, is_cliente=cliente_mode,
+        bac=bac_congelado or None)
     db.session.add(baseline)
     db.session.flush()
     for t in tarefas:

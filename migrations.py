@@ -6029,6 +6029,34 @@ def _migration_277_editor_v2_em_todo_o_parque():
         raise
 
 
+def _migration_278_baseline_bac():
+    """p10 — `cronograma_baseline.bac`: o orçamento congelado junto com o prazo.
+
+    A linha de base guardava só datas. O EVM comparava o custo real contra o
+    custo orçado VIVO, e isso esvazia o indicador: quem revisa o orçamento
+    para cima faz o CPI melhorar sozinho, sem nada ter mudado na obra.
+
+    Nullable de propósito. As linhas de base que já existem — inclusive as
+    milhares que a **migração 277** congelou no rollout do editor v2 — ficam
+    com NULL, e o EVM cai para o custo orçado vivo, que é o comportamento de
+    antes. Preencher retroativamente seria inventar um orçamento que ninguém
+    congelou naquele momento.
+
+    Idempotente (`ADD COLUMN IF NOT EXISTS`), no padrão das irmãs.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE cronograma_baseline "
+                "ADD COLUMN IF NOT EXISTS bac NUMERIC(15,2)"))
+        logger.info("[Migration 278] cronograma_baseline.bac criada (NULL = "
+                    "baseline anterior ao congelamento de orçamento).")
+    except Exception as e:
+        logger.error(f"[Migration 278] Falha: {e}", exc_info=True)
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -6312,6 +6340,7 @@ def executar_migracoes():
             (268, "Fase 9a — unicidade de assinatura por signatário (dois índices parciais)", _migration_268_unicidade_assinatura_por_signatario),
             (269, "Fase 9a — remove uq_rdo_assinatura_papel também quando é ÍNDICE (a 268 só tratava constraint)", _migration_269_remover_indice_unico_antigo_de_assinatura),
             (277, "Editor de cronograma v2 em todo o parque — linha de base primeiro, flag ligada em todos os tenants, default da coluna vira TRUE", _migration_277_editor_v2_em_todo_o_parque),
+            (278, "p10 — cronograma_baseline.bac (orçamento congelado junto com o prazo; NULL = baseline anterior)", _migration_278_baseline_bac),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

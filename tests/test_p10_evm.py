@@ -190,3 +190,45 @@ def test_o_painel_financeiro_expoe_a_chave_evm():
     assert painel['evm']['ev'] == 30000.0
     # o resto do painel continua lá
     assert 'kpis' in painel and 'curva_s' in painel and 'etapas' in painel
+
+
+# ---------------------------------------------------------------------------
+# BAC congelado na linha de base
+# ---------------------------------------------------------------------------
+
+def test_bac_vem_da_linha_de_base_quando_ela_congelou_um():
+    """Comparar custo real com orçamento VIVO esvazia o EVM: revisar o
+    orçamento para cima faria o CPI melhorar sozinho."""
+    from models import CronogramaBaseline
+
+    t = _tenant()
+    _custo_orcado(t, 100000, linhas=(60000,))
+    _tarefa(t, 50)
+
+    db.session.add(CronogramaBaseline(
+        obra_id=t.obra_id, admin_id=t.admin_id, nome='Plano congelado',
+        ativa=True, is_cliente=False, bac=Decimal('50000')))
+    db.session.commit()
+
+    evm = calcular_evm(t.obra_id, t.admin_id)
+    assert evm['bac'] == 50000.0
+    assert evm['bac_origem'] == 'baseline'
+    assert evm['ev'] == 25000.0
+
+
+def test_baseline_antiga_sem_bac_cai_para_o_orcado_vivo():
+    """As milhares que a migração 277 congelou têm `bac` NULL — e continuam
+    funcionando como antes."""
+    from models import CronogramaBaseline
+
+    t = _tenant()
+    _custo_orcado(t, 100000, linhas=(60000,))
+
+    db.session.add(CronogramaBaseline(
+        obra_id=t.obra_id, admin_id=t.admin_id, nome='Antes do editor v2',
+        ativa=True, is_cliente=False, bac=None))
+    db.session.commit()
+
+    evm = calcular_evm(t.obra_id, t.admin_id)
+    assert evm['bac'] == 60000.0
+    assert evm['bac_origem'] == 'vivo'

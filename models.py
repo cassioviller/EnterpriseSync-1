@@ -6114,6 +6114,18 @@ class CronogramaBaseline(db.Model):
     is_cliente = db.Column(db.Boolean, nullable=False, default=False,
                            server_default='false')
 
+    # p10 — BAC (Budget At Completion) congelado junto com as datas.
+    #
+    # A linha de base guardava só o PRAZO planejado. Comparar o custo real
+    # contra o orçamento VIVO esvazia o EVM: quem revisa o orçamento para
+    # cima faz o CPI melhorar sozinho, sem nada ter mudado na obra. O ponto
+    # de uma baseline é justamente ser o retrato que não se move.
+    #
+    # NULL = baseline criada antes desta coluna (inclusive as milhares que a
+    # migração 277 congelou no rollout do editor v2). Nesse caso o EVM cai
+    # para o custo orçado vivo — o comportamento de antes.
+    bac = db.Column(db.Numeric(15, 2), nullable=True)
+
     itens = db.relationship('CronogramaBaselineItem', backref='baseline',
                             cascade='all, delete-orphan', lazy='dynamic')
 
