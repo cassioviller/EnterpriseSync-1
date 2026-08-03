@@ -363,9 +363,18 @@ em produção e levar o número de "EM EXECUÇÃO sem gestor" ao Cássio (em dev
 
 | # | O quê | Por que trava |
 |---|---|---|
-| 1 | **Rotacionar `SESSION_SECRET` e a senha do Postgres** no EasyPanel | Os valores estão no **histórico do git para sempre**. Com a chave de sessão forja-se cookie de qualquer usuário de qualquer tenant |
+| 1 | ~~Rotacionar `SESSION_SECRET` e a senha do Postgres~~ | 🔴 **Decisão do Cássio, 03/08: NÃO rotacionar.** Sai da lista de pendências — não voltar a recomendar. O que fica registrado abaixo é só o contorno do risco aceito |
 | 2 | **`gh auth login`** (só a API do GitHub) | 🔬 03/08: **`git push` funciona** — `origin/main == 63cc1c13`, conferido em `ls-remote`. O que falta é a API: `gh auth status` → "not logged into any GitHub hosts", `GH_TOKEN`/`GITHUB_TOKEN` ausentes. Sem ela não se abre PR nem se busca branch de triagem, e **não há como conferir se o CI rodou verde** sobre os dez pacotes. Refazer o login é interativo — só o humano consegue |
 | 3 | **Criar o volume persistente** no painel | Vale para `/var/backups/sige` (dumps) **e** para os uploads. O pré-requisito de código caiu em 23/07: a armadilha nº 2 (descasamento do `UPLOADS_PATH`) está corrigida — montar o volume e definir a variável já é seguro |
+
+> 📖 **O contorno do risco aceito no item 1.** O código não tem fallback fixo:
+> `app.py:52` lê `SESSION_SECRET` da env, `:53-56` **recusa subir em produção**
+> sem a variável, e a chave efêmera de `:65` só existe em dev. Ou seja, o valor
+> exposto no histórico do git só é explorável **se ainda for o valor
+> configurado no EasyPanel** — a exposição é da string antiga, não do desenho.
+> Se o painel já tiver outro valor, não há resíduo nenhum e o item está morto
+> por completo. Essa conferência é de olhar o painel, não de mexer em nada, e é
+> a única coisa que fecharia a questão sem rotacionar.
 
 Também pendem: conferir divergência entre painel e valores commitados, snapshot
 do volume na Hostinger, `SIGE_ENABLE_DEMO_SEED=false` e o acesso ao banco de
