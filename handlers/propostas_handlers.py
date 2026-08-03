@@ -176,6 +176,111 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
     return criados
 
 
+def _semear_servicos_reais(proposta_id: int, admin_id: int) -> int:
+    """p5 — a obra nasce pronta para o RDO: `ServicoObraReal` dos itens.
+
+    O RDO trabalha sobre `ServicoObraReal`. Sem esta semeadura, a obra criada
+    pela aprovação nascia com IMC, OSC e cronograma — e **sem serviço nenhum
+    para apontar**: quem fosse lançar o primeiro RDO precisava re-selecionar
+    na mão os mesmos serviços que a proposta já listava.
+
+    Só semeia item com `servico_id` (linhagem de catálogo). Item avulso, sem
+    serviço cadastrado, não vira `ServicoObraReal` — o modelo exige
+    `servico_id` NOT NULL, e inventar um serviço aqui seria criar catálogo
+    pelo caminho errado.
+
+    Idempotente por (obra, serviço): reexecutar não duplica. Não commita — a
+    rota é dona da transação.
+    """
+    from models import Proposta, PropostaItem, ServicoObraReal
+
+    proposta = Proposta.query.filter_by(id=proposta_id, admin_id=admin_id).first()
+    if not proposta or not proposta.obra_id:
+        return 0
+
+    itens = PropostaItem.query.filter_by(proposta_id=proposta_id).all()
+    if not itens:
+        return 0
+
+    ja_existem = {
+        s.servico_id for s in ServicoObraReal.query.filter_by(
+            obra_id=proposta.obra_id, admin_id=admin_id).all()
+    }
+
+    criados = 0
+    sem_servico = 0
+    for item in itens:
+        servico_id = getattr(item, 'servico_id', None)
+        if not servico_id:
+            sem_servico += 1
+            continue
+        if servico_id in ja_existem:
+            continue
+
+        quantidade = float(getattr(item, 'quantidade', 0) or 0)
+        unitario = float(getattr(item, 'preco_unitario', 0) or 0)
+        db.session.add(ServicoObraReal(
+            obra_id=proposta.obra_id,
+            servico_id=servico_id,
+            admin_id=admin_id,
+            quantidade_planejada=quantidade,
+            valor_unitario=unitario,
+            valor_total_planejado=quantidade * unitario,
+            status='Não Iniciado',
+        ))
+        ja_existem.add(servico_id)
+        criados += 1
+
+    if sem_servico:
+        logger.info(
+            '[p5] proposta %s: %s item(ns) sem servico_id não viraram '
+            'ServicoObraReal — item avulso não cria catálogo', proposta_id,
+            sem_servico)
+    if criados:
+        logger.info('[p5] proposta %s: %s ServicoObraReal semeado(s) na obra '
+                    '%s — a obra nasce pronta para o RDO', proposta_id,
+                    criados, proposta.obra_id)
+    return criados
+
+
+def _fechar_lead_da_proposta(proposta_id: int, admin_id: int) -> int:
+    """p5 — o CRM fica sabendo do desfecho.
+
+    `Lead.proposta_id` e `Lead.obra_id` existem no modelo (models.py:7967 e
+    :7971) e **nada os escrevia**: a proposta era aprovada, a obra nascia, e o
+    lead correspondente continuava aberto no Kanban para sempre.
+
+    Fecha o lead como APROVADO e amarra a obra. Não mexe em lead já PERDIDO —
+    um desfecho registrado à mão vale mais que a inferência daqui. Não
+    commita.
+    """
+    from models import Lead, LeadStatus, Proposta
+
+    proposta = Proposta.query.filter_by(id=proposta_id, admin_id=admin_id).first()
+    if not proposta:
+        return 0
+
+    leads = Lead.query.filter_by(proposta_id=proposta_id, admin_id=admin_id).all()
+    fechados = 0
+    for lead in leads:
+        if lead.status == LeadStatus.PERDIDO.value:
+            logger.info('[p5] lead %s está PERDIDO — não reaberto pela '
+                        'aprovação da proposta %s', lead.id, proposta_id)
+            continue
+        mudou = False
+        if lead.status != LeadStatus.APROVADO.value:
+            lead.status = LeadStatus.APROVADO.value
+            mudou = True
+        if proposta.obra_id and lead.obra_id != proposta.obra_id:
+            lead.obra_id = proposta.obra_id
+            mudou = True
+        if mudou:
+            fechados += 1
+            logger.info('[p5] lead %s fechado como APROVADO e vinculado à '
+                        'obra %s', lead.id, proposta.obra_id)
+    return fechados
+
+
 @event_handler('proposta_aprovada')
 def handle_proposta_aprovada(data: dict, admin_id: int):
     """
@@ -318,6 +423,9 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         )
         _propagar_proposta_para_obra(proposta_id, admin_id)
         _materializar_cronograma_se_houver()
+        # p5 — a obra nasce pronta para o RDO, e o CRM sabe do desfecho.
+        _semear_servicos_reais(proposta_id, admin_id)
+        _fechar_lead_da_proposta(proposta_id, admin_id)
         return
 
     # Delta negativo (revisão para baixo) inverte as partidas: estorna
@@ -379,6 +487,11 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
 
     # Task #102: materializar cronograma. Falha propaga (rota faz rollback).
     _materializar_cronograma_se_houver()
+
+    # p5 — mesma transação: a obra nasce com os serviços do orçamento
+    # prontos para apontamento, e o lead do CRM fecha com a obra amarrada.
+    _semear_servicos_reais(proposta_id, admin_id)
+    _fechar_lead_da_proposta(proposta_id, admin_id)
 
     logger.info(f"✅ Handler proposta_aprovada executado - Proposta #{proposta_id} (commit pendente)")
 
