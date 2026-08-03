@@ -150,13 +150,34 @@ Cada pacote tem tamanho de uma spec. Pacotes na mesma onda podem andar em
 paralelo.
 
 ```
-Onda A   p1
-Onda B   p2 ‖ p3 ‖ p9
-Onda C   p4 ‖ p5 ‖ p6
-Onda D   p7
-Onda E   p8
-Onda F   p10
+Onda A   p1                ✅ 03/08
+Onda B   p2 ‖ p3 ‖ p9    ✅ 03/08
+Onda C   p4 ‖ p5 ‖ p6    ✅ 03/08
+Onda D   p7                ✅ 03/08 (parcial)
+Onda E   p8                ✅ 03/08 (leitura; escrita segue dual)
+Onda F   p10               ✅ 03/08
 ```
+
+> ### ✅ 03/08 — os dez pacotes entregues, e o que ficou de fora
+>
+> Cada pacote tem commit próprio, testes próprios e regressão verde. Três
+> recortes deliberados, para ninguém achar que estão fechados:
+>
+> * **p7** — saiu a correção de perda de dado: o plano nunca mais sobrescreve
+>   a batida real, e os dois ramos que criavam `RegistroPonto` sem `admin_id`
+>   pararam de estourar. Ficaram para depois: aposentar `AlocacaoEquipe` (dois
+>   leitores vivos ainda) e o pré-carregamento do RDO a partir do ponto (A17);
+> * **p8** — a **leitura** convergiu (`services/progresso_subatividade.py` usa
+>   o elo `subatividade_mestre_id`, que existia dos dois lados e nunca era
+>   lido). A **escrita** continua dual: `percentual_concluido` versus
+>   apontamentos de RDO — o p4 mostrou por que isso não se resolve por decreto;
+> * **p10** — PV/EV/AC e índices servidos no painel. Ficaram o BAC congelado
+>   junto à `CronogramaBaseline` (hoje ela só congela datas) e a folga livre no
+>   scheduler.
+>
+> ⚠️ **Nada disso rodou fora do ambiente de desenvolvimento.** São commits
+> mexendo em custo, medição, progresso e contrato — números que o cliente vê —
+> parados atrás de um push sem credencial nesta sessão.
 
 ### p1 — Estancar sangramento: tenant e dupla contagem *(onda A)*
 
