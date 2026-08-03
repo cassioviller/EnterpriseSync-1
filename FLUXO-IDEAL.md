@@ -296,6 +296,17 @@ dos dois lados (barato), depois unificar fatos, por fim contar a história.
 
 ## 6. Próximos passos deste estudo
 
+> **31/07 — os passos 1 e 3 foram executados. Leia `PLANO-NUCLEO.md`.**
+> A conferência rodou como verificação adversarial dos 12 achados estruturais
+> (10 confirmados, 2 parciais, **0 refutados**) e um segundo levantamento mapeou
+> as conexões entre módulos. As ondas 0-3 da seção 5 continuam válidas como
+> diagnóstico, mas **foram reordenadas em 10 pacotes** por decisão de produto —
+> o centro é o par cronograma ↔ RDO. Onde os vereditos divergem do que está
+> escrito aqui, vale o `PLANO-NUCLEO.md`. As duas correções mais importantes a
+> este documento: o auto-casamento item↔tarefa da onda 1.3 **já existe** desde a
+> Task #102, e a dupla digitação de progresso no formulário de RDO **já foi
+> removida** pelo M07 — o que resta nos dois casos é camada de dados.
+
 1. **Conferência módulo a módulo** (spec a derivar do `MODULOS.md`): validar
    cada achado citado aqui no código vivo, marcando `Conferência:` — os
    agentes leram estaticamente; nada aqui vira mudança sem confirmação.
@@ -305,6 +316,10 @@ dos dois lados (barato), depois unificar fatos, por fim contar a história.
 
 ## Histórico
 
+- **2026-07-31** — conferência adversarial dos achados e levantamento das
+  conexões entre módulos. Resultado em `PLANO-NUCLEO.md`; bruto em
+  `docs/estudo-fluxo/conferencia-2026-07-31.json` e
+  `docs/estudo-fluxo/conexoes-2026-07-31.json`.
 - **2026-07-30** — primeira rodada: 14 análises paralelas, síntese em 7
   padrões de retrabalho, 13 elos mapeados, plano em 4 ondas. Bruto em
   `docs/estudo-fluxo/analises-2026-07-30.json`.

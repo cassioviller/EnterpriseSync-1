@@ -1,0 +1,702 @@
+{
+ "data": "2026-07-31",
+ "tipo": "conferencia-adversarial",
+ "metodo": "12 verificadores em paralelo tentando refutar cada achado no codigo vivo + 1 sintetizador",
+ "vereditos": [
+  {
+   "claim_id": "osc-valor-orcado-herda-venda",
+   "verdict": "CONFIRMADO",
+   "resumo": "O código vivo grava valor de VENDA em ObraServicoCusto.valor_orcado em todos os caminhos automáticos (listener after_insert em models.py:7466 e dois pontos de sync que reforçam valor_comercial em edições), e nenhum caminho grava o custo da composição de insumos nesse campo — o custo real vive em ObraServicoCustoItem, e um consumidor (resumo_custos_obra) já contorna isso explicitamente, enquanto outro (cronograma físico-financeiro) ainda soma valor_orcado como \"orcado\".",
+   "evidencias": [
+    {
+     "arquivo": "/home/runner/workspace/models.py",
+     "linhas": "7450-7487",
+     "fato": "Listener after_insert de ItemMedicaoComercial cria o OSC pareado com valor_orcado = target.valor_comercial or 0 (linha 7466) — preço de venda, não custo"
+    },
+    {
+     "arquivo": "/home/runner/workspace/handlers/propostas_handlers.py",
+     "linhas": "55-59 e 120-140",
+     "fato": "Na aprovação da proposta, cada PropostaItem vira ItemMedicaoComercial com valor_comercial = it.subtotal (preço de venda); o docstring declara 'valor_orcado = valor_comercial'; revisões atualizam existente.valor_comercial, re-inflando via sync"
+    },
+    {
+     "arquivo": "/home/runner/workspace/medicao_views.py",
+     "linhas": "302-315",
+     "fato": "Edição manual do item de medição re-sincroniza par.valor_orcado = item.valor_comercial — sobrescreve qualquer correção de custo digitada pelo gestor"
+    },
+    {
+     "arquivo": "/home/runner/workspace/views/catalogo_views.py",
+     "linhas": "870-886",
+     "fato": "Vincular/atualizar preço pelo catálogo usa svc.preco_venda_unitario e grava par.valor_orcado = it.valor_comercial — outro caminho venda→orcado, nenhum usa composição de insumos"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/resumo_custos_obra.py",
+     "linhas": "253-269",
+     "fato": "O próprio código admite o defeito em comentário ('valor_orcado herda o valor_comercial (VENDA)... não o custo') e mitiga localmente: usa soma de ObraServicoCustoItem quando > 0, caindo para valor_orcado só no fluxo manual/legado"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/cronograma_fisico_financeiro.py",
+     "linhas": "281-296",
+     "fato": "O cronograma físico-financeiro ainda acumula et['orcado'] += osc.valor_orcado sem a mitigação — qualquer BAC derivado daqui herda o valor de venda"
+    }
+   ],
+   "correcao": "Achado envelheceu só em detalhe: as linhas deslocaram (listener hoje em 7450-7487, atribuição em 7466 — coincide com a citação; modelo OSC em 7030-7126) e existe uma mitigação parcial pós-estudo em resumo_custos_obra.py:253-269 que o achado não menciona, mas ela é local a um consumidor e não corrige o campo.",
+   "implicacao_plano": "Item 8 da onda 1 confirma-se como pré-requisito da Fase 7: BAC calculado sobre valor_orcado sai inflado pela margem em todo OSC nascido de proposta. Dois caminhos para a Fase 7: (a) padronizar o fallback já existente em resumo_custos_obra (soma de ObraServicoCustoItem quando houver linhas) como fonte do BAC, o que reduz o item 8 a replicar um padrão já testado; ou (b) corrigir a origem (gravar custo da composição no valor_orcado), o que exige também neutralizar os dois pontos de re-sync (medicao_views.py:314 e catalogo_views.py:886) que hoje sobrescreveriam a correção. O cronograma físico-financeiro (fonte provável da curva PV/EV) usa valor_orcado cru e precisa entrar no escopo do item 8, não só o EVM."
+  },
+  {
+   "claim_id": "vinculo-imc-tarefa-auto-casamento",
+   "verdict": "PARCIAL",
+   "resumo": "A linhagem dos dois lados existe (IMC.proposta_item_id e TarefaCronograma.gerada_por_proposta_item_id), mas o auto-casamento que a onda 1.3 propõe JÁ ESTÁ IMPLEMENTADO desde Task #102 (abr/2026): materializar_cronograma cria ItemMedicaoCronogramaTarefa automaticamente na aprovação da proposta, casando IMC e tarefa exatamente por esses dois campos, com peso ponderado por horas somando 100 por construção.",
+   "correcao": "Três correções ao achado: (1) os nomes de campo não são simétricos — no ItemMedicaoComercial o campo é `proposta_item_id` (unique, FK proposta_itens, models.py:6626), não \"gerada_por_proposta_item_id\"; só TarefaCronograma usa esse nome (models.py:5882). (2) A criação NÃO é só manual fora do import JSON: há DOIS criadores automáticos — services/cronograma_proposta.py:758-773 (aprovação de proposta, via mapa imc_por_pi construído em 533-538 casando os dois campos de linhagem; chamado de handlers/propostas_handlers.py:224-241/279/320) e services/importacao_fisico_financeiro.py:234-242 (dentro do import JSON, peso=dias sem normalizar a 100). O criador manual (medicao_views.py:343-396, rota vincular_tarefa) é apenas o terceiro caminho. (3) A soma-100 É validada: medicao_views.py:376-383 bloqueia soma>100 no manual; services/medicao_service.py:68-73 (validar_pesos_item, ==100) e :88-92 (gerar_medicao_quinzenal recusa medição se soma!=100). O git mostra o auto-criador presente desde 9e647988 (2026-04-18, \"Task #102 completa: cronograma automático na aprovação da proposta\") — o estudo de 21/07 já nasceu desatualizado nesse ponto. Tensão real remanescente: o caminho do import JSON grava peso=dias (não soma 100), o que passa em calcular_percentual_item (normaliza pelo total, medicao_service.py:49-66) mas colide com o gate ==100 de gerar_medicao_quinzenal.",
+   "evidencias": [
+    {
+     "arquivo": "/home/runner/workspace/models.py",
+     "linhas": "6626, 6637",
+     "fato": "Linhagem do lado IMC chama-se proposta_item_id (FK proposta_itens, unique, index), com relationship proposta_item — nome diferente do sugerido no achado"
+    },
+    {
+     "arquivo": "/home/runner/workspace/models.py",
+     "linhas": "5882-5896",
+     "fato": "Linhagem do lado TarefaCronograma chama-se gerada_por_proposta_item_id (FK proposta_itens, Migration 125, Task #102), com relationship viewonly gerada_por_proposta_item"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/cronograma_proposta.py",
+     "linhas": "533-538, 758-773",
+     "fato": "Auto-casamento JÁ implementado: imc_por_pi mapeia proposta_item_id→IMC e o loop cria/atualiza ItemMedicaoCronogramaTarefa por folha com peso=(horas/soma_horas)*100 (fallback 100/n_folhas), somando 100 por construção; presente desde o commit de origem 9e647988 (2026-04-18)"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/importacao_fisico_financeiro.py",
+     "linhas": "227-242",
+     "fato": "Segundo criador automático, dentro do import JSON (_vincular_etapa_tarefas): vincula IMC da etapa às folhas do .mpp com peso=dias, SEM normalizar a 100"
+    },
+    {
+     "arquivo": "/home/runner/workspace/medicao_views.py",
+     "linhas": "342-397",
+     "fato": "Único criador manual (rota vincular_tarefa) e validação parcial de soma: rejeita peso>100 e soma>100 (linhas 376-383), mas não exige ==100 no ato"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/medicao_service.py",
+     "linhas": "68-73, 88-92",
+     "fato": "Validação soma-100 existe: validar_pesos_item retorna (total==100, total) e gerar_medicao_quinzenal recusa gerar medição quando a soma dos pesos de um item difere de 100"
+    }
+   ],
+   "implicacao_plano": "A onda 1.3 (auto-casamento IMC↔tarefa via linhagem) deve ser RE-ESCOPADA, não construída do zero: o casamento automático já roda na aprovação de proposta (Task #102) e no import JSON. O que resta de real para a onda 1.3 é (a) reconciliar os dois regimes de peso — normalizado-100 na aprovação vs peso=dias no import, que hoje quebra o gate ==100 de gerar_medicao_quinzenal — e (b) cobrir itens legados/manuais sem linhagem. Para a Fase 7 (EVM), o valor agregado por item já tem cobertura automática nos fluxos novos; o risco está nos dados de import JSON e legado, não na inexistência do mecanismo."
+  },
+  {
+   "claim_id": "custoobra-dupla-contagem-ponto-rdo",
+   "verdict": "CONFIRMADO",
+   "resumo": "Os dois handlers seguem vivos e sem dedup cruzada: o de ponto cria CustoObra (categoria PONTO_ELETRONICO, rdo_id NULL, sem NENHUMA checagem de existência) e o de RDO cria CustoObra (categoria RDO) com idempotência filtrada por rdo_id — que nunca casa com o registro do ponto — logo funcionário horista com valor_diaria>0, ponto batido e presença no RDO do mesmo dia gera duas linhas de custo de mão de obra para o mesmo (funcionario, data, obra).",
+   "correcao": "Duas nuances vs. o achado estático: (1) para DIARISTAS o handler de ponto não cria CustoObra (cria só GestaoCustoFilho origem 'registro_ponto'), então a dupla contagem migra para GestaoCustoFilho — o dedup SALARIO do handler de RDO (linhas 734-750) filtra origem_tabela=='rdo_mao_obra' e não enxerga o filho do ponto; (2) existe uma guarda anti-duplicação (existe_ponto_no_dia, services/rdo_custos.py:50) mas só no caminho paralelo gerar_custos_mao_obra_rdo — o handler de evento lancar_custos_rdo não a usa, e views/rdo.py dispara os DOIS caminhos na finalização. Bônus agravante: o path horista do ponto não tem idempotência nem por registro_id — ponto_service emite em cada batida (entrada/almoço/saída), podendo criar múltiplos CustoObra no mesmo dia sozinho.",
+   "evidencias": [
+    {
+     "arquivo": "/home/runner/workspace/event_manager.py",
+     "linhas": "459-503",
+     "fato": "Handler ponto_registrado (horistas): cria CustoObra tipo='mao_obra', categoria='PONTO_ELETRONICO', rdo_id ausente (NULL), com db.session.add direto e zero verificação de existência prévia (nem por registro_id nem por funcionario+data)."
+    },
+    {
+     "arquivo": "/home/runner/workspace/event_manager.py",
+     "linhas": "706-728",
+     "fato": "Handler rdo_finalizado: dedup de CustoObra filtra por rdo_id=rdo.id + funcionario_id + data + admin_id — o CustoObra do ponto (rdo_id NULL) nunca casa; cria segunda linha categoria='RDO' com valor_diaria, sem checar tipo_remuneracao nem existe_ponto_no_dia."
+    },
+    {
+     "arquivo": "/home/runner/workspace/event_manager.py",
+     "linhas": "353-370 e 734-750",
+     "fato": "Dedup de GestaoCustoFilho é intra-origem em ambos os lados: ponto filtra origem_tabela=='registro_ponto', RDO filtra origem_tabela=='rdo_mao_obra' — filhos SALARIO do outro handler são invisíveis, logo diarista com ponto + RDO no dia duplica no V2."
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/rdo_custos.py",
+     "linhas": "50-71 e 366-373",
+     "fato": "existe_ponto_no_dia existe e é usada como anti-duplicação — mas só dentro de gerar_custos_mao_obra_rdo (que gera apenas GestaoCustoFilho), nunca no handler lancar_custos_rdo que grava CustoObra."
+    },
+    {
+     "arquivo": "/home/runner/workspace/views/rdo.py",
+     "linhas": "2145-2157 e 4487-4498",
+     "fato": "A finalização viva do RDO chama gerar_custos_mao_obra_rdo E emite rdo_finalizado em sequência — os dois caminhos de custo rodam a cada finalização (handlers executam sincronamente, event_manager.py:44-46)."
+    },
+    {
+     "arquivo": "/home/runner/workspace/ponto_service.py",
+     "linhas": "142-150",
+     "fato": "ponto_registrado é emitido em TODA batida (entrada, saída-almoço, volta, saída), sem filtro de tipo — o path horista sem idempotência pode gravar CustoObra mais de uma vez no mesmo dia por conta própria."
+    }
+   ],
+   "implicacao_plano": "O item 3 da onda 0 fica confirmado como pré-requisito da Fase 7 (EVM): qualquer AC que some CustoObra por obra/período infla mão de obra em (a) horistas com valor_diaria>0 presentes em ponto+RDO do mesmo dia, (b) horistas com múltiplas batidas (auto-duplicação do próprio ponto), e qualquer AC via GestaoCustoFilho infla diaristas com ponto+RDO. O escopo do item 3 precisa cobrir DUAS tabelas (CustoObra com chave cross-origem sem rdo_id, e GestaoCustoFilho SALARIO/MAO_OBRA_DIRETA cross-origem), mais idempotência do path horista do ponto; a guarda existe_ponto_no_dia já pronta em services/rdo_custos.py:50 é o ponto de reuso natural para o handler lancar_custos_rdo. Enquanto isso não sai, os estágios 0-4 que exibem custo realizado devem tratar CustoObra como fonte potencialmente inflada."
+  },
+  {
+   "claim_id": "duas-formulas-progresso",
+   "verdict": "CONFIRMADO",
+   "resumo": "Coexistem em produção a métrica ponderada calcular_progresso_geral_obra_v2 (anel do portal, header do cronograma, KPI de detalhes, card/PDF de RDO, curva S) e a média simples (gerar_medicao em portal_obras_views.py:754, dashboard em views/dashboard.py:448-453, index do cronograma em cronograma_views.py:354-373), e a página do portal do cliente ainda exibe os dois números — anel v2 no hero e percentual_executado (média simples persistida) na seção de medições incluída na mesma portal_obra.html; a única divergência já sanada é a linha raiz do cronograma do portal, alinhada ao v2 em 229-230.",
+   "evidencias": [
+    {
+     "arquivo": "portal_obras_views.py",
+     "linhas": "177-179 e 229-230",
+     "fato": "O anel do portal usa calcular_progresso_geral_obra_v2 e a raiz da árvore do cronograma do cliente é sobrescrita com o mesmo perc_geral (essa divergência interna já foi sanada)."
+    },
+    {
+     "arquivo": "portal_obras_views.py",
+     "linhas": "745-758",
+     "fato": "gerar_medicao ainda calcula média simples de percentual_concluido das tarefas 'empresa' (linha 754) e a converte em valor_medido (dinheiro) e percentual_executado persistido; o fix de 27/07 corrigiu só o ESCOPO (do_cronograma_interno), não a fórmula."
+    },
+    {
+     "arquivo": "templates/portal/portal_obra.html",
+     "linhas": "13",
+     "fato": "A mesma página do portal inclui _portal_medicoes.html, cuja linha 23 exibe m.percentual_executado (média simples), lado a lado com o anel v2 de _portal_hero.html linhas 6-11 — o cliente vê os dois números divergentes."
+    },
+    {
+     "arquivo": "views/dashboard.py",
+     "linhas": "444-453 e 987-988",
+     "fato": "O dashboard calcula o progresso de cada obra por média simples das subatividades do RDO mais recente e deriva produtividade_obra dessa média — sem passar pelo v2."
+    },
+    {
+     "arquivo": "cronograma_views.py",
+     "linhas": "354-373",
+     "fato": "O index do cronograma usa sqlfunc.avg sobre TODAS as tarefas (perc_medio), dupla-contando pais — terceiro call-site de média simples."
+    },
+    {
+     "arquivo": "utils/cronograma_engine.py",
+     "linhas": "1035-1054",
+     "fato": "progresso_geral_para_kpi já encapsula a bifurcação v2-com-cronograma / fallback V1-sem-cronograma, servindo de ponto único reutilizável para migrar os call-sites restantes."
+    }
+   ],
+   "implicacao_plano": "Item 5 da onda 1 permanece necessário e o escopo é de ~4 call-sites a migrar para v2 (ou para progresso_geral_para_kpi, que já trata obra sem cronograma): portal_obras_views.py:754 (gerar_medicao), views/dashboard.py:448-453 (+987-988 derivado), cronograma_views.py:354-373 (index) e o fallback de template em templates/obras/cronograma.html:124/158 (modo cliente); atenção especial a gerar_medicao porque o percentual vira dinheiro (valor_medido) e as MedicaoObra antigas são snapshots persistidos que continuarão divergentes do anel mesmo após a migração — o EVM e a linha do tempo do portal precisam decidir se recalculam ou congelam o histórico; a divergência anel-versus-cronograma dentro do portal já foi resolvida (229-230), então o único sintoma visível ao cliente hoje é anel v2 versus percentual das medições."
+  },
+  {
+   "claim_id": "rdo-progresso-duplo-subatividade-apontamento",
+   "verdict": "PARCIAL",
+   "resumo": "A dualidade de DESTINOS persiste sem ponte (RDOServicoSubatividade.percentual_conclusao vs RDOApontamentoCronograma via registrar_apontamento, ambos parseados na mesma rota salvar_rdo_flexivel), mas a dupla DIGITAÇÃO no mesmo formulário não existe mais: nenhum template/JS vivo emite campos subatividade_*_percentual — o form novo.html (M07) tem campo único por tarefa, e no editar as seções V1/V2 são mutuamente exclusivas por is_v2_active.",
+   "correcao": "O achado envelheceu na metade da UI: o M07 (comentários datados 21-22/07) removeu os inputs de percentual por subatividade dos formulários — grep em templates/ e static/ não acha nenhum emissor de subatividade_*_percentual; novo.html:1170 declara \"campo ÚNICO por modo — nunca dois campos\" e editar_rdo.html:708 só mostra percentual de subatividade quando NOT is_v2_active (sem card de cronograma junto). Também errou o peso da medição: medicao_service prioriza vínculos IMC↔TarefaCronograma.percentual_concluido e usa RDOServicoSubatividade só como fallback por servico_id. O que segue verdadeiro: backend da mesma rota ainda aceita e grava as duas famílias de campos em dois destinos sem tradução entre eles, e o elo TarefaCronograma.subatividade_mestre_id (preenchido por garantir_subatividade na criação da tarefa) nunca é usado para unificar progresso na gravação do RDO.",
+   "evidencias": [
+    {
+     "arquivo": "views/rdo.py",
+     "linhas": "3770-3827 e 4005-4016",
+     "fato": "salvar_rdo_flexivel parseia subatividade_<sid>_<sub>_percentual e grava RDOServicoSubatividade.percentual_conclusao (com subatividade_mestre_id na linha 4013) — destino 1, ainda vivo no backend"
+    },
+    {
+     "arquivo": "views/rdo.py",
+     "linhas": "4338-4394",
+     "fato": "a MESMA rota parseia cronograma_tarefa_pct_<id>/cronograma_tarefa_<id> e chama registrar_apontamento → RDOApontamentoCronograma — destino 2, sem nenhuma tradução para/da subatividade"
+    },
+    {
+     "arquivo": "templates/rdo/novo.html",
+     "linhas": "244 e 1170-1216",
+     "fato": "o único form vivo de criação posta para /salvar-rdo-flexivel e renderiza campo ÚNICO por tarefa (M07: 'nunca dois campos'); grep em templates/ e static/ não encontra nenhum emissor de subatividade_*_percentual — a dupla digitação no mesmo formulário não existe mais"
+    },
+    {
+     "arquivo": "templates/rdo/editar_rdo.html",
+     "linhas": "707-736",
+     "fato": "inputs de percentual por subatividade (name=subatividade_<id>) só aparecem quando NOT is_v2_active(), e o card de cronograma só quando V2 — as duas entradas são mutuamente exclusivas, nunca no mesmo form"
+    },
+    {
+     "arquivo": "models.py",
+     "linhas": "5853-5858, 1952, 6109-6148",
+     "fato": "o elo existe (TarefaCronograma.subatividade_mestre_id e RDOServicoSubatividade.subatividade_mestre_id, preenchido por garantir_subatividade em cronograma_views.py:655-704), mas RDOApontamentoCronograma não tem FK de subatividade nem RDOServicoSubatividade tem FK de tarefa — nenhum caminho de gravação de RDO usa o elo para unificar progresso"
+    },
+    {
+     "arquivo": "services/medicao_service.py",
+     "linhas": "207-250",
+     "fato": "medição usa como fonte primária os vínculos IMC↔cronograma (TarefaCronograma.percentual_concluido, alimentado por apontamentos) e RDOServicoSubatividade.percentual_conclusao apenas como fallback por servico_id — 'subatividade alimenta medição' hoje é só o fallback"
+    }
+   ],
+   "implicacao_plano": "O item 3 da onda 2 (progresso único) encolhe de \"redesenhar formulário + unificar dados\" para trabalho só de camada de dados e caminhos legados: (a) a UI já é entrada única (M07 fez a metade visível); o que falta é aposentar/derivar RDOServicoSubatividade.percentual_conclusao a partir dos apontamentos usando o elo subatividade_mestre_id que já existe e está preenchido, (b) repontar o fallback da medição e o fallback V1 do KPI (cronograma_engine.py:1016-1054) para a fonte única, e (c) decidir o destino dos caminhos backend mortos que ainda aceitam subatividade_*_percentual (salvar_rdo_flexivel, rdo_salvar_unificado) e do fluxo V1 de edição que ainda digita percentual de subatividade sem tocar o cronograma. A costura deixa de ser bloqueante para as fases de formulário e vira tarefa de convergência de leitura/gravação — pode ser reordenada para depois do núcleo cronograma+RDO sem retrabalho de UI."
+  },
+  {
+   "claim_id": "onda1-item2-seed-servico-obra-real-na-aprovacao",
+   "verdict": "CONFIRMADO",
+   "resumo": "Nenhum dos dois handlers de proposta_aprovada (event_manager.propagar_proposta_para_obra e handlers.propostas_handlers.handle_proposta_aprovada) cria ServicoObraReal — só Obra, Cliente, IMC/OSC e cronograma (TarefaCronograma) — enquanto todos os 4 criadores vivos de ServicoObraReal são rotas manuais, e o RDO segue lendo ServicoObra (legada) e ServicoObraReal em pontos distintos, exatamente como o achado descreve.",
+   "evidencias": [
+    {
+     "arquivo": "/home/runner/workspace/handlers/propostas_handlers.py",
+     "linhas": "54-117, 180-260",
+     "fato": "handle_proposta_aprovada materializa PropostaItem como ItemMedicaoComercial/OSC e cronograma (TarefaCronograma via materializar_cronograma) — grep confirma zero menções a ServicoObraReal em handlers/ e services/"
+    },
+    {
+     "arquivo": "/home/runner/workspace/event_manager.py",
+     "linhas": "882-1070",
+     "fato": "propagar_proposta_para_obra (handler de proposta_aprovada) cria Obra, Cliente e ObraTransicaoEstado; nao instancia ServicoObraReal nem ServicoObra"
+    },
+    {
+     "arquivo": "/home/runner/workspace/views/obras.py",
+     "linhas": "640-700",
+     "fato": "criacao de ServicoObraReal acontece na rota manual de edicao da obra, iterando servicos_selecionados do form com quantidade_planejada=1.0 padrao — o gestor re-seleciona a mao"
+    },
+    {
+     "arquivo": "/home/runner/workspace/views/rdo.py",
+     "linhas": "1228-1239 e 1407-1410",
+     "fato": "o mesmo modulo RDO le ServicoObra (legada) em 1237-1239 e ServicoObraReal em 1407 (e tambem 646-651, 2290-2296, 4570-4576) — as linhas do achado ainda batem"
+    },
+    {
+     "arquivo": "/home/runner/workspace/views/rdo.py",
+     "linhas": "4762-4790",
+     "fato": "existe fallback dual explicito: ESTRATEGIA 1 via ServicoObraReal e ESTRATEGIA 2 via ServicoObra 'tabela legada', provando que a duplicidade e reconhecida no proprio codigo"
+    },
+    {
+     "arquivo": "/home/runner/workspace/views/rdo.py",
+     "linhas": "3725-3742",
+     "fato": "nuance recente: admin ou tenant V2 pode criar RDO SEM ServicoObraReal ('cronograma e a fonte de servicos') — valvula de escape que evita o bloqueio mas nao semeia quantidade/peso"
+    }
+   ],
+   "implicacao_plano": "O item 2 da onda 1 permanece necessario e na ordem prevista: a aprovacao ja materializa cronograma (TarefaCronograma + ItemMedicaoCronogramaTarefa via services/cronograma_proposta.materializar_cronograma) mas nunca ServicoObraReal, entao o cronograma vindo de .mpp continua sem servico/quantidade/peso para a Fase 7; a valvula V2 em rdo.py:3733-3737 apenas desbloqueia a criacao do RDO sem resolver o seed, e a unificacao ServicoObra vs ServicoObraReal deve entrar no escopo porque o proprio rdo.py mantem fallback dual (4762-4790)."
+  },
+  {
+   "claim_id": "relatorios_funcionais-sem-admin_id-e-fallbacks-obras-rdo",
+   "verdict": "CONFIRMADO",
+   "resumo": "Os 7 relatorios operacionais e as 3 exportacoes de relatorios_funcionais.py consultam sem filtrar admin_id (vazamento cross-tenant), e os dois fallbacks \"admin com mais dados\" continuam vivos em obras.py e rdo.py; commits ate 30/07 nao tocaram nesse ponto.",
+   "evidencias": [
+    {
+     "arquivo": "relatorios_funcionais.py",
+     "linhas": "58-266",
+     "fato": "_relatorio_funcionarios, _relatorio_ponto, _relatorio_horas_extras, _relatorio_alimentacao, _relatorio_obras, _relatorio_custos_obra e _relatorio_veiculos consultam Funcionario/RegistroPonto/RegistroAlimentacao/Obra/CustoObra/Veiculo filtrando so por data/obra/departamento, nunca por admin_id"
+    },
+    {
+     "arquivo": "relatorios_funcionais.py",
+     "linhas": "456-459,507-510,569-572",
+     "fato": "_exportar_csv, _exportar_excel e _exportar_pdf fazem Funcionario.query filtrando apenas departamento_id — exportam funcionarios de todos os tenants"
+    },
+    {
+     "arquivo": "relatorios_funcionais.py",
+     "linhas": "304-411",
+     "fato": "apenas os 3 relatorios executivos (_relatorio_dashboard_executivo, _relatorio_progresso_obras, _relatorio_rentabilidade) usam _tenant_id()/admin_id=_tenant_id() (Fase 0/R3); os demais nao — confirma a divisao 7 vulneraveis vs 3 corrigidos"
+    },
+    {
+     "arquivo": "views/obras.py",
+     "linhas": "1520-1526",
+     "fato": "fallback ainda presente: no ramo nao-autenticado executa SELECT admin_id, COUNT(*) FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1 e usa o admin com mais obras"
+    },
+    {
+     "arquivo": "views/rdo.py",
+     "linhas": "2274-2276",
+     "fato": "fallback ainda presente em api_percentuais_ultimo_rdo: SELECT admin_id ... FROM funcionario GROUP BY admin_id ORDER BY total DESC LIMIT 1; padrao repetido tambem em rdo.py:70, 78 e 92"
+    },
+    {
+     "arquivo": "app.py",
+     "linhas": "448-449",
+     "fato": "relatorios_bp esta registrado (url_prefix /relatorios) e nao ha before_request/with_loader_criteria global de tenant em app.py nem utils/tenant.py — nenhuma protecao transversal compensa a falta de admin_id"
+    }
+   ],
+   "implicacao_plano": "Sustenta a onda 0.1/0.2 como item mais urgente e sem plano escrito: escopo confirmado como 10 pontos de correcao em relatorios_funcionais.py (7 relatorios + 3 exportacoes) mais a remocao/blindagem de 5 fallbacks \"admin com mais dados\" (obras.py:1520, rdo.py:70/78/92/2274). Os commits de 21-30/07 (ciencia RDO, migrations 269, cronograma v2) nao alteraram nada disso — o achado nao envelheceu."
+  },
+  {
+   "claim_id": "presenca-tres-tabelas-sem-fonte-de-verdade",
+   "verdict": "CONFIRMADO",
+   "resumo": "A presença vive em três tabelas desconectadas (AllocationEmployee/Allocation, RegistroPonto, RDOMaoObra), a sync alocação→ponto sobrescreve a batida real com o plano (models.py:4543-4559, deslocou 1 linha), nenhum código preenche AlocacaoEquipe.rdo_gerado_id (só limpa para None), e nenhum fluxo de criação de RDOMaoObra lê ponto ou alocação — e, agravante extra, o modelo AlocacaoEquipe nem sequer é instanciado em lugar algum do código vivo.",
+   "evidencias": [
+    {
+     "arquivo": "/home/runner/workspace/models.py",
+     "linhas": "755, 1217, 2090, 4402, 4441",
+     "fato": "Existem de fato 3 modelos de alocação (AlocacaoEquipe legado, Allocation, AllocationEmployee) mais RegistroPonto e RDOMaoObra — cinco classes disputando a presença sem fonte de verdade"
+    },
+    {
+     "arquivo": "/home/runner/workspace/models.py",
+     "linhas": "4532-4592 (sobrescrita em 4543-4559)",
+     "fato": "AllocationEmployee.sincronizar_com_ponto, quando já existe RegistroPonto do funcionário/data, sobrescreve hora_entrada/hora_saida/obra_id/almoço/percentual com turno_inicio/turno_fim do plano e recalcula horas_trabalhadas — a batida real é perdida; chamado via processar_lancamentos_automaticos (4709-4712), disparado de equipe_views.py:1236"
+    },
+    {
+     "arquivo": "/home/runner/workspace/models.py",
+     "linhas": "2107",
+     "fato": "AlocacaoEquipe.rdo_gerado_id existe como FK para rdo.id; grep no repo inteiro mostra que nenhum código atribui valor não-nulo — só leituras e limpezas; pior: nenhum código instancia AlocacaoEquipe() fora de testes"
+    },
+    {
+     "arquivo": "/home/runner/workspace/views/rdo.py",
+     "linhas": "550-552 e 4139-4204",
+     "fato": "As únicas escritas em rdo_gerado_id setam None (idem crud_rdo_completo.py:532 e services/importacao_fisico_financeiro.py:372-373); a criação de RDOMaoObra (4139, 4154, 4194) monta tudo do request.form — grep confirma zero referências a RegistroPonto ou Allocation/AllocationEmployee em views/rdo.py, crud_rdo_completo.py, rdo_editar_sistema.py e services/rdo_assinatura.py"
+    },
+    {
+     "arquivo": "/home/runner/workspace/almoxarifado_utils.py",
+     "linhas": "418-420",
+     "fato": "Único leitor de rdo_gerado_id em produção — como nada o preenche, alocacao é sempre None e funcionario_id da movimentação de estoque sai sempre nulo (efeito colateral silencioso do achado)"
+    },
+    {
+     "arquivo": "/home/runner/workspace/tests/test_fase5_rdo_ciclo_vida.py",
+     "linhas": "858-872",
+     "fato": "O teste seta rdo_gerado_id manualmente só para verificar que a exclusão de RDO o limpa — confirma que o único ciclo de vida implementado da FK é a limpeza, nunca o preenchimento"
+    }
+   ],
+   "correcao": "Apenas deslocamento de 1 linha (sobrescrita começa em 4543, não 4544) e um agravante não citado: AlocacaoEquipe é modelo órfão — nenhum código a cria, logo é candidata a descontinuação, não a integração. Os commits recentes (ciência do RDO, cronograma v2, migrations até 269) não tocaram nada disso.",
+   "implicacao_plano": "Itens 6 da onda 1 e 1 da onda 2 permanecem válidos e na ordem prevista; o escopo pode até encolher: AlocacaoEquipe (e sua FK rdo_gerado_id) pode ser aposentada em vez de virar ponte, a fonte de verdade a unificar é Allocation/AllocationEmployee vs RegistroPonto vs RDOMaoObra, e a correção da sobrescrita da batida real (sincronizar_com_ponto) deve preceder qualquer pré-carga de mão de obra no RDO — inclui corrigir de carona o funcionario_id sempre nulo em almoxarifado_utils.py:419."
+  },
+  {
+   "claim_id": "flags-nucleo-completas-desligadas",
+   "verdict": "CONFIRMADO",
+   "resumo": "As três flags existem, default FALSE em modelo e migração, cada uma com script CLI de ligar/desligar e runbook; os guards do editor v2 (calendário sáb/dom E linha de base, ambos antes de gravar) e do percentual livre (tarefas que perderiam físico) são reais, e o \"?\" do mpp se resolve como ausência deliberada de guard bloqueante (flag só de borda visual, pré-checagem via diagnostico_cronograma_tenant.py).",
+   "evidencias": [
+    {
+     "arquivo": "/home/runner/workspace/models.py",
+     "linhas": "4253-4293",
+     "fato": "As três colunas de ConfiguracaoEmpresa (cronograma_mpp_ativo, cronograma_editor_v2, rdo_percentual_livre) são nullable=False, default=False, server_default='false' — migrações espelho 211/222/226, e nenhuma migração até a 269 as reescreve."
+    },
+    {
+     "arquivo": "/home/runner/workspace/scripts/flag_cronograma_editor_v2.py",
+     "linhas": "221-263",
+     "fato": "Dois guards ANTES de gravar: aborta se CalendarioEmpresa considera sábado/domingo (221-231) e aborta se há obra com cronograma datado sem linha de base ativa (246-263), com --criar-baseline (233-241) e --forcar como escape — o guard de baseline é de 28/07 (commit a667846f), mais forte do que o achado descrevia."
+    },
+    {
+     "arquivo": "/home/runner/workspace/scripts/flag_rdo_percentual_livre.py",
+     "linhas": "182-198",
+     "fato": "O --ligar recusa antes de gravar quando tarefas_que_regridem() (linhas 80-140, SQL lateral comparando quantidade_acumulada/total vs percentual_realizado) encontra tarefa que perderia físico, listando obra/tarefa/pct_hoje→pct_apos; --forcar como escape."
+    },
+    {
+     "arquivo": "/home/runner/workspace/scripts/flag_cronograma_mpp.py",
+     "linhas": "88-104",
+     "fato": "O script mpp NÃO tem guard bloqueante — grava direto (92) e só depois avisa se o tenant não é v2 (102-103); a pré-checagem é externa (scripts/diagnostico_cronograma_tenant.py, runbook linhas 25-37), coerente com a flag governar apenas a borda visual (docstring 17-19)."
+    },
+    {
+     "arquivo": "/home/runner/workspace/docs/rdo-percentual-livre-rollout.md",
+     "linhas": "81-93",
+     "fato": "A conferência visual das telas já foi feita em dev (27/07, tenant visual_rdo, capturas em docs/img/); o que falta medir em produção é o passo 6: rodar uma semana com um tenant só, observando reclamação de avanço que mudou sozinho."
+    },
+    {
+     "arquivo": "/home/runner/workspace/docs/cronograma-editor-v2-rollout.md",
+     "linhas": "26-42",
+     "fato": "Antes de ligar em produção faltam decisões operacionais, não código: tenant precisa ser versao_sistema='v2' e o calendário não pode considerar fim de semana (motor é seg–sex fixo nesta fase) — tenant que precisa de sábado/domingo exige ajuste de calendário ou esperar a fase de calendário configurável."
+    }
+   ],
+   "implicacao_plano": "O estágio 0 se sustenta: ligar as três flags é rollout puro, sem código novo — os scripts, guards e runbooks estão prontos e os defaults estão FALSE. Mas o estágio 0 não é zero-esforço: é trabalho operacional por tenant (mpp: diagnóstico das 5 portas + verificação de equivalência pós-import; editor v2: piloto pequeno, snapshot antes/comparar, criar baselines e decidir o calendário; percentual livre: reapontar as tarefas legadas que o guard listar e observar uma semana). Único ponto onde o estágio 0 pode virar código: tenant de produção cujo calendário exige sábado/domingo bloqueia o editor v2 até existir calendário configurável — se isso ocorrer no piloto, essa fase sobe de prioridade; o resto da ordem 0-4/6-9/0-3 não muda."
+  },
+  {
+   "claim_id": "contradicao-dono-valor-contrato-fase6-vs-fase9b",
+   "verdict": "CONFIRMADO",
+   "resumo": "Os dois planos seguem abertos e não implementados (grep: zero ocorrências de ObraContratoVersao, Contrato ou ContratoAditivo em models.py/migrations.py) e prescrevem escritores incompatíveis para Obra.valor_contrato — Fase 6: serviço único services/contrato_obra.py gravando cache da versão vigente de ObraContratoVersao (valores absolutos em cadeia temporal); Fase 9b Task 16: listener after_flush em ContratoAditivo (deltas) via services/contrato_service.py — enquanto no código vivo o campo continua Float editável com 5 escritores (event_manager.py:1029 e 1104, views/obras.py:417 e 954, services/importacao_fisico_financeiro.py:754) e ~30 pontos de leitura em 13 arquivos; a nuance é que a própria Fase 9b (premissa P1, linha 4670) já reconhece que Task 15/18 conflitariam com a cadeia da Fase 6 se ambas nascessem, ou seja, a contradição é real mas parcialmente antecipada pelo plano mais novo.",
+   "evidencias": [
+    {
+     "arquivo": "docs/superpowers/plans/2026-07-21-fase-6-orcamento-versionado-aditivo.md",
+     "linhas": "7, 173, 264, 281, 346-357",
+     "fato": "Fase 6 define Obra.valor_contrato como cache derivado de ObraContratoVersao com services/contrato_obra.py como 'único lugar do sistema que escreve valor_contrato' (Task 2), e a Task 5 fecha a edição livre no POST de editar_obra"
+    },
+    {
+     "arquivo": "docs/superpowers/plans/2026-07-21-fase-9-portal-assinatura-contratos.md",
+     "linhas": "4658, 4683-4711",
+     "fato": "Fase 9b Task 15 cria Contrato+ContratoAditivo (deltas, migration 306) e Task 16 faz Obra.valor_contrato virar espelho mantido por listener after_flush em ContratoAditivo via services/contrato_service.py — modelo de dados, serviço e mecanismo de escrita diferentes dos da Fase 6"
+    },
+    {
+     "arquivo": "docs/superpowers/plans/2026-07-21-fase-9-portal-assinatura-contratos.md",
+     "linhas": "4670, 4729",
+     "fato": "A premissa P1 e a Task 18 da própria Fase 9b admitem que ContratoAditivo 'deve reusar aquela cadeia [da Fase 6], não criar outra' e que sem a Fase 6 nasceria 'uma segunda modelagem de aditivo, que vai conflitar depois' — o plano antecipa o conflito mas mesmo assim especifica modelo e escritor próprios"
+    },
+    {
+     "arquivo": "event_manager.py",
+     "linhas": "1024-1035, 1104-1126",
+     "fato": "Hoje quem escreve valor_contrato na aprovação de proposta é o event_manager: construtor de Obra com valor_contrato=valor_total (linha 1029) e reescrita direta obra.valor_contrato = valor_total na revisão (linha 1104), com congelamento manual de MedicaoContrato antes — nenhum serviço de contrato existe"
+    },
+    {
+     "arquivo": "views/obras.py",
+     "linhas": "417, 954",
+     "fato": "A edição livre continua aberta: criação de obra (linha 417) e POST de editar_obra (linha 954, era 873 no plano) gravam float(request.form.get('valor_contrato')) sem guarda; terceiro escritor em services/importacao_fisico_financeiro.py:754"
+    },
+    {
+     "arquivo": "models.py",
+     "linhas": "346",
+     "fato": "Obra.valor_contrato segue db.Float default 0.0 (era linha 254/269 nos planos — só deslocamento); grep em models.py e migrations.py não encontra class ObraContratoVersao, class Contrato nem ContratoAditivo, provando que nenhum dos dois planos começou (migrations vivas param antes da 306 prevista pela 9b)"
+    }
+   ],
+   "correcao": "Não se aplica ao veredito, mas dois detalhes do achado envelheceram: as linhas citadas deslocaram (models.py:254→346, views/obras.py:873→954, event_manager.py:1043→1104) e o inventário de escritores da Fase 6 (linha 602 do plano) omite services/importacao_fisico_financeiro.py:754, que o próprio plano só cita como caminho de FK na linha 334 — é um quarto ponto de escrita que qualquer um dos dois desenhos precisa fechar.",
+   "implicacao_plano": "A contradição precisa de decisão única antes de qualquer uma das duas fases entrar em execução, mas a saída já está sinalizada dentro da própria Fase 9b: sua premissa P1 e a Task 18 subordinam ContratoAditivo à cadeia da Fase 6. A ordenação segura é Fase 6 primeiro (ObraContratoVersao + services/contrato_obra.py como escritor único), e a Fase 9b Tasks 15-16 devem ser reescritas para que Contrato seja camada documental (PDF, assinatura, vencimento) apontando para a cadeia da Fase 6 — eliminando o listener after_flush concorrente e o segundo serviço (contrato_service.py vs contrato_obra.py). Se a Fase 9b rodar antes ou em paralelo como está escrita, nascem duas modelagens de aditivo (absoluta-temporal vs delta) e dois escritores do mesmo campo, exatamente o cenário que P1 declara inaceitável. Quem decidir também deve incluir importacao_fisico_financeiro.py:754 na lista de escritores a fechar, ausente do risco 1 da Fase 6."
+  },
+  {
+   "claim_id": "fase7-obsoleta-editor-v2",
+   "verdict": "CONFIRMADO",
+   "resumo": "O editor de cronograma v2 (commits 73f58d3e a dd414212, 24/07) já entregou por outro caminho o núcleo estrutural da Fase 7 — TarefaVinculo com N predecessoras tipadas TI/II/TT/IT + lag em dias úteis, motor puro com passe para frente e para trás (folga total, is_critica, detecção de ciclo, roll-up) e CronogramaBaseline com itens congelados e coluna Desvio na UI — restando da Fase 7 apenas o EVM/monetização, o BAC congelado e a folga livre; não há duas implementações concorrentes vivas: o legado predecessora_id é sincronizado deliberadamente para TarefaVinculo, e CronogramaVersao segue separada de propósito (sem is_baseline).",
+   "evidencias": [
+    {
+     "arquivo": "/home/runner/workspace/models.py",
+     "linhas": "5952-5978",
+     "fato": "TarefaVinculo existe: predecessora_id/sucessora_id, tipo TI/II/TT/IT (check constraint), lag_dias em dias úteis podendo ser negativo, unique no par, N vínculos por tarefa; docstring diz que substitui sem apagar o legado predecessora_id, backfill na migration 223 (migrations.py:3866 cria a tabela na 222)"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/cronograma_scheduler.py",
+     "linhas": "307-457",
+     "fato": "calcular_agendamento (motor puro) faz passe para frente em cascata em dias úteis, passe para trás com folga total (l.402-433: folga_dias, is_critica = folga==0) e roll-up de pais (l.435-457); detectar_ciclo l.194 e ordenar_topologicamente l.227; persistência em recalcular_obra l.522 grava TarefaCronograma.folga_dias/is_critica (models.py:5912-5914)"
+    },
+    {
+     "arquivo": "/home/runner/workspace/models.py",
+     "linhas": "6036-6102",
+     "fato": "CronogramaBaseline + CronogramaBaselineItem existem (migration 225): congelam data_inicio, data_fim e duracao_dias por tarefa, itens nunca reescritos, uma ativa por (obra, is_cliente) via índice único parcial; a docstring declara que é SEPARADA de propósito de CronogramaVersao (que serve só ao fluxo de importação .mpp) — grep por is_baseline em CronogramaVersao = zero"
+    },
+    {
+     "arquivo": "/home/runner/workspace/cronograma_views.py",
+     "linhas": "2050-2159",
+     "fato": "API completa de baseline (criar/listar/ativar/excluir) e a view principal (l.462-504) injeta baseline_map no template; templates/obras/cronograma.html l.199 renderiza coluna Desvio (término atual − término congelado) e l.996/2480 a barra cinza da baseline no Gantt — o comparativo baseline×vigente por DATAS já existe na UI interna"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/cronograma_scheduler.py",
+     "linhas": "629-644",
+     "fato": "Não há duas implementações concorrentes: sincronizar_vinculos_de_predecessora_id materializa o legado predecessora_id (models.py:5818) em TarefaVinculo (TI, lag 0) no pós-importação .mpp e na geração por proposta; o motor antigo utils/cronograma_engine só roda para tenants com a flag cronograma_editor_v2 desligada (models.py:4280, utils/tenant.py:139-161, default FALSE)"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/cronograma_fisico_financeiro.py",
+     "linhas": "263",
+     "fato": "Nada do EVM da Fase 7 existe: utils/cpm.py, services/evm.py, services/cronograma_cpm_service.py, services/cronograma_baseline_service.py e o modelo TarefaPredecessora são todos inexistentes; grep por valor_agregado/IDP/IDC/earned em .py/.js/.html fora de docs = zero; pct_fisico segue como placeholder None"
+    }
+   ],
+   "implicacao_plano": "A Fase 7 como escrita em 21/07 está estruturalmente obsoleta e deve ser reescrita antes de qualquer sequenciamento: (a) descartar as tasks de TarefaPredecessora, utils/cpm.py, cronograma_cpm_service, backfill_predecessoras_tipadas e baseline-como-CronogramaVersao.is_baseline — implementá-las criaria uma SEGUNDA rede de predecessoras e uma SEGUNDA baseline concorrentes com as do editor v2; (b) o que sobra de verdade é o EVM inteiro (motor das 11 grandezas, coletor VP/VA/CR/BAC, chave evm no endpoint /obras/<id>/financeiro/dados, UI), a monetização do comparativo baseline×vigente (hoje o desvio é só em datas — CronogramaBaselineItem não congela custo, então o BAC congelado junto à baseline continua pendente e conectado à Fase 6), a folga livre (o v2 só calcula folga total) e o calendário do tenant (o v2 fixa seg-sex deliberadamente); (c) duas mudanças de premissa: o CPM vivo é um AGENDADOR que reescreve datas (não a camada de análise não-destrutiva que o plano assumia — a validação \"caminho crítico bate com MS Project\" muda de natureza), e a Fase 7 deve se pendurar na flag cronograma_editor_v2 existente em vez de criar flag própria de CPM; a integração baseline↔CronogramaVersao que o plano propunha foi decidida em contrário no código (separação deliberada) e não deve ser reaberta sem motivo novo."
+  },
+  {
+   "claim_id": "evm-fase7-series-existentes",
+   "verdict": "CONFIRMADO",
+   "resumo": "As três séries do EVM existem e estão vivas — planejado físico (calcular_progresso_rdo/calcular_progresso_geral_obra_v2, hoje em :734/:839, não mais ~:429/:510), custo previsto faseado (alocar_por_peso :62, montar_curva_s :86) e custo realizado mensal (curva_realizado :572 sobre GestaoCustoFilho.data_referencia) — e pct_fisico segue declarado como None (:263) e nunca atribuído no serviço.",
+   "correcao": "Só as linhas do cronograma_engine.py envelheceram: o arquivo cresceu com commits recentes (editor v2 fases 1/3, flag rdo_percentual_livre, agrupamento de atividades no RDO), deslocando calcular_progresso_rdo de ~:429 para :734 e calcular_progresso_geral_obra_v2 de ~:510 para :839; as assinaturas ganharam kwargs (percentual_livre; com_arquivadas_historicas) mas o contrato de retorno (percentual_planejado/percentual_realizado; progresso_geral_pct/progresso_planejado_pct) permanece o que o achado descreve.",
+   "evidencias": [
+    {
+     "arquivo": "/home/runner/workspace/utils/cronograma_engine.py",
+     "linhas": "734-758",
+     "fato": "calcular_progresso_rdo(tarefa_id, data_rdo, admin_id, percentual_livre=None) devolve dict com percentual_planejado (interpolacao linear por dias uteis, None=sem plano), percentual_realizado e quantidade_acumulada"
+    },
+    {
+     "arquivo": "/home/runner/workspace/utils/cronograma_engine.py",
+     "linhas": "839-868",
+     "fato": "calcular_progresso_geral_obra_v2(obra_id, data_ref, admin_id, *, com_arquivadas_historicas=False) agrega folhas por media ponderada e devolve progresso_geral_pct e progresso_planejado_pct — o planejado agregado da obra ja existe"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/cronograma_fisico_financeiro.py",
+     "linhas": "62-83 e 86-106",
+     "fato": "alocar_por_peso distribui Decimal por pesos conservando o total (ultima chave absorve o resto) e montar_curva_s devolve por mes custo_mes/acumulado/pct_acumulado ignorando o bucket NAO_FASEADO"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/cronograma_fisico_financeiro.py",
+     "linhas": "572-592",
+     "fato": "curva_realizado(obra) soma custo realizado por 'YYYY-MM' de GestaoCustoFilho.data_referencia, tenant-scoped, excluindo FATURAMENTO_DIRETO e cancelados (via sem_cancelados, endurecido no commit 2107de80)"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/cronograma_fisico_financeiro.py",
+     "linhas": "263 e 547",
+     "fato": "pct_fisico e inicializado como None (:263, comentario 'periodo nao tem avanco fisico') e repassado com e.get('pct_fisico') (:547); nenhuma linha do arquivo o atribui — o campo do painel continua vazio"
+    },
+    {
+     "arquivo": "/home/runner/workspace/services/importacao_fisico_financeiro.py",
+     "linhas": "246-261",
+     "fato": "o outro pct_fisico do repo e conceito distinto: campo do payload .mpp que semeia RDOs sinteticos na importacao (_rdos_sinteticos_do_pct_fisico), nao preenche o campo do painel"
+    }
+   ],
+   "implicacao_plano": "Sustenta que a Fase 7 (EVM) e aritmetica de composicao sobre series ja existentes: PV vem de montar_curva_s/alocar_por_peso, AC de curva_realizado, e EV = pct fisico (calcular_progresso_geral_obra_v2 ou por tarefa) x orcamento — nenhum motor novo a construir, so o join das tres fontes e o preenchimento do pct_fisico do painel (hoje None) a partir do cronograma_engine; a Fase 7 pode manter posicao tardia no plano sem dependencia de estagios extras, e o unico ponto de costura novo e mapear tarefa/OSC para ligar fisico a custo por etapa."
+  }
+ ],
+ "plano_rearquitetado": {
+  "leitura_geral": "Os vereditos deslocam o plano de \"construir\" para \"convergir e reaproveitar\": o núcleo cronograma↔RDO já tem motor de agendamento v2, rede de predecessoras tipada, baseline congelada, auto-casamento IMC↔tarefa (Task #102) e as três séries do EVM vivas — logo a Fase 7 encolhe para composição EVM + monetização da baseline, e as ondas 1.3 e 2.3 viram trabalho de reconciliação de dados, não de mecanismo novo. Em contrapartida, três sangramentos confirmados sobem de prioridade e viram o pacote 1 (vazamento cross-tenant em relatorios_funcionais + fallbacks \"admin com mais dados\", e dupla contagem de mão de obra em DUAS tabelas com idempotência furada no ponto), porque qualquer AC/custo realizado exibido nos estágios seguintes sai inflado sem eles. O rollout das três flags do núcleo é pacote próprio sem código novo (confirmado pronto), e a contradição Fase 6 × Fase 9b sobre o dono de Obra.valor_contrato exige uma decisão humana única ANTES de qualquer uma das duas fases — a saída sinalizada pela própria 9b (P1) é Fase 6 primeiro e 9b reescrita como camada documental. A ordem geral segue a distância ao núcleo: estancar → ligar o que está pronto → consertar as fontes (custo orçado, progresso, seed de serviços, pesos) → unificar presença e gravação de progresso → contrato → EVM.",
+  "pacotes": [
+   {
+    "id": "p1-estancamento",
+    "nome": "Estancar sangramento: tenant e dupla contagem de custo",
+    "objetivo": "Fechar o vazamento cross-tenant dos relatórios e eliminar a dupla contagem de mão de obra ponto×RDO nas duas tabelas de custo.",
+    "escopo": [
+     "admin_id nos 7 relatórios operacionais de relatorios_funcionais.py:58-266 (veredito relatorios_funcionais-sem-admin_id)",
+     "admin_id nas 3 exportações CSV/Excel/PDF de relatorios_funcionais.py:456-572",
+     "Remover/blindar os 5 fallbacks 'admin com mais dados' (views/obras.py:1520, views/rdo.py:70/78/92/2274) devolvendo 403/404",
+     "Dedup cross-origem de CustoObra mão de obra por (funcionario, data, obra, admin) — o dedup do handler rdo_finalizado (event_manager.py:706-728) filtra por rdo_id e nunca enxerga o registro do ponto (rdo_id NULL)",
+     "Dedup cross-origem de GestaoCustoFilho SALARIO/MAO_OBRA_DIRETA — filtros intra-origem (event_manager.py:353-370 e 734-750) duplicam diaristas com ponto+RDO no mesmo dia",
+     "Idempotência do path horista do ponto: ponto_registrado é emitido em toda batida (ponto_service.py:142-150) e o handler (event_manager.py:459-503) grava CustoObra sem nenhuma checagem prévia",
+     "Reusar a guarda existe_ponto_no_dia (services/rdo_custos.py:50) no handler lancar_custos_rdo — hoje só o caminho paralelo gerar_custos_mao_obra_rdo a usa, e views/rdo.py dispara os dois na finalização",
+     "Testes de regressão multi-tenant e de não-duplicação por (funcionario, data, obra)"
+    ],
+    "dependencias": [],
+    "origem": "onda 0.1 + 0.2 + 0.3 do FLUXO-IDEAL / vereditos relatorios_funcionais-sem-admin_id-e-fallbacks-obras-rdo e custoobra-dupla-contagem-ponto-rdo (ambos CONFIRMADOS)",
+    "pronto_quando": "Nenhuma query de relatorios_funcionais.py roda sem admin_id (teste cross-tenant vermelho→verde); simulação de dia com batidas múltiplas + finalização de RDO para horista e diarista produz exatamente 1 linha de custo de mão de obra por (funcionario, data, obra) em cada ledger; os 5 fallbacks respondem 403/404."
+   },
+   {
+    "id": "p2-rollout-flags",
+    "nome": "Rollout das 3 flags prontas do núcleo (zero código novo)",
+    "objetivo": "Ligar cronograma_mpp_ativo, cronograma_editor_v2 e rdo_percentual_livre em tenant piloto seguindo os runbooks — trabalho operacional, não de desenvolvimento.",
+    "escopo": [
+     "Confirmar deploy/migrations em produção (onda 0.1 do rollout-consolidado: maior migration aplicada pós-deploy)",
+     "mpp: pré-checagem via scripts/diagnostico_cronograma_tenant.py (a flag não tem guard bloqueante por design — governa borda visual) + verificação de equivalência pós-import",
+     "editor v2: snapshot antes, --criar-baseline para obras datadas, decidir calendário (guard recusa sáb/dom — motor seg-sex fixo), ligar e comparar",
+     "percentual livre: reapontar as tarefas legadas que tarefas_que_regridem() listar, ligar, observar 1 semana (passo 6 do runbook: avanço que 'mudou sozinho')",
+     "Se o piloto exigir calendário com sábado/domingo, promover a fase de calendário configurável na fila (única situação em que este pacote vira código)"
+    ],
+    "dependencias": [],
+    "origem": "rollout-consolidado.md onda 4 / veredito flags-nucleo-completas-desligadas (CONFIRMADO: scripts, guards e runbooks prontos, defaults FALSE)",
+    "pronto_quando": "As 3 flags TRUE no tenant piloto, uma semana de operação sem regressão de físico nem reclamação de datas, evidências registradas nos runbooks.",
+    "decisao_pendente": "Escolha do tenant piloto (menor com uso real) e decisão de calendário: aceitar seg-sex ou esperar calendário configurável para tenants que trabalham fim de semana."
+   },
+   {
+    "id": "p3-custo-orcado",
+    "nome": "Fonte única do custo orçado (OSC.valor_orcado herda venda)",
+    "objetivo": "Garantir que todo consumidor de 'orçado' (inclusive o futuro BAC) leia custo de composição, não preço de venda inflado pela margem.",
+    "escopo": [
+     "Decidir e executar o caminho: (a) padronizar o fallback já testado de resumo_custos_obra.py:253-269 (soma de ObraServicoCustoItem quando houver linhas) como fonte canônica do orçado/BAC, ou (b) corrigir a origem gravando custo da composição em valor_orcado no listener (models.py:7466)",
+     "Se caminho (b): neutralizar os dois re-syncs venda→orcado que sobrescreveriam a correção (medicao_views.py:302-315 e views/catalogo_views.py:870-886)",
+     "Corrigir cronograma_fisico_financeiro.py:281-296, que soma valor_orcado cru sem a mitigação — fonte provável da curva PV/BAC da Fase 7",
+     "Inventariar os demais consumidores de valor_orcado e migrá-los para a fonte escolhida",
+     "Teste: OSC nascido de proposta aprovada expõe orçado = custo da composição, nunca valor_comercial"
+    ],
+    "dependencias": [],
+    "origem": "onda 1 item 8 do FLUXO-IDEAL / veredito osc-valor-orcado-herda-venda (CONFIRMADO)",
+    "pronto_quando": "resumo_custos_obra e cronograma_fisico_financeiro devolvem o mesmo 'orçado' (custo) para a mesma obra, e edição de medição/vínculo de catálogo não re-infla o valor.",
+    "decisao_pendente": "Escolha entre caminho (a) padronizar fallback no consumo e (b) corrigir a origem — (a) é menor e replica padrão testado; (b) é definitivo mas exige neutralizar os dois re-syncs."
+   },
+   {
+    "id": "p4-progresso-leitura",
+    "nome": "Uma fórmula de progresso em todos os leitores",
+    "objetivo": "Migrar os ~4 call-sites de média simples restantes para calcular_progresso_geral_obra_v2 / progresso_geral_para_kpi.",
+    "escopo": [
+     "portal_obras_views.py:745-758 (gerar_medicao) — crítico: a média simples vira dinheiro (valor_medido) e percentual_executado persistido que o cliente vê ao lado do anel v2",
+     "views/dashboard.py:444-453 e o derivado produtividade_obra em 987-988",
+     "cronograma_views.py:354-373 (index com avg sobre TODAS as tarefas, dupla-contando pais)",
+     "Fallback de template em templates/obras/cronograma.html:124/158 (modo cliente)",
+     "Usar progresso_geral_para_kpi (utils/cronograma_engine.py:1035-1054) como ponto único — já trata obra sem cronograma",
+     "Definir política para MedicaoObra históricas (snapshots persistidos que seguirão divergentes após a migração)"
+    ],
+    "dependencias": [],
+    "origem": "onda 1 item 5 do FLUXO-IDEAL / veredito duas-formulas-progresso (CONFIRMADO)",
+    "pronto_quando": "Anel do portal, dashboard, index do cronograma e nova medição gerada exibem o mesmo percentual para a mesma obra/data; política de histórico documentada.",
+    "decisao_pendente": "Recalcular ou congelar as MedicaoObra antigas (afeta linha do tempo do portal e o EVM retroativo)."
+   },
+   {
+    "id": "p5-seed-sor",
+    "nome": "Aprovação semeia ServicoObraReal e fecha o elo comercial",
+    "objetivo": "A obra nascer pronta para o RDO: serviços/quantidades semeados dos PropostaItens na mesma transação que já cria IMC/OSC/cronograma, e o CRM sabendo o desfecho.",
+    "escopo": [
+     "handle_proposta_aprovada semeia ServicoObraReal dos PropostaItens — hoje nenhum dos dois handlers cria (grep zero em handlers/ e services/; criação só em 4 rotas manuais como views/obras.py:640-700)",
+     "Fechar o Lead na aprovação (ganho + obra_id) — onda 1.2",
+     "propostas.nova lê ?cliente_id=&lead_id= e persiste CPF/CNPJ coletado — onda 1.1",
+     "Definir destino da válvula V2 (views/rdo.py:3725-3742, RDO sem SOR com 'cronograma é a fonte') e do fallback dual ServicoObra legada × ServicoObraReal (views/rdo.py:4762-4790)",
+     "Cronograma vindo de .mpp: garantir serviço/quantidade/peso equivalentes (hoje entra órfão da cadeia comercial)"
+    ],
+    "dependencias": [],
+    "origem": "onda 1 itens 1 e 2 do FLUXO-IDEAL / veredito onda1-item2-seed-servico-obra-real-na-aprovacao (CONFIRMADO)",
+    "pronto_quando": "Obra criada por aprovação de proposta permite criar RDO sem nenhuma re-seleção manual de serviços; lead correspondente marcado ganho com obra_id."
+   },
+   {
+    "id": "p6-pesos-medicao",
+    "nome": "Reconciliar regimes de peso IMC↔tarefa (onda 1.3 re-escopada)",
+    "objetivo": "NÃO construir o auto-casamento (já existe desde Task #102) — apenas unificar os dois regimes de peso e cobrir dados sem linhagem.",
+    "escopo": [
+     "Normalizar o peso do import JSON (services/importacao_fisico_financeiro.py:227-242 grava peso=dias sem somar 100) OU adaptar o gate ==100 de gerar_medicao_quinzenal (medicao_service.py:88-92) — hoje o import passa em calcular_percentual_item mas quebra na geração de medição",
+     "Alinhar as validações: o manual (medicao_views.py:376-383) só bloqueia soma>100, o gerador exige ==100",
+     "Backfill/ferramenta para itens legados e manuais sem linhagem proposta_item_id ↔ gerada_por_proposta_item_id",
+     "Teste ponta-a-ponta: aprovação, import JSON e vínculo manual produzem pesos que a medição quinzenal aceita"
+    ],
+    "dependencias": [],
+    "origem": "onda 1 item 3 do FLUXO-IDEAL, re-escopada / veredito vinculo-imc-tarefa-auto-casamento (PARCIAL: mecanismo já implementado em services/cronograma_proposta.py:758-773)",
+    "pronto_quando": "gerar_medicao_quinzenal não recusa nenhum item de obra criada por qualquer dos 3 caminhos (aprovação, import JSON, manual); zero itens ativos com soma de pesos != 100."
+   },
+   {
+    "id": "p7-presenca",
+    "nome": "Presença única: alocação = plano, ponto = fato, RDO pré-carregado",
+    "objetivo": "Uma fonte de verdade de presença: a batida real nunca sobrescrita pelo plano, RDO pré-carregando mão de obra do ponto, e AlocacaoEquipe aposentada.",
+    "escopo": [
+     "PRIMEIRO: corrigir AllocationEmployee.sincronizar_com_ponto (models.py:4543-4559), que sobrescreve hora_entrada/saida/obra da batida real com o turno planejado — precede qualquer pré-carga",
+     "RDO pré-carrega RDOMaoObra do ponto/alocação do dia + alerta de divergência ponto×RDO (onda 1.6)",
+     "Aposentar AlocacaoEquipe (modelo órfão — nenhum código a instancia) e sua FK rdo_gerado_id, em vez de integrá-la",
+     "Corrigir de carona o funcionario_id sempre nulo em almoxarifado_utils.py:418-420 (único leitor da FK morta)",
+     "Convergir Allocation/AllocationEmployee × RegistroPonto × RDOMaoObra para o modelo planejada→confirmada→apontada (onda 2.1)"
+    ],
+    "dependencias": [
+     "p1-estancamento (veredito custoobra-dupla-contagem-ponto-rdo: pré-carregar o RDO a partir do ponto sem a dedup cross-origem multiplicaria a dupla linha de custo por funcionário/dia)"
+    ],
+    "origem": "onda 1 item 6 + onda 2 item 1 do FLUXO-IDEAL / veredito presenca-tres-tabelas-sem-fonte-de-verdade (CONFIRMADO, escopo encolhido: AlocacaoEquipe descontinuada)",
+    "pronto_quando": "Batida real jamais alterada por sync de plano (teste); RDO novo nasce com equipe do dia pré-carregada; AlocacaoEquipe sem referências vivas; movimentação de almoxarifado grava funcionario_id."
+   },
+   {
+    "id": "p8-progresso-gravacao",
+    "nome": "Convergência de gravação do progresso (onda 2.3 re-escopada)",
+    "objetivo": "Fechar a dualidade de destinos no backend do RDO — a UI já é entrada única (M07); resta derivar/aposentar o trilho de subatividade.",
+    "escopo": [
+     "Derivar RDOServicoSubatividade.percentual_conclusao dos apontamentos de cronograma usando o elo subatividade_mestre_id que já existe e está preenchido (models.py:5853-5858, garantir_subatividade)",
+     "Repontar o fallback da medição (medicao_service.py:207-250 usa subatividade só como fallback por servico_id) e o fallback V1 do KPI (cronograma_engine.py:1016-1054) para a fonte única",
+     "Decidir destino dos caminhos backend mortos que ainda aceitam subatividade_*_percentual (salvar_rdo_flexivel views/rdo.py:3770-3827, rdo_salvar_unificado) e do fluxo V1 de edição que digita subatividade sem tocar o cronograma",
+     "Garantir que nenhum template/JS volte a emitir os campos (hoje grep = zero emissores)"
+    ],
+    "dependencias": [
+     "p4-progresso-leitura (veredito duas-formulas-progresso: convergir a gravação antes de unificar a leitura re-criaria divergência — a fonte única de leitura define para onde o fallback V1 aponta)",
+     "p2-rollout-flags (veredito rdo-progresso-duplo + flags-nucleo: com rdo_percentual_livre/V2 ligados no piloto sabe-se quais caminhos legados seguem vivos e podem ser aposentados sem quebrar tenant V1)"
+    ],
+    "origem": "onda 2 item 3 do FLUXO-IDEAL, re-escopada / veredito rdo-progresso-duplo-subatividade-apontamento (PARCIAL: M07 já fez a metade visível; sobra camada de dados)",
+    "pronto_quando": "Um único apontamento no RDO atualiza cronograma, subatividade (derivada) e medição com o mesmo número; nenhum caminho de gravação aceita as duas famílias de campos."
+   },
+   {
+    "id": "p9-contrato-decisao",
+    "nome": "Dono único de Obra.valor_contrato (Fase 6 antes da 9b)",
+    "objetivo": "Resolver a contradição entre Fase 6 (cadeia ObraContratoVersao) e Fase 9b (listener em ContratoAditivo) antes que qualquer uma entre em execução, e fechar os 4 escritores vivos do campo.",
+    "escopo": [
+     "Ratificar a ordenação Fase 6 primeiro: ObraContratoVersao + services/contrato_obra.py como escritor único (a própria 9b, premissa P1 linha 4670 e Task 18, subordina ContratoAditivo à cadeia da 6)",
+     "Reescrever Fase 9b Tasks 15-16: Contrato vira camada documental (PDF, assinatura, vencimento) apontando para a cadeia da Fase 6 — eliminar o listener after_flush e o segundo serviço (contrato_service.py)",
+     "Fechar os 4 escritores vivos: event_manager.py:1029 e 1104, views/obras.py:417 e 954, MAIS services/importacao_fisico_financeiro.py:754 (omitido do inventário da Fase 6)",
+     "Executar a Fase 6 (spec→plano→flag) com a lista de escritores completa"
+    ],
+    "dependencias": [],
+    "origem": "fase 6 (2026-07-21) + fase 9b tasks 15-18 / veredito contradicao-dono-valor-contrato-fase6-vs-fase9b (CONFIRMADO: nenhum dos dois planos começou — grep zero)",
+    "pronto_quando": "Decisão registrada; Fase 9b reescrita sem modelagem própria de aditivo; após a Fase 6, grep confirma um único ponto de escrita de valor_contrato (contrato_obra.py).",
+    "decisao_pendente": "Decisão humana do dono do produto ratificando: cadeia absoluta-temporal da Fase 6 como dona do valor_contrato e 9b como camada documental (vs. o desenho por deltas da 9b)."
+   },
+   {
+    "id": "p10-fase7-evm",
+    "nome": "Fase 7 reescrita: EVM sobre o editor v2 (reaproveitar, não reconstruir)",
+    "objetivo": "Entregar EVM e monetização da baseline compondo o que o editor v2 e as séries existentes já dão — jamais uma segunda rede de predecessoras ou segunda baseline.",
+    "escopo": [
+     "REAPROVEITAR do editor v2: TarefaVinculo (TI/II/TT/IT + lag, models.py:5952-5978), motor cronograma_scheduler (folga total, is_critica, ciclo, roll-up), CronogramaBaseline/Item + coluna Desvio na UI, e a flag cronograma_editor_v2 existente",
+     "DESCARTAR do plano de 21/07: TarefaPredecessora, utils/cpm.py, cronograma_cpm_service, backfill_predecessoras_tipadas, baseline-como-CronogramaVersao.is_baseline (separação decidida em código) e flag própria de CPM",
+     "CONSTRUIR: motor EVM das 11 grandezas por composição — PV de montar_curva_s/alocar_por_peso, AC de curva_realizado (GestaoCustoFilho), EV = progresso físico (calcular_progresso_geral_obra_v2 / por tarefa) × BAC",
+     "Preencher pct_fisico do painel (hoje None em cronograma_fisico_financeiro.py:263) a partir do cronograma_engine",
+     "BAC congelado junto à CronogramaBaseline (hoje só datas) — conectado à cadeia de contrato do p9",
+     "Costura tarefa↔OSC para ligar físico a custo por etapa (único join novo, per veredito evm-series)",
+     "Folga livre no scheduler (v2 só calcula folga total) e chave evm no endpoint /obras/<id>/financeiro/dados + UI",
+     "Ajustar a premissa de validação: o CPM vivo é um AGENDADOR que reescreve datas, não camada de análise não-destrutiva"
+    ],
+    "dependencias": [
+     "p3-custo-orcado (veredito osc-valor-orcado-herda-venda: BAC calculado sobre valor_orcado sai inflado pela margem em todo OSC nascido de proposta; cronograma_fisico_financeiro soma valor_orcado cru)",
+     "p1-estancamento (veredito custoobra-dupla-contagem-ponto-rdo: o AC somaria custo de mão de obra duplicado em horistas e diaristas)",
+     "p6-pesos-medicao (veredito vinculo-imc-tarefa-auto-casamento: o EV por item já tem cobertura nos fluxos novos, mas os dados de import JSON com peso=dias e o legado sem linhagem corromperiam o valor agregado)",
+     "p9-contrato-decisao (veredito contradicao-dono-valor-contrato + fase7-obsoleta-editor-v2: o BAC congelado junto à baseline depende da cadeia de valor da Fase 6 — sem dono único do contrato, o BAC não tem fonte estável)",
+     "p2-rollout-flags (vereditos flags-nucleo + fase7-obsoleta-editor-v2: a Fase 7 deve se pendurar na flag cronograma_editor_v2 já existente, que precisa estar ligada e validada no piloto)"
+    ],
+    "origem": "fase 7 (2026-07-21) reescrita / vereditos fase7-obsoleta-editor-v2 e evm-fase7-series-existentes (ambos CONFIRMADOS)",
+    "pronto_quando": "Curvas PV/EV/AC e índices (IDP/IDC etc.) servidos no endpoint financeiro e na UI para a obra piloto, com BAC = custo (não venda), desvio monetizado contra a baseline e nenhum modelo/serviço novo duplicando TarefaVinculo ou CronogramaBaseline."
+   }
+  ],
+  "ajustes_por_veredito": [
+   {
+    "claim_id": "osc-valor-orcado-herda-venda",
+    "ajuste": "Onda 1 item 8 vira pacote próprio (p3) e pré-requisito duro da Fase 7; escopo ampliado para incluir cronograma_fisico_financeiro.py:281-296 (que soma valor_orcado cru) e, se a correção for na origem, os dois re-syncs venda→orcado (medicao_views.py:314, catalogo_views.py:886); abre decisão pendente entre padronizar o fallback já testado de resumo_custos_obra ou corrigir o campo na origem."
+   },
+   {
+    "claim_id": "vinculo-imc-tarefa-auto-casamento",
+    "ajuste": "Onda 1.3 deixa de ser 'construir auto-casamento' — ele existe desde Task #102 (aprovação) e no import JSON; o pacote p6 encolhe para reconciliar os dois regimes de peso (normalizado-100 vs peso=dias, que quebra o gate ==100 da medição quinzenal) e cobrir itens legados/manuais sem linhagem; risco da Fase 7 migra de 'mecanismo inexistente' para 'dados de import/legado'."
+   },
+   {
+    "claim_id": "custoobra-dupla-contagem-ponto-rdo",
+    "ajuste": "Item 3 da onda 0 confirmado e AMPLIADO no p1: a dedup precisa cobrir duas tabelas (CustoObra com chave cross-origem sem rdo_id E GestaoCustoFilho SALARIO cross-origem), mais idempotência do path horista do ponto (emitido a cada batida); ponto de reuso definido: existe_ponto_no_dia no handler lancar_custos_rdo; enquanto não sai, custo realizado exibido é tratado como potencialmente inflado."
+   },
+   {
+    "claim_id": "duas-formulas-progresso",
+    "ajuste": "Item 5 da onda 1 mantido com escopo fechado em ~4 call-sites (p4), com gerar_medicao como o crítico (percentual vira dinheiro); adiciona decisão pendente sobre recalcular ou congelar MedicaoObra históricas; a divergência anel×cronograma do portal já foi sanada — o sintoma restante ao cliente é anel v2 vs percentual das medições."
+   },
+   {
+    "claim_id": "rdo-progresso-duplo-subatividade-apontamento",
+    "ajuste": "Onda 2.3 encolhe de 'redesenhar formulário + unificar dados' para só camada de dados (p8): a UI já é entrada única (M07); o trabalho vira derivar subatividade dos apontamentos via subatividade_mestre_id, repontar fallbacks de medição/KPI e aposentar caminhos backend mortos; deixa de bloquear o núcleo e é reordenado para depois de p4 e do rollout das flags."
+   },
+   {
+    "claim_id": "onda1-item2-seed-servico-obra-real-na-aprovacao",
+    "ajuste": "Confirma p5 na ordem prevista; escopo ganha dois itens que o achado original não tinha: definir o destino da válvula V2 (RDO sem SOR) e da dualidade ServicoObra legada × ServicoObraReal (fallback dual explícito em rdo.py:4762-4790), além do seed equivalente para cronogramas vindos de .mpp."
+   },
+   {
+    "claim_id": "relatorios_funcionais-sem-admin_id-e-fallbacks-obras-rdo",
+    "ajuste": "Sustenta p1 como pacote mais urgente; escopo fixado com precisão: 10 pontos em relatorios_funcionais.py (7 relatórios + 3 exportações) + 5 fallbacks 'admin com mais dados' (obras.py:1520, rdo.py:70/78/92/2274); confirmado que nenhuma proteção transversal compensa (sem before_request/with_loader_criteria)."
+   },
+   {
+    "claim_id": "presenca-tres-tabelas-sem-fonte-de-verdade",
+    "ajuste": "p7 mantém a ordem prevista mas ENCOLHE: AlocacaoEquipe é modelo órfão e será aposentada em vez de integrada (a FK rdo_gerado_id nunca é preenchida); a correção da sobrescrita da batida real (sincronizar_com_ponto) passa a preceder obrigatoriamente a pré-carga de mão de obra no RDO; entra de carona o conserto do funcionario_id nulo em almoxarifado_utils.py:419."
+   },
+   {
+    "claim_id": "flags-nucleo-completas-desligadas",
+    "ajuste": "Valida p2 como pacote de rollout puro (regra 2): scripts, guards e runbooks prontos, defaults FALSE — mas não zero-esforço: é trabalho operacional por tenant (diagnóstico mpp, baselines e calendário no editor v2, reapontamento de legados no percentual livre + 1 semana de observação); único gatilho de código: tenant que exija sábado/domingo promove a fase de calendário configurável."
+   },
+   {
+    "claim_id": "contradicao-dono-valor-contrato-fase6-vs-fase9b",
+    "ajuste": "Cria o pacote de decisão p9 como gate antes de Fase 6 ou 9b executarem: Fase 6 primeiro (ObraContratoVersao + contrato_obra.py escritor único), 9b Tasks 15-16 reescritas como camada documental sem listener after_flush nem contrato_service.py; a lista de escritores a fechar ganha o 4º ponto omitido (importacao_fisico_financeiro.py:754); p10 depende de p9 pelo BAC congelado."
+   },
+   {
+    "claim_id": "fase7-obsoleta-editor-v2",
+    "ajuste": "A Fase 7 de 21/07 é reescrita, não sequenciada (p10): reaproveitar TarefaVinculo, cronograma_scheduler, CronogramaBaseline e a flag cronograma_editor_v2; descartar TarefaPredecessora, utils/cpm.py, cronograma_cpm_service, backfill_predecessoras_tipadas e baseline-em-CronogramaVersao; duas premissas mudam: o CPM vivo é agendador destrutivo (validação muda de natureza) e não nasce flag própria de CPM; a separação baseline↔CronogramaVersao foi decidida em código e não se reabre."
+   },
+   {
+    "claim_id": "evm-fase7-series-existentes",
+    "ajuste": "Confirma que o p10 é aritmética de composição, não motor novo: PV de montar_curva_s/alocar_por_peso, AC de curva_realizado, EV de calcular_progresso_geral_obra_v2 × BAC; adiciona ao escopo preencher o pct_fisico do painel (hoje None) e a única costura nova — mapear tarefa↔OSC para ligar físico a custo por etapa; permite à Fase 7 manter posição tardia sem estágios extras."
+   }
+  ],
+  "ordem_recomendada": [
+   "p1-estancamento",
+   "p2-rollout-flags ‖ p3-custo-orcado ‖ p9-contrato-decisao",
+   "p4-progresso-leitura ‖ p5-seed-sor ‖ p6-pesos-medicao",
+   "p7-presenca",
+   "p8-progresso-gravacao",
+   "p10-fase7-evm"
+  ]
+ }
+}
