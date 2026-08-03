@@ -1,4 +1,5 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify, make_response, session
+from flask import render_template, request, redirect, url_for, flash, jsonify, make_response, session, abort
+from werkzeug.exceptions import HTTPException
 from flask_login import login_required, current_user
 from models import db, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, NotificacaoCliente
 from auth import admin_required, funcionario_required
@@ -79,21 +80,25 @@ def rdos():
                 ).fetchone()
                 admin_id = func_counts[0] if func_counts and func_counts[0] else current_user.id
         else:
-            # Funcionário - buscar admin_id através do funcionário
-            # Fase 0.5 / 1.4 — removido o mapeamento chumbado
-            # "123@gmail.com" -> "funcionario@valeverde.com": e-mail de um
-            # tenant específico no código de produção, resquício da época
-            # de cliente único.
-            email_busca = current_user.email
-            funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
-            
-            if not funcionario_atual:
-                # Detectar admin_id dinamicamente
-                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-                admin_id_dinamico = admin_counts[0] if admin_counts else current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id
-                funcionario_atual = Funcionario.query.filter_by(admin_id=admin_id_dinamico, ativo=True).first()
-            
-            admin_id = funcionario_atual.admin_id if funcionario_atual else (current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id)
+            # p1 Step B — o tenant sai do usuário autenticado, e ponto.
+            #
+            # Havia aqui duas consultas que cruzavam empresas: primeiro
+            # `Funcionario.query.filter_by(email=…)` SEM tenant (com o mesmo
+            # e-mail em duas empresas, o primeiro registro ganhava), e, se
+            # falhasse, uma heurística em SQL cru — "a empresa com mais
+            # funcionários ativos" — que servia um funcionário QUALQUER dela
+            # e adotava o `admin_id` daquela empresa para a tela inteira.
+            #
+            # Nada disso é necessário: o `admin_id` de um FUNCIONARIO é a
+            # empresa que lhe deu acesso, e `get_tenant_admin_id` (utils/
+            # tenant.py:15) já responde isso a partir da sessão. Quem não tem
+            # tenant não recebe o de outra empresa — recebe 404.
+            from utils.tenant import get_tenant_admin_id
+            admin_id = get_tenant_admin_id()
+            if not admin_id:
+                logger.warning('[p1] usuário %s sem tenant resolvido em rdos()',
+                               getattr(current_user, 'id', '?'))
+                abort(404)
         
         # Filtros
         obra_filter = request.args.get('obra_id', type=int)
@@ -306,6 +311,12 @@ def rdos():
                                  'order_by': 'data_desc'
                              })
         
+    except HTTPException:
+        # p1 Step B — 404/403 são RESPOSTA, não falha a ser recuperada. Sem
+        # isto, o `abort(404)` do usuário sem tenant caía no bloco de baixo,
+        # que tenta reconsultar com `admin_id` e devolve a tela com 200 — o
+        # oposto do que o abort pediu.
+        raise
     except Exception as e:
         logger.error(f"ERRO LISTA RDO: {str(e)}")
         # Rollback da sessão e tentar novamente
@@ -2261,22 +2272,14 @@ def editar_rdo(id):
 def api_percentuais_ultimo_rdo(obra_id):
     """API CORRIGIDA: Percentuais do último RDO + novos serviços com 0%"""
     try:
-        # Buscar funcionário correto para admin_id
-        # Fase 0.5 / 1.4 — removido o mapeamento chumbado
-        # "123@gmail.com" -> "funcionario@valeverde.com": e-mail de um
-        # tenant específico no código de produção, resquício da época
-        # de cliente único.
-        email_busca = current_user.email
-        funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
-        
-        if not funcionario_atual:
-            # Detectar admin_id dinamicamente
-            admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-            admin_id_dinamico = admin_counts[0] if admin_counts else current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id
-            funcionario_atual = Funcionario.query.filter_by(admin_id=admin_id_dinamico, ativo=True).first()
-        
-        admin_id_correto = funcionario_atual.admin_id if funcionario_atual else (current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id)
-        
+        # p1 Step B — mesma correção de `rdos()`: o tenant vem do usuário
+        # autenticado, não de uma busca por e-mail sem escopo nem da empresa
+        # com mais funcionários ativos.
+        from utils.tenant import get_tenant_admin_id
+        admin_id_correto = get_tenant_admin_id()
+        if not admin_id_correto:
+            return jsonify({'error': 'Obra não encontrada'}), 404
+
         # Verificar se obra pertence ao admin
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id_correto).first()
         if not obra:
@@ -2389,15 +2392,14 @@ def funcionario_rdo_consolidado():
         admin_id_correto = get_admin_id_dinamico()
         
         # Buscar funcionário para logs
+        # p1 Step B — a busca por e-mail era SEM tenant: um log podia nomear
+        # o funcionário de outra empresa. Serve só para log, mas log que
+        # mistura empresa é como se descobre a mistura tarde demais.
         funcionario_atual = None
         if hasattr(current_user, 'email') and current_user.email:
-            # Fase 0.5 / 1.4 — removido o mapeamento chumbado
-            # "123@gmail.com" -> "funcionario@valeverde.com": e-mail de um
-            # tenant específico no código de produção, resquício da época
-            # de cliente único.
-            email_busca = current_user.email
-            funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
-        
+            funcionario_atual = Funcionario.query.filter_by(
+                email=current_user.email, admin_id=admin_id_correto).first()
+
         if not funcionario_atual:
             funcionario_atual = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
             logger.debug(f"DEBUG RDO CONSOLIDADO: Funcionário {funcionario_atual.nome if funcionario_atual else 'N/A'}, admin_id={admin_id_correto}")

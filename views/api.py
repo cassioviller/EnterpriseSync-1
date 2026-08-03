@@ -999,21 +999,13 @@ def api_remover_servico_obra():
             'message': f'Erro ao remover serviço: {str(e)}'
         }), 500
 
-def get_admin_id_dinamico():
-    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+# p1 Step B — a definição gêmea de `get_admin_id_dinamico` que existia aqui
+# foi removida. Ela era idêntica à de `views/helpers.py:411` (as duas já
+# delegavam ao resolvedor canônico desde a Fase 0.5) e sombreava o import do
+# topo deste módulo, que é de onde ela vem agora. Duas cópias do mesmo
+# resolvedor é como uma delas fica para trás na próxima correção de tenant.
 
-    Fase 0.5 / 3.5 — esta função era uma das 41 definições concorrentes de
-    resolvedor de tenant, e a mais perigosa: depois de tentar `current_user`,
-    caía numa cascata de heurísticas (admin com mais funcionários → com mais
-    serviços → o primeiro da tabela) terminando em `return 1`.
 
-    A correção da Fase 0 guardou apenas o caminho ANÔNIMO — mas um usuário
-    AUTENTICADO sem `admin_id` (funcionário órfão) escapava pelo `else: pass`
-    e chegava ao `return 1` do mesmo jeito. A cascata inteira foi removida:
-    quem não tem tenant não recebe o tenant de outra empresa.
-    """
-    from utils.tenant import get_tenant_admin_id
-    return get_tenant_admin_id()
 @main_bp.route('/api/servicos')
 @login_required
 def api_servicos():

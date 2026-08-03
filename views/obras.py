@@ -1,4 +1,5 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify
+from flask import render_template, request, redirect, url_for, flash, jsonify, abort
+from werkzeug.exceptions import HTTPException
 from flask_login import login_required, current_user
 from models import db, TipoUsuario, Funcionario, Obra, Cliente, RDO, Servico, ServicoObraReal, RDOServicoSubatividade, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao, RelatorioCompraMapa, ConfiguracaoEmpresa
 from auth import admin_required
@@ -1505,46 +1506,45 @@ def detalhes_obra(id):
             logger.debug(f"DEBUG PERÍODO DETALHES: {data_inicio} até {data_fim}")
         obra_id = id
         
-        # Sistema robusto de detecção de admin_id - PRODUÇÃO
-        admin_id = None  # Inicialmente sem filtro
-        
-        if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
-            if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-                # Super Admin vê todas as obras - não filtrar por admin_id
-                admin_id = None
-            elif current_user.tipo_usuario == TipoUsuario.ADMIN:
-                admin_id = current_user.id
-            else:
-                admin_id = current_user.admin_id
+        # p1 Step B — o tenant vem do usuário autenticado.
+        #
+        # O que havia aqui tinha TRÊS saídas para fora da empresa, em cascata:
+        #
+        #   1. o ramo de bypass (usuário não autenticado) adotava "o admin_id
+        #      com mais obras" — a maior empresa da base;
+        #   2. se aquela consulta falhasse, `admin_id = None` fazia a busca da
+        #      obra rodar SEM filtro nenhum;
+        #   3. e, mesmo autenticado, quando a obra não era do tenant o código
+        #      buscava DE NOVO sem filtro "para debug" e **adotava a obra
+        #      encontrada**, reescrevendo `admin_id` com o dono dela — todo o
+        #      resto da tela (custos, RDOs, cronograma) passava a ler a outra
+        #      empresa. Era abrir qualquer obra por id.
+        #
+        # `@login_required` na rota já cobre o caso anônimo; o resolvedor
+        # canônico cobre o resto. SUPER_ADMIN segue sem filtro, que é decisão
+        # explícita e não bypass.
+        admin_id = None
+        if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+            admin_id = None  # vê todas as obras, por definição do papel
         else:
-            # Sistema de bypass - usar admin_id com mais obras OU null para ver todas
-            try:
-                from sqlalchemy import text
-                obra_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-                # Em produção, pode não ter filtro de admin_id - usar o que tem mais dados
-                admin_id = obra_counts[0] if obra_counts else None
-                logger.debug(f"DEBUG: Admin_id detectado automaticamente: {admin_id}")
-            except Exception as e:
-                logger.error(f"Erro ao detectar admin_id: {e}")
-                admin_id = None  # Ver todas as obras
-        
-        # Buscar a obra - usar filtro de admin_id apenas se especificado
+            from utils.tenant import get_tenant_admin_id
+            admin_id = get_tenant_admin_id()
+            if not admin_id:
+                logger.warning('[p1] usuário %s sem tenant resolvido no detalhe '
+                               'da obra %s', getattr(current_user, 'id', '?'), id)
+                abort(404)
+
         if admin_id is not None:
             obra = Obra.query.filter_by(id=id, admin_id=admin_id).first()
         else:
             obra = Obra.query.filter_by(id=id).first()
-        
+
         if not obra:
-            logger.debug(f"ERRO: Obra {id} não encontrada (admin_id: {admin_id})")
-            # Tentar buscar obra sem filtro de admin_id (para debug)
-            obra_debug = Obra.query.filter_by(id=id).first()
-            if obra_debug:
-                logger.debug(f"DEBUG: Obra {id} existe mas com admin_id {obra_debug.admin_id}")
-                # Se encontrou sem filtro, usar essa obra
-                obra = obra_debug
-                admin_id = obra.admin_id  # Ajustar admin_id para as próximas consultas
-            else:
-                return f"Obra não encontrada (ID: {id})", 404
+            # 404 seco: sem segunda busca e sem dizer que a obra existe em
+            # outra empresa (mesmo critério de
+            # `tests/test_gestao_custo_filho_tenant.py:114`).
+            logger.info('[p1] obra %s não encontrada no tenant %s', id, admin_id)
+            abort(404)
 
         # Task #200: gate de revisão inicial de cronograma. Se a obra ainda
         # não foi revisada E veio de uma proposta com conteúdo de cronograma
@@ -2272,6 +2272,11 @@ def detalhes_obra(id):
                              # Senha recém-gerada (convite): mostrada UMA vez,
                              # vinda da sessão — nunca da URL.
                              **_consumir_senha_gerada())
+    except HTTPException:
+        # p1 Step B — 404 é resposta, não erro a ser convertido em flash +
+        # redirect. Sem isto o `abort(404)` da obra fora do tenant viraria
+        # "Erro ao carregar detalhes" com traceback na tela.
+        raise
     except Exception as e:
         import traceback
         error_traceback = traceback.format_exc()
