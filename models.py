@@ -4543,7 +4543,40 @@ class AllocationEmployee(db.Model):
         ).first()
         
         if registro_existente:
-            # Atualizar registro existente
+            # ── p7: a batida real NUNCA é sobrescrita pelo plano ───────────
+            #
+            # Este bloco reescrevia `hora_entrada`, `hora_saida` e `obra_id`
+            # do registro EXISTENTE com o turno planejado da alocação. Ou
+            # seja: o funcionário batia ponto às 7h12 na obra A, o sync
+            # rodava, e o registro virava 08:00–17:00 na obra do plano. A
+            # medição do que aconteceu era substituída pela previsão do que
+            # deveria acontecer — e sem deixar rastro do que foi apagado.
+            #
+            # A doutrina do pacote: **alocação = planejada, ponto =
+            # confirmada, RDO = apontada.** O plano semeia o registro vazio;
+            # a batida confirma e ganha, sempre.
+            tem_batida_real = bool(registro_existente.hora_entrada
+                                   or registro_existente.hora_saida)
+            if tem_batida_real:
+                logger.info(
+                    '[p7] alocação %s: registro de ponto de %s em %s já tem '
+                    'batida real — plano NÃO sobrescreve (entrada=%s, '
+                    'saída=%s)', self.id, self.funcionario_id,
+                    self.allocation.data_alocacao,
+                    registro_existente.hora_entrada,
+                    registro_existente.hora_saida)
+                self.sincronizado_ponto = True
+                self.data_sincronizacao = datetime.utcnow()
+                try:
+                    db.session.commit()
+                    return True
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"Erro ao marcar sincronização: {e}")
+                    return False
+
+            # Registro existe mas está VAZIO (semeado por falta/folga ou por
+            # outra rodada do plano): aí o plano pode preencher.
             registro_existente.obra_id = self.allocation.obra_id
             registro_existente.tipo_local = self.allocation.local_trabalho
             registro_existente.hora_entrada = self.turno_inicio
@@ -4561,9 +4594,14 @@ class AllocationEmployee(db.Model):
             registro_existente.horas_trabalhadas = self._calcular_horas_trabalhadas()
         else:
             # Criar novo registro
+            # p7 — `admin_id` FALTAVA aqui, e a coluna é NOT NULL: este ramo
+            # estourava IntegrityError toda vez que a alocação era de um
+            # funcionário sem ponto no dia, que é justamente o caso que ele
+            # existe para cobrir. O sync nunca criou um registro sequer.
             registro = RegistroPonto(
                 funcionario_id=self.funcionario_id,
                 obra_id=self.allocation.obra_id,
+                admin_id=self.allocation.admin_id,
                 data=self.allocation.data_alocacao,
                 hora_entrada=self.turno_inicio,
                 hora_saida=self.turno_fim,
@@ -4731,6 +4769,10 @@ def processar_lancamentos_automaticos(data_processamento=None, admin_id=None):
                     registro.tipo_registro = tipo_registro
                 if hasattr(registro, 'observacoes'):
                     registro.observacoes = f'Lançamento automático - {tipo_registro}'
+                # p7 — mesmo defeito do outro ramo: `admin_id` é NOT NULL e
+                # não era preenchido. O lançamento de falta/folga também
+                # nunca chegou a gravar.
+                registro.admin_id = admin_id
                 db.session.add(registro)
     
     try:

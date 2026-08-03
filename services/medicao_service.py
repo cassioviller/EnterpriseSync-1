@@ -265,20 +265,21 @@ def _recalcular_imc_avanco(obra_id, admin_id):
     for item in itens:
         perc_atual = calcular_percentual_item(item)
 
-        # Fallback por servico_id quando não há vínculos no cronograma
+        # Fallback por servico_id quando não há vínculos no cronograma.
+        #
+        # p8 — era `MAX(RDOServicoSubatividade.percentual_conclusao)` puro: uma
+        # fonte diferente da que o Gantt mostra, então a mesma obra podia medir
+        # por um número e exibir outro. Agora passa por
+        # `services/progresso_subatividade.py`, que prefere o percentual da
+        # TAREFA de cronograma ligada pelo `subatividade_mestre_id` — elo que
+        # existe dos dois lados e nunca era lido. Sem elo, cai no valor gravado
+        # na linha, que é o comportamento de antes.
         if perc_atual <= 0 and getattr(item, 'servico_id', None):
             try:
-                max_perc = (
-                    db.session.query(db.func.max(_RSS.percentual_conclusao))
-                    .join(_RDO, _RDO.id == _RSS.rdo_id)
-                    .filter(
-                        _RSS.servico_id == item.servico_id,
-                        _RSS.admin_id == admin_id,
-                        _RDO.obra_id == obra_id,
-                        _RDO.status.in_(['Finalizado', 'FINALIZADO', 'finalizado']),
-                    )
-                    .scalar()
-                )
+                from services.progresso_subatividade import (
+                    percentual_do_servico_na_obra)
+                max_perc = percentual_do_servico_na_obra(
+                    item.servico_id, obra_id, admin_id)
                 if max_perc is not None:
                     perc_atual = Decimal(str(max_perc)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             except Exception as e:
