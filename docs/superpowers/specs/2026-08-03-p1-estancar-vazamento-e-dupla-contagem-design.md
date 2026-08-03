@@ -187,11 +187,24 @@ de medição.
 
 ## Decisões pendentes
 
-| # | Decisão | Recomendação |
+| # | Decisão | Estado |
 |---|---|---|
-| 1 | **Histórico duplicado**: consertar só para frente, ou reconciliar o passado? | Consertar para frente **primeiro**; depois um script de reconciliação com `--dry-run`, no padrão dos backfills da casa. Sem isso, o número velho continua inflado — mas apagar custo em produção sem ensaio é como o projeto perdeu dado antes |
-| 2 | **Resposta das rotas sem tenant**: 403 ou 404? | **404.** 403 confirma que o recurso existe em outra empresa |
-| 3 | **Horista: atualizar ou somar** o custo do dia | **Atualizar** — o último cálculo do dia é o correto; somar batidas é o defeito |
+| 1 | **Histórico duplicado**: consertar só para frente, ou reconciliar o passado? | ✅ **DECIDIDA em 03/08 pelo Cássio: "consertar para frente primeiro, reconciliar depois."** Steps A-E são o para-frente; o Step F virou `scripts/reconciliar_custos_mao_obra.py`, com `--dry-run` como modo padrão e `--aplicar` explícito |
+| 2 | **Resposta das rotas sem tenant**: 403 ou 404? | ✅ **404** — e o repositório já tinha decidido assim: `tests/test_gestao_custo_filho_tenant.py:114` se chama *"a mensagem não revela que a obra existe"* |
+| 3 | **Horista: atualizar ou somar** o custo do dia | ✅ **Atualizar** — o último cálculo do dia é o correto; somar batidas era o defeito (Step C) |
+
+### O que a decisão nº 1 produziu, em concreto
+
+`scripts/reconciliar_custos_mao_obra.py` — assistido, nunca no boot: ele
+apaga dinheiro já lançado, e isso não acontece sozinho num deploy.
+
+* **Sobrevive o lançamento do PONTO.** É o fato medido — batida de crachá,
+  com hora. O do RDO é declaração de quem preencheu o relatório.
+* **`RDOMaoObra` nunca é apagado.** A rota `excluir_filho`
+  (`gestao_custos_views.py:620`) apaga o registro de origem junto com o custo;
+  faz sentido para exclusão pela tela, seria destruir registro de campo aqui.
+* **PAGO/RECUSADO não é tocado** — custo pago tem contrapartida no
+  financeiro. Sai no relatório marcado para tratamento manual.
 
 ## Testes
 
