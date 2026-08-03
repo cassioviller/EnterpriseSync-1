@@ -751,7 +751,12 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
                     data_inicio=data_inicio)
         db.session.add(obra)
     obra.nome = obra_j.get('nome')
-    obra.valor_contrato = float(contrato.get('valor_venda') or 0)
+    # p9 — escritor que estava OMITIDO do inventário da Fase 6. Passa pelo
+    # ponto único como os outros três.
+    from services.contrato_obra import ORIGEM_IMPORTACAO, definir_valor_contrato
+    definir_valor_contrato(obra, contrato.get('valor_venda') or 0,
+                           origem=ORIGEM_IMPORTACAO,
+                           motivo='import JSON físico-financeiro')
     obra.data_inicio = data_inicio
     obra.data_previsao_fim = _parse_date(contrato.get('data_fim_cronograma'))
     # Endereço da obra (exibido no portal do cliente). Usa `endereco` do JSON;

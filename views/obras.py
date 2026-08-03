@@ -415,7 +415,6 @@ def nova_obra():
                 data_inicio=data_inicio,
                 data_previsao_fim=data_previsao_fim,
                 orcamento=orcamento,
-                valor_contrato=valor_contrato,
                 area_total_m2=area_total_m2,
                 status=status,
                 estado=_EstadoObra.PLANEJAMENTO.value,
@@ -430,6 +429,16 @@ def nova_obra():
                 raio_geofence_metros=raio_geofence_metros
             )
             
+            # p9 — o valor de contrato sai do construtor e entra pelo ponto
+            # único, para que criar obra e editar obra passem pelo MESMO
+            # caminho. Antes do flush: é atributo em memória, não escrita.
+            from services.contrato_obra import (ORIGEM_CADASTRO,
+                                                definir_valor_contrato)
+            definir_valor_contrato(nova_obra, valor_contrato,
+                                   origem=ORIGEM_CADASTRO,
+                                   motivo='cadastro de obra',
+                                   usuario_id=getattr(current_user, 'id', None))
+
             db.session.add(nova_obra)
             db.session.flush()  # Para obter o ID da obra
 
@@ -952,7 +961,15 @@ def editar_obra(id):
             
             # Valores financeiros
             obra.orcamento = float(request.form.get('orcamento', 0)) if request.form.get('orcamento') else None
-            obra.valor_contrato = float(request.form.get('valor_contrato', 0)) if request.form.get('valor_contrato') else None
+            # p9 — escrita pelo ponto único (services/contrato_obra.py).
+            from services.contrato_obra import (ORIGEM_EDICAO,
+                                                definir_valor_contrato)
+            definir_valor_contrato(
+                obra,
+                float(request.form.get('valor_contrato', 0))
+                if request.form.get('valor_contrato') else 0,
+                origem=ORIGEM_EDICAO, motivo='formulário de edição da obra',
+                usuario_id=getattr(current_user, 'id', None))
             
             # Novos campos
             obra.area_total_m2 = float(request.form.get('area_total_m2', 0)) if request.form.get('area_total_m2') else None

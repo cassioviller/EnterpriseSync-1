@@ -1117,7 +1117,6 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
             cliente_id=cliente_obj.id,
             endereco=proposta.cliente_endereco,
             data_inicio=datetime.now().date(),
-            valor_contrato=valor_total,
             orcamento=valor_total,
             # Fase 2 — a obra nasce em PLANEJAMENTO, não em execução.
             # Antes: `status='Em andamento'` — a obra entrava em execução no
@@ -1132,6 +1131,11 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
             ativo=True,
             portal_ativo=True,
         )
+        # p9 — o contrato da obra nascida da proposta também passa pelo ponto
+        # único, e não pelo construtor: criar e alterar seguem o mesmo caminho.
+        from services.contrato_obra import ORIGEM_PROPOSTA, definir_valor_contrato
+        definir_valor_contrato(obra, valor_total, origem=ORIGEM_PROPOSTA,
+                               motivo=f'obra criada pela proposta {proposta.numero}')
         db.session.add(obra)
         db.session.flush()
         logger.info(
@@ -1192,11 +1196,16 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
                         "🔒 Obra %s: %d medição(ões) já emitida(s) congelada(s) "
                         "na base %.2f antes do aditivo",
                         obra.codigo, congeladas, anterior)
-            obra.valor_contrato = valor_total
-            logger.info(
-                "💰 Obra %s: valor_contrato %.2f → %.2f pela aprovação da "
-                "proposta %s", obra.codigo, anterior, valor_total,
-                proposta.numero)
+            # p9 — escrita pelo ponto único. O congelamento das medições
+            # já emitidas (acima) continua aqui: é regra de aditivo, não de
+            # escrita do campo.
+            from services.contrato_obra import (ORIGEM_ADITIVO,
+                                                ORIGEM_PROPOSTA,
+                                                definir_valor_contrato)
+            definir_valor_contrato(
+                obra, valor_total,
+                origem=ORIGEM_ADITIVO if anterior else ORIGEM_PROPOSTA,
+                motivo=f'proposta {proposta.numero}')
         if (obra.orcamento or 0) <= 0 and valor_total > 0:
             obra.orcamento = valor_total
 
