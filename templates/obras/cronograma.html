@@ -121,7 +121,11 @@
   {% if tarefas %}
   <div class="row g-2 mb-3" id="statsRow">
     {% set tarefas_empresa = tarefas | selectattr('responsavel', 'ne', 'terceiros') | list %}
-    {% set perc_total = (tarefas_empresa | map(attribute='percentual_concluido') | select | list | sum / tarefas_empresa|length) if tarefas_empresa else 0 %}
+    {# p4 — a média simples que existia aqui era a QUINTA fórmula de progresso
+       do sistema, escondida numa expressão de template: dava peso igual a uma
+       tarefa de 1 dia e a uma de 40, e contava tarefa-pai junto com as filhas.
+       O número agora vem pronto do servidor (`progresso_geral_header`), nos
+       dois modos — empresa e cliente. Ver cronograma_views.py:499. #}
     {% set concluidas = tarefas_empresa | selectattr('percentual_concluido', 'ge', 100) | list | length %}
     {% set em_andamento = tarefas_empresa | selectattr('percentual_concluido', 'gt', 0) | selectattr('percentual_concluido', 'lt', 100) | list | length %}
     <div class="col-6 col-md-3">
@@ -155,7 +159,7 @@
       <div class="stat-card stat-card-purple">
         <div class="stat-icon"><i class="fas fa-chart-pie"></i></div>
         <div class="stat-body">
-          <div class="stat-val" id="statPercGeral">{{ "%.1f"|format(progresso_geral_header if progresso_geral_header is not none else perc_total) }}%</div>
+          <div class="stat-val" id="statPercGeral">{{ "%.1f"|format(progresso_geral_header or 0) }}%</div>
           <div class="stat-lbl">Progresso Geral</div>
         </div>
       </div>

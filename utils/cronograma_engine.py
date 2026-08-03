@@ -838,7 +838,8 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int,
 
 def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date,
                                      admin_id: int, *,
-                                     com_arquivadas_historicas: bool = False) -> dict:
+                                     com_arquivadas_historicas: bool = False,
+                                     responsavel: str | None = None) -> dict:
     """
     Calcula o **progresso geral acumulado da obra** (modo V2) até `data_ref`.
 
@@ -874,6 +875,13 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date,
         .filter_by(obra_id=obra_id, admin_id=admin_id)
         .filter_by(is_cliente=False)
     )
+    if responsavel is not None:
+        # p4 — a medição do portal conta só o que é execução da EMPRESA:
+        # tarefa sob responsabilidade do cliente não é o que ele paga. Sem
+        # este parâmetro, o portal precisava reimplementar a fórmula inteira
+        # para preservar o escopo — e foi assim que nasceu a média simples
+        # que virava dinheiro. Default None = comportamento de sempre.
+        consulta = consulta.filter(TarefaCronograma.responsavel == responsavel)
     if com_arquivadas_historicas:
         # Curva histórica (M06 §4.2): tarefa arquivada DEPOIS de data_ref
         # ainda estava viva na data consultada — o trabalho feito nela não
@@ -1030,6 +1038,61 @@ def _progresso_fallback_subatividades(obra_id: int) -> float:
     if not subs:
         return 0.0
     return round(sum(s.percentual_conclusao or 0 for s in subs) / len(subs), 1)
+
+
+def progresso_ponderado_armazenado(obra_id: int, admin_id: int, *,
+                                   responsavel: str | None = None) -> float:
+    """Média ponderada do `percentual_concluido` GRAVADO nas tarefas-folha.
+
+    p4 — mesma **forma** de `calcular_progresso_geral_obra_v2` (só folhas,
+    peso por duração), mas outra **fonte**: a coluna gravada, não os
+    apontamentos de RDO.
+
+    ## Por que as duas existem, e por que isto não é a sexta fórmula
+
+    `calcular_progresso_geral_obra_v2` deriva tudo de
+    `RDOApontamentoCronograma` — tarefa sem apontamento conta 0, por desenho
+    (é o que faz o número não decrescer ao longo do tempo). Já
+    `TarefaCronograma.percentual_concluido` é escrito por vários caminhos:
+    a sincronização vinda dos apontamentos, o import de .mpp/JSON e a edição
+    direta na grade.
+
+    Numa obra que registra avanço por import ou pela grade — sem apontar RDO —
+    as duas divergem: a coluna mostra o avanço real e o motor devolve 0.
+
+    Trocar a fonte embaixo da medição do portal, que multiplica esse
+    percentual pelo `valor_contrato`, **zeraria a medição** dessas obras. Por
+    isso o call-site que vira dinheiro usa esta função: ganha a forma correta
+    (fim da média simples e da dupla contagem de pais) sem trocar de onde o
+    número vem.
+
+    **Unificar as duas FONTES é o p8** (`convergência da gravação do
+    progresso`), não este pacote.
+    """
+    from models import TarefaCronograma
+
+    consulta = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
+        .filter(TarefaCronograma.ativa.is_(True))
+    )
+    if responsavel is not None:
+        consulta = consulta.filter(TarefaCronograma.responsavel == responsavel)
+    tarefas = consulta.all()
+    if not tarefas:
+        return 0.0
+
+    pais_ids = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id}
+    folhas = [t for t in tarefas if t.id not in pais_ids]
+    if not folhas:
+        return 0.0
+
+    soma_pesos = sum(float(t.duracao_dias or 1) for t in folhas)
+    if soma_pesos <= 0:
+        return 0.0
+    soma = sum(float(t.percentual_concluido or 0) * float(t.duracao_dias or 1)
+               for t in folhas)
+    return round(soma / soma_pesos, 2)
 
 
 def progresso_geral_para_kpi(obra_id: int, admin_id: int) -> float:

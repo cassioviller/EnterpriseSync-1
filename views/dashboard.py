@@ -444,12 +444,20 @@ def dashboard():
                 ).order_by(RDO.data_relatorio.desc()).first()
                 
                 if rdo_mais_recente and rdo_mais_recente.servico_subatividades:
-                    # FÓRMULA SIMPLES: média das subatividades
-                    total_percentual = sum(
-                        sub.percentual_conclusao for sub in rdo_mais_recente.servico_subatividades
-                    )
-                    total_sub = len(rdo_mais_recente.servico_subatividades)
-                    progresso = round(total_percentual / total_sub, 1) if total_sub > 0 else 0
+                    # p4 — era "FÓRMULA SIMPLES: média das subatividades do
+                    # último RDO", que é a terceira das cinco fórmulas de
+                    # progresso que o sistema tinha. Ela ignora o cronograma
+                    # inteiro e olha só a última folha preenchida: obra com
+                    # RDO recente cobrindo um serviço pequeno aparecia
+                    # adiantada no dashboard e atrasada no detalhe.
+                    #
+                    # `progresso_geral_para_kpi` já é o ponto único do
+                    # detalhe da obra e trata sozinho o caso "sem cronograma"
+                    # (cai no fallback por subatividades — o mesmo número de
+                    # antes, para quem não tem cronograma).
+                    from utils.cronograma_engine import progresso_geral_para_kpi
+                    progresso = round(
+                        progresso_geral_para_kpi(obra.id, admin_id), 1)
                     obra.progresso_atual = min(progresso, 100)  # Max 100%
                     logger.debug(f"[TARGET] DASHBOARD PROGRESSO: {total_percentual}÷{total_sub} = {progresso}%")
                     obra.data_ultimo_rdo = rdo_mais_recente.data_relatorio

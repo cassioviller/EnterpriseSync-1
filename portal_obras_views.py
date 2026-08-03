@@ -747,11 +747,26 @@ def gerar_medicao(obra_id: int):
     # percentual parado e a dilui. 🔬 27/07 (dev): 107 obras davam percentual
     # diferente — numa amostra, 8,75% em vez de 11,67%, 25% a menos de valor.
     # Ver `TarefaCronograma.do_cronograma_interno`.
-    tarefas_empresa = TarefaCronograma.do_cronograma_interno(
-        obra_id, admin_id).filter_by(responsavel='empresa').all()
+    # p4 — a média SIMPLES que existia aqui dupla-contava tarefa-pai (o pai
+    # entra com o próprio percentual e as filhas entram de novo) e dava peso
+    # igual a uma tarefa de 1 dia e a uma de 40. Como o número vira
+    # `valor_medido` logo abaixo, o erro saía em dinheiro.
+    #
+    # Agora é a forma única: média das FOLHAS ponderada por duração, com o
+    # escopo `responsavel='empresa'` como parâmetro em vez de filtro
+    # reimplementado aqui.
+    #
+    # ⚠️ Usa `progresso_ponderado_armazenado`, e NÃO
+    # `calcular_progresso_geral_obra_v2`, de propósito: o motor deriva tudo de
+    # apontamento de RDO e conta 0 para tarefa sem apontamento. Obra que
+    # registra avanço por import de .mpp ou pela grade — sem apontar RDO —
+    # teria a medição ZERADA, porque este percentual multiplica o
+    # `valor_contrato` logo abaixo. A fonte continua sendo a coluna gravada;
+    # o que mudou foi a fórmula. Unificar as duas fontes é o p8.
+    from utils.cronograma_engine import progresso_ponderado_armazenado
 
-    total = len(tarefas_empresa)
-    perc = (sum(t.percentual_concluido or 0 for t in tarefas_empresa) / total) if total else 0.0
+    perc = progresso_ponderado_armazenado(obra_id, admin_id,
+                                          responsavel='empresa')
 
     valor_medido = 0
     if obra.valor_contrato and obra.valor_contrato > 0:

@@ -351,13 +351,40 @@ def index():
     from sqlalchemy import func as sqlfunc
     # Otimização N+1: uma agregação por obra_id (count + avg) em vez de duas queries
     # por obra dentro do loop.
+    #
+    # p4 — a agregação tinha dois defeitos que faziam este índice discordar do
+    # detalhe da obra:
+    #
+    #   1. **contava a cópia-cliente** (`is_cliente=True`) e as arquivadas,
+    #      diluindo a média com um plano paralelo parado;
+    #   2. **contava tarefa-pai junto com as filhas** — o pai entra com o
+    #      próprio percentual e as filhas entram de novo, então uma etapa com
+    #      muitas subtarefas pesa mais do que deveria.
+    #
+    # Agora a média é sobre FOLHAS do cronograma interno vivo, ponderada por
+    # duração — a mesma regra dominante de `calcular_progresso_geral_obra_v2`.
+    # Não é bit-idêntica à do detalhe quando todas as folhas têm
+    # `quantidade_total` (lá a quantidade governa o peso); o número exato da
+    # obra continua sendo o do detalhe, e é ele que vira dinheiro.
+    _pais = (
+        db.session.query(TarefaCronograma.tarefa_pai_id)
+        .filter(TarefaCronograma.admin_id == admin_id,
+                TarefaCronograma.tarefa_pai_id.isnot(None))
+        .distinct()
+    )
+    _peso = sqlfunc.coalesce(TarefaCronograma.duracao_dias, 1)
     _agg_rows = (
         db.session.query(
             TarefaCronograma.obra_id,
             sqlfunc.count(TarefaCronograma.id),
-            sqlfunc.avg(TarefaCronograma.percentual_concluido),
+            (sqlfunc.sum(
+                sqlfunc.coalesce(TarefaCronograma.percentual_concluido, 0)
+                * _peso) / sqlfunc.nullif(sqlfunc.sum(_peso), 0)),
         )
-        .filter(TarefaCronograma.admin_id == admin_id)
+        .filter(TarefaCronograma.admin_id == admin_id,
+                TarefaCronograma.is_cliente.is_(False),
+                TarefaCronograma.ativa.is_(True),
+                TarefaCronograma.id.notin_(_pais))
         .group_by(TarefaCronograma.obra_id)
         .all()
     )
@@ -470,7 +497,23 @@ def cronograma_obra(obra_id: int):
             baseline_map = _itens_da_baseline(_bl)
 
     progresso_geral_header = None
-    if not cliente_mode:
+    if cliente_mode:
+        # p4 — no modo cliente o header ficava None e o TEMPLATE calculava a
+        # média simples em Jinja (`perc_total`) — a quinta fórmula de
+        # progresso do sistema, escondida numa expressão de template. O
+        # conjunto de tarefas aqui é o plano do CLIENTE (`is_cliente=True`),
+        # que o motor não cobre; então a média sai daqui, em Python, com a
+        # mesma regra do motor: só FOLHAS, ponderadas por duração.
+        _pais_cliente = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id}
+        _folhas = [t for t in tarefas if t.id not in _pais_cliente]
+        _peso_total = sum(float(t.duracao_dias or 1) for t in _folhas)
+        if _peso_total > 0:
+            progresso_geral_header = round(sum(
+                float(t.percentual_concluido or 0) * float(t.duracao_dias or 1)
+                for t in _folhas) / _peso_total, 1)
+        else:
+            progresso_geral_header = 0.0
+    else:
         progresso_geral_header = calcular_progresso_geral_obra_v2(
             obra_id, hoje, admin_id)['progresso_geral_pct']
         # Alinha a linha raiz (OBRA, sem tarefa_pai_id) ao mesmo número no array
