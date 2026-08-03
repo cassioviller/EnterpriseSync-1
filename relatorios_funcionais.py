@@ -56,8 +56,14 @@ def gerar_relatorio(tipo):
         })
 
 def _relatorio_funcionarios(departamento_id=None):
-    """Relatório de funcionários"""
-    query = Funcionario.query
+    """Relatório de funcionários — escopado por tenant (p1 Step A).
+
+    O filtro de tenant entra ANTES de qualquer filtro de negócio. É regra do
+    plano, não estilo: filtro de escopo depois de `join` depende de ordem e é
+    o que volta a vazar na primeira refatoração.
+    """
+    admin_id = _tenant_id()
+    query = Funcionario.query.filter_by(admin_id=admin_id)
     if departamento_id:
         query = query.filter_by(departamento_id=departamento_id)
     funcionarios = query.all()
@@ -79,8 +85,10 @@ def _relatorio_funcionarios(departamento_id=None):
     })
 
 def _relatorio_ponto(data_inicio, data_fim, obra_id=None, departamento_id=None):
-    """Relatório de registros de ponto"""
-    query = RegistroPonto.query
+    """Relatório de registros de ponto — escopado por tenant (p1 Step A)."""
+    admin_id = _tenant_id()
+    obra_id = _obra_do_tenant(obra_id, admin_id)
+    query = RegistroPonto.query.filter_by(admin_id=admin_id)
     if data_inicio:
         query = query.filter(RegistroPonto.data >= data_inicio)
     if data_fim:
@@ -97,8 +105,8 @@ def _relatorio_ponto(data_inicio, data_fim, obra_id=None, departamento_id=None):
     
     for r in registros:
         html += f'<tr><td>{r.data.strftime("%d/%m/%Y")}</td>'
-        html += f'<td>{r.funcionario.nome}</td>'
-        html += f'<td>{r.obra.nome if r.obra else "-"}</td>'
+        html += f'<td>{r.funcionario_ref.nome}</td>'
+        html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td>'
         html += f'<td>{r.hora_entrada.strftime("%H:%M") if r.hora_entrada else "-"}</td>'
         html += f'<td>{r.hora_saida.strftime("%H:%M") if r.hora_saida else "-"}</td>'
         html += f'<td>{r.horas_trabalhadas:.2f}h</td>'
@@ -113,8 +121,12 @@ def _relatorio_ponto(data_inicio, data_fim, obra_id=None, departamento_id=None):
     })
 
 def _relatorio_horas_extras(data_inicio, data_fim, obra_id=None, departamento_id=None):
-    """Relatório de horas extras"""
-    query = RegistroPonto.query.filter(RegistroPonto.horas_extras > 0)
+    """Relatório de horas extras — escopado por tenant (p1 Step A)."""
+    admin_id = _tenant_id()
+    obra_id = _obra_do_tenant(obra_id, admin_id)
+    query = (RegistroPonto.query
+             .filter_by(admin_id=admin_id)
+             .filter(RegistroPonto.horas_extras > 0))
     if data_inicio:
         query = query.filter(RegistroPonto.data >= data_inicio)
     if data_fim:
@@ -138,11 +150,11 @@ def _relatorio_horas_extras(data_inicio, data_fim, obra_id=None, departamento_id
         periodo_fim = r.data
         # Task #98: usa serviço único para suportar diaristas (valor/hora equiv = diária/8)
         from services.funcionario_metrics import calcular_valor_hora, get_modo_remuneracao
-        if get_modo_remuneracao(r.funcionario) == 'diaria':
-            valor_hora_base = float(r.funcionario.valor_diaria or 0) / 8.0
+        if get_modo_remuneracao(r.funcionario_ref) == 'diaria':
+            valor_hora_base = float(r.funcionario_ref.valor_diaria or 0) / 8.0
         else:
-            valor_hora_base = calcular_valor_hora(r.funcionario, periodo_inicio) or (
-                calcular_valor_hora_periodo(r.funcionario, periodo_inicio, periodo_fim) if r.funcionario.salario else 0
+            valor_hora_base = calcular_valor_hora(r.funcionario_ref, periodo_inicio) or (
+                calcular_valor_hora_periodo(r.funcionario_ref, periodo_inicio, periodo_fim) if r.funcionario_ref.salario else 0
             )
         valor_hora = valor_hora_base * 1.5
         valor_extras = r.horas_extras * valor_hora
@@ -150,8 +162,8 @@ def _relatorio_horas_extras(data_inicio, data_fim, obra_id=None, departamento_id
         total_valor += valor_extras
         
         html += f'<tr><td>{r.data.strftime("%d/%m/%Y")}</td>'
-        html += f'<td>{r.funcionario.nome}</td>'
-        html += f'<td>{r.obra.nome if r.obra else "-"}</td>'
+        html += f'<td>{r.funcionario_ref.nome}</td>'
+        html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td>'
         html += f'<td>{r.horas_extras:.2f}h</td>'
         html += f'<td>R$ {valor_extras:.2f}</td></tr>'
     
@@ -164,8 +176,10 @@ def _relatorio_horas_extras(data_inicio, data_fim, obra_id=None, departamento_id
     })
 
 def _relatorio_alimentacao(data_inicio, data_fim, obra_id=None, departamento_id=None):
-    """Relatório de alimentação"""
-    query = RegistroAlimentacao.query
+    """Relatório de alimentação — escopado por tenant (p1 Step A)."""
+    admin_id = _tenant_id()
+    obra_id = _obra_do_tenant(obra_id, admin_id)
+    query = RegistroAlimentacao.query.filter_by(admin_id=admin_id)
     if data_inicio:
         query = query.filter(RegistroAlimentacao.data >= data_inicio)
     if data_fim:
@@ -185,10 +199,10 @@ def _relatorio_alimentacao(data_inicio, data_fim, obra_id=None, departamento_id=
     for r in registros:
         total_valor += r.valor
         html += f'<tr><td>{r.data.strftime("%d/%m/%Y")}</td>'
-        html += f'<td>{r.funcionario.nome}</td>'
+        html += f'<td>{r.funcionario_ref.nome}</td>'
         html += f'<td>{r.tipo.title()}</td>'
-        html += f'<td>{r.restaurante.nome if r.restaurante else "-"}</td>'
-        html += f'<td>{r.obra.nome if r.obra else "-"}</td>'
+        html += f'<td>{r.restaurante_ref.nome if r.restaurante_ref else "-"}</td>'
+        html += f'<td>{r.obra_ref.nome if r.obra_ref else "-"}</td>'
         html += f'<td>R$ {r.valor:.2f}</td></tr>'
     
     html += f'<tr class="table-info"><td colspan="5"><strong>TOTAL</strong></td><td><strong>R$ {total_valor:.2f}</strong></td></tr>'
@@ -200,18 +214,29 @@ def _relatorio_alimentacao(data_inicio, data_fim, obra_id=None, departamento_id=
     })
 
 def _relatorio_obras(obra_id=None):
-    """Relatório de obras"""
-    query = Obra.query
+    """Relatório de obras — escopado por tenant (p1 Step A)."""
+    admin_id = _tenant_id()
+    obra_id = _obra_do_tenant(obra_id, admin_id)
+    query = Obra.query.filter_by(admin_id=admin_id)
     if obra_id:
         query = query.filter_by(id=obra_id)
-    
+
     obras = query.all()
     
     html = '<div class="table-responsive"><table class="table table-striped">'
     html += '<thead><tr><th>Nome</th><th>Responsável</th><th>Data Início</th><th>Previsão Fim</th><th>Orçamento</th><th>Status</th><th>Funcionários</th></tr></thead><tbody>'
     
     for obra in obras:
-        funcionarios_obra = db.session.query(func.count(FuncionarioObra.id)).filter_by(obra_id=obra.id).scalar() or 0
+        # p1 Step A — era `FuncionarioObra`, modelo que NUNCA existiu (o real
+        # é `FuncionarioObrasPonto`, e ele governa dropdown de ponto, não
+        # lotação). Como não há semântica original a preservar — a linha
+        # levantava NameError e derrubava o relatório inteiro —, vale a
+        # leitura operacional: quantas pessoas distintas bateram ponto na obra.
+        funcionarios_obra = (
+            db.session.query(func.count(func.distinct(RegistroPonto.funcionario_id)))
+            .filter(RegistroPonto.obra_id == obra.id,
+                    RegistroPonto.admin_id == admin_id)
+            .scalar() or 0)
         
         html += f'<tr><td>{obra.nome}</td>'
         html += f'<td>{obra.responsavel.nome if obra.responsavel else "-"}</td>'
@@ -229,8 +254,15 @@ def _relatorio_obras(obra_id=None):
     })
 
 def _relatorio_custos_obra(data_inicio, data_fim, obra_id=None):
-    """Relatório de custos por obra"""
-    query = CustoObra.query
+    """Relatório de custos por obra — escopado por tenant (p1 Step A).
+
+    Filtra por `CustoObra.admin_id` **e** pela obra ser do tenant: o `join(Obra)`
+    de baixo não escopa nada sozinho, e custo com `admin_id` divergente do dono
+    da obra é sujeira conhecida (mesma família da migração 266).
+    """
+    admin_id = _tenant_id()
+    obra_id = _obra_do_tenant(obra_id, admin_id)
+    query = CustoObra.query.filter_by(admin_id=admin_id)
     if data_inicio:
         query = query.filter(CustoObra.data >= data_inicio)
     if data_fim:
@@ -238,7 +270,9 @@ def _relatorio_custos_obra(data_inicio, data_fim, obra_id=None):
     if obra_id:
         query = query.filter_by(obra_id=obra_id)
     
-    custos = query.join(Obra).order_by(CustoObra.data.desc()).all()
+    custos = (query.join(Obra)
+              .filter(Obra.admin_id == admin_id)
+              .order_by(CustoObra.data.desc()).all())
     
     html = '<div class="table-responsive"><table class="table table-striped">'
     html += '<thead><tr><th>Data</th><th>Obra</th><th>Tipo</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>'
@@ -299,6 +333,29 @@ def _tenant_id():
     if not admin_id:
         abort(403)
     return admin_id
+
+
+def _obra_do_tenant(obra_id, admin_id):
+    """p1 Step A — `obra_id` que veio do filtro pertence a este tenant?
+
+    Sem isto o escopo se fura pela porta lateral: as consultas passariam a
+    filtrar por `admin_id`, mas quem mandasse o id de uma obra alheia no corpo
+    do POST continuaria recebendo as linhas dela — o filtro por obra é do
+    usuário, a obra ser dele não é.
+
+    404, e não 403, pelo mesmo motivo que
+    `tests/test_gestao_custo_filho_tenant.py:114` registra: 403 confirma que
+    o recurso existe em outra empresa.
+    """
+    if not obra_id:
+        return None
+
+    from flask import abort
+
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+    if not obra:
+        abort(404)
+    return obra.id
 
 
 def _relatorio_dashboard_executivo():
@@ -436,7 +493,13 @@ def exportar_relatorio(formato):
         return jsonify({'error': 'Formato não suportado'}), 400
 
 def _exportar_csv(data_inicio, data_fim, obra_id, departamento_id):
-    """Exportar relatório consolidado em CSV"""
+    """Exportar relatório consolidado em CSV — escopado por tenant (p1 Step A).
+
+    A exportação é a via mais silenciosa do vazamento: o arquivo sai da tela e
+    vai para o e-mail de alguém. Mesmo escopo do relatório equivalente.
+    """
+    admin_id = _tenant_id()
+    obra_id = _obra_do_tenant(obra_id, admin_id)
     output = BytesIO()
     output.write('\ufeff'.encode('utf-8'))  # BOM for UTF-8
     
@@ -453,7 +516,7 @@ def _exportar_csv(data_inicio, data_fim, obra_id, departamento_id):
     writer.writerow(['=== FUNCIONÁRIOS ==='])
     writer.writerow(['Código', 'Nome', 'CPF', 'Departamento', 'Função', 'Data Admissão', 'Salário', 'Status'])
     
-    query = Funcionario.query
+    query = Funcionario.query.filter_by(admin_id=admin_id)
     if departamento_id:
         query = query.filter_by(departamento_id=departamento_id)
     funcionarios = query.all()
@@ -481,7 +544,9 @@ def _exportar_csv(data_inicio, data_fim, obra_id, departamento_id):
     return response
 
 def _exportar_excel(data_inicio, data_fim, obra_id, departamento_id):
-    """Exportar relatório em Excel"""
+    """Exportar relatório em Excel — escopado por tenant (p1 Step A)."""
+    admin_id = _tenant_id()
+    obra_id = _obra_do_tenant(obra_id, admin_id)
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
     
@@ -504,7 +569,7 @@ def _exportar_excel(data_inicio, data_fim, obra_id, departamento_id):
         cell.alignment = Alignment(horizontal="center")
     
     # Dados dos funcionários
-    query = Funcionario.query
+    query = Funcionario.query.filter_by(admin_id=admin_id)
     if departamento_id:
         query = query.filter_by(departamento_id=departamento_id)
     funcionarios = query.all()
@@ -533,7 +598,9 @@ def _exportar_excel(data_inicio, data_fim, obra_id, departamento_id):
     return response
 
 def _exportar_pdf(data_inicio, data_fim, obra_id, departamento_id):
-    """Exportar relatório em PDF"""
+    """Exportar relatório em PDF — escopado por tenant (p1 Step A)."""
+    admin_id = _tenant_id()
+    obra_id = _obra_do_tenant(obra_id, admin_id)
     from reportlab.lib.pagesizes import A4
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -566,7 +633,7 @@ def _exportar_pdf(data_inicio, data_fim, obra_id, departamento_id):
     elements.append(Spacer(1, 20))
     
     # Dados dos funcionários (primeiros 20)
-    query = Funcionario.query
+    query = Funcionario.query.filter_by(admin_id=admin_id)
     if departamento_id:
         query = query.filter_by(departamento_id=departamento_id)
     funcionarios = query.all()
@@ -610,6 +677,11 @@ def gerar_relatorio_funcional(tipo, formato, filtros=None):
     """
     Função principal para gerar relatórios funcionais com exportação
     Suporta formatos: csv, excel, pdf
+
+    ⚠️ p1 Step A — **sem chamador nenhum** em 03/08 (varrido em .py e .html).
+    Escopada mesmo assim: dead code com consulta sem tenant é uma armadilha
+    armada para quem for religar a função. Candidata a remoção — quem a
+    remover, remova também os três `_gerar_*_export` que só ela usa.
     """
     if filtros is None:
         filtros = {}
@@ -625,7 +697,7 @@ def gerar_relatorio_funcional(tipo, formato, filtros=None):
     nome_arquivo = f"relatorio_{tipo}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     
     if tipo == 'funcionarios':
-        query = Funcionario.query
+        query = Funcionario.query.filter_by(admin_id=_tenant_id())
         if departamento_id:
             query = query.filter_by(departamento_id=departamento_id)
         funcionarios = query.all()
