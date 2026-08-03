@@ -368,6 +368,34 @@ def calcular_horas_folha(data: dict, admin_id: int):
                     )
                     .first()
                 )
+            if not ja_existe:
+                # p1 Step D, direção inversa: o RDO do dia pode ter sido
+                # finalizado ANTES de uma batida tardia. Nesse caso já existe
+                # um lançamento de origem `rdo_mao_obra` para o mesmo
+                # funcionário e dia, e criar o do ponto conta duas vezes.
+                #
+                # O ponto é o fato medido e deveria prevalecer — mas trocar um
+                # pelo outro é reescrever custo já gravado, e isso é a decisão
+                # nº 1 da spec (histórico), não um efeito colateral deste
+                # step. Aqui: não duplica e DIZ que aconteceu.
+                ja_existe = (
+                    GestaoCustoFilho.query
+                    .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+                    .filter(
+                        GestaoCustoFilho.origem_tabela == 'rdo_mao_obra',
+                        GestaoCustoFilho.data_referencia == registro.data,
+                        GestaoCustoFilho.admin_id == admin_id,
+                        GestaoCustoPai.entidade_id == funcionario.id,
+                    )
+                    .first()
+                )
+                if ja_existe:
+                    logger.warning(
+                        "[p1] custo de %s em %s já foi lançado pelo RDO — a "
+                        "batida de ponto NÃO duplicou, mas a origem ficou "
+                        "sendo o RDO. Reconciliação: Step F do p1.",
+                        funcionario.nome, registro.data)
+
             if ja_existe:
                 logger.info(f"[INFO] Custo diária de {funcionario.nome} em {registro.data} já existe — skip (idempotência)")
                 return
@@ -634,6 +662,7 @@ def lancar_custos_rdo(data: dict, admin_id: int):
     try:
         from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Funcionario, CustoObra, GestaoCustoPai, GestaoCustoFilho
         from decimal import Decimal
+        from services.rdo_custos import existe_ponto_no_dia
         from utils.financeiro_integration import (
             registrar_custo_automatico,
             resolver_obra_servico_custo_id,
@@ -675,6 +704,26 @@ def lancar_custos_rdo(data: dict, admin_id: int):
             funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
             if not funcionario:
                 logger.warning(f"⚠️ Funcionário {func_id} não encontrado para admin {admin_id} — ignorado")
+                continue
+
+            # ── p1 Step D: o dedup passa a cruzar as origens ───────────────
+            # O bloco de `CustoObra` abaixo deduplica por `rdo_id` na chave, e
+            # o custo gerado pelo ponto nasce com `rdo_id` NULL
+            # (event_manager.py:486, categoria 'PONTO_ELETRONICO') — os dois
+            # nunca se enxergavam, POR CONSTRUÇÃO. Resultado: o mesmo dia de
+            # trabalho contado duas vezes, uma pelo ponto e outra pelo RDO.
+            #
+            # A guarda certa já existia e só o caminho paralelo usava
+            # (`services/rdo_custos.gerar_custos_mao_obra_rdo`). Aqui ela
+            # entra no caminho do evento.
+            #
+            # Logar é requisito, não zelo: foi o silêncio que deixou a dupla
+            # contagem invisível.
+            if existe_ponto_no_dia(func_id, data_rdo, admin_id):
+                logger.info(
+                    "[p1] RDO %s: custo de %s em %s NÃO lançado — já há "
+                    "registro de ponto no dia, e o ponto é o fato medido",
+                    rdo_id, funcionario.nome, data_rdo)
                 continue
 
             # Custo base: valor_diaria — sem fallback para horário
@@ -762,11 +811,21 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                 custos_criados += 1
             
             # GestaoCustoPai/Filho via registrar_custo_automatico (tipo_categoria='SALARIO')
-            # Idempotência: origem_tabela + data_referencia + entidade_id + admin_id (sem origem_id)
+            # Idempotência: data_referencia + entidade_id + admin_id + categoria
+            # de mão de obra.
+            #
+            # p1 Step D — o filtro `origem_tabela == 'rdo_mao_obra'` saiu da
+            # chave. Com ele, o lançamento vindo do ponto (`registro_ponto`)
+            # era invisível para esta consulta e a mesma diária entrava duas
+            # vezes no ledger de Gestão de Custos.
+            #
+            # A chave nova é local, e não em `registrar_custo_automatico` como
+            # o plano supunha: aquela função serve TODAS as categorias, e
+            # afrouxar a chave lá faria compras e almoxarifado passarem a se
+            # deduplicar entre si. Aqui o alcance é exatamente mão de obra.
             existing_filho = (
                 db.session.query(GestaoCustoFilho)
                 .filter(
-                    GestaoCustoFilho.origem_tabela == 'rdo_mao_obra',
                     GestaoCustoFilho.data_referencia == data_rdo,
                     GestaoCustoFilho.admin_id == admin_id,
                 )
