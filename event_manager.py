@@ -484,6 +484,38 @@ def calcular_horas_folha(data: dict, admin_id: int):
         else:
             descricao += f" ({horas_trabalhadas}h trabalhadas)"
         
+        # ── p1 Step C: idempotência do horista ────────────────────────────
+        # `PontoService` emite `ponto_registrado` a CADA BATIDA
+        # (ponto_service.py:142-148) — entrada e saída são eventos separados,
+        # e um dia com quatro batidas gerava quatro linhas de custo para o
+        # mesmo (funcionário, data, obra). O caminho diarista, logo acima,
+        # sempre teve guardas `ja_existe_*`; o horista não tinha nenhuma.
+        #
+        # ATUALIZA em vez de somar: as horas do dia mudam a cada batida, e o
+        # cálculo correto é o último — somar as parciais era o defeito.
+        custo = CustoObra.query.filter_by(
+            funcionario_id=registro.funcionario_id,
+            data=registro.data,
+            obra_id=registro.obra_id,
+            admin_id=admin_id,
+            categoria='PONTO_ELETRONICO',
+        ).first()
+
+        if custo:
+            custo.descricao = descricao
+            custo.valor = valor_total
+            custo.horas_trabalhadas = Decimal(str(horas_trabalhadas))
+            custo.horas_extras = Decimal(str(horas_extras))
+            custo.valor_unitario = Decimal(str(salario_hora))
+            custo.quantidade = Decimal(str(horas_trabalhadas + horas_extras))
+            db.session.commit()
+            logger.info(f"[OK] Custo de ponto ATUALIZADO (batida nova no mesmo "
+                        f"dia): R$ {valor_total:.2f} na obra {registro.obra_id}")
+            logger.info(f"     Funcionário: {funcionario.nome} | "
+                        f"{horas_trabalhadas}h + {horas_extras}h extras | "
+                        f"Registro: {registro_id}")
+            return
+
         custo = CustoObra(
             obra_id=registro.obra_id,
             tipo='mao_obra',
@@ -498,10 +530,10 @@ def calcular_horas_folha(data: dict, admin_id: int):
             quantidade=Decimal(str(horas_trabalhadas + horas_extras)),
             categoria='PONTO_ELETRONICO'
         )
-        
+
         db.session.add(custo)
         db.session.commit()
-        
+
         logger.info(f"[OK] Custo mão de obra lançado: R$ {valor_total:.2f} na obra {registro.obra_id}")
         logger.info(f"     Funcionário: {funcionario.nome} | {horas_trabalhadas}h + {horas_extras}h extras | Registro: {registro_id}")
         
