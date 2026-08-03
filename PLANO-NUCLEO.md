@@ -198,7 +198,7 @@ potencialmente inflado.
 >
 > Decisão do Cássio: *"todos cronogramas que já estão feitos no deploy virarem
 > no novo formato, que pode editar no botão direito."* A migração **277**
-> (`41f23403`) executa o runbook no boot, para todos os tenants: congela a
+> (`41f23403` + `ff94240d`) executa o runbook no boot, para todos os tenants: congela a
 > linha de base de toda obra datada → cria `configuracao_empresa` para quem
 > tem cronograma e não tinha linha → liga a flag em todas as linhas → vira o
 > default da coluna para TRUE.
@@ -532,7 +532,7 @@ compras. Não afeta o núcleo; afeta quem pode aprovar aditivo na Fase 6.
 ## Histórico
 
 - **2026-08-03** — o editor v2 saiu do p2 pela porta larga: ligado em **todo o
-  parque** pela migração 277 (`41f23403`), com linha de base congelada antes,
+  parque** pela migração 277 (`41f23403` + `ff94240d`), com linha de base congelada antes,
   em vez do rollout tenant a tenant. O guard de calendário virou aviso
   nominal no log do deploy, e o gatilho de "calendário configurável" deixou de
   ser hipotético. Restam duas flags no p2 (`cronograma_mpp_ativo`,
