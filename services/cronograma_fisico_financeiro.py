@@ -502,6 +502,7 @@ def painel_financeiro(obra) -> dict:
     """Dicionário consolidado do Painel Financeiro (pronto para JSON):
     KPIs, etapas (previsto+realizado), Curva S de 4 séries (recebido líquido,
     gasto Veks previsto, lucro, custo realizado), caixa, medições, doughnut, divergência."""
+    from services.evm import calcular_evm
     from services.resumo_custos_obra import calcular_resumo_obra
 
     dados = montar_fisico_financeiro(obra.id, obra.admin_id)
@@ -575,6 +576,11 @@ def painel_financeiro(obra) -> dict:
         "medicoes": meds,
         "doughnut": {"veks": dados["totais"]["veks"], "fat": dados["totais"]["fat_direto"]},
         "divergencia": div,
+        # p10 — EVM por composição. A chave é aditiva: quem já consome o
+        # painel não vê diferença, e a UI passa a ter PV/EV/AC e os índices
+        # sem uma segunda rota. `tem_dados=False` distingue "obra sem custo
+        # orçado" de "índice zero", que significaria desempenho nulo.
+        "evm": calcular_evm(obra.id, obra.admin_id),
         "config": {"fat_competencia": _fat_competencia(obra)},
     }
 
