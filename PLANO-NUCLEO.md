@@ -500,8 +500,8 @@ Carregadas em todo boot, sem uso em produção:
 | # | Decisão | Trava |
 |---|---|---|
 | 1 | ~~**Tenant piloto do rollout**~~ **+ calendário** | 🔬 **03/08: metade decidida.** O editor v2 foi ligado em todo o parque (migração 277), então não há piloto a escolher para ele — só para as outras duas flags. O **calendário** continua aberto e agora com nome e sobrenome: o log do deploy imprime quais tenants consideram sábado/domingo, e é neles que as datas vão andar na primeira edição. Se algum deles trabalha sábado de verdade, calendário configurável vira código |
-| 2 | **Dono do `valor_contrato`**: Fase 6 (cadeia) × Fase 9b (deltas) | p9, e por consequência o BAC do p10 |
-| 3 | **Custo orçado: consertar no consumo ou na origem** | p3 |
+| 2 | ~~**Dono do `valor_contrato`**: Fase 6 (cadeia) × Fase 9b (deltas)~~ | ✅ **03/08: FASE 6**, como a própria 9b já assumia na premissa P1. `services/contrato_obra.py` já é o escritor único — os escritores eram **cinco**, não quatro: o quinto é o construtor `Obra(valor_contrato=…)` do handler de aprovação, que não aparece em grep por atribuição |
+| 3 | ~~**Custo orçado: consertar no consumo ou na origem**~~ | ✅ **03/08: no CONSUMO.** `services/custo_orcado.py` virou a fonte única (regra "linha de custo vence agregado", extraída de `resumo_custos_obra`); `valor_orcado` segue gravado com venda, mas ninguém mais o lê como custo. Consertar na origem continua sendo a saída definitiva e está registrada na spec |
 | 4 | **Medições históricas: recalcular ou congelar** | p4, a linha do tempo do portal e o EVM retroativo |
 | 5 | **Conta de débito da despesa geral** (contador) | A04 e a contabilização dos pagamentos da Gestão de Custos |
 | 6 | **Rateio dos encargos patronais por obra** | A24 — hoje a mão de obra sai ~28% subestimada |

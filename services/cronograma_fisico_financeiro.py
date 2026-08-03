@@ -278,6 +278,15 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
     meses_veks.update(linhas_veks)
     meses_fat.update(linhas_fat)
 
+    # p3 — o "orçado" por etapa vinha de `osc.valor_orcado` cru, que na cadeia
+    # comercial é VENDA herdada do ItemMedicaoComercial, não custo. Painel e
+    # resumo mostravam números diferentes para a mesma obra. Agora os dois
+    # leem `services/custo_orcado.py`, que aplica a regra "linha de custo
+    # vence agregado" — por serviço, para uma etapa com linhas não contaminar
+    # a irmã que só tem o agregado.
+    from services.custo_orcado import custo_orcado_por_servico
+    orcado_por_osc = custo_orcado_por_servico(obra_id, admin_id)
+
     for osc in custos:
         material, mao_obra, outros = _previsto_por_categoria(osc)
         previsto_total = material + mao_obra + outros
@@ -292,7 +301,8 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
         et["previsto"]["total"] += previsto_total
         et["veks"] += veks
         et["fat_direto"] += fat
-        et["orcado"] += Decimal(osc.valor_orcado or 0)
+        et["orcado"] += Decimal(str(orcado_por_osc.get(osc.id,
+                                                       osc.valor_orcado or 0)))
         et["realizado"] += Decimal(osc.realizado_total or 0)
 
         # remanescente a fasear pelo cronograma = total do OSC menos o já faseado
