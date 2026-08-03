@@ -177,7 +177,7 @@ Declaradas, não assumidas. **Confira o nome real antes de importar — não rei
 | `templates/aditivos/listar.html`, `templates/aditivos/form.html` | **novos** — extrato de contrato (original + aditivos + vigente) e formulário de aditivo com preview do diff |
 | `templates/orcamentos/comparar.html`, `templates/propostas/comparar.html` | **novos** — comparador lado a lado |
 | `models.py` | `ObraContratoVersao`, `AditivoContrato`; `MedicaoContrato.contrato_versao_id` + reescrita da property `valor` (`models.py:5585-5588`); `PropostaItem.item_origem_id`; `OrcamentoItem.item_origem_id`; `Orcamento.origem_id`/`versao`/`motivo_revisao`/`travado_em` |
-| `migrations.py` | migrations **270–276** + registro em `migrations_to_run` (após `migrations.py:4014`) |
+| `migrations.py` | migrations **271–276** (⚠️ **não 270** — queimado em 03/08, ver premissa 4) + registro em `migrations_to_run` (após `migrations.py:4014`) |
 | `handlers/propostas_handlers.py:15-70` | `_propagar_proposta_para_obra` passa a **reconciliar** por cadeia em vez de sempre inserir |
 | `handlers/propostas_handlers.py:186-219` | lançamento contábil do aditivo = delta (D5) |
 | `event_manager.py:1030-1048` | para de escrever `obra.valor_contrato` direto; delega a `services/contrato_obra.py` |
@@ -586,7 +586,7 @@ O formulário de aditivo mostra o **preview do diff** (Task 12) entre a proposta
 ### Task 14: Fecho da fase
 
 - [ ] **Step 1: Rode o gate** — `bash run_tests.sh --gate`. Compare o total com os 878 testes de referência do `ESTADO-ATUAL.md`. Qualquer teste que **passe a falhar** é regressão desta fase até prova em contrário.
-- [ ] **Step 2: Confira as migrations** — 270 a 276 registradas em `migrations_to_run` (`migrations.py:3831-4014`), na ordem, e o boot da app aplicando-as sem erro. Rode duas vezes para provar idempotência.
+- [ ] **Step 2: Confira as migrations** — **271** a 276 registradas em `migrations_to_run` (`migrations.py:3831-4014`), na ordem, e o boot da app aplicando-as sem erro. Rode duas vezes para provar idempotência. ⚠️ **Não use a 270**: ela consta `success` em bancos que deployaram de `41f23403` e uma migração nova com esse número seria pulada sem avisar (premissa 4).
 - [ ] **Step 3: Rode `ruff check` nos arquivos tocados** — não herde violação nova (543 existentes são dívida anterior; não aumente a conta).
 - [ ] **Step 4: Atualize `ESTADO-ATUAL.md`** — marque a Fase 6 e registre o que ficou em aberto (§8).
 - [ ] **Step 5: Commit** — `chore(fase6): fecho — orçamento versionado e aditivo contratual`
@@ -684,7 +684,7 @@ A fase está pronta quando **todos** forem verdade, cada um com teste:
 | 1 | `valor_contrato` é Float, escrito só em `event_manager.py:1043`, `views/obras.py:391` e `:873` | **PARCIAL** | Float sim (`models.py:346`). Escritores reais: `event_manager.py:1018` (criação) e `:1093` (revisão), `views/obras.py:326`/`:413` (criação) e `:940` (edição), **`services/importacao_fisico_financeiro.py:786`** e `scripts/seed_demo_alfa.py:1084`/`:2650` | A lista da premissa estava incompleta: o importador físico-financeiro é um 4º escritor de produção. D6 (escritor único) precisa domá-lo também — o risco "obra sem baseline" do §9 já o citava, mas como criador de obra, não como escritor de `valor_contrato` |
 | 2 | A duplicação de IMC/lançamento de §1.1 ainda acontece (2 itens/220k, saldo −100k) | **QUEBRADA** — a mais importante | Fase 0.6/D1: `handlers/propostas_handlers.py:54-176` reconcilia IMC por linhagem (atualiza em vez de inserir; item sumido vira `WARNING` com ids, `:153-167`); `:291-375` lança **o delta** contábil (estorno via conta de dedução `4.2.01.001`, não inversão de partidas); `event_manager.py:1069-1093` congela `valor_base` das medições recebidas antes de sobrescrever o contrato. ESTADO-ATUAL/D1: "Agora: 1 item/120k, saldo 0, receita 120k" | Tasks 7 e 8 mudam de "criar" para "completar" — ver Impacto. O Step 2 da Task 7 ("se seus números divergirem, pare e reinvestigue") já tem resposta: foi a 0.6 |
 | 3 | `handlers/propostas_handlers.py` é o único criador de IMC a partir de proposta | **CONFIRMADA** | Único `ItemMedicaoComercial(` a partir de proposta: `handlers/propostas_handlers.py:141`. `medicao_views.py:198` cria IMC **manual** (sem `proposta_item_id`) — fora do escopo da premissa. O importador reusa o caminho canônico com `skip_contabil` (`handlers/propostas_handlers.py:203-204`) | Nenhum |
-| 4 | Maior migration abaixo de 270 | **CONFIRMADA** | Maior registrada: **247** (Fase 3). Faixa **270-276 livre** — zero ocorrências em `migrations_to_run`. Fases usaram: 214-216 (F1), 217-219 (F0.6), 220-221 (F1.5), 230-232 (F2), 240-247 (F3) | Duas ressalvas: `migrations_to_run` está em `migrations.py:4567` (não `:3831-4014` como diz a Task 14); e a **Fase 4 está em curso** num worktree consumindo 250-254 (ver N7) |
+| 4 | Maior migration abaixo de 270 | 🔴 **QUEBRADA em 03/08 — releia antes de numerar qualquer coisa** | Era CONFIRMADA quando escrita (maior registrada: **247**, faixa 270-276 livre). Deixou de ser: 📖 a maior registrada em `migrations.py` hoje é a **278**, e o **270 está QUEIMADO**. 🔬 03/08, dev: a migração do editor v2 consta `success` sob **dois números** — 270 (53.141 ms, o trabalho real) e 277 (7.860 ms, reexecução vazia). `41f23403` foi empurrado para `origin/main` com ela numerada 270 e rodou assim; `ff94240d` só depois a renumerou para 277. **Todo banco que deployou de `41f23403`, produção inclusive, tem o fantasma** | **A faixa desta fase passa a ser 271-276.** Uma migração 270 nova seria pulada em silêncio por `is_migration_executed`. Não resolva apagando a linha de `migration_history`: sem acesso a produção não há como saber quais bancos a têm. Ressalvas antigas seguem valendo: `migrations_to_run` está em `migrations.py:4567` (não `:3831-4014`), e a F4 consumiu 250-254 (N7) |
 | 5 | `MedicaoContrato` sem UI de escrita | **CONFIRMADA** | Único criador: `services/importacao_fisico_financeiro.py:732`; grep em `views/` → nada | Mas o modelo ganhou `valor_base` (D1c, `models.py:6209`) e a property `valor` já lê por ela (`:6213-6218`) — a Task 4 muda de forma (ver N8) |
 | 6 | Decorator de autorização por obra da Fase 1 | **CONFIRMADA** | `utils/autorizacao.py`: `obra_required(papel_minimo=None)` (`:184`), `papel_na_obra` (`:102`), `pode_editar_obra` (`:149`), `pode_ver_obra` (`:145`) — os nomes do plano da F1 valeram | Risco novo N4: colapso do papel com `escopo_obra_ativo` OFF |
 | 7 | Fase 4 não tornou centro de custo obrigatório | **CONFIRMADA em `main`** | Nada de NOT NULL/CHECK em `LancamentoContabil`/`ObraServicoCusto` no `main` de hoje | **F4 em execução** no worktree `.claude/worktrees/fase-4` (branch `feat/fase-4-centro-custo`, migrations 250-254). O CHECK dela é em `gestao_custo_filho` (destino do custo), não nas tabelas que a F6 insere — mas reconferir no merge da F4 |
@@ -730,7 +730,8 @@ natureza.** O que continua inexistindo (verificado hoje): `ObraContratoVersao`,
 `AditivoContrato`, extrato/UI de aditivo, trava de edição do orçamento
 convertido, cadeia de revisões do Orçamento, comparador de versões, e a cópia
 dos campos dimensionais na revisão. **Tasks 1-5, 10-13 valem como escritas**
-(ajustando linhas e o write-through da F2). A faixa 270-276 está livre.
+(ajustando linhas e o write-through da F2). A faixa livre é **271-276** — o
+**270 queimou em 03/08** (premissa 4).
 
 O que muda:
 

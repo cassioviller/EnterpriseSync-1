@@ -1,9 +1,10 @@
 # ESTADO ATUAL — SIGE / Veks
 
-> Snapshot de **2026-07-28** (5ª revisão, após a rodada de revisão que fechou
-> 9 defeitos nas Fases 1–5 já entregues).
-> Este é o documento a ler PRIMEIRO ao retomar. Os demais (`DEVOLUTIVA.md`,
-> `DOSSIE-REPO.md`, `FECHO-FASE-0.5.md`) são o detalhe; este é o mapa.
+> Snapshot de **2026-08-03** (6ª revisão, após o `PLANO-NUCLEO.md` — os dez
+> pacotes entregues, com três recortes explícitos).
+> Este é o documento a ler PRIMEIRO ao retomar. Os demais (`PLANO-NUCLEO.md`,
+> `DEVOLUTIVA.md`, `DOSSIE-REPO.md`, `FECHO-FASE-0.5.md`) são o detalhe; este é
+> o mapa.
 
 ## Como ler os números deste documento
 
@@ -27,14 +28,21 @@ defeito de fabricação que produziu os cinco erros.
 
 ## Onde estamos
 
-Branch: `main` · 🔬 28/07: **`origin/main == main == 5471507e`, árvore
-limpa**. O item humano nº 2 (push travado) **fechou em 24/07** — o reflog
-de `origin/main` registra os pushes de `35fe1a67` e `bdee680a`. O `gh` CLI
-continua deslogado *nesta máquina* (🔬 28/07: `gh auth status` → "not logged
-into any GitHub hosts"; `GH_TOKEN`/`GITHUB_TOKEN` também ausentes), o que é
-outra coisa: `git push` funciona, o que falta é a API do GitHub (abrir PR,
-fetch de branch de triagem). Refazer o login é interativo — item humano,
-agora restrito ao `gh`.
+Branch: `main` · 🔬 03/08: **`origin/main == main == 63cc1c13`, árvore
+limpa** — conferido em `git ls-remote origin main`, não só no ref local. Os
+dez pacotes do núcleo **estão no GitHub**; o aviso do commit `6942d043`
+("parados atrás de um push sem credencial") **envelheceu no mesmo dia**: o
+push saiu depois dele. O `gh` CLI continua deslogado *nesta máquina*
+(🔬 03/08: `gh auth status` → "not logged into any GitHub hosts";
+`GH_TOKEN`/`GITHUB_TOKEN` também ausentes), o que é outra coisa: `git push`
+funciona, o que falta é a API do GitHub (abrir PR, fetch de branch de
+triagem). Refazer o login é interativo — item humano, restrito ao `gh`.
+
+> ⚠️ **O que continua parado não é o push, é a produção.** Os dez pacotes
+> mexem em custo, medição, progresso e contrato — números que o cliente vê — e
+> 🔬 nada disso rodou fora do ambiente de desenvolvimento. Gate completo sobre
+> o núcleo, migrações 277/278 em produção e a semana de observação do editor v2
+> seguem por fazer.
 
 🔬 24/07 ~00h: **gate completo VERDE sobre a Fase 4** (worktree em
 `6775b391` pré-rebase): `pytest tests/ -m "not browser"` → **1177 passed,
@@ -43,6 +51,88 @@ foi mergeada em `main` por fast-forward após esse gate. 🔬 24/07: revisão
 de premissas P5-P9 apensada aos planos das Fases 5-9 (`941e6738`) e fix do
 achado R10 — PDF de medição do portal agora respeita expiração de token
 (`fe605252`).
+
+### 🔬 03/08 — `PLANO-NUCLEO.md`: os dez pacotes, entregues
+
+`85ab9f4d` → `63cc1c13`, **21 commits em `main`**. O plano nasceu da
+conferência adversarial dos 12 vereditos de 31/07 (**10 confirmados, 2
+parciais, 0 refutados**) mais o levantamento de 20 conexões entre módulos —
+brutos em `docs/estudo-fluxo/`. Não é fase nova: é o núcleo (cronograma e RDO)
+parando de discordar de si mesmo.
+
+| # | O quê | Como ficou |
+|---|---|---|
+| **p1** | Vazamento entre empresas + dupla contagem | Seis steps. 🔬 arreio de dois tenants (Step 0) mediu **12 falhas** antes; **20/20** depois |
+| **p2** | Rollout das três flags | Editor v2 foi ao **parque inteiro** pela migração **277** — sem piloto |
+| **p3** | Fonte única do custo orçado | `services/custo_orcado.py`. Resumo e painel devolvem o mesmo número |
+| **p4** | Uma fórmula de progresso | Cinco viraram uma: **só folhas, ponderadas por duração** |
+| **p5** | A aprovação semeia a obra inteira | `ServicoObraReal` + `Lead.proposta_id`/`obra_id` na mesma transação |
+| **p6** | Regimes de peso reconciliados | O gate da medição virou **peso > 0**, não "soma exatamente 100" |
+| **p7** | Presença única | Alocação = planejada, ponto = confirmada, RDO = apontada |
+| **p8** | Convergência do progresso (leitura) | `services/progresso_subatividade.py` — medição e Gantt dizem o mesmo número |
+| **p9** | Dono único do `valor_contrato` | `services/contrato_obra.py`; eram **cinco** escritores, não quatro |
+| **p10** | Fase 7 reescrita: EVM por composição | BAC/PV/AC/EV compostos do que já existia + migração **278** (BAC congelado) |
+
+**Os quatro achados que mudaram o tamanho do diagnóstico** — todos apareceram
+executando, não relendo:
+
+1. **Quatro dos seis relatórios sem escopo já respondiam 500** (📖 `r.funcionario`
+   não existe — o backref é `funcionario_ref`, `models.py:311`; e
+   `FuncionarioObra` é **modelo que nunca existiu**). O vazamento visível era
+   menor que o veredito nº 7 dizia — e o alívio é enganoso: bastaria alguém
+   consertar o render sem pensar em tenant para o furo inteiro entrar em produção.
+2. **`detalhes_obra` tinha TRÊS saídas em cascata**, e a terceira não estava em
+   veredito nenhum: mesmo autenticado, obra de outro tenant era rebuscada **sem
+   filtro "para debug" e adotada**, reescrevendo o `admin_id` da tela. Era abrir
+   qualquer obra por id com login de qualquer empresa. Junto: as duas rotas
+   engoliam o próprio `abort(404)` num `except Exception` e devolviam **200**.
+3. **São duas FONTES de progresso, não cinco fórmulas.**
+   `calcular_progresso_geral_obra_v2` ignora `TarefaCronograma.percentual_concluido`
+   e deriva tudo de `RDOApontamentoCronograma`. Migrar a medição para o motor —
+   o que o plano pedia — **zeraria a medição de obra que avança por import ou
+   pela grade, sem apontar RDO**. Por isso o dinheiro usa a coluna gravada, com
+   teste dedicado que falha se alguém unificar as fontes sem rever a medição.
+   É isso que torna o p8 maior do que "caminhos de gravação divergentes".
+4. **A quinta fórmula estava no template** (`templates/obras/cronograma.html`,
+   média simples em Jinja, só no modo cliente) e o **quinto escritor de
+   `valor_contrato` estava num construtor** (`Obra(valor_contrato=…)`,
+   `event_manager.py:1120`) — que **não aparece em grep por `valor_contrato =`**,
+   e foi assim que escapou de dois inventários anteriores.
+
+**Os três recortes — o que NÃO foi feito dentro dos pacotes:**
+
+| Pacote | Saiu | Ficou |
+|---|---|---|
+| **p7** | A perda de dado (o plano sobrescrevia a batida real) e a saída de estoque atribuída a quem existe | Aposentar `AlocacaoEquipe` e o pré-carregamento do RDO (A17). 🔬 dev 03/08: 33 linhas, **zero** com `rdo_gerado_id` — FK morta, marcada **EM APOSENTADORIA** no modelo, **tabela não removida** |
+| **p8** | A **leitura** convergiu | A **escrita** segue dual, pelo motivo do achado nº 3 acima |
+| **p10** | PV/EV/AC no painel + BAC congelado na baseline (`3612db6b`) | Folga livre no scheduler |
+
+🔬 03/08: **94 passed em 30,5s** nos dez arquivos `tests/test_p*`
+(`SIGE_ENABLE_DEMO_SEED=false`). Cada pacote rodou regressão própria na
+entrega — 148/148 (p3), 154/154 (p1 Step E), 113/113 (p7 recorte), 99/99 (p5).
+
+### 🔬 03/08 — gate completo VERDE sobre os dez pacotes
+
+`pytest tests/ -m "not browser"` com `SIGE_ENABLE_DEMO_SEED=false` →
+**1778 passed, 1 failed, 6 skipped, 201 deselected em 21min17s**. É o primeiro
+gate completo desde 24/07 (que deu 1177) — a suíte cresceu 601 testes no
+intervalo.
+
+**A única falha não é dos pacotes**: `test_e2e_metricas_funcionario_task98`
+falhava por **data**, não por código. 📖 Os três cenários semeavam N dias a
+partir do dia 1º do mês e consultavam a janela `1º … date.today()`; nos
+primeiros dias do mês *hoje* cai **antes** do último dia semeado, e tudo dava
+3/5 do esperado (40h→24, 5 dias→3, R$ 900→540). 🔬 Provado por bisseção: o
+mesmo teste, com as **mesmas 14 linhas de falha**, quebra em `ff94240d` — o
+commit **anterior** aos 21 do núcleo. Corrigido em `tests/`: a janela passou a
+ser `max(date.today(), dias[-1])`, que é idêntica à anterior do dia 6 em diante
+e só alarga nos cinco primeiros dias do mês. **O teste só passava em ~80% do
+calendário** — e quem rodasse o gate no começo do mês ia herdar um vermelho
+para explicar.
+
+> ⚠️ Gate verde **não** é aval de produção. Ele prova que a suíte concorda
+> consigo mesma no banco de dev; não prova volume, nem migração 277/278
+> aplicada, nem a semana de observação do editor v2.
 
 ### 🔬 28/07 — rodada de revisão: 9 defeitos, dois deles de perda de dado
 
@@ -77,10 +167,14 @@ no meio da rodada eram ⚠️ dev — as obras foram apagadas por corridas de te
 e a consulta, que juntava com `tarefa_cronograma`, perdeu as linhas. A *forma*
 do defeito é real; o volume não foi medido em produção.
 
-**Aberto:** 🔬⚠️ dev 28/07 — **40.824 snapshots com a tarefa apagada**. Num
-rollback, `_restaurar` não acha a tarefa e INSERE uma cópia nova, o mesmo
-efeito do defeito corrigido, em escala muito maior. Quase certamente carga de
-suíte; **medir em produção antes de escrever qualquer código**.
+~~**Aberto:** 🔬⚠️ dev 28/07 — **40.824 snapshots com a tarefa apagada**.~~
+**Não reproduz mais.** 🔬⚠️ dev 03/08: **598.235 snapshots, ZERO com a tarefa
+apagada** (`scripts/medir_producao.py`, pergunta 4). Era carga de suíte, como
+se suspeitava — as obras foram apagadas por corridas de teste e levaram as
+tarefas junto; o banco atual não tem mais o resíduo. O mecanismo segue real
+(num rollback, `_restaurar` não acha a tarefa e INSERE uma cópia nova), mas
+**não há volume que justifique escrever código**. Continua valendo medir em
+produção antes de decidir — é a pergunta 4 do script.
 
 ### 🔬 24/07 — editor de cronograma v2 (5 fases) em `main`
 
@@ -88,6 +182,20 @@ Commits `73f58d3e` → `8fda59f5`, todos em `main`: **Fase 1** motor de
 agendamento estilo MS Project; **Fase 2** grade tipo planilha; **Fase 3**
 desfazer/refazer; **Fase 4** linha de base; **Fase 5** manual de uso em
 PDF. Spec e planos em `docs/superpowers/{specs,plans}/2026-07-24-cronograma-*`.
+
+🔬 **03/08: saiu do piloto pela porta larga.** A migração **277** (`41f23403`
++ `ff94240d`) ligou o editor v2 em **todo o parque** — linha de base congelada
+primeiro, depois a flag em todos os tenants, depois o default da coluna virando
+`TRUE`. Runbook em `docs/cronograma-editor-v2-rollout.md`. **Duas coisas ficaram
+de pé:** (1) a *semana de observação* — a validação agora é "o parque
+observado", e ela não aconteceu; (2) o guard de calendário virou **aviso nominal
+no log do deploy**, então quem estiver naquela lista **vai ver datas andarem na
+primeira edição** (decisão pendente nº 1). E o p10 dependia disso: o EVM assume
+o editor v2 ligado no parque, faltando só a observação.
+
+> 📖 **Vale para qualquer migração futura que toque tabela quente com o app de
+> pé:** o defeito de lock do `ALTER TABLE` está registrado no `PLANO-NUCLEO.md`
+> — não como anedota, mas porque a próxima vai encontrá-lo igual.
 
 ### 🔬 24/07 — RDO em porcentagem livre (`bdee680a`), atrás de flag
 
@@ -256,12 +364,20 @@ em produção e levar o número de "EM EXECUÇÃO sem gestor" ao Cássio (em dev
 | # | O quê | Por que trava |
 |---|---|---|
 | 1 | **Rotacionar `SESSION_SECRET` e a senha do Postgres** no EasyPanel | Os valores estão no **histórico do git para sempre**. Com a chave de sessão forja-se cookie de qualquer usuário de qualquer tenant |
-| 2 | **`gh auth login` + `gh auth setup-git`** (ou push manual) | 🔬 23/07: o `gh` **perdeu a autenticação** na recriação do ambiente (em 21/07 estava logado como `cassioviller`; hoje `gh auth status` diz "not logged in" e o push recusa credencial). Refazer o login é interativo — só o humano consegue. Sem push, o CI nunca rodou verde |
+| 2 | **`gh auth login`** (só a API do GitHub) | 🔬 03/08: **`git push` funciona** — `origin/main == 63cc1c13`, conferido em `ls-remote`. O que falta é a API: `gh auth status` → "not logged into any GitHub hosts", `GH_TOKEN`/`GITHUB_TOKEN` ausentes. Sem ela não se abre PR nem se busca branch de triagem, e **não há como conferir se o CI rodou verde** sobre os dez pacotes. Refazer o login é interativo — só o humano consegue |
 | 3 | **Criar o volume persistente** no painel | Vale para `/var/backups/sige` (dumps) **e** para os uploads. O pré-requisito de código caiu em 23/07: a armadilha nº 2 (descasamento do `UPLOADS_PATH`) está corrigida — montar o volume e definir a variável já é seguro |
 
 Também pendem: conferir divergência entre painel e valores commitados, snapshot
 do volume na Hostinger, `SIGE_ENABLE_DEMO_SEED=false` e o acesso ao banco de
 produção — que é pré-requisito de **quase toda medição pendente abaixo**.
+
+> 📖 **O acesso a produção agora tem um comando só.** `scripts/medir_producao.py`
+> (somente leitura, conexão em `readonly=True`, roda com o app de pé) responde
+> de uma vez as seis perguntas que este documento deixou em aberto: o fantasma
+> da migração 270, quanto do parque é de fato `v2`, **quais tenants vão ver
+> datas andarem** na primeira edição, os snapshots órfãos, as baselines sem BAC
+> e o volume da duplicação ponto × RDO. Cada pergunta traz no docstring por que
+> está aberta e o que fazer com a resposta. Uma que falhe não derruba as outras.
 
 ~~A grafia do domínio (`cassioviller` × `cassiovillar`)~~ — **resolvida em
 23/07**: 🔬 grep na árvore inteira (inclusive `attached_assets/`) só encontra
@@ -478,25 +594,47 @@ gate, o branch foi **mergeado em `main`** (fast-forward, 23/07).
 | **3** | Compras com governança | ✅ **23/07** — 12/12 tasks | `fase-3-compras-governanca.md` + `docs/fase-3-rollout.md` |
 | **4** | Centro de custo obrigatório | ✅ **24/07** — 13/13 tasks | `fase-4-centro-custo-obrigatorio.md` |
 | **5** | RDO com ciclo de vida e assinatura | ✅ **24/07** — 16/16 tasks (Task 15: código pronto, execução espera infra) | `fase-5-rdo-ciclo-vida-assinatura.md` + `docs/fase-5-rollout.md` |
-| **6** | Orçamento versionado e aditivo | ⬜ | `fase-6-orcamento-versionado-aditivo.md` |
-| **7** | Planejamento avançado (CPM, baseline, EVM) | ⬜ | `fase-7-planejamento-avancado-cpm-evm.md` |
+| **6** | Orçamento versionado e aditivo | ⬜ — mas o **p9 já abriu a porta**: `definir_valor_contrato()` é o escritor único e os 5 chamadores passam por ele. A fase deixou de ser caça a chamadores; virou gravar `ObraContratoVersao` dentro de função que já existe | `fase-6-orcamento-versionado-aditivo.md` |
+| **7** | Planejamento avançado (CPM, baseline, EVM) | ❌ **obsoleta como escrita — reescrita pelo p10.** O editor v2 já entregou `TarefaVinculo`, o motor com passe direto/inverso, folga total, caminho crítico e `CronogramaBaseline`; implementá-la ao pé da letra criaria uma **segunda** rede de predecessoras e uma **segunda** baseline. O que sobrou dela era o EVM, entregue em `e86ab635` + `3612db6b` | ~~`fase-7-planejamento-avancado-cpm-evm.md`~~ → `PLANO-NUCLEO.md` §p10 |
 | **8** | Financeiro avançado + exportação Domínio | ⬜ | `fase-8-financeiro-avancado-dominio.md` |
 | **9a/9b** | Portal, assinatura de medição, contratos, Drive | ⬜ | `fase-9-portal-assinatura-contratos.md` |
 
 Todos em `docs/superpowers/plans/2026-07-21-*`. Faixas de migration reservadas
 sem colisão: 214-216 (F1), 220-221 (F1.5), 230-232 (F2), 240-247 (F3),
-250-254 (F4), 260-264 (F5), 270-276 (F6), 280-283 (F7), 290-295 (F8),
-300-307 (F9). A **Fase 0.6 usou 217-219**, fora de todas as faixas.
-🔬 Maior aplicada hoje: **219**. A Fase 1 aplicou 214, 215 e 216.
+250-254 (F4), 260-264 (F5), **271-276 (F6 — ver abaixo, era 270-276)**,
+280-283 (F7), 290-295 (F8), 300-307 (F9). A **Fase 0.6 usou 217-219**, fora de
+todas as faixas. 📖 03/08: **maior registrada em `migrations.py` é a 278**.
 
-> ⚠️ **A reserva já foi furada duas vezes — confira o registro real em
+> 🔴 **O número 270 está QUEIMADO — a Fase 6 começa em 271.** 🔬 03/08: a
+> mesma migração do editor v2 está gravada `success` sob **dois números** no
+> banco de dev — **270** (53.141 ms, o trabalho real) e **277** (7.860 ms,
+> reexecução que não achou nada a fazer). O motivo: `41f23403` **foi empurrado
+> para `origin/main`** com a migração numerada 270 e rodou assim; só depois
+> `ff94240d` a renumerou para 277. Todo ambiente que deployou de `41f23403` —
+> **produção inclusive, se ela sobe de `main`** — tem o mesmo registro fantasma.
+> Consequência: se a Fase 6 entregar uma migração numerada 270,
+> `is_migration_executed(270)` responde `True` e **ela nunca roda, em silêncio**.
+> Estreitar a faixa para 271-276 é a correção certa; **apagar a linha de
+> `migration_history` não é**, porque não há como saber quais bancos têm o
+> fantasma sem acesso a produção. A renumeração que existia para evitar colisão
+> armou uma.
+>
+> 🔬 03/08, **varrido — é o único**: nenhum outro nome aparece sob dois números,
+> nenhum número aparece sob dois nomes, nenhuma linha com status ≠ `success`
+> (220 linhas, 220 números distintos), e toda migração registrada em
+> `migrations.py` consta no histórico. O 270 é o **único órfão**: está no
+> histórico e não existe mais no código. Isso delimita o dano — mas delimita
+> **em dev**; a mesma varredura em produção continua por fazer.
+
+> ⚠️ **A reserva já foi furada três vezes — confira o registro real em
 > `migrations.py`, não esta tabela.** A **Fase 9a** usou **267-269** (dentro da
-> faixa da F5, não da sua 300-307), e o rollout do editor v2 em todo o parque
-> (03/08) usou o **277** — número escolhido no vão livre entre a faixa da F6
-> (270-276, intacta) e a da F7 (280-283) justamente para não colidir. Numerar
-> por faixa sem olhar o registro é receita para duas migrações com o mesmo
-> número: a segunda nunca roda, porque `is_migration_executed` já viu a
-> primeira.
+> faixa da F5, não da sua 300-307); o rollout do editor v2 em todo o parque
+> (03/08) usou o **277**, no vão livre entre a faixa da F6 e a da F7; e o BAC
+> congelado do p10 usou o **278** — e **não** a faixa 280-283 da F7, apesar de
+> o p10 ser a reescrita dela: mexer em faixa reservada de fase é exatamente o
+> que a renumeração de 270→277 existiu para evitar. Numerar por faixa sem olhar
+> o registro é receita para duas migrações com o mesmo número: a segunda nunca
+> roda, porque `is_migration_executed` já viu a primeira.
 
 > **Os planos das Fases 6-9 têm validade menor.** Foram escritos sobre o schema
 > de hoje, e as Fases 1-5 vão mudá-lo. Cada um tem seção *"Premissas a
@@ -649,7 +787,10 @@ FUNCIONARIO.)*
 | Rotas de **escrita** por token eterno | **8** | 📖 21/07 — não "1", ver acima |
 | Índice `rdo_apontamento_cronograma` | 881 ms → 0,034 ms | 🔬 |
 | Testes | gate 24/07 (Fase 5): **1284 passed**, 6 skipped, 201 deselected, 28min46s | 🔬 24/07 |
-| Testes — última medição | **847 passed** em `-k "obra or custo or rdo or fase"`, 8min25 · **não é o gate completo** | 🔬 28/07 |
+| Testes | **847 passed** em `-k "obra or custo or rdo or fase"`, 8min25 · **não é o gate completo** | 🔬 28/07 |
+| Testes — os dez pacotes | **94 passed** nos dez arquivos `tests/test_p*` do núcleo, 30,5s | 🔬 03/08 |
+| **Testes — gate completo** | **1778 passed**, 1 failed (data, não código — corrigido), 6 skipped, 201 deselected, 21min17s | 🔬 03/08 |
+| Migração mais alta registrada | **278** (p10, BAC da baseline) | 📖 03/08 |
 | Violações de ruff herdadas | 543, das quais 186 F821 | 🧮 |
 | Tabelas vazias | ~65 de 178 (37%) | 🧮 |
 | `models.py` / `migrations.py` | 7.610 / 14.300+ linhas | 🧮 |
@@ -750,7 +891,70 @@ FUNCIONARIO.)*
     errada, varra o repositório pelo padrão antes de fechar** — o relatório
     diz "corrigido" sobre o arquivo que ele olhou, não sobre o sistema.
 
+14. **`except Exception` engole o próprio `abort()`.** 🔬 03/08: em `rdos()` e
+    `detalhes_obra`, o catch-all capturava a `HTTPException` do `abort(404)` e
+    devolvia a tela com **200** (ou flash com traceback impresso ao usuário). A
+    correção de escopo do p1 teria ficado decorativa: o 404 saía pela porta e
+    voltava pela janela. **Ao escopar rota, cheque o handler de exceção antes
+    de comemorar o `abort`** — `except HTTPException: raise` vem primeiro.
+
+15. **Escrita em construtor não aparece em `grep`.** 🔬 03/08: o quinto
+    escritor de `Obra.valor_contrato` era `Obra(valor_contrato=valor_total)`
+    em `event_manager.py:1120`. Dois inventários anteriores procuraram
+    `valor_contrato =` e passaram direto por ele. O teste do p9 procura pela
+    forma `valor_contrato=` **dentro de construtor**, não só pela atribuição.
+
+16. **Decorador de registro adota a função inserida logo abaixo dele.** 🔬 03/08
+    (p5): uma função nova entrou entre `@event_handler('proposta_aprovada')` e
+    `handle_proposta_aprovada`. O decorador ficou órfão e passou a registrar a
+    função errada como ouvinte — chamada com `(data_dict, admin_id)` em vez de
+    `(proposta_id, admin_id)`, o dicionário ia parar no `WHERE id = %s` e o
+    psycopg2 estourava. **Os 9 testes do pacote passaram**, porque chamam as
+    funções direto; quem pegou foram os 59 de importação, que exercitam o
+    evento. Em módulo com decorador de registro, "inserir logo antes do
+    handler" é armadilha silenciosa — e teste que chama a função direto não
+    cobre o registro dela.
+
+17. **`AlocacaoEquipe.rdo_gerado_id` é FK que nada escreve.** 🔬⚠️ dev 03/08:
+    33 linhas em `alocacao_equipe`, **zero** com o campo preenchido. Toda saída
+    de estoque vinda de RDO nascia sem funcionário — desde o primeiro dia, sem
+    ninguém notar, porque o campo é opcional. Corrigido em `d5294ce4` (a
+    autoria real é a do RDO, via `Usuario.funcionario_id`). O modelo está
+    marcado **EM APOSENTADORIA**, mas **a tabela continua lá** e ainda tem dois
+    leitores (📖 `crud_rdo_completo.py:539`, mantido de propósito, e o import
+    físico-financeiro). Remover exige migração destrutiva e conferência em
+    produção — passo próprio.
+
+18. **Teste vermelho não é regressão até que se prove.** 🔬 03/08: a única
+    falha do gate completo era de **calendário** — semeava N dias a partir do
+    1º do mês e consultava até `date.today()`, então só passava do dia 6 em
+    diante. Custou uma bisseção de dois minutos (rodar o mesmo teste num
+    worktree do commit anterior) provar que não vinha dos 21 commits do núcleo.
+    **Antes de caçar a regressão, rode o teste no commit anterior** — e
+    desconfie de falha cujos números são todos a mesma fração do esperado
+    (aqui, 3/5 em catorze asserções): proporção constante é dado faltando, não
+    cálculo errado. Vale a varredura da armadilha nº 13: `date.today()` como
+    limite de janela em teste que semeia datas fixas é padrão, não caso único.
+
 ## Decisões pendentes suas
+
+### Das sete do `PLANO-NUCLEO.md` §7 — três fecharam em 03/08
+
+| # | Decisão | Estado |
+|---|---|---|
+| 1 | Tenant piloto **+ calendário** | 🟡 **metade decidida.** Não há mais piloto do editor v2 — foi ao parque inteiro pela migração 277. Sobra o piloto das outras duas flags e o **calendário**: 📖 o log do deploy imprime quais tenants consideram sábado/domingo, e **é neles que as datas vão andar na primeira edição**. Se algum trabalha sábado de verdade, calendário configurável vira código |
+| 2 | Dono do `valor_contrato`: F6 × F9b | ✅ **FASE 6**, como a própria 9b já assumia na premissa P1. A 9b vira camada documental (PDF, assinatura, vencimento), sem listener concorrente |
+| 3 | Custo orçado: consertar no consumo ou na origem | ✅ **no CONSUMO.** `valor_orcado` segue gravado com **venda** — ele nunca guardou custo —, mas ninguém mais o lê como custo. Consertar na origem continua sendo a saída definitiva e está na spec: muda a escrita de toda obra nova e exige backfill |
+| 4 | **Medições históricas: recalcular ou congelar** | 🔴 **aberta.** O p4 foi entregue "para frente": medição NOVA usa a fórmula única, as já emitidas seguem congeladas. Trava a linha do tempo do portal e o EVM retroativo |
+| 5 | **Conta de débito da despesa geral** (contador) | 🔴 aberta — A04 e a contabilização dos pagamentos da Gestão de Custos |
+| 6 | **Rateio dos encargos patronais por obra** | 🔴 aberta — A24; hoje a mão de obra sai **~28% subestimada** |
+| 7 | **`N8N_WEBHOOK_URL` e cron** (infra) | 🔴 aberta — A25 e **toda notificação do plano** |
+
+Segue valendo a decisão de **27/07**: *"por enquanto todos os perfis vão ter
+acesso"* — o que mantém desligadas as flags de escopo por obra e de governança
+de compras. Não afeta o núcleo; afeta quem pode aprovar aditivo na Fase 6.
+
+### Das 10 fases
 
 Consolidadas dos 10 planos. Cada uma **já tem recomendação adotada no plano** —
 nenhum plano está bloqueado esperando resposta. Revise quando puder.
@@ -772,7 +976,11 @@ nenhum plano está bloqueado esperando resposta. Revise quando puder.
 | Arquivo | O que é |
 |---|---|
 | **`ESTADO-ATUAL.md`** | este — leia primeiro |
-| `docs/superpowers/plans/2026-07-21-*` | **os 10 planos das fases** (ver tabela acima) |
+| **`PLANO-NUCLEO.md`** (31/07, fechado 03/08) | **leia em segundo.** Os 10 pacotes do núcleo, os 12 vereditos, a matriz de 20 conexões, o backlog de 25 automações, as estruturas mortas e as 7 decisões. Onde ele diverge do `FLUXO-IDEAL.md`, **vale ele** |
+| `FLUXO-IDEAL.md` (30/07) | O diagnóstico que originou o plano. Suas ondas 0-3 foram **reordenadas** nos pacotes p1-p10 — traz o aviso no topo |
+| `docs/estudo-fluxo/*.json` (31/07) | Os brutos: conferência adversarial dos 12 vereditos e o levantamento de conexões |
+| `docs/superpowers/{specs,plans}/2026-08-03-p1-*` | Spec e plano do p1 — o único pacote que teve os dois documentos antes do código, porque dois vereditos mudaram de tamanho ao serem reconferidos |
+| `docs/superpowers/plans/2026-07-21-*` | **os 10 planos das fases** (ver tabela acima). ⚠️ o da **Fase 7 está obsoleto** — substituído pelo p10 |
 | `DEVOLUTIVA.md` | aderência à especificação + sequência de fases. (O erro do `:73` sobre "não existe recebimento" foi corrigido em 23/07 — o recebimento existe, só não é o gatilho financeiro) |
 | `docs/fase-1-rollout.md` / `fase-2-rollout.md` / `fase-3-rollout.md` | **runbooks de rollout por fase** — pré-checagens, ordem de ligar flags e rollback |
 | `DOSSIE-REPO.md` | as 29 respostas sobre arquitetura, dados, infra e qualidade |
