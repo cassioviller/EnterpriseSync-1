@@ -464,11 +464,18 @@ def salvar_rdo():
         # Geração automática de custos de mão-de-obra (Gestão de Custos V2 →
         # Realizado no dashboard + ContaPagar). Falhas aqui NÃO podem quebrar
         # o salvamento do RDO.
+        # p1 Step E — emite o evento em vez de chamar o serviço direto.
+        # Chamar `gerar_custos_mao_obra_rdo` na mão gerava o custo e NÃO
+        # disparava `rdo_finalizado`, então a medição da obra não era
+        # recalculada (event_manager.py:1418 é quem faz isso). Metade dos
+        # caminhos de salvar RDO ficava com custo sem medição correspondente.
+        # O handler do evento faz o que esta chamada fazia, MAIS o recálculo.
         try:
-            from services.rdo_custos import gerar_custos_mao_obra_rdo
-            gerar_custos_mao_obra_rdo(rdo, admin_id)
+            from event_manager import EventManager
+            EventManager.emit('rdo_finalizado', {'rdo_id': rdo.id},
+                              admin_id=admin_id)
         except Exception as _e:
-            logger.error(f"[rdo-custo] gerar_custos_mao_obra_rdo falhou: {_e}")
+            logger.error(f"[rdo-custo] evento rdo_finalizado falhou: {_e}")
 
         # Mensagem de sucesso
         acao = "editado" if rdo_id else "criado"
@@ -574,11 +581,18 @@ def finalizar_rdo(rdo_id):
         rdo.finalizado_por_id = current_user.id
         # Gera os custos da mão-de-obra do RDO no fechamento. A função abaixo
         # é idempotente; rodar de novo num RDO já lançado não duplica nada.
+        # p1 Step E — emite o evento em vez de chamar o serviço direto.
+        # Chamar `gerar_custos_mao_obra_rdo` na mão gerava o custo e NÃO
+        # disparava `rdo_finalizado`, então a medição da obra não era
+        # recalculada (event_manager.py:1418 é quem faz isso). Metade dos
+        # caminhos de salvar RDO ficava com custo sem medição correspondente.
+        # O handler do evento faz o que esta chamada fazia, MAIS o recálculo.
         try:
-            from services.rdo_custos import gerar_custos_mao_obra_rdo
-            gerar_custos_mao_obra_rdo(rdo, admin_id)
+            from event_manager import EventManager
+            EventManager.emit('rdo_finalizado', {'rdo_id': rdo.id},
+                              admin_id=admin_id)
         except Exception as _e:
-            logger.error(f"[rdo-custo] gerar_custos_mao_obra_rdo falhou: {_e}")
+            logger.error(f"[rdo-custo] evento rdo_finalizado falhou: {_e}")
 
         # Calcular produtividade por funcionário (V2) — parte da mesma transação
         subs_com_meta = RDOServicoSubatividade.query.filter(
