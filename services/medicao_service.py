@@ -66,6 +66,17 @@ def calcular_percentual_item(item):
 
 
 def validar_pesos_item(item_id):
+    """Soma dos pesos do item bate com a convenção de 100 da UI?
+
+    p6 — **100 é convenção de entrada, não requisito do cálculo.**
+    `calcular_percentual_item` normaliza (`peso / total_peso`), então a
+    medição sai correta com pesos em qualquer escala: 3 e 7 dias dão 30% e
+    70% exatamente como 30 e 70.
+
+    Esta função continua servindo à tela de cadastro manual, onde distribuir
+    100 pontos é a forma de pensar. O que ela NÃO faz mais é decidir se a
+    medição pode ser gerada — ver `gerar_medicao_quinzenal`.
+    """
     vinc = ItemMedicaoCronogramaTarefa.query.filter_by(item_medicao_id=item_id).all()
     if not vinc:
         return True, Decimal('0')
@@ -84,12 +95,36 @@ def gerar_medicao_quinzenal(obra_id, admin_id, periodo_inicio=None, periodo_fim=
     if not itens_comerciais:
         return None, "Nenhum item de medição comercial cadastrado para esta obra"
 
+    # p6 — o gate era `soma == 100` e recusava a medição inteira. Mas
+    # `calcular_percentual_item` NORMALIZA os pesos (`peso / total_peso`), então
+    # 100 nunca foi requisito do cálculo: é a convenção da tela de cadastro
+    # manual, onde se distribuem 100 pontos.
+    #
+    # Havia dois regimes convivendo. A importação físico-financeira grava
+    # **peso = dias** da tarefa no .mpp (`importacao_fisico_financeiro.py:239`)
+    # — soma 47, 112, o que a obra tiver. A Task #102 grava somando 100 por
+    # construção. O import passava no cálculo e **quebrava na geração da
+    # medição**: a obra inteira ficava sem medir por causa de uma convenção
+    # de outro caminho de entrada.
+    #
+    # O que de fato impede medir é peso total ZERO — aí não há como
+    # distribuir. É esse o gate agora. Divergência de 100 vira AVISO: pode ser
+    # dias (legítimo) ou distribuição manual incompleta (erro de cadastro), e
+    # o log nomeia o item para quem for conferir.
     for item in itens_comerciais:
         vinc = ItemMedicaoCronogramaTarefa.query.filter_by(item_medicao_id=item.id).all()
         if vinc:
             soma_pesos = sum(Decimal(str(v.peso)) for v in vinc)
+            if soma_pesos <= 0:
+                return None, (f'Item "{item.nome}" tem soma de pesos ZERO — '
+                              f'sem peso não há como distribuir o avanço entre '
+                              f'as tarefas vinculadas')
             if soma_pesos != Decimal('100'):
-                return None, f'Item "{item.nome}" possui soma de pesos = {float(soma_pesos):.0f}% (deve ser exatamente 100%)'
+                logger.info(
+                    '[p6] item %s ("%s") tem soma de pesos %s (≠ 100) — '
+                    'medição gerada com pesos normalizados. Escala de dias '
+                    'vem do import; se era distribuição manual, confira o '
+                    'cadastro.', item.id, item.nome, float(soma_pesos))
 
     if not periodo_inicio or not periodo_fim:
         periodo_inicio, periodo_fim = calcular_periodo_atual(obra)
