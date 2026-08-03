@@ -852,9 +852,15 @@ FUNCIONARIO.)*
    (`scripts/flag_cronograma_mpp.py <admin_id> --ligar`) e `versao_sistema=='v2'`
    via `_check_v2()`. Antes de investigar "não aparece", cheque as flags.
 
-7. **`Obra.regime_medicao` é coluna morta com comentário mentiroso.**
-   📖 `models.py:288-291` afirma governar o vínculo custo↔tarefa. **Nada no
-   código a lê.**
+7. ~~**`Obra.regime_medicao` é coluna morta com comentário mentiroso.**~~
+   **Já não é morta — esta armadilha envelheceu.** 📖 03/08: a Fase 1.5 passou
+   a lê-la em `cronograma_views.py:732`, onde `regime_medicao == 'percentual'`
+   define o **default do `modo_apontamento`** de tarefa nova. O comentário do
+   modelo continua enganoso (fala em governar o vínculo custo↔tarefa, que não é
+   o que ela faz), mas "nada no código a lê" virou falso. A inversão importa:
+   antes, mexer na coluna era inócuo; **hoje mexer no domínio dela muda o modo
+   de apontamento de toda tarefa nova**. Achado ao reconferir a premissa 8 do
+   plano da Fase 6.
 
 8. ~~**Furo de tenant latente.**~~ **Fechado em 22/07 (`b966218`).** O ramo
    `sem_template` das duas árvores de preview devolvia `servico_id` cru, sem

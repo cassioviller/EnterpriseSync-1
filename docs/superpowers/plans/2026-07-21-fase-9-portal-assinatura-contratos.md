@@ -4903,3 +4903,46 @@ O que muda na execução:
 6. **Faixa 300-307 livre e confirmada** (maior aplicada: 247); alinhar a menção "300-309" do cabeçalho com a reserva oficial 300-307 antes de usar 308-309.
 
 Todos os `arquivo:linha` do corpo do plano (escritos sobre `fb4147b`) defasaram — os principais remapeamentos estão na tabela acima (R8, R11, R13, R14, R15). Usar esta revisão como índice de linhas ao executar; o texto original foi mantido intacto como registro do estado de 21/07.
+
+---
+
+## Revisão de premissas — 2026-08-03 (pós-PLANO-NUCLEO)
+
+Reconferência contra `main` em 2026-08-03 (commit `a2d3dc02` — Fases 1–5 mergeadas **e os dez pacotes do `PLANO-NUCLEO.md` entregues**; migrations registradas até **278**; gate completo verde: 1778 passed). Legenda: **CONFIRMADA** · **QUEBRADA** · **NOVA**.
+
+**A manchete: a 9b mudou de papel por decisão, não por código.** A decisão nº 2 do `PLANO-NUCLEO.md` §7 (03/08) definiu que **o dono do `Obra.valor_contrato` é a Fase 6** — `ObraContratoVersao` + `services/contrato_obra.py` como cadeia única. A 9b vira **camada documental**: PDF, assinatura, vencimento, Drive. **Sem listener concorrente sobre o contrato.** Isso ratifica o que a própria 9b já assumia na premissa P1, mas agora é decisão registrada, não suposição.
+
+### As dez premissas
+
+| # | Premissa | Veredito | Evidência (03/08) | Ajuste necessário |
+|---|---|---|---|---|
+| P1 | A Fase 6 entregou versionamento e aditivo | 🟡 **AINDA NÃO — mas a porta está aberta** | 🔬 `grep` em `models.py`: `Contrato`, `ContratoAditivo`, `ObraContratoVersao`, `AditivoContrato` e `OrcamentoVersao` **não existem**. Porém o p9 entregou o **escritor único**: `services/contrato_obra.definir_valor_contrato()` (`services/contrato_obra.py:57`), com os 5 chamadores roteados | **A Task 16 encolheu drasticamente.** "`Obra.valor_contrato` vira espelho" já é meio-verdade: hoje há um ponto único de escrita, que só não versiona ainda. A 9b **não** cria modelagem de aditivo — é da Fase 6 (decisão nº 2). Reescrever as Tasks 15 e 18 nessa chave |
+| P2 | A Fase 2 entregou estados da Obra | **CONFIRMADA** | `EstadoObra` (`models.py:29`) e `ObraTransicaoEstado` (`models.py:485`) | Nenhum. O job de vencimento filtra por `Obra.estado`, não por `status` |
+| P3 | Existe Shared Drive no Workspace | **ABERTA** — externa ao código | Nenhum pacote toca nisso | Segue sendo pergunta ao Cássio |
+| P4 | Onde o segredo do Google vai morar | **ABERTA — e o argumento citado mudou de fato** | O texto cita a rotação de `SESSION_SECRET` como "pendente do lado humano". 🔬 **03/08: decidido NÃO rotacionar** — o item saiu da lista de pendências | O argumento **fica mais forte, não mais fraco**: se a casa optou por conviver com um segredo exposto no histórico, mais razão para o JSON do Drive nunca encostar no repositório. Variável de ambiente no painel segue sendo a recomendação. Só corrija a referência, que envelheceu |
+| P5 | Estrutura de pastas padrão por obra | **ABERTA** | — | Segue sendo pergunta |
+| P6 | Quem enxerga a pasta da obra no Drive | **ABERTA** | — | Segue sendo pergunta |
+| P7 | `N8N_WEBHOOK_URL` configurado em produção | **ABERTA — e agora nomeada** | É a decisão nº 7 do `PLANO-NUCLEO.md` §7 e o item **A25** do backlog. Sem ela o dispatcher é no-op silencioso | Inalterado, mas saiba que **toda notificação do plano do núcleo** depende do mesmo item — não é custo só desta fase |
+| P8 | Evolution API pareada | **ABERTA** | — | Segue sendo verificação externa |
+| P9 | O que é "contrato" para a Veks | **ABERTA — e agora mais urgente** | Continua sem resposta, e a Fase 6 (que roda antes) vai modelar `ObraContratoVersao` | ⚠️ **Levante P9 antes da Fase 6, não antes da 9b.** Se contrato for "a proposta aprovada + assinatura", isso muda a modelagem da 6, não só a desta fase. Perguntar tarde custa duas fases |
+| P10 | Locação entra nesta fase? | **ABERTA** — recomendação inalterada | — | Segue **FORA** da 9b |
+
+### Riscos NOVOS (criados pelos dez pacotes)
+
+| # | Risco | Evidência | Ajuste necessário |
+|---|---|---|---|
+| N1 | **A medição do portal mudou de fórmula.** O p4 achou que `gerar_medicao` do portal fazia **média simples** das tarefas × `valor_contrato` — dupla-contava tarefa-pai e dava peso igual a tarefa de 1 dia e de 40. Agora é a fórmula única: só folhas, ponderadas por duração | commit `a2321503` | A assinatura de medição desta fase assina um número **diferente** do que assinaria em julho. Medição já emitida segue congelada até a decisão nº 4 — a fase precisa saber qual dos dois está assinando e dizer isso no documento assinado |
+| N2 | **A trilha de acesso do portal já foi corrigida uma vez por IP forjável.** `_registrar_acesso` lia `X-Forwarded-For` à mão; a assinatura ao lado gravava o IP honesto e a trilha o forjado, no **mesmo POST** | commit `d9836e5c`; `ESTADO-ATUAL.md` armadilha 13 | Qualquer registro novo de acesso ou assinatura usa o helper único. E ao corrigir defeito que é convenção errada, **varra o repositório pelo padrão** antes de fechar |
+| N3 | **404, não 403, e cuidado com o catch-all.** A casa fixou o critério (403 confirma que o recurso existe em outra empresa) e o p1 achou duas rotas onde `except Exception` engolia o próprio `abort(404)` e devolvia 200 | commit `78a15253`; `tests/test_gestao_custo_filho_tenant.py:114` | Rotas do portal e de contrato seguem o precedente, com `except HTTPException: raise` antes de qualquer catch-all |
+| N4 | **`PortalAcesso` continua inexistente** — o `ESTADO-ATUAL.md` registra a 9a como parcial por isso. O que existe é `PortalAcessoEvento` (`models.py:5758`) | 🔬 `grep` 03/08 | Ao reabrir a 9a, confirmar se o desenho pede a tabela ou se `PortalAcessoEvento` já cobre — não recriar por leitura do nome no plano |
+| N5 | **Aprovar proposta agora semeia a obra inteira e fecha o lead** (p5): `ServicoObraReal` + `Lead.proposta_id`/`obra_id`, na mesma transação | commit `af29acc1` | O portal e os documentos desta fase podem contar com serviço real existindo desde a aprovação. E `Lead` deixou de ser ponta solta — o que muda o que faz sentido mostrar ao cliente |
+
+### Impacto no plano
+
+**A 9b precisa ser reescrita, e depois da Fase 6 — não em paralelo.** Não por defeito no plano, mas porque a decisão nº 2 lhe tirou o pedaço estrutural: contrato, versão e aditivo são da Fase 6; a 9b fica com PDF, assinatura, vencimento e Drive. As Tasks 15, 16 e 18 são as afetadas — a 16 quase some, porque o p9 já entregou o ponto único de escrita.
+
+**A 9a segue como está**, parcial: a ciência do RDO foi entregue (e corrigida em 29/07 pelo IP forjável), `PortalAcesso` continua inexistente.
+
+**O item que subiu de prioridade é a P9.** Ela sempre foi pergunta desta fase, mas quem vai modelar contrato primeiro é a Fase 6 — e a Fase 6 é a próxima da fila. Perguntar "o que é um contrato para a Veks" depois que a 6 modelar custa refazer duas fases.
+
+As premissas externas (P3, P5, P6, P7, P8, P10) não foram tocadas por nenhum pacote e seguem abertas exatamente como escritas.

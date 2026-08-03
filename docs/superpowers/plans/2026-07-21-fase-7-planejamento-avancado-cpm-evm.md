@@ -1,5 +1,39 @@
 # Fase 7 — Planejamento Avançado: CPM, Baseline e EVM
 
+> # ❌ PLANO OBSOLETO — NÃO EXECUTE
+>
+> **Substituído pelo `PLANO-NUCLEO.md` §p10, entregue em 03/08** (commits
+> `e86ab635` + `3612db6b`). Este arquivo fica como registro do raciocínio; as
+> tasks abaixo **não devem ser implementadas como escritas**.
+>
+> **Por quê:** o plano foi escrito em 21/07. Três dias depois, o editor de
+> cronograma v2 (5 fases, commits `73f58d3e` → `8fda59f5`) entregou o núcleo
+> estrutural das camadas 1 e 2 deste plano: `TarefaVinculo` com N predecessoras
+> tipadas, motor com passe direto e inverso, folga total, caminho crítico e
+> `CronogramaBaseline`. Implementar as Tasks como escritas criaria uma
+> **segunda** rede de predecessoras (`TarefaPredecessora`) e uma **segunda**
+> baseline, concorrendo com as que já estão em produção no parque inteiro
+> desde a migração 277.
+>
+> **O que sobrou e foi entregue:** o EVM — a camada 3. O p10 o fez por
+> **composição**, não construção: BAC ← `services/custo_orcado.custo_orcado_da_obra`
+> (p3), PV ← curva de desembolso de `montar_fisico_financeiro`, AC ←
+> `curva_realizado`, EV ← progresso físico (p4) × BAC. Mais o BAC congelado na
+> baseline (migração **278**).
+>
+> **O que o p10 deixou de fora, e segue aberto:** a **folga livre** no
+> scheduler. É o único item deste plano sem substituto entregue.
+>
+> **A faixa 280-283 continua reservada e NÃO foi usada** — o p10 numerou a
+> migração do BAC como **278** de propósito, para não mexer em faixa reservada
+> de fase. Se a folga livre virar migração, a faixa está livre. ⚠️ Mas confira
+> `migrations.py` antes: o número **270 está queimado** (ver a revisão de
+> premissas da Fase 6), e numerar por faixa sem olhar o registro é como se
+> queimou.
+>
+> Leia o `PLANO-NUCLEO.md` §p10 e a seção *"🔬 03/08 — os dez pacotes"* do
+> `ESTADO-ATUAL.md` antes de tocar em qualquer coisa de planejamento avançado.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Dar ao SIGE as três perguntas de controle de obra que ele ainda não sabe responder — *quais tarefas não podem atrasar* (caminho crítico), *quanto o plano de hoje se afastou do plano contratado* (baseline congelada) e *o que a obra conseguiu com o dinheiro que gastou* (EVM: IDP, IDC, EAC) — reaproveitando integralmente o motor, o versionamento e as curvas que os módulos M01–M10 já entregaram.

@@ -4552,3 +4552,41 @@ requisição → pedido → `ContaPagar.pedido_compra_id` → baixa → `FluxoCa
 existe de ponta a ponta — a premissa 6 deixou de ser bloqueio. As premissas
 1, 2, 3 e 7 continuam abertas e travadas nas Fases 4 e 6, exatamente como o
 plano previa.
+
+---
+
+## Revisão de premissas — 2026-08-03 (pós-PLANO-NUCLEO)
+
+Reconferência contra `main` em 2026-08-03 (commit `a2d3dc02` — Fases 1–5 mergeadas **e os dez pacotes do `PLANO-NUCLEO.md` entregues**; migrations registradas até **278**; gate completo verde: 1778 passed). Legenda: **CONFIRMADA** · **QUEBRADA** · **NOVA**.
+
+**A manchete: duas das sete premissas da Parte A quebraram, e uma delas é a que o próprio plano marcou como mudança de agregação, não de filtro.**
+
+### As sete premissas da Parte A
+
+| # | Premissa | Veredito | Evidência (03/08) | Ajuste necessário |
+|---|---|---|---|---|
+| 1 | `FluxoCaixa.obra_id` ficou obrigatório? | **CONFIRMADA — segue nullable** | 🔬 `information_schema`: `fluxo_caixa.obra_id` e `centro_custo_id` ambos `is_nullable = YES`. ⚠️ drift grande de linha: `class FluxoCaixa` está em `models.py:1049`, não `:792` | Nenhum na substância. Localizar por classe — as referências de linha desta seção estão todas ~250 linhas deslocadas |
+| 2 | A obra do custo mudou de lugar? | 🔴 **QUEBRADA — a Fase 4 moveu** | 🔬 `gestao_custo_pai.obra_id` **existe** no banco (migrations 250-254 da Fase 4). O plano dizia "`gestao_custo_pai` não tem a coluna" e avisava: *"se a Fase 4 mover a obra para o pai, o rateio do DRE por obra muda de agregação, não só de filtro"* — foi exatamente o que aconteceu | **A2 (DRE por obra) precisa ser reprojetada antes de começar.** A agregação deixa de depender de `.itens.any(...)`. ⚠️ E a obra continua também no filho (`models.py:5288`): são **duas** fontes agora, e o `ESTADO-ATUAL.md` registra que 9 pais são legitimamente multi-obra — decidir qual manda, por seção do DRE |
+| 3 | O de/para `CentroCusto` × `CentroCustoContabil` foi criado? | **CONFIRMADA — segue inexistente** | Nenhuma FK entre as tabelas. A Fase 4 criou centro de custo administrativo por tenant, mas não a ponte contábil | Nenhum — A2 e A5 seguem dependendo desta ponte |
+| 4 | A PK global de `PlanoContas` foi corrigida? | **QUEBRADA — a favor, resolvida** | 🔬 PK real hoje: **`(admin_id, codigo)`**. Foi a Fase 0.6/D4 (21/07): 2.639 contas copiadas, 0 partidas órfãs (eram 980) | **A1 encolhe.** A parte "tornar por tenant" está feita; sobra unificar os **dois dialetos** (`5 = DESPESAS` do `financeiro_seeds` × `6 = DESPESAS` do V2), que é o problema real e continua aberto |
+| 5 | `BancoEmpresa.saldo_atual` passou a ser mantido? | **CONFIRMADA — segue em 0** | Nenhum pacote tocou conciliação bancária | Nenhum |
+| 6 | A Fase 3 criou o vínculo pedido → pagamento? | **CONFIRMADA — segue ausente** | Nenhuma coluna ligando pagamento a pedido em `GestaoCustoPai` nem em `FluxoCaixa` | Nenhum — A5 parte 2 segue bloqueada |
+| 7 | Qual versão do orçamento é a linha de base? | 🟡 **PARCIALMENTE RESPONDIDA** | O p3 deu **fonte única do custo orçado** (`services/custo_orcado.py`) e o p10 deu **BAC congelado** na baseline (migração 278). O que continua aberto é o *versionamento* do orçamento, que é a Fase 6 | **A6 (farol por categoria) já tem contra o que comparar**: `custo_orcado_da_obra`. Não espere a Fase 6 para isso — espere só para "qual versão" |
+
+### Riscos NOVOS (criados pelos dez pacotes)
+
+| # | Risco | Evidência | Ajuste necessário |
+|---|---|---|---|
+| N1 | **`ObraServicoCusto.valor_orcado` guarda VENDA, não custo.** O p3 fechou o vício no consumo, não na origem — o campo segue gravado com valor comercial | `services/custo_orcado.py`; commit `f8454f4e` | Qualquer seção desta fase que compare orçado × realizado (A6, A2, o DRE por obra) **lê por `services/custo_orcado.py`**. Ler `valor_orcado` cru dá margem contra o próprio preço de venda |
+| N2 | **O EVM já existe — não reconstrua.** O p10 serve BAC/PV/AC/EV e índices na chave `evm` do `painel_financeiro`, e o BAC prefere a baseline ativa (`bac_origem`: `'baseline'` \| `'vivo'`) | commits `e86ab635`, `3612db6b` | Os painéis desta fase **consomem** `painel_financeiro['evm']`. Uma segunda aritmética de EVM divergiria da primeira, que é exatamente o defeito que o p3 e o p4 passaram o dia fechando |
+| N3 | **Relatórios sem escopo de tenant já custaram um pacote.** O p1 escopou 9 pontos de `relatorios_funcionais.py` que serviam o consolidado de todas as empresas — e quatro deles **respondiam 500**, o que escondia o furo | commit `955aeb9f` | A exportação Domínio e os relatórios desta fase entram com o filtro de tenant **antes** de qualquer `join` ou filtro de negócio — é regra do plano do núcleo, não estilo. E obra vinda do corpo do POST valida contra o tenant, respondendo **404** |
+| N4 | **`get_tenant_admin_id` trata SUPER_ADMIN como tenant PRÓPRIO.** Escopar relatório faz o super admin deixar de ver consolidado do parque | `utils/tenant.py:15`; plano do p1 | Se o consolidado do parque for requisito da exportação Domínio, ele é **rota própria e explícita** — nunca vazamento por omissão de filtro |
+| N5 | **A04 e A24 continuam sendo decisão sua, e esta fase depende das duas.** `DESPESA_GERAL` fora do `MAPEAMENTO_CONTABIL` faz o pagamento pela Gestão de Custos falhar **em silêncio**; os encargos patronais não rateados deixam a mão de obra ~28% subestimada | `PLANO-NUCLEO.md` §5 e §7 | Nenhum código destrava isso. Levantar as duas **antes** da Parte A, porque ambas mudam número que o DRE mostra |
+
+### Impacto no plano
+
+**A Parte A não pode começar pelo A2 como está escrito.** A premissa 2 quebrou no sentido que o próprio plano identificou como o pior — mudança de agregação —, e agora há **duas** fontes de obra para o custo (pai e filho), com o caso legítimo de pai multi-obra documentado no `ESTADO-ATUAL.md`. Reprojetar o A2 é pré-requisito, não ajuste.
+
+Em compensação, **o A1 encolheu**: a metade "por tenant" foi entregue pela Fase 0.6 há duas semanas; sobra a unificação dos dois dialetos de plano de contas, que sempre foi o problema difícil.
+
+O que a execução incorpora além do texto: custo orçado sai de `services/custo_orcado.py`, nunca de `valor_orcado` (N1); EVM se consome, não se reescreve (N2); tenant antes do join, 404 para obra alheia (N3); e as decisões A04/A24 sobem para antes da Parte A, porque mudam o número que o DRE exibe.

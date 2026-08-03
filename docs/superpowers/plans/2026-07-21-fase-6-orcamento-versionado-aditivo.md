@@ -763,3 +763,43 @@ sobre os mecanismos da 0.6 (linhagem por raiz, `valor_base`, delta por
 linhagem) em vez de recriá-los**. Recomendação: revisar as Tasks 4, 6, 7, 8 e
 12 contra esta seção antes da primeira linha de código, e reconfirmar a
 premissa 7 (§7) depois do merge da Fase 4.
+
+---
+
+## Revisão de premissas — 2026-08-03 (pós-PLANO-NUCLEO)
+
+Reconferência contra `main` em 2026-08-03 (commit `a2d3dc02` — Fases 1–5 mergeadas **e os dez pacotes do `PLANO-NUCLEO.md` entregues**; migrations registradas até **278**; gate completo verde: 1778 passed). Cada linha foi verificada abrindo o arquivo. Legenda: **CONFIRMADA** · **QUEBRADA** · **NOVA**.
+
+**A manchete: esta fase encolheu.** O p9 entregou o escritor único do `valor_contrato` — que era a D6 e boa parte do risco da fase. A Fase 6 deixou de ser caça a chamadores espalhados e passou a ser *gravar `ObraContratoVersao` dentro de uma função que já existe*. A decisão nº 2 do `PLANO-NUCLEO.md` §7 **ratificou a Fase 6 como dona** do campo (03/08), e a Fase 9b vira camada documental — PDF, assinatura, vencimento — sem listener concorrente.
+
+### Premissas numeradas (§7)
+
+| # | Premissa | Veredito | Evidência (03/08) | Ajuste necessário |
+|---|---|---|---|---|
+| 1 | `valor_contrato` escrito só em `event_manager.py:1043`, `views/obras.py:391` e `:873` | **QUEBRADA — a favor** | Eram **cinco** escritores, não três: o p9 achou o 4º (`services/importacao_fisico_financeiro.py`) e o 5º (`Obra(valor_contrato=…)` no construtor do handler de aprovação, `event_manager.py:1120`). Hoje há **um só**: `services/contrato_obra.py:80`, dentro de `definir_valor_contrato()` (`:57`). Os chamadores: `event_manager.py:1137` (proposta) e `:1205` (aditivo), `views/obras.py:436`, `services/importacao_fisico_financeiro.py:757` | **A D6 já está pronta.** A Task correspondente muda de "criar escritor único" para "fazer o escritor único gravar `ObraContratoVersao`". Não reintroduza escrita direta em `obra.valor_contrato` |
+| 2 | A duplicação de IMC/lançamento de §1.1 ainda acontece | **QUEBRADA** (desde 23/07) | Corrigida pela Fase 0.6/D1. Sem mudança em 03/08 | Tasks 7 e 8 seguem "completar", não "criar" — ver revisão de 23/07 |
+| 3 | `handlers/propostas_handlers.py` é o único criador de IMC a partir de proposta | **CONFIRMADA** | O p5 acrescentou `_semear_servicos_reais` e o fecho do lead no mesmo handler, mas cria `ServicoObraReal` e escreve `Lead.proposta_id`/`obra_id` — **não** cria IMC | Nenhum. Mas ver N4: o p5 quase quebrou o registro do handler ao inserir função ali |
+| 4 | A maior migration continua abaixo de 270 | 🔴 **QUEBRADA — e o 270 está QUEIMADO** | 📖 maior registrada: **278**. 🔬 a migração do editor v2 consta `success` sob **dois números** (270 e 277), porque `41f23403` foi empurrado antes da renumeração de `ff94240d`. Todo banco que deployou dali tem o fantasma | **A faixa desta fase é 271-276.** Uma migração 270 nova seria pulada em silêncio por `is_migration_executed`. Não apague a linha do histórico — ver a premissa 4 original, já reescrita |
+| 5 | `MedicaoContrato` continua sem UI de escrita | **CONFIRMADA (drift)** | Único criador segue sendo o import: `services/importacao_fisico_financeiro.py:682` (era `:732`). `grep` em `views/` → nada | Nenhum |
+| 6 | Nome real do decorator de autorização por obra | **CONFIRMADA** (desde 23/07) | `utils/autorizacao.py`: `obra_required`, `pode_ver_obra`, `pode_editar_obra` | Usar o guard **por verbo**, como já dizia a revisão de 23/07 |
+| 7 | A Fase 4 não tornou centro de custo obrigatório sem default | **CONFIRMADA** | `centro_custo_id` segue nullable em todos os modelos (`models.py:921`, `:1001`, `:1061`, `:1777` — este último `nullable=True` explícito) | Nenhum. Os inserts das Tasks 7 e 8 não quebram |
+| 8 | `Obra.regime_medicao` continua `'fixa'\|'percentual'` | **CONFIRMADA — e a coluna NÃO está morta** | O valor e o domínio seguem (migração 201). Mas a F1.5 passou a **lê-la**: `cronograma_views.py:732` usa `regime_medicao == 'percentual'` como default do `modo_apontamento` de tarefa nova | ⚠️ A armadilha nº 7 do `ESTADO-ATUAL.md` dizia "nada no código a lê" e **está desatualizada** (corrigida em 03/08). Mexer no domínio da coluna agora muda o default de apontamento — a D4 precisa considerar isso |
+| 9 | `criar_nova_versao` continua sendo a única porta para revisar proposta enviada | **CONFIRMADA (drift)** | `propostas_consolidated.py:1248` (era `:1511-1518`) | Localizar por nome, não por linha |
+| 10 | `TarefaCronograma.ativa` continua existindo, sem semântica conflitante | **CONFIRMADA (drift)** | `models.py:5971` (era `:4947`). Atenção: há outras três colunas `ativa` no arquivo, uma delas em `CronogramaBaseline` (`:6134`) | Localizar por classe, não por linha — `grep "class TarefaCronograma"` primeiro |
+
+### Riscos NOVOS (criados pelos dez pacotes)
+
+| # | Risco | Evidência | Ajuste necessário |
+|---|---|---|---|
+| N1 | **`definir_valor_contrato` não commita, de propósito.** A aprovação escreve o contrato no meio de uma transação que também cria itens de medição e cronograma; um commit ali a partiria no meio | `services/contrato_obra.py:57-80`; commit `5a2b02ee` | A Fase 6 grava `ObraContratoVersao` **dentro** dessa função e herda a regra: quem chama continua dono do tudo-ou-nada. Nenhum `db.session.commit()` no caminho novo |
+| N2 | **`ObraServicoCusto.valor_orcado` guarda VENDA, não custo.** O p3 fechou o vício no consumo, não na origem: o campo continua gravado com valor comercial | `services/custo_orcado.py`; commit `f8454f4e` | A fase versiona **orçamento**. Se qualquer task ler `valor_orcado` como custo, reintroduz o vício que o p3 acabou de fechar — margem calculada contra o próprio preço de venda. A fonte é `custo_orcado_da_obra` / `custo_orcado_por_servico` |
+| N3 | **Já existe uma noção de "orçamento congelado" no sistema.** O p10 pôs `cronograma_baseline.bac` (migração 278) e o EVM prefere o BAC da baseline ativa, caindo para o vivo quando não há | `migrations.py:6032`; commit `3612db6b` | Ao versionar orçamento, **decidir explicitamente** a relação com o BAC da baseline: ou a versão nova congela BAC junto, ou o sistema passa a ter duas verdades sobre "o orçamento daquele momento". Isto não estava em nenhuma decisão D1-D8 |
+| N4 | **Decorador de registro adota a função inserida logo abaixo dele.** No p5, inserir uma função entre `@event_handler('proposta_aprovada')` e o handler deixou o decorador órfão e registrou a função errada como ouvinte. Os testes do pacote não pegaram — chamam a função direto | commit `af29acc1`; `ESTADO-ATUAL.md` armadilha 16 | A fase mexe em `event_manager.py` (aditivo). Ao acrescentar função ali, **nunca** insira imediatamente acima de um handler decorado, e garanta ao menos um teste que exercite o **evento**, não a função |
+| N5 | **A casa fixou 404, não 403, para recurso de outro tenant** — e `except Exception` engolindo o próprio `abort()` já devolveu 200 duas vezes | commit `78a15253`; `tests/test_gestao_custo_filho_tenant.py:114` | As rotas novas de aditivo/versão respondem **404** para obra de outro tenant, e qualquer catch-all leva `except HTTPException: raise` antes |
+| N6 | **A Fase 9b foi rebaixada a camada documental** pela decisão nº 2 de 03/08 — sem listener concorrente sobre o contrato | `PLANO-NUCLEO.md` §7 | Nenhum ajuste nesta fase; é alívio. Mas a 9b precisa ser reescrita **depois** desta, não em paralelo |
+
+### Impacto no plano
+
+**A Fase 6 segue executável, e mais barata do que quando foi escrita.** Nenhuma task cai; uma delas (a do escritor único, D6) muda de "construir" para "estender o que o p9 deixou pronto". As decisões D1-D5, D7 e D8 seguem válidas como escritas.
+
+O que a execução precisa incorporar além do texto original: a faixa de migração vira **271-276** (P4 — e é o item com maior chance de custar uma fase se ignorado, porque falha em silêncio); `ObraContratoVersao` grava dentro de `definir_valor_contrato` sem commitar (N1); orçamento lê custo por `services/custo_orcado.py`, nunca por `valor_orcado` (N2); e entra uma decisão nova, que não existia em julho — **a relação entre a versão de orçamento e o BAC congelado da baseline** (N3).
