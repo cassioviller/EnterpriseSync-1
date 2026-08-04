@@ -52,6 +52,9 @@ pytestmark = pytest.mark.integration
 
 # Dia sem nenhum RegistroPonto semeado — ver o docstring de `um_tenant`.
 DIA = date(2026, 6, 15)
+# Segundo dia, para comparar rotas dentro do MESMO tenant — ver a nota de
+# `test_finalizar_produz_o_mesmo_custo_que_a_rota_de_referencia`.
+OUTRO_DIA = date(2026, 6, 16)
 
 
 @pytest.fixture(autouse=True)
@@ -138,32 +141,39 @@ def test_a_rota_de_referencia_gera_custo_para_mensalista():
 # (a) e (b) — paridade entre as rotas
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason='A05 — event_manager.py:729-733 faz '
-                                       'continue quando valor_diaria <= 0')
 def test_finalizar_produz_o_mesmo_custo_que_a_rota_de_referencia():
+    """Paridade em UM tenant, duas datas.
+
+    🔬 A primeira versão usava dois tenants no mesmo ``app_context`` e media
+    errado: o segundo POST não completava, e o teste acusava R$ 0,00 tanto na
+    presença do defeito quanto na sua ausência. Duas datas isolam o custo sem
+    precisar de segundo tenant — e sem a contaminação.
+    """
     with app.app_context():
-        ref, tarefa_ref = _cenario('parref')
-        _via_flexivel(ref, tarefa_ref)
-        esperado = soma(filhos_mao_de_obra(ref, DIA))
+        tenant, tarefa = _cenario('parfin')
 
-        alvo, tarefa_alvo = _cenario('parfin')
-        _via_finalizar(alvo, tarefa_alvo)
+        _via_flexivel(tenant, tarefa, dia=DIA)
+        esperado = soma(filhos_mao_de_obra(tenant, DIA))
+        assert esperado > 0, 'a referência não gerou custo — cenário quebrado'
 
-        obtido = soma(filhos_mao_de_obra(alvo, DIA))
+        _via_finalizar(tenant, tarefa, dia=OUTRO_DIA)
+
+        obtido = soma(filhos_mao_de_obra(tenant, OUTRO_DIA))
         assert obtido == pytest.approx(esperado), (
             f'/rdo/finalizar rendeu R$ {obtido:.2f} onde a referência rendeu '
             f'R$ {esperado:.2f}')
 
 
-@pytest.mark.xfail(strict=True, reason='A05 — mesmo continue, pela rota de edição')
 def test_editar_produz_o_mesmo_custo_que_a_rota_de_referencia():
+    """Mesma estrutura do teste acima: um tenant, duas datas."""
     with app.app_context():
-        ref, tarefa_ref = _cenario('parref2')
-        _via_flexivel(ref, tarefa_ref)
-        esperado = soma(filhos_mao_de_obra(ref, DIA))
+        tenant, tarefa = _cenario('paredit')
 
-        alvo, tarefa_alvo = _cenario('paredit')
-        rdo = _via_editar(alvo, tarefa_alvo)
+        _via_flexivel(tenant, tarefa, dia=DIA)
+        esperado = soma(filhos_mao_de_obra(tenant, DIA))
+        assert esperado > 0, 'a referência não gerou custo — cenário quebrado'
+
+        rdo = _via_editar(tenant, tarefa, dia=OUTRO_DIA)
 
         # A equipe tem de ter sobrevivido ao POST, senão o assert de dinheiro
         # abaixo seria vacuoso: zero custo porque zero gente.
@@ -171,7 +181,7 @@ def test_editar_produz_o_mesmo_custo_que_a_rota_de_referencia():
             'o POST apagou a mão de obra — o formulário não carregava as '
             'chaves cron_tarefa_*, e este teste mediria o apagamento')
 
-        obtido = soma(filhos_mao_de_obra(alvo, DIA))
+        obtido = soma(filhos_mao_de_obra(tenant, OUTRO_DIA))
         assert obtido == pytest.approx(esperado), (
             f'/rdo/editar rendeu R$ {obtido:.2f} onde a referência rendeu '
             f'R$ {esperado:.2f}')
@@ -367,7 +377,6 @@ def test_diarista_gera_custo_pela_rota_de_finalizar():
         assert soma(linhas) == pytest.approx(150.0)
 
 
-@pytest.mark.xfail(strict=True, reason='A05 — mensalista cai no continue')
 def test_mensalista_gera_custo_pela_rota_de_finalizar():
     """O espelho do anterior. A diferença entre os dois é UMA coluna do
     funcionário — e é ela que hoje decide se o dia custa ou não custa nada."""
@@ -384,8 +393,6 @@ def test_mensalista_gera_custo_pela_rota_de_finalizar():
 # (g) — a assinatura estrutural do defeito
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason='A05 — a linha de custo diário existe e '
-                                       'não vira lançamento')
 def test_custo_diario_gravado_implica_lancamento_na_gestao_de_custos():
     """A asserção mais barata de todas, e a que descreve o defeito com precisão:
     se `RDOCustoDiario.componente_folha > 0`, alguém calculou o custo do dia.

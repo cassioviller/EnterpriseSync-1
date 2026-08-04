@@ -382,7 +382,13 @@ def calcular_horas_folha(data: dict, admin_id: int):
                     GestaoCustoFilho.query
                     .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
                     .filter(
-                        GestaoCustoFilho.origem_tabela == 'rdo_mao_obra',
+                        # B1.2 — a chave do RDO virou `rdo_custo_diario`.
+                        # Manter as duas no `in_` é obrigatório: bancos que já
+                        # rodaram têm filhos gravados sob a chave antiga, e um
+                        # guard que só olhasse a nova deixaria a batida tardia
+                        # duplicar em cima deles.
+                        GestaoCustoFilho.origem_tabela.in_(
+                            ['rdo_mao_obra', 'rdo_custo_diario']),
                         GestaoCustoFilho.data_referencia == registro.data,
                         GestaoCustoFilho.admin_id == admin_id,
                         GestaoCustoPai.entidade_id == funcionario.id,
@@ -412,7 +418,7 @@ def calcular_horas_folha(data: dict, admin_id: int):
                 entidade_id=funcionario.id,
                 data=registro.data,
                 descricao=descricao,
-                valor=valor_diaria,
+                valor=valor_folha,
                 obra_id=registro.obra_id,
                 origem_tabela='registro_ponto',
                 origem_id=registro.id,
@@ -651,7 +657,9 @@ def lancar_custos_rdo(data: dict, admin_id: int):
     """Handler: Lançar custos de mão de obra quando RDO é finalizado.
 
     Regras de negócio (v2):
-    - Custo base = funcionario.valor_diaria — sem fallback; se zero/nulo → skip
+    - Custo base = `RDOCustoDiario.componente_folha` do par (rdo, funcionário),
+      gravado por `services.custo_funcionario_dia` — a fórmula por tipo de
+      remuneração mora lá, não aqui (B1.1)
     - UMA diária por funcionário por data_rdo (deduplicação por funcionário, não por registro)
     - CustoObra: idempotente por rdo_id + funcionario_id + data + admin_id
     - GestaoCustoPai/Filho: via registrar_custo_automatico (tipo_categoria='SALARIO')
@@ -688,6 +696,29 @@ def lancar_custos_rdo(data: dict, admin_id: int):
             return
 
         data_rdo = rdo.data_relatorio
+
+        # ── B1.1 — a fórmula do custo mora num lugar só ───────────────────
+        # Antes daqui o handler calculava o valor por conta própria, com
+        # `funcionario.valor_diaria` e sem fallback nenhum. Como
+        # `models.py:302-303` dá `tipo_remuneracao='salario'` e
+        # `valor_diaria=0.0` por default, TODO mensalista e horista caía no
+        # `continue` logo abaixo e o dia não custava nada — enquanto a chamada
+        # direta que este evento substituiu (`services/rdo_custos.py:400-413`)
+        # sabia calcular `horas × valor_hora`.
+        #
+        # `gravar_custo_funcionario_rdo` é idempotente (upsert de
+        # `RDOCustoDiario`) e é o ÚNICO lugar que conhece a fórmula por tipo de
+        # remuneração mais o rateio do funcionário que aparece em vários RDOs
+        # do mesmo dia. Escrever o fallback à mão aqui seria a sexta cópia da
+        # fórmula — o mesmo pecado que o p4 acabou de consertar no progresso.
+        from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+        from services.rdo_custos import _custo_diario_rdo
+        try:
+            gravar_custo_funcionario_rdo(rdo, admin_id)
+        except Exception as _e:
+            logger.error(
+                "[B1.1] gravar_custo_funcionario_rdo falhou para RDO %s: %s",
+                rdo_id, _e, exc_info=True)
 
         # Agrupar por funcionário (dedup) + coletar subatividades por funcionário
         func_mo_map = {}  # func_id → [RDOMaoObra]
@@ -726,10 +757,39 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                     rdo_id, funcionario.nome, data_rdo)
                 continue
 
-            # Custo base: valor_diaria — sem fallback para horário
-            valor_diaria = float(getattr(funcionario, 'valor_diaria', 0) or 0)
-            if valor_diaria <= 0:
-                logger.warning(f"⚠️ {funcionario.nome}: valor_diaria não configurado (={valor_diaria}) — custo RDO não lançado")
+            # ── B1.1 — o valor vem da linha de custo do dia, não do cadastro ──
+            # `custo_dia` traz `componente_folha` já correto para diarista (a
+            # diária rateada entre os RDOs do dia) E para mensalista/horista
+            # (`horas × valor_hora`). O fallback defensivo chama a MESMA função
+            # de cálculo — em nenhum caminho a fórmula é reescrita aqui.
+            custo_dia = _custo_diario_rdo(rdo_id, func_id)
+            if custo_dia is not None:
+                valor_folha = float(custo_dia.componente_folha or 0)
+                valor_va = float(custo_dia.componente_va or 0)
+                valor_vt = float(custo_dia.componente_vt or 0)
+            else:
+                from services.custo_funcionario_dia import (
+                    calcular_custo_funcionario_no_rdo)
+                horas_no_rdo = sum(float(mo.horas_trabalhadas or 0)
+                                   for mo in mo_list)
+                componentes = calcular_custo_funcionario_no_rdo(
+                    funcionario, horas_no_rdo, horas_no_rdo, data_rdo)
+                valor_folha = float(componentes['componente_folha'])
+                valor_va = float(componentes['componente_va'])
+                valor_vt = float(componentes['componente_vt'])
+                logger.warning(
+                    "[B1.1] RDO %s: sem RDOCustoDiario para %s — valor "
+                    "recalculado em memória", rdo_id, funcionario.nome)
+
+            # O `continue` exige os TRÊS zerados. Espelha
+            # `services/rdo_custos.py:415-419`, e é deliberado: o bloco de
+            # benefícios (VA/VT) fica ABAIXO deste ponto, então sair daqui por
+            # folha zerada matava o benefício junto — foi assim que o
+            # mensalista perdeu o VA além do salário.
+            if valor_folha <= 0 and valor_va <= 0 and valor_vt <= 0:
+                logger.warning(
+                    "⚠️ %s: sem valor > 0 em %s (folha/VA/VT) — custo RDO não "
+                    "lançado", funcionario.nome, data_rdo)
                 continue
 
             # Coletar nomes de subatividades trabalhadas por este funcionário
@@ -796,14 +856,14 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                     obra_id=rdo.obra_id,
                     tipo='mao_obra',
                     descricao=descricao,
-                    valor=valor_diaria,
+                    valor=valor_folha,
                     data=data_rdo,
                     funcionario_id=func_id,
                     rdo_id=rdo.id,
                     admin_id=admin_id,
                     horas_trabalhadas=Decimal('0'),    # Custo por diária (não por hora)
                     horas_extras=Decimal('0'),
-                    valor_unitario=Decimal(str(valor_diaria)),
+                    valor_unitario=Decimal(str(valor_folha)),
                     quantidade=Decimal('1'),            # 1 diária
                     categoria='RDO'
                 )
@@ -855,10 +915,10 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                     entidade_id=func_id,
                     data=data_rdo,
                     descricao=descricao,
-                    valor=valor_diaria,
+                    valor=valor_folha,
                     obra_id=rdo.obra_id,
-                    origem_tabela='rdo_mao_obra',
-                    origem_id=rdo.id,
+                    origem_tabela='rdo_custo_diario',
+                    origem_id=custo_dia.id if custo_dia is not None else rdo.id,
                     obra_servico_custo_id=obra_servico_custo_id_auto,
                     force_v2=True,
                 )
@@ -938,8 +998,8 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                     descricao=desc_beneficio,
                     valor=valor_beneficio,
                     obra_id=rdo.obra_id,
-                    origem_tabela=f'rdo_mao_obra_{tag.lower()}',
-                    origem_id=rdo.id,
+                    origem_tabela=f'rdo_custo_diario_{tag.lower()}',
+                    origem_id=custo_dia.id if custo_dia is not None else rdo.id,
                     force_v2=True,
                 )
                 if filho_b:
@@ -956,7 +1016,7 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                         f"verifique tenant V2 e logs anteriores)"
                     )
 
-            valor_total_custos += valor_diaria
+            valor_total_custos += valor_folha
 
         db.session.commit()
         logger.info(
