@@ -527,22 +527,56 @@ def calcular_horas_folha(data: dict, admin_id: int):
         #
         # ATUALIZA em vez de somar: as horas do dia mudam a cada batida, e o
         # cálculo correto é o último — somar as parciais era o defeito.
-        custo = CustoObra.query.filter_by(
-            funcionario_id=registro.funcionario_id,
-            data=registro.data,
-            obra_id=registro.obra_id,
-            admin_id=admin_id,
-            categoria='PONTO_ELETRONICO',
-        ).first()
+        #
+        # ── B1.6 — `obra_id` SAI da chave ─────────────────────────────────
+        # Enquanto ele estava aqui, dois lançamentos do mesmo dia em obras
+        # DIFERENTES não se enxergavam e viravam DOIS `CustoObra` de 4h cada:
+        # o dia cobrado em dobro por 8h que ninguém trabalhou. Com a chave
+        # estreitada, o custo do dia é um só e **segue** a obra hoje gravada
+        # no registro, em vez de deixar uma linha órfã na obra anterior.
+        #
+        # A invariante que isto assume — um custo de ponto por
+        # (funcionário, dia) — é a mesma que o resto do código já assume: dos
+        # dez criadores de `RegistroPonto` fora de `archive/` e `tests/`, NOVE
+        # reusam o registro do dia antes de criar. O décimo é
+        # `views/admin.py:150`, e é a Task B1.7.
+        #
+        # `.order_by(CustoObra.id)` é deliberado: em base que já rodou pode
+        # haver mais de uma linha no dia (herança das duas obras). Pegar a
+        # primeira e deixar as sobras para reconciliação é a escolha
+        # conservadora — um laço de merge aqui transformaria esta correção
+        # numa deleção silenciosa de histórico.
+        custo = (
+            CustoObra.query
+            .filter_by(
+                funcionario_id=registro.funcionario_id,
+                data=registro.data,
+                admin_id=admin_id,
+                categoria='PONTO_ELETRONICO',
+            )
+            .order_by(CustoObra.id)
+            .first()
+        )
 
         if custo:
+            _obra_anterior = custo.obra_id
             custo.descricao = descricao
             custo.valor = valor_total
             custo.horas_trabalhadas = Decimal(str(horas_trabalhadas))
             custo.horas_extras = Decimal(str(horas_extras))
             custo.valor_unitario = Decimal(str(salario_hora))
             custo.quantidade = Decimal(str(horas_trabalhadas + horas_extras))
+            # B1.6 — o custo acompanha a obra do registro. Sem isto, corrigir a
+            # obra de um ponto deixaria o dinheiro na obra errada para sempre.
+            custo.obra_id = registro.obra_id
             db.session.commit()
+            if _obra_anterior != registro.obra_id:
+                logger.info(
+                    "[B1.6] Custo de ponto de %s em %s MOVIDO da obra %s para a "
+                    "obra %s — o registro do dia mudou de obra e o custo o "
+                    "acompanha (linha %s, R$ %.2f)",
+                    funcionario.nome, registro.data, _obra_anterior,
+                    registro.obra_id, custo.id, valor_total)
             logger.info(f"[OK] Custo de ponto ATUALIZADO (batida nova no mesmo "
                         f"dia): R$ {valor_total:.2f} na obra {registro.obra_id}")
             logger.info(f"     Funcionário: {funcionario.nome} | "
