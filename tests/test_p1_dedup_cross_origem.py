@@ -95,8 +95,17 @@ def _filhos_de_mao_de_obra(t):
 # Step D
 # ---------------------------------------------------------------------------
 
+@pytest.mark.xfail(strict=True, reason='A05 — com a asserção apertada para '
+                                       '== 1, o defeito aparece: dá ZERO')
 def test_dia_com_ponto_e_rdo_nao_gera_dois_custos_de_obra(_par):
-    """O caso do mundo real: bate ponto durante o dia, RDO fechado à noite."""
+    """O caso do mundo real: bate ponto durante o dia, RDO fechado à noite.
+
+    🔬 **04/08 — a asserção era ``<= 1``, que é verdadeira para zero.** Apertada
+    para ``== 1``, revela que o dia não gera custo NENHUM: `existe_ponto_no_dia`
+    (`event_manager.py:722-726`) faz o RDO abster-se porque **existe registro de
+    ponto**, não porque existe custo do ponto. Com o custo do ponto ausente, os
+    dois lados se abstêm citando o outro.
+    """
     a, _b = _par
     _limpar_custos(a)
 
@@ -109,14 +118,22 @@ def test_dia_com_ponto_e_rdo_nao_gera_dois_custos_de_obra(_par):
     _emitir_rdo_finalizado(a, rdo)
 
     custos = _custos_do_dia(a)
-    assert len(custos) <= 1, (
-        f'{len(custos)} custos para o mesmo (funcionário, dia) — o RDO voltou '
-        f'a lançar por cima do ponto')
+    assert len(custos) == 1, (
+        f'{len(custos)} custos para o mesmo (funcionário, dia): '
+        + ('PERDEU o custo — o dia trabalhado não gerou lançamento nenhum'
+           if len(custos) < 1 else
+           'CONTOU DUAS VEZES — o RDO voltou a lançar por cima do ponto'))
 
 
+@pytest.mark.xfail(strict=True, reason='A05 — mesma asserção apertada, mesmo '
+                                       'zero no segundo andar do ledger')
 def test_o_ledger_de_gestao_de_custos_tambem_conta_uma_vez(_par):
     """A dupla contagem tinha dois andares: `CustoObra` e `GestaoCustoFilho`,
-    com dedups que não se cruzavam em nenhum dos dois."""
+    com dedups que não se cruzavam em nenhum dos dois.
+
+    🔬 **04/08:** apertada de ``<= 1`` para ``== 1``, dá zero — ver a nota do
+    teste acima. A prova por rota está em `tests/test_arreio_custo_rdo_rotas.py`.
+    """
     a, _b = _par
     _limpar_custos(a)
 
@@ -125,9 +142,11 @@ def test_o_ledger_de_gestao_de_custos_tambem_conta_uma_vez(_par):
     _emitir_rdo_finalizado(a, rdo)  # reexecução: idempotência
 
     filhos = _filhos_de_mao_de_obra(a)
-    assert len(filhos) <= 1, (
+    assert len(filhos) == 1, (
         f'{len(filhos)} lançamentos de mão de obra no mesmo dia para o mesmo '
-        f'funcionário')
+        f'funcionário: '
+        + ('PERDEU o lançamento — o dia não custou nada'
+           if len(filhos) < 1 else 'CONTOU DUAS VEZES'))
 
 
 def test_a_deduplicacao_nao_atravessa_tenants(_par):
@@ -148,9 +167,25 @@ def test_a_deduplicacao_nao_atravessa_tenants(_par):
 # Step E
 # ---------------------------------------------------------------------------
 
-def test_os_tres_caminhos_emitem_o_evento_em_vez_de_chamar_o_servico():
-    """Chamada direta a `gerar_custos_mao_obra_rdo` gera custo e pula
-    `recalcular_medicao_apos_rdo` — custo sem medição correspondente."""
+def test_forma_os_caminhos_emitem_o_evento_em_vez_de_chamar_o_servico():
+    """**GUARDA DE FORMA — não prova comportamento.** Ver o aviso abaixo.
+
+    Lê o TEXTO dos arquivos e verifica que ninguém reintroduziu a chamada
+    direta a `gerar_custos_mao_obra_rdo`. É a classe de regressão que este
+    teste pega bem: alguém acrescentar a chamada "só aqui", que foi como a
+    assimetria nasceu (mensagem do commit `31aed041`).
+
+    ⚠️ **O que ele NÃO pega, e já não pegou:** que o evento emitido leve o
+    payload certo e que o handler faça o que a chamada fazia. A string
+    ``"EventManager.emit('rdo_finalizado'"`` aparece nos três arquivos e o
+    teste ficou verde enquanto mensalista e horista deixavam de gerar custo e o
+    payload ia sem ``obra_id``. Um emissor com payload ``{}`` passaria por aqui.
+
+    **A prova de comportamento mora em** ``tests/test_arreio_custo_rdo_rotas.py``,
+    que posta nas rotas e afirma sobre ``GestaoCustoFilho``. Este arquivo é
+    complemento barato, não substituto — e o erro nunca foi ele existir, foi
+    ele ser o único.
+    """
     import re
 
     for arquivo in ('rdo_editar_sistema.py', 'crud_rdo_completo.py'):

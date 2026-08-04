@@ -207,10 +207,25 @@ def test_fechar_lead_e_idempotente():
     assert _fechar_lead_da_proposta(p.id, t.admin_id) == 0
 
 
-def test_o_handler_chama_os_dois_nos_dois_caminhos():
-    """O handler tem dois caminhos de saída — o normal e o de importação
-    (`skip_contabil`). A semeadura tem de estar nos dois, senão obra criada
-    por import continua nascendo sem serviço."""
+def test_forma_o_handler_chama_os_dois_nos_dois_caminhos_conhecidos():
+    """**GUARDA DE FORMA — não prova comportamento.**
+
+    Conta ocorrências no texto do handler para pegar quem remover uma das
+    chamadas. Serve para isso e só para isso.
+
+    ⚠️ **A docstring anterior estava errada** e vale registrar por quê: ela
+    dizia que este teste cobria "o caminho de importação (`skip_contabil`)".
+    Não cobre — contar ``== 2`` ocorrências não diz por onde a execução passa.
+    🔬 04/08: o handler tem um **terceiro** caminho de saída
+    (`handlers/propostas_handlers.py:378-385`) que dá ``return`` **antes** das
+    duas chamadas, e é justamente por ele que a importação físico-financeira
+    (`services/importacao_fisico_financeiro.py:572-578`) e toda proposta de
+    valor zero passam. O contador de strings ficou verde o tempo todo.
+
+    **A prova de comportamento mora em**
+    ``tests/test_arreio_aprovacao_proposta_rotas.py``, que aprova pela rota e
+    afirma sobre ``ServicoObraReal``.
+    """
     caminho = os.path.join(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))), 'handlers', 'propostas_handlers.py')
     with open(caminho, encoding='utf-8') as fh:

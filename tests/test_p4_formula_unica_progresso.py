@@ -131,6 +131,11 @@ def test_medicao_do_portal_usa_o_mesmo_numero():
 
     esperado = _pct(t, responsavel='empresa')
 
+    # ⚠️ GUARDA DE FORMA. As duas asserções abaixo leem o TEXTO do arquivo:
+    # pegam quem reintroduzir cálculo próprio em `gerar_medicao`, e não pegam
+    # se o cálculo que ficou está certo. A asserção de comportamento é a
+    # última linha desta função (`esperado == 2.5`), e a cobertura por rota do
+    # custo que decorre daí está em `tests/test_arreio_custo_rdo_rotas.py`.
     fonte = os.path.join(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))), 'portal_obras_views.py')
     with open(fonte, encoding='utf-8') as fh:
