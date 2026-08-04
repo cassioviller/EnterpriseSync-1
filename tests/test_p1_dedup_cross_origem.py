@@ -125,14 +125,16 @@ def test_dia_com_ponto_e_rdo_nao_gera_dois_custos_de_obra(_par):
            'CONTOU DUAS VEZES — o RDO voltou a lançar por cima do ponto'))
 
 
-@pytest.mark.xfail(strict=True, reason='A05 — mesma asserção apertada, mesmo '
-                                       'zero no segundo andar do ledger')
 def test_o_ledger_de_gestao_de_custos_tambem_conta_uma_vez(_par):
     """A dupla contagem tinha dois andares: `CustoObra` e `GestaoCustoFilho`,
     com dedups que não se cruzavam em nenhum dos dois.
 
-    🔬 **04/08:** apertada de ``<= 1`` para ``== 1``, dá zero — ver a nota do
-    teste acima. A prova por rota está em `tests/test_arreio_custo_rdo_rotas.py`.
+    🔬 **04/08:** apertada de ``<= 1`` para ``== 1``, deu ZERO — o `<=` escondia
+    a perda. **Verde desde B1.3**, que tirou o guard do ponto de cima do bloco
+    de `GestaoCustoFilho`: o ponto só cria filho no ramo diarista
+    (`event_manager.py:404-416`), então para mensalista o RDO se abstinha em
+    favor de um lançamento que não existia. A prova por rota está em
+    `tests/test_arreio_custo_rdo_rotas.py`.
     """
     a, _b = _par
     _limpar_custos(a)

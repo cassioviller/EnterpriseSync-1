@@ -750,13 +750,6 @@ def lancar_custos_rdo(data: dict, admin_id: int):
             #
             # Logar é requisito, não zelo: foi o silêncio que deixou a dupla
             # contagem invisível.
-            if existe_ponto_no_dia(func_id, data_rdo, admin_id):
-                logger.info(
-                    "[p1] RDO %s: custo de %s em %s NÃO lançado — já há "
-                    "registro de ponto no dia, e o ponto é o fato medido",
-                    rdo_id, funcionario.nome, data_rdo)
-                continue
-
             # ── B1.1 — o valor vem da linha de custo do dia, não do cadastro ──
             # `custo_dia` traz `componente_folha` já correto para diarista (a
             # diária rateada entre os RDOs do dia) E para mensalista/horista
@@ -830,9 +823,19 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                 logger.warning(f"⚠️ Erro ao ler função do funcionário {funcionario.nome}: {funcao_err}")
 
             sub_str = f" | {', '.join(sub_nomes)}" if sub_nomes else ""
+            # B1.3 — a descrição dizia "1 diária" para todo mundo, inclusive
+            # para quem é pago por hora. Espelha `services/rdo_custos.py:452-459`.
+            _snapshot = (getattr(custo_dia, 'tipo_remuneracao_snapshot', None)
+                         if custo_dia is not None else None)
+            if _snapshot == 'diaria':
+                _unidade_desc = '1 diária'
+            else:
+                _horas_desc = float(getattr(custo_dia, 'horas_normais', 0) or 0) \
+                    if custo_dia is not None else 0.0
+                _unidade_desc = f'{_horas_desc:g}h' if _horas_desc else '1 diária'
             descricao = (
                 f"RDO #{rdo.numero_rdo} - {funcionario.nome} ({funcao})"
-                f" - {data_rdo.strftime('%d/%m/%Y')} - 1 diária{sub_str}"
+                f" - {data_rdo.strftime('%d/%m/%Y')} - {_unidade_desc}{sub_str}"
             )
             # Task #7: defesa contra StringDataRightTruncation. A coluna
             # custo_obra.descricao foi ampliada para 500 chars (migração
@@ -844,31 +847,75 @@ def lancar_custos_rdo(data: dict, admin_id: int):
             if len(descricao) > _DESC_MAX:
                 descricao = descricao[: _DESC_MAX - 3] + "..."
 
-            # CustoObra — idempotente por rdo_id + funcionario_id + data + admin_id
-            existing_custo = CustoObra.query.filter_by(
-                rdo_id=rdo.id,
-                funcionario_id=func_id,
-                data=data_rdo,
-                admin_id=admin_id
-            ).first()
-            if not existing_custo:
-                custo = CustoObra(
-                    obra_id=rdo.obra_id,
-                    tipo='mao_obra',
-                    descricao=descricao,
-                    valor=valor_folha,
-                    data=data_rdo,
-                    funcionario_id=func_id,
+            # ── B1.3 — o guard do ponto cobre APENAS `CustoObra` ──────────
+            # Ele saiu de cima do laço. O motivo é que ele não distingue os
+            # dois ledgers, e eles têm defeitos opostos:
+            #
+            #   * `CustoObra`: o ponto grava para TODO perfil
+            #     (`event_manager.py:527-563` para mensalista/horista), então
+            #     aqui o guard evita contagem dupla real;
+            #   * `GestaoCustoFilho`: o ponto só grava no ramo DIARISTA
+            #     (`:404-416`). Para mensalista o ponto nunca criou filho, e o
+            #     guard fazia o RDO abster-se em favor de um lançamento que
+            #     não existe — o dia não custava nada em lugar nenhum.
+            #
+            # Os blocos de filho e de VA/VT abaixo decidem pelas próprias
+            # chaves largas do p1 Step D, que cruzam origem e por isso são
+            # MAIS precisas que este guard.
+            ponto_produtivo = existe_ponto_no_dia(func_id, data_rdo, admin_id)
+            if ponto_produtivo:
+                logger.info(
+                    "[p1] RDO %s: CustoObra de %s em %s NÃO lançado — já há "
+                    "ponto produtivo no dia, e o ponto é o fato medido",
+                    rdo_id, funcionario.nome, data_rdo)
+            else:
+                # B1.3 — upsert, não skip. O `if not existing` deixava o custo
+                # velho intacto quando as horas eram corrigidas: editar o RDO
+                # nunca alcançava a linha já gravada.
+                diarista = (getattr(custo_dia, 'tipo_remuneracao_snapshot', None)
+                            == 'diaria') if custo_dia is not None else False
+                if diarista:
+                    horas_lanc = Decimal('0')
+                    qtd = Decimal('1')
+                    unit = Decimal(str(valor_folha))
+                else:
+                    horas_lanc = Decimal(str(
+                        getattr(custo_dia, 'horas_normais', 0) or 0))
+                    qtd = horas_lanc if horas_lanc > 0 else Decimal('1')
+                    unit = Decimal(str(
+                        getattr(custo_dia, 'custo_hora_normal', 0) or 0))
+
+                existing_custo = CustoObra.query.filter_by(
                     rdo_id=rdo.id,
-                    admin_id=admin_id,
-                    horas_trabalhadas=Decimal('0'),    # Custo por diária (não por hora)
-                    horas_extras=Decimal('0'),
-                    valor_unitario=Decimal(str(valor_folha)),
-                    quantidade=Decimal('1'),            # 1 diária
-                    categoria='RDO'
-                )
-                db.session.add(custo)
-                custos_criados += 1
+                    funcionario_id=func_id,
+                    data=data_rdo,
+                    admin_id=admin_id
+                ).first()
+                if existing_custo:
+                    existing_custo.valor = valor_folha
+                    existing_custo.descricao = descricao
+                    existing_custo.horas_trabalhadas = horas_lanc
+                    existing_custo.valor_unitario = unit
+                    existing_custo.quantidade = qtd
+                    existing_custo.obra_id = rdo.obra_id
+                else:
+                    custo = CustoObra(
+                        obra_id=rdo.obra_id,
+                        tipo='mao_obra',
+                        descricao=descricao,
+                        valor=valor_folha,
+                        data=data_rdo,
+                        funcionario_id=func_id,
+                        rdo_id=rdo.id,
+                        admin_id=admin_id,
+                        horas_trabalhadas=horas_lanc,
+                        horas_extras=Decimal('0'),
+                        valor_unitario=unit,
+                        quantidade=qtd,
+                        categoria='RDO'
+                    )
+                    db.session.add(custo)
+                    custos_criados += 1
             
             # GestaoCustoPai/Filho via registrar_custo_automatico (tipo_categoria='SALARIO')
             # Idempotência: data_referencia + entidade_id + admin_id + categoria
@@ -1587,7 +1634,25 @@ def recalcular_medicao_apos_rdo(data: dict, admin_id: int):
     try:
         obra_id = data.get('obra_id')
         if not obra_id:
-            logger.warning("⚠️ obra_id ausente em rdo_finalizado — recalcular_medicao_obra pulado")
+            # B1.4 — o handler resolve sozinho em vez de desistir.
+            #
+            # `EventManager.emit` repassa `data` INTACTO (`:46`), então corrigir
+            # só os emissores deixaria o PRÓXIMO livre para repetir o erro em
+            # silêncio — foi assim que dois payloads truncados sobreviveram a um
+            # gate verde. O filtro por `admin_id` não é zelo: sem ele isto vira
+            # leitura cross-tenant.
+            rdo_id = data.get('rdo_id')
+            if rdo_id:
+                from models import RDO as _RDO
+                _rdo = _RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
+                obra_id = getattr(_rdo, 'obra_id', None)
+                if obra_id:
+                    logger.info(
+                        "[B1.4] obra_id ausente no payload de rdo_finalizado — "
+                        "resolvido pelo RDO %s", rdo_id)
+        if not obra_id:
+            logger.warning("⚠️ obra_id ausente em rdo_finalizado e não "
+                           "resolvível pelo rdo_id — recalcular_medicao_obra pulado")
             return
         from services.medicao_service import recalcular_medicao_obra
         recalcular_medicao_obra(obra_id, admin_id)

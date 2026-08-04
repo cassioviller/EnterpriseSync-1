@@ -232,8 +232,8 @@ def test_a_rota_de_referencia_dispara_o_recalculo_da_medicao():
             'rota de referência')
 
 
-@pytest.mark.xfail(strict=True, reason='A05 — payload {rdo_id} sem obra_id; '
-                                       'event_manager.py:1529-1531 retorna')
+# B1.4 — verde desde que os payloads levam obra_id e o handler resolve sozinho.
+
 def test_finalizar_dispara_o_recalculo_da_medicao():
     with app.app_context():
         tenant, tarefa = _cenario('medfin')

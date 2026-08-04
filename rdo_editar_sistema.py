@@ -554,7 +554,11 @@ def salvar_edicao_rdo(rdo_id):
         # O handler do evento faz o que esta chamada fazia, MAIS o recálculo.
         try:
             from event_manager import EventManager
-            EventManager.emit('rdo_finalizado', {'rdo_id': rdo.id},
+            EventManager.emit('rdo_finalizado', {
+                                  'rdo_id': rdo.id,
+                                  'obra_id': rdo.obra_id,
+                                  'data_relatorio': str(rdo.data_relatorio),
+                              },
                               admin_id=admin_id)
         except Exception as _e:
             logger.error(f"[rdo-custo] evento rdo_finalizado falhou: {_e}")

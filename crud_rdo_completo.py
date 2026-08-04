@@ -472,7 +472,11 @@ def salvar_rdo():
         # O handler do evento faz o que esta chamada fazia, MAIS o recálculo.
         try:
             from event_manager import EventManager
-            EventManager.emit('rdo_finalizado', {'rdo_id': rdo.id},
+            EventManager.emit('rdo_finalizado', {
+                                  'rdo_id': rdo.id,
+                                  'obra_id': rdo.obra_id,
+                                  'data_relatorio': str(rdo.data_relatorio),
+                              },
                               admin_id=admin_id)
         except Exception as _e:
             logger.error(f"[rdo-custo] evento rdo_finalizado falhou: {_e}")
@@ -579,21 +583,6 @@ def finalizar_rdo(rdo_id):
         rdo.status = 'Finalizado'
         rdo.finalizado_em = datetime.utcnow()
         rdo.finalizado_por_id = current_user.id
-        # Gera os custos da mão-de-obra do RDO no fechamento. A função abaixo
-        # é idempotente; rodar de novo num RDO já lançado não duplica nada.
-        # p1 Step E — emite o evento em vez de chamar o serviço direto.
-        # Chamar `gerar_custos_mao_obra_rdo` na mão gerava o custo e NÃO
-        # disparava `rdo_finalizado`, então a medição da obra não era
-        # recalculada (event_manager.py:1418 é quem faz isso). Metade dos
-        # caminhos de salvar RDO ficava com custo sem medição correspondente.
-        # O handler do evento faz o que esta chamada fazia, MAIS o recálculo.
-        try:
-            from event_manager import EventManager
-            EventManager.emit('rdo_finalizado', {'rdo_id': rdo.id},
-                              admin_id=admin_id)
-        except Exception as _e:
-            logger.error(f"[rdo-custo] evento rdo_finalizado falhou: {_e}")
-
         # Calcular produtividade por funcionário (V2) — parte da mesma transação
         subs_com_meta = RDOServicoSubatividade.query.filter(
             RDOServicoSubatividade.rdo_id == rdo_id,
@@ -616,6 +605,27 @@ def finalizar_rdo(rdo_id):
         logger.info(f"[PRODUTIVIDADE] RDO {rdo.numero_rdo}: {len(subs_com_meta)} subatividade(s) com meta calculadas.")
 
         db.session.commit()
+
+        # ── B1.4 — o emit vem DEPOIS do commit ────────────────────────────
+        # Era o único dos seis caminhos que emitia antes, com o
+        # `status='Finalizado'` ainda pendente. Duas consequências: o handler
+        # via um RDO que podia não existir se a transação falhasse adiante, e o
+        # `except` da rota não conseguia mais desfazer de verdade, porque o
+        # handler já havia commitado por dentro.
+        #
+        # p1 Step E — emite o evento em vez de chamar o serviço direto. Chamar
+        # `gerar_custos_mao_obra_rdo` na mão gerava o custo e NÃO disparava
+        # `rdo_finalizado`, então a medição da obra não era recalculada.
+        try:
+            from event_manager import EventManager
+            EventManager.emit('rdo_finalizado', {
+                                  'rdo_id': rdo.id,
+                                  'obra_id': rdo.obra_id,
+                                  'data_relatorio': str(rdo.data_relatorio),
+                              },
+                              admin_id=admin_id)
+        except Exception as _e:
+            logger.error(f"[rdo-custo] evento rdo_finalizado falhou: {_e}")
 
         flash(f'RDO {rdo.numero_rdo} finalizado com sucesso.', 'success')
         return redirect(url_for('rdo_crud.visualizar_rdo', rdo_id=rdo_id))

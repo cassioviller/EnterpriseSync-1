@@ -53,15 +53,27 @@ def existe_ponto_no_dia(funcionario_id, data_ref, admin_id) -> bool:
     Usada como anti-duplicação contra o handler ponto_registrado, tanto
     em ``gerar_custos_mao_obra_rdo`` quanto na verificação pós-fase-2
     da migração #154.
+
+    B1.3 — passa a exigir ponto **PRODUTIVO**. Antes bastava existir a linha,
+    e isso confundia "houve registro" com "houve custo": um dia de `falta`,
+    `falta_justificada` ou `feriado` (`models.py:779`) nasce sem horas e sem
+    obra, não gera custo nenhum, e mesmo assim suprimia o custo do RDO. Os dois
+    lados se absteriam citando o outro, e o dia não custava nada.
+
+    As duas condições abaixo são exatamente aquelas sob as quais
+    `calcular_horas_folha` de fato gera custo (`event_manager.py:328-330` e
+    `:496-498`) — a guarda passa a espelhar o gerador em vez de adivinhá-lo.
     """
     try:
         from models import RegistroPonto
         return (
             RegistroPonto.query
-            .filter_by(
-                funcionario_id=funcionario_id,
-                data=data_ref,
-                admin_id=admin_id,
+            .filter(
+                RegistroPonto.funcionario_id == funcionario_id,
+                RegistroPonto.data == data_ref,
+                RegistroPonto.admin_id == admin_id,
+                RegistroPonto.horas_trabalhadas > 0,
+                RegistroPonto.obra_id.isnot(None),
             )
             .first() is not None
         )
@@ -138,6 +150,33 @@ def remover_custos_rdo(rdo, admin_id) -> int:
                 )
                 .all()
             )
+
+        # B1.3 — o resíduo legado do EVENTO.
+        #
+        # Antes de B1.2 o handler gravava `origem_tabela='rdo_mao_obra'` com
+        # `origem_id=rdo.id` — id de RDO num campo que as duas cláusulas acima
+        # comparam contra ids de `RDOMaoObra` e de `RDOCustoDiario`. Espaços de
+        # id diferentes: **nenhum filho criado pelo evento era removível**, e
+        # editar as horas de um RDO nunca corrigia o custo dele.
+        #
+        # Todo banco que já rodou tem essas linhas. Sem esta cláusula elas
+        # ficam para sempre, e a chave larga do p1 Step D as encontra e faz o
+        # lançamento novo ser pulado — o custo velho congela no lugar do certo.
+        #
+        # O recorte por `data_referencia` não é zelo: sem ele, um filho legítimo
+        # de OUTRO RDO cujo `RDOMaoObra.id` coincida numericamente com este
+        # `rdo.id` seria apagado.
+        filhos += (
+            GestaoCustoFilho.query
+            .filter(
+                GestaoCustoFilho.admin_id == admin_id,
+                GestaoCustoFilho.origem_tabela.in_(origens_legado),
+                GestaoCustoFilho.origem_id == rdo.id,
+                GestaoCustoFilho.data_referencia == rdo.data_relatorio,
+            )
+            .all()
+        )
+        filhos = list({f.id: f for f in filhos}.values())
 
         if not filhos:
             return 0
