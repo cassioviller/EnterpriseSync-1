@@ -724,7 +724,7 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
         traceback.print_exc()
         return 0
 
-def calcular_progresso_real_servico(obra_id, servico_id):
+def calcular_progresso_real_servico(obra_id, servico_id, admin_id=None):
     """
     Calcula o progresso real de um serviço baseado no ÚLTIMO percentual de CADA subatividade
     ao longo de TODOS os RDOs (corrige bug de regressão de progresso).
@@ -732,15 +732,35 @@ def calcular_progresso_real_servico(obra_id, servico_id):
     Args:
         obra_id: ID da obra
         servico_id: ID do serviço
-        
+        admin_id: tenant, OPCIONAL — ver a nota de B1.13 abaixo
+
     Returns:
         float: Percentual médio de conclusão (0.0 a 100.0)
+
+    B1.13 — **defesa em profundidade, não correção de vazamento vivo.** A cadeia
+    inteira foi aberta antes de mexer: os únicos chamadores são `:846` e `:898`,
+    ambos dentro de `obter_servicos_da_obra` (`:776`); os dela são `:1104`
+    (`editar_obra`, que resolve a obra com
+    `obras_visiveis().filter(...).first_or_404()`) e `:1884` (`detalhes_obra`,
+    com `@obra_required()`); `utils/autorizacao.py:73-99` filtra
+    `Obra.admin_id == tenant` SEMPRE; e a consulta já é fechada por obra
+    (`WHERE r.obra_id = :obra_id`). **Nada vaza hoje**, e isto não deve entrar
+    em changelog como `fix(tenant)`.
+
+    O parâmetro é OPCIONAL de propósito: com default `None` a consulta se
+    comporta exatamente como antes, e o teste de fórmula que a chama direto
+    (`tests/test_cronograma_engine_unificado.py:114`) segue valendo sem edição.
+    Quem tem o tenant à mão passa e ganha a segunda barreira.
     """
     try:
         from sqlalchemy import text
-        
+
         # Query corrigida: busca último percentual de CADA subatividade (não apenas último RDO)
-        query = text("""
+        # O filtro de tenant entra por interpolação condicional porque `text()`
+        # não aceita cláusula variável: com `admin_id=None` a linha some e o SQL
+        # é byte a byte o de antes.
+        _filtro_tenant = 'AND r.admin_id = :admin_id' if admin_id is not None else ''
+        query = text(f"""
             SELECT AVG(rss.percentual_conclusao) as progresso_medio
             FROM rdo_servico_subatividade rss
             WHERE rss.id IN (
@@ -751,15 +771,16 @@ def calcular_progresso_real_servico(obra_id, servico_id):
                 WHERE r.obra_id = :obra_id
                   AND rss2.servico_id = :servico_id
                   AND rss2.ativo = true
+                  {_filtro_tenant}
                 GROUP BY rss2.nome_subatividade
             )
             AND rss.ativo = true
         """)
-        
-        result = db.session.execute(query, {
-            'obra_id': obra_id,
-            'servico_id': servico_id
-        }).fetchone()
+
+        _params = {'obra_id': obra_id, 'servico_id': servico_id}
+        if admin_id is not None:
+            _params['admin_id'] = admin_id
+        result = db.session.execute(query, _params).fetchone()
         
         if result and result[0] is not None:
             progresso = float(result[0])
@@ -788,12 +809,32 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
         # Usar nova tabela ServicoObraReal
         try:
             # Buscar serviços usando a nova tabela
+            # B1.12 — `Servico.admin_id` FALTAVA neste filtro.
+            #
+            # O vínculo era filtrado por tenant (`ServicoObraReal.admin_id`), o
+            # catálogo não. Basta um `ServicoObraReal` apontando para serviço de
+            # outro tenant — e nada impede: a FK não conhece fronteira de
+            # tenant — para nome, categoria, unidade e `custo_unitario` alheios
+            # saírem em `servicos_lista` logo abaixo.
+            #
+            # O fallback de `:856` deste mesmo arquivo já filtrava certo
+            # (`s.admin_id = :admin_id`). A mesma pergunta, duas vezes no mesmo
+            # arquivo, com respostas diferentes — e a errada era a do caminho
+            # principal.
+            #
+            # 🔬 Medido antes de corrigir, e vale registrar para não inflar o
+            # que isto é: os dados alheios saem da CONSULTA, mas **não chegam à
+            # tela**. `detalhes_obra` passa `servicos_obra` para um template que
+            # não referencia a variável, e `editar_obra` reduz a lista a ids
+            # (`:1105`) que só marcam checkbox de serviço já listado — id alheio
+            # nunca casa. É defesa em profundidade, não vazamento vivo.
             servicos_obra_real = db.session.query(ServicoObraReal, Servico).join(
                 Servico, ServicoObraReal.servico_id == Servico.id
             ).filter(
                 ServicoObraReal.obra_id == obra_id,
                 ServicoObraReal.admin_id == admin_id,
                 ServicoObraReal.ativo == True,
+                Servico.admin_id == admin_id,
                 Servico.ativo == True
             ).all()
             
@@ -823,7 +864,7 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
             # [OK] CALCULAR PROGRESSO REAL BASEADO EM RDOs
                 logger.info(f"[STATS] Calculando progresso real dos serviços baseado em RDOs...")
             for servico in servicos_lista:
-                progresso_real = calcular_progresso_real_servico(obra_id, servico['id'])
+                progresso_real = calcular_progresso_real_servico(obra_id, servico['id'], admin_id)
                 servico['progresso'] = progresso_real
             
                 logger.info(f"[OK] {len(servicos_lista)} serviços encontrados na NOVA TABELA para obra {obra_id}")
@@ -875,7 +916,7 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
             # [OK] CALCULAR PROGRESSO REAL BASEADO EM RDOs (FALLBACK)
                 logger.info(f"[STATS] Calculando progresso real dos serviços baseado em RDOs (FALLBACK)...")
             for servico in servicos_lista:
-                progresso_real = calcular_progresso_real_servico(obra_id, servico['id'])
+                progresso_real = calcular_progresso_real_servico(obra_id, servico['id'], admin_id)
                 servico['progresso'] = progresso_real
             
                 logger.info(f"[OK] FALLBACK: {len(servicos_lista)} serviços encontrados")

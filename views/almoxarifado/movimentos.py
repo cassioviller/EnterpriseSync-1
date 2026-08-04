@@ -13,6 +13,40 @@ from views.almoxarifado import almoxarifado_bp, get_admin_id
 logger = logging.getLogger(__name__)
 
 
+def entrada_ja_lancada(nota_fiscal, item_id, admin_id):
+    """A09 — esta nota fiscal já deu entrada deste item neste tenant?
+
+    Até aqui `nota_fiscal` era gravada em seis pontos deste arquivo **sem
+    verificação nenhuma**. A única guarda viva era por número de série
+    (`:88-96`), que só alcança item SERIALIZADO; para CONSUMIVEL não havia
+    defesa, e reenviar o formulário — F5 numa tela de entrada é operação de
+    rotina — duplicava estoque em silêncio.
+
+    **A chave é (tenant, nota, item), e cada parte tem motivo:**
+
+    * ``admin_id`` — dedup GLOBAL seria repetir o defeito que existe um andar
+      acima, no UNIQUE global de `NotaFiscal.chave_acesso` (`models.py:2550`),
+      que faz a nota de uma empresa bloquear a de outra. Numeração de NF é
+      sequencial por emitente, não universal: duas construtoras recebem
+      "NF-1000" no mesmo dia o tempo todo.
+    * ``item_id`` — uma nota legitimamente cobre vários itens. Deduplicar só por
+      (tenant, nota) impediria lançar o segundo item de uma nota já parcialmente
+      dada entrada, que é correção normal de quem esqueceu uma linha. Com o item
+      na chave, o que se bloqueia é o duplicado exato — que é o defeito.
+    * **nota vazia não é chave.** `''` é o default do formulário, e entrada sem
+      nota é rotina em obra (compra de balcão, doação, sobra de outra obra).
+      Tratá-la como chave faria a segunda compra sem nota desaparecer.
+    """
+    if not nota_fiscal:
+        return None
+    return AlmoxarifadoMovimento.query.filter_by(
+        admin_id=admin_id,
+        nota_fiscal=nota_fiscal,
+        item_id=item_id,
+        tipo_movimento='ENTRADA',
+    ).first()
+
+
 # ========================================
 # ENTRADA DE MATERIAIS
 # ========================================
@@ -60,6 +94,19 @@ def processar_entrada():
         item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
         if not item:
             flash('Item não encontrado', 'danger')
+            return redirect(url_for('almoxarifado.entrada'))
+
+        # A09 — a mesma nota não dá entrada do mesmo item duas vezes.
+        _ja = entrada_ja_lancada(nota_fiscal, item_id, admin_id)
+        if _ja:
+            logger.warning(
+                '[A09] entrada recusada: NF %s já lançada para o item %s no '
+                'tenant %s (movimento %s, em %s)',
+                nota_fiscal, item_id, admin_id, _ja.id, _ja.data_movimento)
+            flash(
+                f'A nota fiscal "{nota_fiscal}" já deu entrada deste item em '
+                f'{_ja.data_movimento:%d/%m/%Y}. Nada foi lançado — se a entrada '
+                f'é mesmo outra, use um número de nota diferente.', 'warning')
             return redirect(url_for('almoxarifado.entrada'))
 
         if fornecedor_id:
@@ -250,6 +297,21 @@ def processar_entrada_multipla():
             item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
             if not item:
                 erros.append(f"Item {idx+1}: Item não encontrado")
+                continue
+
+            # A09 — mesma guarda da rota de formulário. Aqui ela entra na FASE
+            # DE VALIDAÇÃO, antes de qualquer escrita: o carrinho é tudo ou
+            # nada, e recusar no meio deixaria metade da nota lançada.
+            _ja = entrada_ja_lancada(nota_fiscal, item_id, admin_id)
+            if _ja:
+                logger.warning(
+                    '[A09] item %s recusado no carrinho: NF %s já lançada no '
+                    'tenant %s (movimento %s)',
+                    item_id, nota_fiscal, admin_id, _ja.id)
+                erros.append(
+                    f"Item {idx+1} ({item.nome}): a nota fiscal "
+                    f"'{nota_fiscal}' já deu entrada deste item em "
+                    f"{_ja.data_movimento:%d/%m/%Y}")
                 continue
 
             if tipo_controle == 'SERIALIZADO':

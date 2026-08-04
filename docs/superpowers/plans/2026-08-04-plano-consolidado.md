@@ -113,26 +113,33 @@ A ordem completa:
 | Bloco | Tasks | Entregues | Abertas | Esforço agregado |
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
-| B1 — parar de perder dado | 17 *(era 16)* | **12** | **5** | G |
+| B1 — parar de perder dado | 17 *(era 16)* | **15** | **2** | G |
 | B2 — o que o sistema informa errado | 20 | 0 | **20** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **62** | **18** | **44** | |
+| **Total** | **62** | **21** | **41** | |
 
-**Estado em 04/08, fim do dia: A05, A10 e A16-a FECHADOS.** B0 inteiro (6/6),
-toda a trilha T1 (A05, B1.1-B1.5b) e toda a trilha T2 (A10 + A16-a,
-B1.6-B1.11) entregues. A contagem subiu de 61 para 62 porque o B0 achou um
+**Estado ao fim de 04/08: A05, A10, A16-a e A09 FECHADOS.** B0 inteiro (6/6), a
+trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e três das cinco da T3
+(B1.12, B1.13, B1.16). A contagem subiu de 61 para 62 porque o B0 achou um
 defeito que nenhum recorte tinha visto (B1.5b).
 
-**Sobra UM `xfail` no arreio inteiro**, e ele não é dívida: é
+**Sobra UM `xfail` no repositório inteiro**, e não é dívida: é
 `test_o_ponto_criado_pelo_sync_gera_custo`, a segunda metade do A16, travada pela
 **D6** (§10) — pergunta de negócio, não de código. Dos oito que o B0 plantou,
 sete foram cobrados e removidos pelo próprio mecanismo que corrigiram.
 
-**O que resta de B1 é a trilha T3** (tenant + almoxarifado, B1.12-B1.16), que não
-depende de nada do que foi feito hoje. Depois dela o bloco B1 fecha e começa o
-B2 — que é o maior, 20 Tasks, e onde o assunto muda: sai "o sistema está perdendo
-dado" e entra "o número exibido mente".
+**O que resta do bloco B1 são duas Tasks, e nenhuma é trabalho de fôlego:**
+
+* **B1.15** — 🟡 aberta e sem impedimento: 403 → 404 na entrada múltipla. Ficou
+  fora por ordem de trabalho, não por dúvida.
+* **B1.14** — ⛔ **recomendação de corte**, por mexer em função sem chamador vivo
+  onde a correção isolada troca uma mensagem errada por um 500. Precisa de
+  decisão para virar corte formal na §8.1.
+
+Depois disso o B1 fecha e começa o **B2** — o maior bloco, 20 Tasks, e onde o
+assunto muda: sai *"o sistema está perdendo dado"* e entra *"o número exibido
+mente"*.
 
 **Como este documento registra progresso.** Task entregue leva uma linha
 `**Status:**` logo abaixo do título, com o commit e — quando houve — o **desvio**
@@ -1581,9 +1588,32 @@ trazer nome, categoria, unidade e `custo_unitario` alheios para a tela.
    fallback) → o teste afirma o **valor** 40.0, não apenas "não explodiu", e confere no
    `caplog` que rodou o caminho principal (log `[STATS]` de `:824`), não o fallback.
 
-- [ ] **Step 1:** arreio vermelho (T1, T2, T4, T5)
-- [ ] **Step 2:** o filtro
-- [ ] **Step 3:** commit — `fix(tenant): catálogo de Servico alheio deixa de vazar na tela da obra`
+- [x] **Step 1:** arreio vermelho (T1, T2, T4, T5)
+- [x] **Step 2:** o filtro
+- [x] **Step 3:** commit — ~~`fix(tenant): ...`~~ → **renomeado**, ver abaixo
+
+**Status: ✅ entregue. 🔴 A TERCEIRA premissa deste bloco também estava errada, e
+esta é do próprio plano.**
+
+O §4.4 diz que nome, categoria, unidade e `custo_unitario` alheios "sobem para
+`servicos_lista` (`:803-808`) **e para a tela de detalhes/edição da obra**". A
+primeira metade é verdade; **a segunda não**. Medido nas duas rotas vivas:
+
+* `/obras/<id>` passa `servicos_obra` para `obras/detalhes_obra_profissional.html`,
+  que **não referencia a variável** — o dado chega ao template e morre lá;
+* `/obras/editar/<id>` reduz a lista a IDs (`:1105`), usados só para marcar
+  checkbox (`templates/obra_form.html:666`), e id alheio nunca casa com um
+  serviço listado.
+
+As duas respondem 200 **sem o nome no corpo**. Ou seja: o defeito da consulta é
+real e sai por ela, mas **não é vazamento observável pelo usuário hoje** — é
+exatamente a classificação que este bloco deu ao `views/obras.py:743-757`, e vale
+a mesma consequência: **não entra no changelog como `fix(tenant)`**. O commit foi
+renomeado para `chore(tenant)`.
+
+**Consequência para o arreio:** o teste afirma sobre a FUNÇÃO, não sobre o corpo
+da resposta. Um teste por corpo aqui seria o **sexto instrumento medindo o vazio**
+desta rodada — teria passado antes e depois da correção, provando nada.
 
 ---
 
@@ -1619,9 +1649,19 @@ de `:776`, resolvido em `:783-784` por `get_admin_id_robusta`).
 
 **Commit:** a mensagem diz *defesa em profundidade*, não `fix(tenant)`.
 
-- [ ] **Step 1:** parâmetro + bind na subconsulta + as duas chamadas
-- [ ] **Step 2:** T4 verde com valor 40.0
-- [ ] **Step 3:** commit — `chore(obras): escopo de admin_id na subconsulta de progresso por serviço (defesa em profundidade)`
+- [x] **Step 1:** parâmetro + bind na subconsulta + as duas chamadas
+- [x] **Step 2:** T4 verde com valor 40.0
+- [x] **Step 3:** commit — `chore(obras): escopo de admin_id na subconsulta de progresso por serviço (defesa em profundidade)`
+
+**Status: ✅ entregue.** Sem desvio de desenho. Uma nota de implementação:
+`text()` não aceita cláusula variável, então o filtro entra por interpolação
+condicional — com `admin_id=None` a linha **some** e o SQL fica byte a byte o de
+antes. É o que garante o Step 2: `tests/test_cronograma_engine_unificado.py:114`
+chama a função direto, sem tenant, e passou **sem edição**.
+
+**Lembrete de sequenciamento (§11.3):** esta Task tem de continuar valendo até a
+**B2.8**, que apaga a função inteira. Fazer B2.8 antes invalidaria o filtro que
+acabou de entrar.
 
 ---
 
@@ -1653,9 +1693,31 @@ outro tenant.
 3. Não usar `abort()`/`first_or_404()` — é função utilitária, não rota; o contrato de
    retorno é `{'erro': ...}` e tem que continuar sendo.
 
-- [ ] **Step 1:** as duas edições juntas
-- [ ] **Step 2:** teste de unidade das duas mensagens
-- [ ] **Step 3:** commit — `fix(almox): dedup de XML por tenant e recusa honesta na chave de acesso global`
+- [ ] ~~**Step 1:** as duas edições juntas~~
+- [ ] ~~**Step 2:** teste de unidade das duas mensagens~~
+- [ ] ~~**Step 3:** commit~~
+
+**Status: ⛔ NÃO EXECUTADA — recomendação de CORTE, confirmada por leitura.
+Precisa da sua decisão para virar corte formal.**
+
+A Task inteira mexe em `almoxarifado_utils.py:250-330` (`processar_xml_nfe`), e o
+próprio §4.4 já registra que a função **está morta**: `grep processar_xml_nfe`
+fora de `archive/` devolve **só a definição de `:250`** — nenhuma rota, template
+ou job. Reconferido hoje, continua assim.
+
+**Por que não executei mesmo assim:** o §4.4 também registra que corrigir a `:257`
+sozinha **piora** — com `admin_id` na consulta o fluxo passa a alcançar o
+`db.session.add` de `:328` + `flush()` de `:329` e estoura `IntegrityError`
+contra o UNIQUE **global** de `NotaFiscal.chave_acesso` (`models.py:2550`),
+trocando uma mensagem amigável errada por um **500**. Escrever isso em código sem
+chamador é pagar risco por zero benefício.
+
+**O que fazer com ela, em ordem de preferência:**
+1. **Cortar** e mover para a §8.1, com a razão acima. É a recomendação.
+2. Se um dia `processar_xml_nfe` ganhar chamador, a Task volta — **e aí junto com
+   a decisão sobre o UNIQUE global**, que é o defeito de verdade e é decisão de
+   negócio (§12 já registra que trocá-lo por `UNIQUE (admin_id, chave_acesso)`
+   não é decisão de execução).
 
 ---
 
@@ -1679,6 +1741,20 @@ tem que passar a tratar 404.
 - [ ] **Step 1:** 403 → 404
 - [ ] **Step 2:** conferir e ajustar o `fetch` do template
 - [ ] **Step 3:** commit — `fix(tenant): recurso de outro tenant responde 404 na entrada múltipla`
+
+**Status: 🟡 ABERTA e pronta para execução — não tem impedimento.** Ficou de fora
+desta sessão só por ordem de trabalho, não por dúvida.
+
+O ponto exato está conferido: `views/almoxarifado/movimentos.py`, no bloco de
+validação de fornecedor da rota `processar-entrada-multipla`, responde
+`403 'Fornecedor não encontrado ou sem permissão'` quando o `fornecedor_id` é de
+outro tenant. **403 confirma que o recurso existe** — é o vazamento de existência
+que a Task descreve. Vira 404, e o `fetch` do template precisa ser conferido
+junto, porque hoje pode estar tratando os dois códigos de forma diferente.
+
+**Nota:** a rota de formulário (`processar-entrada`) já usa 404 em
+`'Item não encontrado'` — mais uma vez o mesmo arquivo responde a mesma pergunta
+de dois jeitos, que foi o padrão desta sessão inteira.
 
 ---
 
@@ -1721,11 +1797,33 @@ validação de fornecedor (`:65-74`) e antes do `if tipo_controle == 'SERIALIZAD
    conveniência, não isolamento → vai POR ÚLTIMO e em commit isolado no fim da pilha,
    para que um revert não desfaça junto os quatro consertos de isolamento.
 
-- [ ] **Step 1:** guarda em `processar_entrada`
-- [ ] **Step 2:** guarda em `processar_entrada_multipla` (FASE 1)
-- [ ] **Step 3:** T1, T2, T3 verdes
-- [ ] **Step 4:** `bash run_tests.sh --gate`
-- [ ] **Step 5:** commit — `feat(almox): dedup de nota fiscal na entrada manual`
+- [x] **Step 1:** guarda em `processar_entrada`
+- [x] **Step 2:** guarda em `processar_entrada_multipla` (FASE 1)
+- [x] **Step 3:** T1, T2, T3 verdes
+- [~] **Step 4:** `bash run_tests.sh --gate` — **estava rodando quando a sessão fechou**
+- [x] **Step 5:** commit — `feat(almox): dedup de nota fiscal na entrada manual`
+
+**Status: ✅ código entregue; ⚠️ gate completo NÃO confirmado (ver §Histórico).**
+
+A guarda virou um helper único, `entrada_ja_lancada`, usado pelas duas rotas. **A
+chave é (tenant, nota, item)** e cada parte foi escolhida contra um erro concreto:
+
+| Parte | Sem ela |
+|---|---|
+| `admin_id` | repetiria o defeito de um andar acima — o UNIQUE **global** de `NotaFiscal.chave_acesso` faz a nota de uma empresa bloquear a de outra. Numeração de NF é sequencial **por emitente**, não universal |
+| `item_id` | impediria lançar o segundo item de uma nota já parcialmente dada entrada — correção normal de quem esqueceu uma linha |
+| nota vazia fora da chave | a segunda compra sem nota sumiria. Entrada sem NF é rotina em obra: balcão, doação, sobra de outra obra |
+
+Na rota de carrinho a guarda entra na **FASE 1 (validação)**, antes de qualquer
+escrita: o carrinho é tudo-ou-nada e recusar no meio deixaria metade da nota
+lançada.
+
+**🔬 Sétimo instrumento vacuoso desta rodada, e o terceiro do mesmo padrão.** O
+teste cross-tenant postava pelas DUAS rotas dentro do mesmo `app_context`, e o
+segundo cliente não completa — o mesmo defeito de construção já registrado duas
+vezes em `tests/test_arreio_custo_rdo_rotas.py`. Reescrito com **um POST só**: a
+nota de A vira precondição semeada no banco, e só B posta. O que o teste precisa é
+de uma precondição e **uma** ação; a segunda rota era cenário, não asserção.
 
 ---
 
@@ -4248,6 +4346,27 @@ pacotes abaixo seguem existindo e valendo.**
 ---
 
 ## Histórico
+
+- **2026-08-04, fecho da sessão** — **A09 fechado e a T3 quase**: B1.12, B1.13 e
+  B1.16 entregues; B1.15 aberta sem impedimento; B1.14 com recomendação de corte.
+
+  ⚠️ **LEIA ISTO ANTES DE CONTINUAR: o gate completo desta última leva NÃO foi
+  confirmado.** A sessão fechou com ele em execução. O que existe de verificação:
+  o arreio da T3 e o `test_cronograma_engine_unificado` verdes (17 passed, zero
+  xfail), e nada mais. **O primeiro passo de quem retomar é `bash run_tests.sh
+  --gate`.** Está anotado aqui e não no commit porque commit ninguém relê.
+
+  As três premissas do §4.4 foram todas reconferidas no código, e **a terceira
+  estava errada, sendo do próprio plano**: o `Servico` alheio sai da consulta mas
+  **não chega à tela** — template de detalhes não usa a variável, e a edição
+  reduz a lista a ids que nunca casam. Reclassificado como defesa em profundidade,
+  e o commit renomeado de `fix(tenant)` para `chore(tenant)`.
+
+  **Sexto e sétimo instrumentos vacuosos**, fechando o padrão da sessão em sete:
+  um teste por corpo de resposta que teria passado antes e depois da correção
+  (por isso a asserção foi para o nível da função), e o terceiro caso de "duas
+  rotas no mesmo `app_context`" — o segundo cliente não completa. Reescrito com
+  um POST só e a precondição semeada.
 
 - **2026-08-04, noite** — **A10 e A16-a FECHADOS** (B1.6-B1.11). Com isso a trilha
   T2 inteira sai, e o bloco B1 fica só com a T3.
