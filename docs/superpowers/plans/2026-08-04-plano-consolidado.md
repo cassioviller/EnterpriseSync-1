@@ -113,20 +113,26 @@ A ordem completa:
 | Bloco | Tasks | Entregues | Abertas | Esforço agregado |
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
-| B1 — parar de perder dado | 17 *(era 16)* | **6** | **11** | G |
+| B1 — parar de perder dado | 17 *(era 16)* | **12** | **5** | G |
 | B2 — o que o sistema informa errado | 20 | 0 | **20** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **62** | **12** | **50** | |
+| **Total** | **62** | **18** | **44** | |
 
-**Estado em 04/08, fim do dia: A05 FECHADO.** B0 inteiro (6/6) e todo o A05
-(B1.1-B1.5b) entregues. O arreio de RDO está verde sem nenhum `xfail` — os seis
-que nasceram no B0 foram todos cobrados e removidos. A contagem subiu de 61 para
-62 porque o B0 achou um defeito que nenhum recorte tinha visto (B1.5b).
+**Estado em 04/08, fim do dia: A05, A10 e A16-a FECHADOS.** B0 inteiro (6/6),
+toda a trilha T1 (A05, B1.1-B1.5b) e toda a trilha T2 (A10 + A16-a,
+B1.6-B1.11) entregues. A contagem subiu de 61 para 62 porque o B0 achou um
+defeito que nenhum recorte tinha visto (B1.5b).
 
-**O que resta de B1 são as outras duas trilhas**, e elas não dependem de nada do
-que foi feito hoje: T2 (presença, B1.6-B1.11) e T3 (tenant + almoxarifado,
-B1.12-B1.16). Os cinco `xfail` vivos do arreio são o checklist delas.
+**Sobra UM `xfail` no arreio inteiro**, e ele não é dívida: é
+`test_o_ponto_criado_pelo_sync_gera_custo`, a segunda metade do A16, travada pela
+**D6** (§10) — pergunta de negócio, não de código. Dos oito que o B0 plantou,
+sete foram cobrados e removidos pelo próprio mecanismo que corrigiram.
+
+**O que resta de B1 é a trilha T3** (tenant + almoxarifado, B1.12-B1.16), que não
+depende de nada do que foi feito hoje. Depois dela o bloco B1 fecha e começa o
+B2 — que é o maior, 20 Tasks, e onde o assunto muda: sai "o sistema está perdendo
+dado" e entra "o número exibido mente".
 
 **Como este documento registra progresso.** Task entregue leva uma linha
 `**Status:**` logo abaixo do título, com o commit e — quando houve — o **desvio**
@@ -1089,9 +1095,14 @@ quebrar, a chave foi estreitada demais.
 4. **Armadilha do decorador:** a mudança é toda DENTRO do corpo; não inserir função
    entre `@event_handler('ponto_registrado')` (`:302`) e `def calcular_horas_folha`.
 
-- [ ] **Step 1:** chave sem `obra_id` + realinhamento + log origem→destino
-- [ ] **Step 2:** `pytest tests/test_p1_fallback_e_idempotencia.py -q` — verde sem edição
-- [ ] **Step 3:** commit — `fix(ponto): custo de ponto é um por funcionário-dia e segue a obra do registro`
+- [x] **Step 1:** chave sem `obra_id` + realinhamento + log origem→destino
+- [x] **Step 2:** `pytest tests/test_p1_fallback_e_idempotencia.py -q` — verde sem edição
+- [x] **Step 3:** commit — `fix(ponto): custo de ponto é um por funcionário-dia e segue a obra do registro`
+
+**Status: ✅ entregue em `cdf18195`.** Sem desvio. A ordem contraintuitiva que a
+§4.2 defende (esta ANTES da B1.7) foi respeitada, e o `test_p1_fallback_e_idempotencia`
+passou **sem edição** — a prova de neutralidade que a Task pedia, e o sinal de que
+a chave não foi estreitada demais.
 
 ---
 
@@ -1156,10 +1167,51 @@ satisfaz**.
    merge, `/novo_ponto` vira de fato o caminho de edição. **Não criar o PUT dentro
    deste recorte**, ou o item dobra de tamanho e passa a mexer no JS.
 
-- [ ] **Step 1:** escrever o teste e vê-lo vermelho no `count() == 1`
-- [ ] **Step 2:** lookup + merge + recálculo sobre o objeto + emissão baseada em `registro.hora_entrada`
-- [ ] **Step 3:** resposta com `criado` e mensagem; ajustar o `alert()` do template
-- [ ] **Step 4:** commit — `fix(ponto): /novo_ponto reusa o registro do dia (merge) em vez de criar incondicionalmente`
+- [x] **Step 1:** escrever o teste e vê-lo vermelho no `count() == 1`
+- [x] **Step 2:** lookup + merge + recálculo sobre o objeto + emissão baseada em `registro.hora_entrada`
+- [x] **Step 3:** resposta com `criado` e mensagem; ajustar o `alert()` do template
+- [x] **Step 4:** commit — `fix(ponto): /novo_ponto reusa o registro do dia (merge) em vez de criar incondicionalmente`
+
+**Status: ✅ entregue em `3710b864`. 🔴 Desvio de SEMÂNTICA, decidido pelo Cássio —
+o recorte desta Task contradizia a §1 deste mesmo documento.**
+
+A §1 diagnostica: *"08:00-12:00 e 13:00-17:00 criam 2 `RegistroPonto` (4h + 4h =
+8h) e deixam um `CustoObra` de 4h. **O dia de 8h vira metade**"* — tratando 8h
+como a verdade perdida. Mas o merge desta Task, como escrito ("cada campo do
+formulário só sobrescreve o que veio preenchido"), faria o segundo POST trocar
+`hora_entrada` para 13:00 e o dia passar a valer **4h**: o sistema ficaria
+coerente consigo mesmo concordando que a jornada foi de meia jornada, e a manhã
+sumiria do registro do trabalhador. Coerência não é correção.
+
+**Decidido: TURNO PARTIDO.** A regra, e o que distingue os casos:
+
+| Segundo lançamento | Interpretação | Resultado |
+|---|---|---|
+| COMEÇA depois de o registrado terminar | segunda metade do dia | `08:00→17:00`, almoço `12:00-13:00`, **8h** |
+| SE SOBREPÕE ao registrado | correção, vale o último | `08:00→18:00`, **9h** |
+| Terceiro turno, almoço já ocupado | não cabe no modelo | aplicado como correção + `WARNING` |
+
+O terceiro caso é o único onde se perde informação, e a escolha é deliberada: o
+modelo tem **um** par de almoço (`models.py:759-763`), e esticar a saída por cima
+do intervalo faria `calcular_horas_trabalhadas` contar o vão como trabalhado.
+**Superestimar folha é pior que subestimar** — um erro paga a mais e ninguém
+reclama; o outro aparece.
+
+**Os seis riscos do recorte foram todos aplicados como escritos.** O que a
+execução acrescentou:
+
+1. **O `alert()` do template parou de adivinhar.** Ele decidia por `registroId`,
+   que só diz se o formulário abriu em modo de edição — não sabe que um
+   lançamento novo pode ter REUSADO o registro do dia, nem que duas metades
+   viraram turno partido. Passa a exibir a mensagem do servidor. **Não é
+   cosmético: a sobrescrita SILENCIOSA era o defeito**, e dizer em voz alta o que
+   aconteceu é metade da correção.
+2. **Quarto instrumento medindo o vazio nesta rodada.** O coletor `custos_obra`
+   estava preso a `tenant.obra_id`, e a invariante da B1.6 é **entre** obras: o
+   teste de troca de obra achava zero linha e passava a acusar o oposto do que
+   investigava. Ganhou `qualquer_obra=True`, com o motivo no docstring.
+3. **O caso de isolamento de tenant ficou mais necessário do que era.** Com
+   merge, um vazamento passa a **alterar** registro alheio, não só criar.
 
 ---
 
@@ -1183,9 +1235,24 @@ não acrescentar nada que escreva. E **não** fazer o script CORRIGIR o históri
 consolidar linhas duplicadas é decisão de negócio (qual obra fica com o custo), não
 efeito colateral de uma medição.
 
-- [ ] **Step 1:** escrever `q7` e registrá-la em `main()`
-- [ ] **Step 2:** rodar em dev, depois em produção, e guardar o número
-- [ ] **Step 3:** commit — `feat(scripts): q7 — pontos duplicados no dia, por tenant`
+- [x] **Step 1:** escrever `q7` e registrá-la em `main()`
+- [~] **Step 2:** rodar em dev ✅, **em produção — PENDENTE**
+- [x] **Step 3:** commit — `feat(scripts): q7 — pontos duplicados no dia, por tenant`
+
+**Status: ✅ código entregue em `36a077b0`; ⚠️ a MEDIÇÃO em produção segue
+pendente, e é ela que serve para alguma coisa.**
+
+Rodada em dev, onde o resultado é resíduo de suíte e **não vale como estimativa**
+— mas exibe o defeito com clareza: 29 tenants, e o padrão repetido é **8.0h
+gravadas contra 4.0h custeadas**. A consulta traz também a coluna de dias em mais
+de uma obra, que é o lado pior (dia cobrado duas vezes) e que a B1.6 acabou de
+fechar para o futuro.
+
+**O que depende deste número:** o índice único em `(funcionario_id, data)` — hoje
+os três índices de `models.py:800-804` são todos NÃO-únicos, e um
+`CREATE UNIQUE INDEX` falharia se produção tiver linhas que o violem. Foi
+`/novo_ponto` que as criou, então provavelmente tem. Se couber, é a **migração
+280** (faixa liberada pelo corte da Fase 7, §12).
 
 ---
 
@@ -1262,9 +1329,19 @@ caixa; e o arquivo de rota da Task B1.10.
 **Risco → mitigação.** A lista branca é de valores JÁ normalizados (strip+lower): se
 alguém escrever `'ATESTADO'` nela, ela nunca casa e o efeito é o oposto do pretendido.
 
-- [ ] **Step 1:** constante + função, **sozinhas**, sem trocar a chamada ainda
-- [ ] **Step 2:** teste de unidade da função
-- [ ] **Step 3:** commit — `feat(ponto): registro_ponto_tem_fato_humano — lista branca fechada de tipos neutros`
+- [x] **Step 1:** constante + função, **sozinhas**, sem trocar a chamada ainda
+- [x] **Step 2:** teste de unidade da função
+- [x] **Step 3:** commit — `feat(ponto): registro_ponto_tem_fato_humano — lista branca fechada de tipos neutros`
+
+**Status: ✅ entregue em `7a33a7f6`.** Sem desvio — 44 testes de unidade, sem
+banco, em `tests/test_a16_fato_humano.py`.
+
+O teste que mais vale entre eles é o que **varre a própria lista branca** e exige
+forma normalizada (`tipo == tipo.strip().lower()`). O erro provável na manutenção
+da constante é acrescentar um valor em CAIXA ALTA; aí a entrada nunca casa, o
+caso legítimo passa a ser tratado como classificado, **o plano deixa de converter
+tudo — em silêncio, e sem nenhum outro teste reclamando.** É o risco que a Task
+já apontava, agora com cão de guarda.
 
 ---
 
@@ -1336,10 +1413,33 @@ está errada — o texto presente é justamente o defeito.
 5. O nome `tem_batida_real` some do arquivo → `grep -rn tem_batida_real tests/` antes,
    caso algum guarda textual o procure.
 
-- [ ] **Step 1:** trocar a condição e ampliar a mensagem de log
-- [ ] **Step 2:** `pytest tests/test_p7_p8_presenca_e_progresso.py -q`
-- [ ] **Step 3:** escrever/rodar `tests/test_a16_plano_nao_sobrescreve_ausencia.py`
-- [ ] **Step 4:** commit — `fix(ponto): plano não sobrescreve registro com fato humano (ausência classificada)`
+- [x] **Step 1:** trocar a condição e ampliar a mensagem de log
+- [x] **Step 2:** `pytest tests/test_p7_p8_presenca_e_progresso.py -q` — 10 passed
+- [x] **Step 3:** escrever/rodar os casos de rota (no arreio, não em arquivo novo)
+- [x] **Step 4:** commit — `fix(ponto): plano não sobrescreve registro com fato humano (ausência classificada)`
+
+**Status: ✅ entregue junto da B1.11.** Dois desvios, os dois de forma e não de
+desenho:
+
+1. **O arquivo `tests/test_a16_plano_nao_sobrescreve_ausencia.py` não foi
+   criado.** Os casos foram para `tests/test_arreio_presenca_rotas.py`, que já
+   posta em `/equipe/api/sync-ponto` com o cenário montado — mesma decisão que a
+   B1.5 tomou sobre `test_a05_custo_mensalista_por_rota.py`, e pelo mesmo motivo:
+   segunda cópia da mesma prova é duas provas que divergem depois.
+2. **O caso 1 da tabela virou parametrizado por CAMINHO DE ENTRADA**, que é mais
+   forte do que estava escrito: `'atestado'` (rota de falta), `'ATESTADO'` e
+   `'FALTA_J'` (importador de Excel, caixa alta), `'ferias'`, e
+   `'licenca_inventada_2026'` — este último prova o **fail-closed**, e não é
+   hipótese acadêmica: `ponto_views.py:1016` persiste `motivo` cru, sem allowlist,
+   então tipo desconhecido é entrada normal do sistema.
+
+Acrescentado um caso que a tabela não previa e que é o contrapeso necessário:
+**registro neutro e vazio continua sendo preenchido**. Guarda estreita demais
+custa dado do usuário; guarda larga demais desliga a funcionalidade inteira, e
+sem barulho nenhum.
+
+O risco 5 (`grep tem_batida_real tests/`) foi conferido: o nome só aparece em
+docstring do próprio arreio, nenhum guarda textual o procura.
 
 ---
 
@@ -1361,10 +1461,38 @@ aplicar**; se houver divergência, deixar esta Task de fora e tratá-la à parte
 ela é separada das duas anteriores: é a única que pode gerar registro duplicado e
 precisa ser descartável sem desfazer o resto.
 
-- [ ] **Step 1:** SELECT de contagem de divergência `RegistroPonto.admin_id` × `AllocationEmployee.admin_id`
-- [ ] **Step 2:** se zero, acrescentar `admin_id` ao `filter_by`
-- [ ] **Step 3:** `pytest tests/test_p7_p8_presenca_e_progresso.py -q` — separar "a guarda nova quebrou p7" de "o filtro de tenant quebrou p7"
-- [ ] **Step 4:** commit — `fix(ponto): sync de alocação busca o registro dentro do tenant`
+- [x] **Step 1:** SELECT de contagem de divergência `RegistroPonto.admin_id` × `AllocationEmployee.admin_id`
+- [x] **Step 2:** se zero, acrescentar `admin_id` ao `filter_by`
+- [x] **Step 3:** `pytest tests/test_p7_p8_presenca_e_progresso.py -q` — separar "a guarda nova quebrou p7" de "o filtro de tenant quebrou p7"
+- [x] **Step 4:** commit — `fix(ponto): sync de alocação busca o registro dentro do tenant`
+
+**Status: ✅ entregue junto da B1.10.**
+
+**Step 1, medido em dev: ZERO divergências, em 90 pares casados.** Era o risco
+que justificava esta Task ser separável e descartável — com divergência, o filtro
+faria o sync não achar o registro e cair no ramo de criação, gerando um SEGUNDO
+registro no dia (não há unique em `funcionario_id, data`). Como deu zero, entrou
+junto. **A contagem precisa ser repetida em produção antes do deploy**; está
+anotada no comentário do código, ao lado da consulta.
+
+**Por que acabou saindo com a B1.10, e não separada:** a B1.10 **piora** este
+buraco antes de a B1.11 fechá-lo. Com a guarda nova, um atestado de OUTRO tenant
+passaria a proteger o dia deste, e o plano deixaria de converter sem ninguém
+entender a causa. Separá-las abriria essa janela.
+
+**🔬 O teste de tenant que eu escrevi primeiro era VACUOSO** — quinto caso desta
+rodada, e o mais instrutivo porque o docstring afirmava o que o código não fazia:
+ele semeava o registro do funcionário de B, mas **cada tenant tem o seu
+funcionário, com id próprio**, então a colisão que ele dizia montar não existia e
+ele passava com e sem o filtro. Só apareceu porque desliguei a correção para ver
+o teste falhar — disciplina que virou hábito nesta sessão e que se pagou de novo.
+
+O cenário verdadeiro é **dado sujo**: uma linha com o funcionário de A e o
+`admin_id` de B. É exatamente a divergência que o Step 1 mandou contar, e é a
+única forma de a busca antiga achar algo que não é dela. Reescrito assim, o teste
+falha sem a correção com a mensagem certa: *"o tenant A deveria ter um registro
+próprio no dia, tem 0 — a busca achou a linha de B e a guarda protegeu o dia
+errado"*.
 
 ---
 
@@ -4040,16 +4168,18 @@ colisão entre B1 e B2 — e é entre trilhas que, sem ela, seriam paralelas.
 
 ### 11.4 Ordem recomendada de entrega
 
-**Onde a entrega está, em 04/08:** passo 1 e a trilha T1 do passo 2 fechados — B0
-inteiro e A05 inteiro (B1.1-B1.5b). **O próximo trabalho são T2 e T3, que podem
-andar em paralelo entre si e não dependem de mais nada.**
+**Onde a entrega está, em 04/08:** passo 1 fechado e o passo 2 quase — falta só a
+T3. **O próximo trabalho é B1.12-B1.16, e ele não espera nada.**
 
 1. ~~**B0**~~ ✅ (a D3 foi respondida pelos fatos: entrou sozinho, com xfail strict —
-   o default recomendado, e os seis xfail funcionaram como checklist até o último).
-2. ~~**B1.1-B1.5b (T1)**~~ ✅ — **A05 fechado.** Faltam **B1.6-B1.11** (T2) e
-   **B1.12-B1.16** (T3), em paralelo. A serialização do guard inverso já foi
-   consumida por T1 (a B1.2 mudou `:379-390`), então **T2 não precisa mais esperar
-   nada de T1** — é o principal efeito prático de A05 ter fechado primeiro.
+   o default recomendado, e os oito xfail funcionaram como checklist até o fim:
+   sete caíram cobrados pelo próprio mecanismo que corrigiram).
+2. ~~**B1.1-B1.5b (T1)**~~ ✅ **A05 fechado.** ~~**B1.6-B1.11 (T2)**~~ ✅ **A10 e
+   A16-a fechados.** Falta **B1.12-B1.16** (T3). A serialização do guard inverso
+   foi consumida pela T1 (a B1.2 mudou `:379-390`) e a T2 nunca precisou esperar —
+   foi o principal efeito prático de A05 ter fechado primeiro.
+   *Fica aberto de T2 só o que depende de gente: rodar a `q7` em PRODUÇÃO (B1.8
+   Step 2) e a segunda metade do A16, travada pela D6.*
 3. **B2**, com T4/T5/T6/T7 em paralelo — lembrando **B1.13 antes de B2.8**.
 4. **B3**, T8 e T9 em paralelo.
 5. **B4**, por último, com o gate de produção de D11 antes do E02.
@@ -4119,6 +4249,25 @@ pacotes abaixo seguem existindo e valendo.**
 
 ## Histórico
 
+- **2026-08-04, noite** — **A10 e A16-a FECHADOS** (B1.6-B1.11). Com isso a trilha
+  T2 inteira sai, e o bloco B1 fica só com a T3.
+  1. **O plano se contradizia sobre o ponto partido, e a contradição foi levada ao
+     Cássio.** A §1 dizia que o dia de 8h "vira metade"; o recorte da B1.7 mandava
+     um merge que produziria 4h — coerente e mentindo sobre a jornada. Decisão:
+     **turno partido**, com a regra de sobreposição distinguindo correção de
+     segunda metade. É a primeira decisão de NEGÓCIO desta execução; as demais
+     saíram por leitura.
+  2. **A B1.10 piora a B1.11 antes de consertá-la.** Com a guarda nova, um
+     atestado de outro tenant passaria a proteger o dia deste. As duas saíram
+     juntas por isso — segundo par inseparável da rodada, depois de B1.5/B1.5b.
+  3. **Quarto e quinto instrumentos medindo o vazio.** O coletor `custos_obra`
+     preso a `tenant.obra_id` num teste cuja invariante é ENTRE obras; e um teste
+     de tenant cujo docstring afirmava uma colisão que não existia, porque cada
+     tenant tem o seu funcionário com id próprio. **Os dois só apareceram porque
+     desligar a correção para ver o teste falhar virou hábito.** Vale como método:
+     teste novo que passa de primeira não provou nada até falhar uma vez.
+  4. **A B1.11 foi decidida por consulta, não por opinião:** zero divergências de
+     `admin_id` em 90 pares casados. Era o risco que a tornava descartável.
 - **2026-08-04, fim do dia** — **A05 FECHADO** com B1.5 + B1.5b no mesmo commit.
   Arreio de RDO verde, sem nenhum `xfail` restante no arquivo. O que esta entrega
   ensinou, e que não estava em recorte nenhum:

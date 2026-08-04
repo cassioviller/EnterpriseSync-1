@@ -256,27 +256,34 @@ def test_corrigir_o_horario_do_mesmo_registro_continua_dando_uma_linha():
 # (c) e (d) — sincronização do plano
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason='A16 — a guarda tem_batida_real '
-                                       '(models.py:4580-4581) não cobre '
-                                       'ausência classificada')
-def test_o_sync_do_plano_nao_sobrescreve_atestado():
-    """Um atestado lançado à mão não pode virar dia trabalhado de 8h.
+@pytest.mark.parametrize('tipo', ['atestado', 'ATESTADO', 'FALTA_J', 'ferias',
+                                  'licenca_inventada_2026'])
+def test_o_sync_do_plano_nao_sobrescreve_ausencia_classificada(tipo):
+    """Uma ausência lançada à mão não pode virar dia trabalhado de 8h.
 
-    ``ponto_service.py:330-360`` cria a ausência **sem hora nenhuma**, então
-    ``tem_batida_real`` é False e o registro cai no ramo de preenchimento:
-    ``models.py:4602`` grava a obra do plano, ``:4614`` devolve
-    ``tipo_registro`` para ``'trabalho_normal'`` e ``:4616`` põe 8h.
+    ``ponto_service.py:330-360`` cria a ausência **sem hora nenhuma**, então a
+    guarda antiga (``bool(hora_entrada or hora_saida)``) era False e o registro
+    caía no ramo de preenchimento: ``models.py:4602`` gravava a obra do plano,
+    ``:4614`` devolvia ``tipo_registro`` para ``'trabalho_normal'`` e ``:4616``
+    punha 8h.
 
     Perda de dado do usuário, em silêncio — e alcançável tanto pelo cron
     (`models.py:4772-4774`) quanto por esta rota.
+
+    🔬 A parametrização é o teste de verdade aqui, e cada valor cobre um caminho
+    de entrada diferente: minúscula é a rota de falta, CAIXA ALTA é o importador
+    de Excel (`services/ponto_importacao.py:598-599`), e o último é string livre
+    — `ponto_views.py:1016` persiste `motivo` cru, sem allowlist, então tipo
+    desconhecido não é hipótese, é entrada normal. Ele prova o **fail-closed**:
+    a guarda protege o que não sabe interpretar.
     """
     with app.app_context():
-        tenant = _cenario('atestado')
+        tenant = _cenario(f'aus{abs(hash(tipo)) % 10000}')
         db.session.add(RegistroPonto(
             funcionario_id=tenant.funcionario_id, admin_id=tenant.admin_id,
-            data=DIA, tipo_registro='atestado', horas_trabalhadas=0.0))
+            data=DIA, tipo_registro=tipo, horas_trabalhadas=0.0))
         db.session.commit()
-        _alocar(tenant)
+        aloc, vinculo = _alocar(tenant)
 
         _sincronizar(tenant)
 
@@ -284,10 +291,101 @@ def test_o_sync_do_plano_nao_sobrescreve_atestado():
         assert len(registros) == 1, (
             f'esperava um registro no dia, achou {len(registros)}')
         registro = registros[0]
-        assert registro.tipo_registro == 'atestado', (
-            f"o atestado virou '{registro.tipo_registro}' com "
+        assert registro.tipo_registro == tipo, (
+            f"a ausência '{tipo}' virou '{registro.tipo_registro}' com "
             f'{registro.horas_trabalhadas}h — o plano sobrescreveu a ausência')
         assert float(registro.horas_trabalhadas or 0) == pytest.approx(0.0)
+        assert registro.hora_entrada is None and registro.hora_saida is None, (
+            f'o plano carimbou horário sobre a ausência: '
+            f'{registro.hora_entrada}-{registro.hora_saida}')
+        assert registro.obra_id is None, (
+            f'o plano vinculou a ausência à obra {registro.obra_id}')
+
+        db.session.expire_all()
+        assert vinculo.sincronizado_ponto is True, (
+            'a alocação protegida não foi marcada como sincronizada — o cron '
+            'vai reprocessá-la todo dia (o defeito que o p7 travou)')
+
+
+def test_o_sync_busca_o_registro_dentro_do_tenant():
+    """O registro de outro tenant não pode nem proteger nem ser escrito.
+
+    🔬 `funcionario_id` é global, e a busca de `sincronizar_com_ponto` era só
+    (`funcionario_id`, `data`). Duas consequências opostas e ambas ruins: a
+    guarda decidiria olhando o `tipo_registro` de um registro alheio, e o ramo de
+    preenchimento escreveria nele.
+
+    **A B1.10 piorou isso antes de a B1.11 consertar**, e é por isso que as duas
+    andam juntas: com a guarda nova, um atestado de OUTRA empresa passaria a
+    proteger o dia deste tenant, e o plano deixaria de converter sem ninguém
+    entender a causa.
+
+    🔬 **A primeira versão deste teste era vacuosa**, e vale registrar por quê:
+    ela semeava o registro do funcionário de B, mas cada tenant tem o SEU
+    funcionário, com id próprio — a colisão que ela dizia montar não existia, e
+    o teste passava com e sem o filtro.
+
+    O cenário verdadeiro é dado sujo: uma linha com o funcionário de A e o
+    ``admin_id`` de B. É a divergência que a Task mandou contar antes de aplicar
+    (zero em dev, 90 pares casados), e é a única forma de a busca antiga achar
+    algo que não é dela.
+    """
+    with app.app_context():
+        a = _cenario('syncA')
+        b = _cenario('syncB')
+
+        # Linha suja: funcionário de A, tenant de B, tipo que a guarda protege.
+        alheio = RegistroPonto(
+            funcionario_id=a.funcionario_id, admin_id=b.admin_id,
+            data=DIA, tipo_registro='atestado', horas_trabalhadas=0.0)
+        db.session.add(alheio)
+        db.session.commit()
+        alheio_id = alheio.id
+
+        _alocar(a)
+        _sincronizar(a)
+
+        db.session.expire_all()
+        sujo = RegistroPonto.query.get(alheio_id)
+        assert sujo.tipo_registro == 'atestado', (
+            f"o sync de A reescreveu a linha do tenant B: "
+            f"'{sujo.tipo_registro}'")
+        assert sujo.hora_entrada is None, (
+            'o sync de A carimbou horário na linha do tenant B')
+
+        registros_de_a = _pontos(a)
+        assert len(registros_de_a) == 1, (
+            f'o tenant A deveria ter um registro próprio no dia, tem '
+            f'{len(registros_de_a)} — a busca achou a linha de B e a guarda '
+            f'protegeu o dia errado')
+        assert registros_de_a[0].hora_entrada == time(8, 0), (
+            'o registro de A não foi preenchido pelo plano')
+
+
+def test_o_sync_do_plano_preenche_o_registro_vazio_legitimo():
+    """O contrapeso do teste acima: o caso legítimo não pode morrer.
+
+    Registro neutro e vazio — semeado por outra rodada do plano — é exatamente o
+    que o sync existe para preencher. Uma guarda estreita demais custa dado do
+    usuário; uma guarda larga demais desliga a funcionalidade inteira, e sem
+    barulho nenhum.
+    """
+    with app.app_context():
+        tenant = _cenario('vazio')
+        db.session.add(RegistroPonto(
+            funcionario_id=tenant.funcionario_id, admin_id=tenant.admin_id,
+            data=DIA, tipo_registro='trabalho_normal', horas_trabalhadas=0.0))
+        db.session.commit()
+        _alocar(tenant)
+
+        _sincronizar(tenant)
+
+        registro = _pontos(tenant)[0]
+        assert registro.hora_entrada == time(8, 0), (
+            f'o plano não preencheu a entrada: {registro.hora_entrada}')
+        assert registro.hora_saida == time(17, 0)
+        assert registro.obra_id == tenant.obra_id, (
+            'o plano não vinculou o registro vazio à obra da alocação')
 
 
 @pytest.mark.xfail(strict=True, reason='A16 — o ponto nascido do plano não '

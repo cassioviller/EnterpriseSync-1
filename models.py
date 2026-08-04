@@ -4635,9 +4635,25 @@ class AllocationEmployee(db.Model):
         from datetime import datetime
         
         # Verificar se já existe registro
+        #
+        # ── B1.11 — a busca era só (funcionario_id, data), SEM `admin_id` ────
+        # `funcionario_id` é global, então a guarda logo abaixo podia decidir
+        # olhando o `tipo_registro` de um registro de OUTRO tenant — e o ramo de
+        # preenchimento escreveria nele. Com a guarda da B1.10 isso ficou pior,
+        # não melhor: um atestado alheio passaria a proteger o dia deste tenant,
+        # e o plano deixaria de converter sem ninguém entender por quê.
+        #
+        # Antes de aplicar, contado em dev: ZERO `RegistroPonto` com `admin_id`
+        # divergente do `AllocationEmployee`, em 90 pares casados. Era o risco
+        # que justificava esta Task ser separável — se houvesse divergência, o
+        # filtro faria o sync não achar o registro e cair no ramo de criação,
+        # gerando um SEGUNDO registro no mesmo dia (não há unique em
+        # `funcionario_id, data`). **Repetir a contagem em produção antes do
+        # deploy**, que é onde o número vale.
         registro_existente = RegistroPonto.query.filter_by(
             funcionario_id=self.funcionario_id,
-            data=self.allocation.data_alocacao
+            data=self.allocation.data_alocacao,
+            admin_id=self.admin_id
         ).first()
         
         if registro_existente:
@@ -4653,16 +4669,55 @@ class AllocationEmployee(db.Model):
             # A doutrina do pacote: **alocação = planejada, ponto =
             # confirmada, RDO = apontada.** O plano semeia o registro vazio;
             # a batida confirma e ganha, sempre.
-            tem_batida_real = bool(registro_existente.hora_entrada
-                                   or registro_existente.hora_saida)
-            if tem_batida_real:
-                logger.info(
-                    '[p7] alocação %s: registro de ponto de %s em %s já tem '
-                    'batida real — plano NÃO sobrescreve (entrada=%s, '
-                    'saída=%s)', self.id, self.funcionario_id,
-                    self.allocation.data_alocacao,
-                    registro_existente.hora_entrada,
-                    registro_existente.hora_saida)
+            # ── B1.10 (A16-a) — "batida real" era estreito demais ──────────
+            # A condição era `bool(hora_entrada or hora_saida)`, e ausência
+            # classificada não tem hora NENHUMA por construção. Atestado, falta
+            # justificada e férias caíam no ramo de preenchimento logo abaixo e
+            # viravam `trabalho_normal` com 8h na obra do plano, em silêncio —
+            # perda de dado do usuário, não de dinheiro, e por isso mais difícil
+            # de perceber: ninguém confere um relatório procurando o atestado
+            # que sumiu.
+            #
+            # `registro_ponto_tem_fato_humano` está ao lado da coluna que lê
+            # (`models.py`, abaixo de `RegistroPonto`) e é fail-closed.
+            if registro_ponto_tem_fato_humano(registro_existente):
+                _tipo = (registro_existente.tipo_registro or '').strip().lower()
+                _tem_hora = bool(registro_existente.hora_entrada
+                                 or registro_existente.hora_saida
+                                 or registro_existente.hora_almoco_saida
+                                 or registro_existente.hora_almoco_retorno)
+                _tem_horas = (float(registro_existente.horas_trabalhadas or 0) > 0
+                              or float(registro_existente.horas_extras or 0) > 0)
+                _classificado = _tipo not in TIPOS_PONTO_NEUTROS_PARA_O_PLANO
+
+                # O log diz QUAL das três causas travou. Sem isso o operador vê
+                # "não sobrescreve" e não sabe se foi batida (esperado) ou uma
+                # falta automática que o plano deveria ter convertido e não
+                # converteu — que é o caso que exige correção manual.
+                if _classificado:
+                    logger.warning(
+                        '[A16-a] alocação %s: registro de ponto de %s em %s tem '
+                        'tipo classificado %r — plano NÃO sobrescreve. Se este '
+                        'dia deveria virar trabalho, corrija o registro à mão: '
+                        'a conversão automática não acontece mais, de propósito.',
+                        self.id, self.funcionario_id,
+                        self.allocation.data_alocacao,
+                        registro_existente.tipo_registro)
+                else:
+                    logger.info(
+                        '[p7] alocação %s: registro de ponto de %s em %s já tem '
+                        'fato humano (%s) — plano NÃO sobrescreve (entrada=%s, '
+                        'saída=%s, horas=%s)',
+                        self.id, self.funcionario_id,
+                        self.allocation.data_alocacao,
+                        'batida' if _tem_hora else 'horas medidas',
+                        registro_existente.hora_entrada,
+                        registro_existente.hora_saida,
+                        registro_existente.horas_trabalhadas)
+                # Marcar como sincronizado é DELIBERADO e simétrico ao que já
+                # valia para batida real: sem isso o cron reprocessa a mesma
+                # alocação todo dia, que é o defeito travado por
+                # `tests/test_p7_p8_presenca_e_progresso.py:95-105`.
                 self.sincronizado_ponto = True
                 self.data_sincronizacao = datetime.utcnow()
                 try:
