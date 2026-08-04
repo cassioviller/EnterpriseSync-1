@@ -803,6 +803,82 @@ class RegistroPonto(db.Model):
         db.Index('idx_registro_ponto_admin_data', 'admin_id', 'data'),
     )
 
+
+# ── A16-a / B1.9 ─────────────────────────────────────────────────────────────
+# Quais `tipo_registro` o PLANO pode sobrescrever sem destruir informação.
+#
+# LISTA BRANCA FECHADA, e é fechada de propósito. Denylist não serve aqui por
+# dois motivos medidos: o importador de Excel grava o tipo verbatim e em CAIXA
+# ALTA (`services/ponto_importacao.py:598-599`, `ponto_views.py:1498`), e a rota
+# de falta persiste `motivo` **cru**, sem allowlist (`ponto_views.py:1016`) —
+# qualquer string chega aqui. Uma lista de proibidos sempre estaria um tipo novo
+# atrás; uma lista de permitidos erra para o lado de PROTEGER o dado.
+#
+# Os valores são os JÁ NORMALIZADOS (strip + lower). Escrever 'ATESTADO' aqui
+# não protegeria nada — faria o oposto: a entrada nunca casaria e o tipo passaria
+# a ser tratado como desconhecido... que também é protegido. Mas um 'TRABALHADO'
+# escrito aqui em maiúsculas SIM quebraria, deixando o caso legítimo protegido e
+# o plano sem efeito nenhum.
+#
+# QUEM ACRESCENTAR UM TIPO NOVO precisa mexer aqui. Os dois vocabulários vivos
+# são o modal (`templates/controle_ponto.html:280-300`) e o Excel
+# (`services/ponto_importacao.py:598-599`).
+TIPOS_PONTO_NEUTROS_PARA_O_PLANO = frozenset({
+    '',
+    'trabalhado',
+    'trabalho_normal',
+    'normal',
+    'trab',
+    'sabado_trabalhado',
+    'domingo_trabalhado',
+    'feriado_trabalhado',
+    'sab_trab',
+    'dom_trab',
+    'fer_trab',
+})
+
+
+def registro_ponto_tem_fato_humano(registro) -> bool:
+    """O registro do dia carrega informação que o plano NÃO pode sobrescrever?
+
+    Três gatilhos, e basta um:
+
+    1. **marca de horário** — qualquer das quatro colunas preenchida;
+    2. **horas medidas** — ``horas_trabalhadas`` ou ``horas_extras`` > 0;
+    3. **tipo classificado** — ``tipo_registro`` fora da lista branca.
+
+    O terceiro é o que existe para o A16-a. A guarda anterior era só
+    ``bool(hora_entrada or hora_saida)``, e ausência classificada **não tem hora
+    nenhuma, por construção**: `PontoService.registrar_falta` cria sem hora
+    (`ponto_service.py:344-350`), o cron idem (`models.py:4783-4793`), e o modal
+    LIMPA os campos de horário para esses tipos
+    (`templates/controle_ponto.html:606-618`). Resultado: atestado, falta
+    justificada e férias caíam no ramo de preenchimento e viravam
+    ``trabalho_normal`` com 8h na obra do plano, em silêncio.
+
+    **Fail-closed: tipo desconhecido é fato humano.** Errar protegendo dado do
+    usuário é a direção certa; errar destruindo não tem volta. O caso aparece no
+    log em WARNING para quem precisar reclassificar à mão.
+
+    ⚠️ Dois tipos que parecem neutros e NÃO são:
+    ``'sabado_horas_extras'`` e ``'domingo_horas_extras'``. Não têm escritor
+    vivo, mas são lidos com regra de pagamento própria — `utils.py:337-342` paga
+    1.5x/2.0x sobre TODAS as horas, e `pdf_generator.py:306-309` os exibe.
+    Convertê-los para ``'sabado_trabalhado'`` não casa com ramo nenhum de
+    `utils.py:326-344`, e **o custo do dia vira zero**.
+    """
+    if (registro.hora_entrada or registro.hora_saida
+            or registro.hora_almoco_saida or registro.hora_almoco_retorno):
+        return True
+
+    if (float(registro.horas_trabalhadas or 0) > 0
+            or float(registro.horas_extras or 0) > 0):
+        return True
+
+    tipo = (registro.tipo_registro or '').strip().lower()
+    return tipo not in TIPOS_PONTO_NEUTROS_PARA_O_PLANO
+
+
 class ConfiguracaoHorario(db.Model):
     """Configuração de horários padrão por obra"""
     __tablename__ = 'configuracao_horario'
