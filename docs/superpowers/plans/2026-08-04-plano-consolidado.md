@@ -110,14 +110,24 @@ A ordem completa:
 
 ## 2. Contagem de Tasks
 
-| Bloco | Tasks | Esforço agregado |
-|---|---|---|
-| B0 — o arreio | 6 | M |
-| B1 — parar de perder dado | 16 | G |
-| B2 — o que o sistema informa errado | 20 | G |
-| B3 — os elos que morrem a um passo | 10 | M |
-| B4 — aposentadorias | 9 | M |
-| **Total** | **61** | |
+| Bloco | Tasks | Entregues | Abertas | Esforço agregado |
+|---|---|---|---|---|
+| B0 — o arreio | 6 | **6** ✅ | 0 | M |
+| B1 — parar de perder dado | 17 *(era 16)* | 4 | **13** | G |
+| B2 — o que o sistema informa errado | 20 | 0 | **20** | G |
+| B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
+| B4 — aposentadorias | 9 | 0 | **9** | M |
+| **Total** | **62** | **10** | **52** | |
+
+**Estado em 04/08, contra `060146ac`:** B0 fechado; A05 a duas Tasks de fechar
+(B1.5 e a B1.5b nascida do arreio). A contagem subiu de 61 para 62 porque o B0
+achou um defeito que nenhum recorte tinha visto — está na §4.1, Task B1.5b.
+
+**Como este documento registra progresso.** Task entregue leva uma linha
+`**Status:**` logo abaixo do título, com o commit e — quando houve — o **desvio**
+em relação ao que estava escrito aqui. O desvio é a parte que importa: checkbox
+marcado não ensina nada a quem retomar, e três das quatro Tasks de B1 foram
+entregues fora do recorte planejado, por motivo técnico registrado em cada uma.
 
 ---
 
@@ -169,9 +179,12 @@ dos três fatos semeados → não mexer nos defaults. E é justamente o `Registr
 `:88-90` que faz o dedup do RDO pular: quem semear ponto **e** RDO na mesma data
 testa `event_manager.py:722-726`, não o custo.
 
-- [ ] **Step 1:** acrescentar `com_fatos` e os dois parâmetros de remuneração
-- [ ] **Step 2:** `pytest tests/test_p1_dedup_cross_origem.py tests/test_p1_fallback_e_idempotencia.py tests/test_p1_isolamento_relatorios.py tests/test_gestao_custo_filho_tenant.py -q` — verdes sem edição
-- [ ] **Step 3:** commit — `test(arreio): helpers_tenant com com_fatos e perfil de remuneração`
+- [x] **Step 1:** acrescentar `com_fatos` e os dois parâmetros de remuneração
+- [x] **Step 2:** `pytest tests/test_p1_dedup_cross_origem.py tests/test_p1_fallback_e_idempotencia.py tests/test_p1_isolamento_relatorios.py tests/test_gestao_custo_filho_tenant.py -q` — verdes sem edição
+- [x] **Step 3:** commit — `test(arreio): helpers_tenant com com_fatos e perfil de remuneração`
+
+**Status: ✅ entregue em `88d3f924`.** Sem desvio. Os quatro consumidores rodaram
+sem edição, que era a prova de neutralidade pedida.
 
 ---
 
@@ -208,9 +221,11 @@ mesma data por acidente: quem quiser os dois chama duas funções explícitas, e
 docstring registra que a combinação testa `event_manager.py:722-726`, não o
 lançamento.
 
-- [ ] **Step 1:** escrever os três blocos
-- [ ] **Step 2:** autoteste do coletor (semeia, coleta, cruza tenant)
-- [ ] **Step 3:** commit — `test(arreio): helpers_dinheiro — coletores de estado por tenant`
+- [x] **Step 1:** escrever os três blocos
+- [x] **Step 2:** autoteste do coletor (semeia, coleta, cruza tenant)
+- [x] **Step 3:** commit — `test(arreio): helpers_dinheiro — coletores de estado por tenant`
+
+**Status: ✅ entregue em `7d929e42`.** Sem desvio.
 
 ---
 
@@ -280,9 +295,33 @@ quando o defeito for corrigido** e alguém esquecer de tirar a marca — o xfail
 checklist de B1. Os que já passam (idempotência, isolamento, paridade da rota
 flexível) entram sem marca.
 
-- [ ] **Step 1:** escrever o arquivo com os sete casos
-- [ ] **Step 2:** rodar — confirmar que (a), (b) e (g) são xfail e o resto passa
-- [ ] **Step 3:** commit — `test(arreio): custo de RDO por rota — paridade entre os três caminhos`
+- [x] **Step 1:** escrever o arquivo com os sete casos
+- [x] **Step 2:** rodar — confirmar que (a), (b) e (g) são xfail e o resto passa
+- [x] **Step 3:** commit — `test(arreio): custo de RDO por rota — paridade entre os três caminhos`
+
+**Status: ✅ entregue em `35975e7a`, corrigido em `ddbbc1b7`. Dois desvios, os dois
+do tipo que este documento existe para registrar.**
+
+**Desvio 1 — um defeito que eu havia relatado NÃO existe.** Estava escrito que dois
+RDOs no mesmo dia dobravam o custo do mensalista (R$ 248,00 por um dia de 8h). Medido
+nos três arranjos: 8h em um RDO = R$ 124,00; 4h+4h em dois = R$ 62,00 + R$ 62,00 =
+R$ 124,00; 8h+8h em dois = R$ 248,00. O custo do mensalista é `horas × valor_hora`
+(`services/custo_funcionario_dia.py:113-116`) e a soma acompanha as horas
+**reportadas** — 8+8 são 16 horas digitadas, e o sistema custeou fielmente o que
+recebeu. O `proporcao` de `:81` é aplicado ao diarista (`:97`) e a VA/VT (`:87-88`),
+onde a unidade é o DIA, e deliberadamente não ao mensalista, onde a unidade é a hora;
+aplicá-lo ali quebraria o caso 4h+4h. **O teste virou congelamento dessa regra**, com
+a medição no docstring, para que quem ler o cabeçalho do módulo ("rateio proporcional
+quando aparece em >1 RDO") não "conserte" o que não está quebrado.
+
+**Desvio 2 — no lugar, a mesma sonda achou um defeito real e mais preciso**, no
+diarista: `RDOCustoDiario = [75,00 · 75,00]` → R$ 150,00 (uma diária, correto) contra
+`GestaoCustoFilho = [150,00 · 75,00]` → R$ 225,00 (uma diária e meia). **Virou a Task
+B1.5b**, que não existia em recorte nenhum.
+
+**Erro meu de construção, corrigido em `ddbbc1b7`:** o teste novo criava dois cenários
+no mesmo `app_context` e o segundo POST dava 404 — o arreio diz "um cenário por teste"
+no próprio helper, e eu violei.
 
 ---
 
@@ -325,9 +364,13 @@ cura: o que faltava era relacionar horas GRAVADAS com horas CUSTEADAS.
 
 **Marcação.** (a), (c) e (d) entram `xfail(strict=True)` — dependem de A10 e A16-a.
 
-- [ ] **Step 1:** escrever os quatro casos
-- [ ] **Step 2:** rodar — (b) verde, (a)/(c)/(d) xfail
-- [ ] **Step 3:** commit — `test(arreio): presença por rota — /novo_ponto e sync do plano`
+- [x] **Step 1:** escrever os quatro casos
+- [x] **Step 2:** rodar — (b) verde, (a)/(c)/(d) xfail
+- [x] **Step 3:** commit — `test(arreio): presença por rota — /novo_ponto e sync do plano`
+
+**Status: ✅ entregue em `a9bf2fd9`.** Sem desvio. Os três xfail são o checklist de
+B1.6-B1.11 — quando aquelas Tasks entrarem, é aqui que o XPASS(strict) cobra a
+remoção da marca.
 
 ---
 
@@ -361,9 +404,12 @@ exceção em handler faz rollback TOTAL e a rota devolve 302 com flash.
 
 **Marcação.** (b) entra `xfail(strict=True, reason='A14')`.
 
-- [ ] **Step 1:** escrever os quatro casos
-- [ ] **Step 2:** rodar — (a), (c), (d) verdes; (b) xfail
-- [ ] **Step 3:** commit — `test(arreio): aprovação de proposta por rota`
+- [x] **Step 1:** escrever os quatro casos
+- [x] **Step 2:** rodar — (a), (c), (d) verdes; (b) xfail
+- [x] **Step 3:** commit — `test(arreio): aprovação de proposta por rota`
+
+**Status: ✅ entregue em `d3ea0471`.** Sem desvio. O xfail de (b) é o checklist de
+B3.5 (A14).
 
 ---
 
@@ -394,10 +440,15 @@ esta Task roda **por último no bloco**, e só depois que a prova de comportamen
 existir é que faz sentido rebaixar a de forma. Se B0 entrar sozinho, os dois `== 1`
 recebem `xfail(strict=True, reason='A05')` como o resto.
 
-- [ ] **Step 1:** trocar `<=` por `==` com mensagens distintas
-- [ ] **Step 2:** renomear e corrigir docstrings dos três arquivos textuais
-- [ ] **Step 3:** `bash run_tests.sh --gate`
-- [ ] **Step 4:** commit — `test(p1): asserção de igualdade no custo; guardas textuais rebaixadas a guarda-de-forma`
+- [x] **Step 1:** trocar `<=` por `==` com mensagens distintas
+- [x] **Step 2:** renomear e corrigir docstrings dos três arquivos textuais
+- [x] **Step 3:** `bash run_tests.sh --gate`
+- [x] **Step 4:** commit — `test(p1): asserção de igualdade no custo; guardas textuais rebaixadas a guarda-de-forma`
+
+**Status: ✅ entregue em `6969a912`.** Sem desvio. Vale registrar que a posição
+adotada na §9 nº 1 (manter e rebaixar, em vez de apagar) sobreviveu à execução: os
+textuais continuam custando milissegundos e continuam pegando a classe de regressão
+que o teste de rota só detecta **depois** do efeito.
 
 ---
 
@@ -501,10 +552,16 @@ devolve (compara-se contra a função, não contra literal — a fórmula fica n
    `@event_handler('rdo_finalizado')` (`event_manager.py:649`) e
    `def lancar_custos_rdo` (`:650`) — o decorador adota a função imediatamente abaixo.
 
-- [ ] **Step 1:** escrever/rodar o teste da Task B1.5 e vê-lo VERMELHO nos quatro casos que hoje dão zero
-- [ ] **Step 2:** as quatro edições, na ordem em que o dado flui
-- [ ] **Step 3:** rodar B0.3 e B1.5 — casos 1, 3 e 4 ficam verdes; o custo ainda não é removível
-- [ ] **Step 4:** commit — `fix(rdo): handler de custo lê RDOCustoDiario em vez de recalcular por valor_diaria`
+- [x] **Step 1:** escrever/rodar o teste da Task B1.5 e vê-lo VERMELHO nos quatro casos que hoje dão zero
+- [x] **Step 2:** as quatro edições, na ordem em que o dado flui
+- [x] **Step 3:** rodar B0.3 e B1.5 — casos 1, 3 e 4 ficam verdes; o custo ainda não é removível
+- [x] **Step 4:** commit — `fix(rdo): handler de custo lê RDOCustoDiario em vez de recalcular por valor_diaria`
+
+**Status: ✅ entregue em `cefba5e7`, JUNTO da Task B1.2. Desvio deliberado de
+recorte** — ver o Status da B1.2 para o motivo. O Step 1 foi cumprido pelo arreio
+B0.3, não pelo arquivo `tests/test_a05_custo_mensalista_por_rota.py`: o arreio já
+posta nas rotas com mensalista e afirma sobre `GestaoCustoFilho`, que é exatamente o
+que aquele arquivo faria. **Esse arquivo não será criado** — ver o Status da B1.5.
 
 ---
 
@@ -537,9 +594,30 @@ POST de finalizar, para diarista: continua havendo 1 filho só.
 **Risco → mitigação.** Separar as duas edições abre uma janela em que batida tardia de
 diarista volta a duplicar → **os dois no mesmo commit, sem exceção**.
 
-- [ ] **Step 1:** as duas trocas de chave + o `in_` do guard inverso
-- [ ] **Step 2:** teste de batida tardia
-- [ ] **Step 3:** commit — `fix(rdo): chave de origem rdo_custo_diario no handler e no guard inverso do ponto`
+- [x] **Step 1:** as duas trocas de chave + o `in_` do guard inverso
+- [x] **Step 2:** teste de batida tardia
+- [x] **Step 3:** commit — `fix(rdo): chave de origem rdo_custo_diario no handler e no guard inverso do ponto`
+
+**Status: ✅ entregue em `cefba5e7`, no MESMO commit da B1.1. Desvio deliberado de
+recorte, e o motivo é o mesmo que a própria Task argumenta para as suas duas
+edições internas:** a troca de chave é o que torna os dois mecanismos **mutuamente
+idempotentes** — com `origem_tabela='rdo_custo_diario'` e `origem_id=RDOCustoDiario.id`,
+quem rodar primeiro vence e o segundo encontra `ja` e sai. Separadas, a B1.1 sozinha
+faria o evento e a chamada direta lançarem **em cima um do outro** — abrindo, entre os
+dois commits, exatamente a dupla contagem que o p1 existiu para fechar. O plano
+previa a janela entre B1.2 e B1.3; não previa esta, entre B1.1 e B1.2.
+
+**Efeito colateral verificado, e é o retorno do investimento do B0:**
+`test_mensalista_gera_custo_pela_rota_de_finalizar` e
+`test_custo_diario_gravado_implica_lancamento` deram **XPASS(strict)** — o mecanismo
+cobrando a remoção da marca obsoleta. As duas paridades (`/rdo/finalizar` e
+`/rdo/editar` contra a referência) passaram a fechar em R$ 124,00.
+
+**Terceiro achado, este de construção dos testes de paridade do B0.3:** eles usavam
+DOIS tenants no mesmo `app_context`, e o segundo POST não completava. Acusavam
+R$ 0,00 na presença **e** na ausência do defeito — teriam ficado verdes por engano.
+Corrigido para um tenant e duas datas. É a segunda vez na mesma rodada que "dois
+cenários no mesmo `app_context`" produz teste vacuoso; está virando padrão de erro.
 
 ---
 
@@ -600,11 +678,26 @@ e 4 (falta no dia → 1 `CustoObra` de RDO; hoje ZERO).
    zero (hoje `Decimal('0')` chumbado em `:803`) — é a correção pretendida, mas
    conferir `relatorios_funcionais.py` antes de considerar surpresa.
 
-- [ ] **Step 1:** `existe_ponto_no_dia`
-- [ ] **Step 2:** mover o guard e virar `CustoObra` em upsert
-- [ ] **Step 3:** cláusula de resíduo em `remover_custos_rdo`
-- [ ] **Step 4:** rodar B1.5 casos 3 e 4
-- [ ] **Step 5:** commit — `fix(rdo): guard de ponto só cobre CustoObra; ponto não-produtivo deixa de suprimir custo`
+- [x] **Step 1:** `existe_ponto_no_dia`
+- [x] **Step 2:** mover o guard e virar `CustoObra` em upsert
+- [x] **Step 3:** cláusula de resíduo em `remover_custos_rdo`
+- [x] **Step 4:** rodar B1.5 casos 3 e 4
+- [x] **Step 5:** commit — `fix(rdo): guard de ponto só cobre CustoObra; ponto não-produtivo deixa de suprimir custo`
+
+**Status: ✅ entregue em `060146ac`, junto da B1.4.** As quatro edições saíram como
+planejadas. Duas notas de execução:
+
+1. **O item 3 (upsert de `CustoObra`) valia mais do que o recorte dizia.** O
+   `if not existing` deixava o custo velho intacto quando as horas eram corrigidas —
+   **editar o RDO nunca alcançava a linha**. Estava escrito aqui como "upsert em vez
+   de skip", o que soa cosmético; é correção de dado velho.
+2. **A cláusula de resíduo (item 4) tem alcance maior que o descrito.** Antes da
+   B1.2, o handler gravava `origem_id=rdo.id` num campo comparado contra ids de
+   `RDOMaoObra`/`RDOCustoDiario` — espaços de id diferentes, nenhum filho criado pelo
+   evento era removível. **Todo banco que já rodou tem essas linhas**, e sem a
+   cláusula a chave larga as encontra para sempre e o custo velho congela no lugar do
+   certo. O recorte por `data_referencia` ficou como o plano manda, e é ele que
+   impede apagar filho de OUTRO RDO cujo `RDOMaoObra.id` coincida com este `rdo.id`.
 
 ---
 
@@ -642,10 +735,21 @@ EFEITO (`ItemMedicaoComercial.valor_executado_acumulado` e `ContaReceber`
 3. `crud_rdo_completo.py:592` é o único emissor pré-commit: movendo-o, o `except` da
    rota (`:621-623`) volta a poder desfazer de verdade o `status='Finalizado'`.
 
-- [ ] **Step 1:** os três payloads
-- [ ] **Step 2:** reposicionar o emit de `crud_rdo_completo.py` para depois de `:618`
-- [ ] **Step 3:** fallback autossuficiente em `recalcular_medicao_apos_rdo`
-- [ ] **Step 4:** commit — `fix(rdo): payload com obra_id nos três emissores e handler de medição autossuficiente`
+- [x] **Step 1:** os três payloads
+- [x] **Step 2:** reposicionar o emit de `crud_rdo_completo.py` para depois de `:618`
+- [x] **Step 3:** fallback autossuficiente em `recalcular_medicao_apos_rdo`
+- [x] **Step 4:** commit — `fix(rdo): payload com obra_id nos três emissores e handler de medição autossuficiente`
+
+**Status: ✅ entregue em `060146ac`, junto da B1.3.** Sem desvio de recorte. O risco 1
+("corrigir apenas os payloads deixa o próximo emissor livre para repetir o erro em
+silêncio") **não é hipotético e merece ficar registrado como fato**: foi exatamente
+assim que dois payloads truncados sobreviveram a um gate verde. Por isso as duas
+coisas saíram juntas — payload explícito **e** handler autossuficiente.
+
+O Step 2 fechou o único emissor pré-commit dos seis caminhos: o handler via um RDO
+que podia não existir, e o `except` da rota não desfazia mais nada porque o handler
+já havia commitado por dentro. Terceiro XPASS(strict) da rodada aqui — a sentinela da
+medição —, marca removida.
 
 ---
 
@@ -653,7 +757,21 @@ EFEITO (`ItemMedicaoComercial.valor_executado_acumulado` e `ContaReceber`
 
 **Files:** Modify `views/rdo.py` — `atualizar_rdo` `:2155-2159`;
 `salvar_rdo_flexivel` `:4488-4493`; `rdo_salvar_unificado` `:3416-3426`.
-Test: `tests/test_a05_custo_mensalista_por_rota.py`
+Test: ~~`tests/test_a05_custo_mensalista_por_rota.py`~~ — **ver a nota abaixo.**
+
+> **Nota de 04/08 — o arquivo de teste desta Task NÃO será criado.** O arreio B0.3
+> (`tests/test_arreio_custo_rdo_rotas.py`, commit `35975e7a`) já posta nas rotas com
+> funcionário mensalista e afirma sobre `GestaoCustoFilho`/`CustoObra`/`RDOCustoDiario`
+> — que é exatamente o que os cinco casos da tabela abaixo fariam, e pela mesma porta
+> (a rota). Escrever o arquivo separado seria uma segunda cópia da mesma prova, com o
+> risco conhecido de as duas divergirem. **A tabela dos cinco casos continua valendo
+> como especificação**; o que muda é onde ela vive. Os casos 1-4 já estão cobertos;
+> confirmar que o caso 5 (medição + `ContaReceber`) tem equivalente no arreio antes de
+> fechar esta Task — se não tiver, ele entra em `tests/test_arreio_custo_rdo_rotas.py`,
+> não em arquivo novo.
+>
+> **Estado das três linhas, conferido contra `060146ac`:** as três chamadas diretas
+> seguem no lugar — `views/rdo.py:2157`, `:3425` e `:4490`. Nada desta Task foi feito.
 
 **Comportamento novo.**
 1. Remover as duas chamadas diretas a `gerar_custos_mao_obra_rdo` (`:2157`, `:4490`).
@@ -706,9 +824,96 @@ que a string existe; os três testes que chamam o handler
 
 - [ ] **Step 1:** remover as duas chamadas diretas
 - [ ] **Step 2:** converter `:3425` em emit
-- [ ] **Step 3:** rodar B0.3 (xfail (a)/(b)/(g) devem virar XPASS → remover as marcas) e B1.5 inteiro
+- [ ] **Step 3:** rodar B0.3 (os xfail (a)/(b)/(g) **já viraram XPASS em `cefba5e7`/`060146ac`** e as marcas já saíram; o que se confere aqui é que continuam verdes)
 - [ ] **Step 4:** `bash run_tests.sh --gate`
 - [ ] **Step 5:** commit — `fix(rdo): mecanismo único de custo — evento canônico, chamadas diretas removidas`
+
+---
+
+### Task B1.5b: a idempotência do custo de mão de obra para de ignorar mudança de valor
+
+> **Esta Task não existia no plano de 04/08.** Nasceu do arreio B0.3 (commit
+> `ddbbc1b7`), que a achou no lugar de um defeito meu que não existia. É o último
+> `xfail` vivo do arreio e o que resta de A05 depois da B1.5.
+
+**Files:** Decidido pelo Step 1 — `event_manager.py` (`lancar_custos_rdo`, guard
+`existing_filho` `:933-948` e o `else` de `:976`) e/ou `services/rdo_custos.py`
+(`gerar_custos_mao_obra_rdo`, guard `ja` `:460-467`).
+Test: `tests/test_arreio_custo_rdo_rotas.py:317`
+(`test_o_razao_acompanha_o_recalculo_cruzado_da_diaria`, hoje `xfail(strict=True)`)
+
+**O defeito, medido — não inferido.** Diarista de R$ 150,00 em dois RDOs do mesmo dia:
+
+```
+RDOCustoDiario   = [75,00 · 75,00]  → R$ 150,00   uma diária        ✅
+GestaoCustoFilho = [150,00 · 75,00] → R$ 225,00   uma diária e meia ❌
+```
+
+A diária **tem teto** — é uma por dia, rateada entre os RDOs
+(`services/custo_funcionario_dia.py:95-97`), e o módulo promete recalcular os RDOs
+vizinhos quando a proporção muda (`:18-19`). **A promessa é cumprida na tabela de
+origem e não no razão.** O primeiro lançamento nasceu com 150,00 quando era o único
+RDO do dia; quando o segundo chegou e a proporção virou 50/50, o vizinho foi
+recalculado na origem, mas o guard de idempotência encontrou o filho existente e fez
+`continue` em vez de atualizar. **Idempotência que ignora mudança de valor vira dado
+velho**, e a fonte e o razão divergem em R$ 75,00.
+
+O mesmo cego existe nos dois mecanismos, e é a mesma frase de código nos dois:
+`services/rdo_custos.py:460-467` (`ja = ...; if ja: continue`) e
+`event_manager.py:933-948` + `:976` (`existing_filho` → `else: skip`). Nenhum dos dois
+compara valor; os dois só perguntam se a linha existe.
+
+**Por que vem DEPOIS da B1.5, e não antes.** Hoje o defeito é observável pela rota
+`/salvar-rdo-flexivel`, que chama o serviço direto (`views/rdo.py:4490`) **e** emite:
+o serviço cria um filho por RDO com chave estreita, e o handler depois encontra a
+chave larga e sai. A B1.5 remove as chamadas diretas e deixa o handler como único
+escritor — **e o guard do handler é o de chave LARGA**, que se comporta de outro modo
+neste cenário (encontra o filho do primeiro RDO e pula o segundo por inteiro). Corrigir
+antes da B1.5 significa corrigir nos dois lugares e depois descobrir qual deles
+sobreviveu. **Por isso o Step 1 é medir de novo, não editar.**
+
+**Comportamento novo (a decidir no Step 1, com o default abaixo).** O guard que
+sobreviver passa a **comparar valor antes de sair**: se a linha existe e o valor
+diverge do que a fonte (`RDOCustoDiario`) diz agora, **atualizar** — valor, descrição e
+`obra_id` — em vez de `continue`. Manter o `continue` quando o valor confere, que é o
+caso comum e o que torna a reexecução barata.
+
+**Default recomendado se o Step 1 deixar dúvida:** corrigir **no handler**, porque
+depois da B1.5 ele é o mecanismo canônico (D1), e deixar o guard do serviço como está,
+com comentário apontando para cá. O serviço fica sem chamador de rota depois da B1.5 —
+sobram `migrations.py:13968` (migração 154) e
+`scripts/migrar_rdos_rascunho_legados.py:120`, ambos de reprocesso, onde dado velho é
+justamente o que se quer corrigir.
+
+**Teste que prova:** o `xfail(strict=True)` de `tests/test_arreio_custo_rdo_rotas.py:317`
+vira XPASS e a marca sai. Ele já mede as duas somas (origem × razão) e falha com as
+duas impressas.
+
+**Riscos → mitigação.**
+1. **Atualizar valor de filho cujo pai já foi PAGO** é a mesma classe de problema que
+   adiou o A12 (§8.2) → o update tem que ser recusado, com WARNING, quando o
+   `GestaoCustoPai` estiver em estado que não admita revisão. **Conferir o estado do pai
+   antes de escrever**, e se não houver campo que o diga, registrar isso como achado e
+   parar — não inventar semântica de pagamento aqui.
+2. Comparar `float` de dinheiro com `==` produz falso negativo por representação →
+   comparar com a mesma tolerância que o resto do módulo usa, ou em `Decimal`.
+3. Um guard que atualiza é um guard que **escreve** em caminho antes somente-leitura:
+   reexecutar o evento passa a poder mexer em linha antiga. É o efeito pretendido, mas
+   é o tipo de mudança que o arreio precisa cobrir nos dois sentidos — teste de que o
+   valor CONFERINDO não gera escrita nenhuma.
+4. A divergência de numeração: o docstring do teste cita
+   `services/rdo_custos.py:422-428`, que era a linha em `35975e7a`; depois de `cefba5e7`
+   o guard está em `:460-467`. **Corrigir a citação do docstring junto**, senão a
+   próxima leitura persegue linha errada.
+
+- [ ] **Step 1:** depois da B1.5, rodar o teste de novo e **medir qual guard sobrou** —
+      as duas somas, com os valores impressos. Só então decidir o arquivo
+- [ ] **Step 2:** o guard passa a comparar valor e atualizar; `continue` só quando confere
+- [ ] **Step 3:** conferir o estado do pai antes de atualizar (risco 1)
+- [ ] **Step 4:** teste de não-escrita quando o valor confere (risco 3); corrigir a
+      citação de linha no docstring (risco 4)
+- [ ] **Step 5:** rodar o arreio inteiro — o `xfail` de `:317` deve virar XPASS e a marca sai
+- [ ] **Step 6:** commit — `fix(rdo): idempotência do custo de mão de obra compara valor, não só existência`
 
 ---
 
@@ -3712,6 +3917,7 @@ colisão entre B1 e B2 — e é entre trilhas que, sem ela, seriam paralelas.
 | Depende | De | Motivo técnico |
 |---|---|---|
 | B1.5 | B1.2 | Remover as chamadas diretas antes da chave nova = perder a chave que `remover_custos_rdo` reconhece; a edição de RDO fica sem caminho de correção |
+| **B1.5b** | **B1.5** | O defeito é hoje observável pelo guard do serviço; a B1.5 deixa o handler como único escritor e é o guard **dele** que passa a valer. Corrigir antes = corrigir nos dois lugares e só depois descobrir qual sobreviveu |
 | B1.3 | B1.2 | A cláusula de resíduo em `remover_custos_rdo` precisa da chave certa para casar |
 | **B1.7** | **B1.6** | **Contraintuitivo, e é o mais importante da §11:** se `/novo_ponto` for corrigido antes da chave, o cenário da troca de obra fica **pior que hoje** — 1 `RegistroPonto` de 4h com 2 `CustoObra` de 4h, o dia cobrado em dobro sem linha que justifique. Com a chave estreitada primeiro, o pior caso intermediário é o custo de hoje |
 | B1.11 | B1.9, B1.10 | É a única que pode gerar registro duplicado; separada para ser descartável sem desfazer o resto |
@@ -3734,9 +3940,15 @@ colisão entre B1 e B2 — e é entre trilhas que, sem ela, seriam paralelas.
 
 ### 11.4 Ordem recomendada de entrega
 
-1. **B0** (com a D3 respondida, ou com o default de xfail strict).
+**Onde a entrega está, em 04/08 (`060146ac`):** passos 1 e metade do 2 feitos — B0
+inteiro e B1.1-B1.4. **O caminho crítico curto é B1.5 → B1.5b**, duas Tasks, e A05
+fecha. Depois disso T2 e T3 abrem em paralelo e a fila volta a ser larga.
+
+1. ~~**B0**~~ ✅ (a D3 foi respondida pelos fatos: entrou sozinho, com xfail strict —
+   o default recomendado).
 2. **B1.1-B1.5** (T1) e **B1.6-B1.11** (T2) em paralelo, respeitando a serialização do
    guard inverso; **B1.12-B1.16** (T3) em paralelo com as duas.
+   *Estado: B1.1-B1.4 ✅; falta **B1.5** e a **B1.5b** nascida do arreio.*
 3. **B2**, com T4/T5/T6/T7 em paralelo — lembrando **B1.13 antes de B2.8**.
 4. **B3**, T8 e T9 em paralelo.
 5. **B4**, por último, com o gate de produção de D11 antes do E02.
@@ -3806,6 +4018,22 @@ pacotes abaixo seguem existindo e valendo.**
 
 ## Histórico
 
+- **2026-08-04, tarde** — **B0 fechado (6/6) e B1.1-B1.4 entregues**, em `test/b0-arreio`,
+  commits `88d3f924`..`060146ac`. Arreio: 29 passed, 6 xfailed. Três coisas que a
+  execução ensinou e que não estavam no plano da manhã:
+  1. **Um defeito que eu havia relatado não existia** — o suposto dobro de custo do
+     mensalista em dois RDOs do mesmo dia. Medido nos três arranjos, o sistema custeia
+     fielmente as horas reportadas. O teste virou congelamento da regra (Status da B0.3).
+  2. **No lugar, o arreio achou um defeito real e mais preciso** — o razão não acompanha
+     o recálculo cruzado da diária, R$ 75,00 de divergência. Virou a **Task B1.5b**, e é
+     o primeiro item deste plano que veio do instrumento de medida, não da leitura. Foi
+     para isso que o B0 existiu.
+  3. **Duas Tasks foram fundidas em um commit por motivo técnico** (B1.1+B1.2), porque
+     separá-las abria uma janela de dupla contagem que o plano não tinha previsto — só
+     havia previsto a janela entre B1.2 e B1.3.
+  Três XPASS(strict) cobraram remoção de marca obsoleta durante o trabalho: mensalista
+  com ponto, segundo andar do razão e a sentinela da medição. **O xfail strict funcionou
+  como checklist, exatamente como a D3 supôs.**
 - **2026-08-04** — primeira versão. Onze recortes aprofundados no código vivo contra
   `a723babe`, consolidados em cinco blocos e 61 Tasks. Nenhum recorte foi descartado na
   leitura. Três medições feitas rodando o código (não lendo): a perda de R$ 124,00 por
