@@ -244,6 +244,75 @@ def q6_duplicacao_ponto_rdo(cur):
     print("     (--dry-run é o modo padrão; só escreve com --aplicar)")
 
 
+def q7_pontos_duplicados_no_dia(cur):
+    """Quantos pares (funcionário, data) têm mais de um `RegistroPonto`.
+
+    A B1.6 e a B1.7 impedem o estrago NOVO; esta contagem é o inventário do
+    estrago JÁ FEITO, que correção de rota não desfaz. É também o número que
+    falta para decidir, **depois e com dado na mão**, se cabe um índice único em
+    `(funcionario_id, data)` — hoje os três índices de `models.py:800-804` são
+    todos NÃO-únicos, e um `CREATE UNIQUE INDEX` falharia se produção já tiver
+    linhas que o violem. Foi `/novo_ponto` que as criou, então provavelmente tem.
+
+    A coluna que mais importa é a última: horas gravadas em `RegistroPonto` que
+    não têm custo correspondente. É a perda, em horas, que o A10 descreve.
+    """
+    secao("7. Pares (funcionário, data) com mais de um RegistroPonto")
+    if not _existe(cur, "registro_ponto"):
+        print("  registro_ponto não existe neste banco.")
+        return
+    linhas = _t(cur, """
+        with dups as (
+            select admin_id, funcionario_id, data,
+                   count(*)                              as registros,
+                   count(distinct obra_id)               as obras,
+                   sum(coalesce(horas_trabalhadas, 0))   as horas
+            from registro_ponto
+            group by admin_id, funcionario_id, data
+            having count(*) > 1
+        )
+        select d.admin_id,
+               count(*)            as dias,
+               sum(d.registros)    as registros,
+               sum(d.horas)        as horas_gravadas,
+               sum(case when d.obras > 1 then 1 else 0 end) as dias_multiobra,
+               coalesce((
+                   select sum(c.horas_trabalhadas)
+                   from custo_obra c
+                   where c.admin_id = d.admin_id
+                     and c.categoria = 'PONTO_ELETRONICO'
+                     and (c.funcionario_id, c.data) in (
+                         select dd.funcionario_id, dd.data
+                         from dups dd where dd.admin_id = d.admin_id)
+               ), 0) as horas_custeadas
+        from dups d
+        group by d.admin_id
+        order by 2 desc
+    """)
+    if not linhas:
+        print("  Nenhum. A invariante 'um registro por (funcionário, dia)' já")
+        print("  vale de fato neste banco — o índice único passaria hoje.")
+        return
+    print(f"  {len(linhas)} tenant(s) afetado(s):")
+    for admin_id, dias, regs, h_grav, multiobra, h_cust in linhas:
+        perda = float(h_grav or 0) - float(h_cust or 0)
+        print(f"    admin_id={admin_id}: {dias} dia(s), {regs} registro(s), "
+              f"{multiobra} dia(s) em mais de uma obra")
+        print(f"      horas gravadas={float(h_grav or 0):.1f}  "
+              f"custeadas={float(h_cust or 0):.1f}  "
+              f"diferença={perda:+.1f}h")
+    print()
+    print("  >> A diferença POSITIVA é hora trabalhada que nunca virou custo")
+    print("     (o segundo lançamento sobrescreveu o primeiro). A NEGATIVA é o")
+    print("     inverso, e é pior: dia cobrado em duas obras — 2 CustoObra para")
+    print("     1 dia, porque a chave antiga incluía obra_id (corrigido na B1.6).")
+    print()
+    print("  >> NÃO consolidar por script: qual obra fica com o custo do dia é")
+    print("     decisão de negócio, não efeito colateral de uma medição.")
+    print("  >> Índice único em (funcionario_id, data) só depois deste número")
+    print("     zerar ou ser consolidado à mão. Aí seria a migração 280.")
+
+
 def main():
     url = os.environ.get("DATABASE_URL")
     if not url:
@@ -258,7 +327,7 @@ def main():
 
     for fn in (q1_migracao_270, q2_editor_v2, q3_calendario,
                q4_snapshots_orfaos, q5_baselines_sem_bac,
-               q6_duplicacao_ponto_rdo):
+               q6_duplicacao_ponto_rdo, q7_pontos_duplicados_no_dia):
         try:
             fn(cur)
         except Exception as exc:      # uma pergunta que falha não derruba as outras
