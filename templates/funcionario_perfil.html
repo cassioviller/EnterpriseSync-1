@@ -2236,7 +2236,15 @@ function salvarPonto(event) {
     })
     .then(data => {
         if (data.success) {
-            alert(registroId ? 'Registro atualizado com sucesso!' : 'Registro criado com sucesso!');
+            // B1.7 — quem sabe o que aconteceu é o servidor, não esta tela.
+            // `registroId` só diz se o formulário foi aberto em modo de edição;
+            // ele não sabe que um lançamento novo pode ter REUSADO o registro
+            // do dia, nem que duas metades viraram um turno partido com almoço.
+            // A mensagem do servidor diz as três coisas, e dizer isso em voz
+            // alta é metade da correção: a sobrescrita silenciosa era o defeito.
+            alert(data.message ||
+                  (registroId ? 'Registro atualizado com sucesso!'
+                              : 'Registro criado com sucesso!'));
             location.reload(); // Recarregar a página para atualizar a tabela
         } else {
             throw new Error(data.error || 'Erro desconhecido');

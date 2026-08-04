@@ -147,19 +147,117 @@ def novo_ponto():
         logger.debug(f"[CONFIG] DEBUG novo_ponto: hora_entrada={hora_entrada}, hora_saida={hora_saida}")
         logger.debug(f"[CONFIG] DEBUG novo_ponto: hora_almoco_saida={hora_almoco_saida}, hora_almoco_retorno={hora_almoco_retorno}")
         
-        registro = RegistroPonto(
+        data_registro = datetime.strptime(data.get('data'), '%Y-%m-%d').date()
+
+        # ── B1.7 — a rota REUSA o registro do dia em vez de criar sempre ──────
+        # Esta era a única de DEZ criadoras de `RegistroPonto` fora de
+        # `archive/` e `tests/` que não consultava antes de criar. As outras
+        # nove reusam (`ponto_service.py:105-118` e `:326-350`,
+        # `ponto_views.py:1483-1500`, `:1642-1656`, `:2362-2382`,
+        # `views/api.py:337-343` e `:732-737`, `models.py:4562` e `:4777`) — o
+        # consenso delas é a prova de que a invariante da casa é UM registro por
+        # (funcionário, data). O modelo diz o mesmo: há UM `hora_entrada`, UM
+        # `hora_saida` e UM par de almoço (`models.py:759-763`); não existe
+        # coluna de turno nem de sequência.
+        registro = RegistroPonto.query.filter_by(
             funcionario_id=funcionario_id,
-            obra_id=obra_id,
-            data=datetime.strptime(data.get('data'), '%Y-%m-%d').date(),
-            hora_entrada=hora_entrada,
-            hora_saida=hora_saida,
-            hora_almoco_saida=hora_almoco_saida,
-            hora_almoco_retorno=hora_almoco_retorno,
-            observacoes=data.get('observacoes', ''),
-            tipo_registro=data.get('tipo_lancamento', 'trabalho_normal'),
-            admin_id=admin_id
-        )
-        
+            data=data_registro,
+            admin_id=admin_id,
+        ).order_by(RegistroPonto.id).first()
+
+        criado = registro is None
+        merge_turno_partido = False
+
+        if criado:
+            registro = RegistroPonto(
+                funcionario_id=funcionario_id,
+                obra_id=obra_id,
+                data=data_registro,
+                hora_entrada=hora_entrada,
+                hora_saida=hora_saida,
+                hora_almoco_saida=hora_almoco_saida,
+                hora_almoco_retorno=hora_almoco_retorno,
+                observacoes=data.get('observacoes', ''),
+                tipo_registro=data.get('tipo_lancamento', 'trabalho_normal'),
+                admin_id=admin_id
+            )
+            db.session.add(registro)
+        else:
+            # ── Turno partido × correção ─────────────────────────────────────
+            # O mesmo formulário serve aos dois casos, e só os HORÁRIOS os
+            # distinguem. Se o lançamento novo COMEÇA depois de o registrado
+            # terminar, ele é a segunda metade do dia — 08:00-12:00 seguido de
+            # 13:00-17:00 são 8h com uma hora de almoço, não 4h que substituem
+            # outras 4h. Se os horários se sobrepõem, é correção: 08:00-17:00
+            # seguido de 08:00-18:00 é o mesmo dia reapontado, e vale o último.
+            #
+            # Sem esta distinção o dia de 8h viraria 4h no registro E no custo:
+            # coerente consigo mesmo, e mentindo sobre a jornada. A perda hoje é
+            # medida — `scripts/medir_producao.py` q7 mostra o padrão "8h
+            # gravadas, 4h custeadas" repetido tenant a tenant.
+            _cabe_almoco = not (registro.hora_almoco_saida
+                                or registro.hora_almoco_retorno)
+            _e_segunda_metade = (
+                hora_entrada is not None
+                and registro.hora_entrada is not None
+                and registro.hora_saida is not None
+                and hora_entrada >= registro.hora_saida
+            )
+
+            if _e_segunda_metade and _cabe_almoco:
+                merge_turno_partido = True
+                registro.hora_almoco_saida = registro.hora_saida
+                registro.hora_almoco_retorno = hora_entrada
+                if hora_saida is not None:
+                    registro.hora_saida = hora_saida
+                logger.info(
+                    "[B1.7] Turno partido para funcionário %s em %s: "
+                    "%s-%s + %s-%s vira %s-%s com almoço %s-%s",
+                    funcionario_id, data_registro,
+                    registro.hora_entrada, registro.hora_almoco_saida,
+                    hora_entrada, hora_saida,
+                    registro.hora_entrada, registro.hora_saida,
+                    registro.hora_almoco_saida, registro.hora_almoco_retorno)
+            else:
+                if _e_segunda_metade and not _cabe_almoco:
+                    # O modelo não comporta um segundo intervalo. Tratar como
+                    # correção é a saída conservadora: estender a saída por cima
+                    # do intervalo faria `calcular_horas_trabalhadas` contar o
+                    # vão como trabalhado, e SUPERESTIMAR folha é pior que
+                    # subestimar. O log existe para o caso aparecer de verdade.
+                    logger.warning(
+                        "[B1.7] Funcionário %s em %s já tem almoço gravado "
+                        "(%s-%s) e recebeu um terceiro turno (%s-%s). O modelo "
+                        "tem UM par de almoço: aplicado como CORREÇÃO, e o "
+                        "intervalo novo não fica representado.",
+                        funcionario_id, data_registro,
+                        registro.hora_almoco_saida, registro.hora_almoco_retorno,
+                        hora_entrada, hora_saida)
+                # Correção — campo vazio no POST NÃO apaga valor já gravado.
+                if hora_entrada is not None:
+                    registro.hora_entrada = hora_entrada
+                if hora_saida is not None:
+                    registro.hora_saida = hora_saida
+                if hora_almoco_saida is not None:
+                    registro.hora_almoco_saida = hora_almoco_saida
+                if hora_almoco_retorno is not None:
+                    registro.hora_almoco_retorno = hora_almoco_retorno
+
+            # `obra_id` vazio não pode zerar a obra: sem ela o handler sai em
+            # `event_manager.py:326-328` ("sem obra vinculada") e o dia inteiro
+            # perde custo.
+            if obra_id is not None:
+                registro.obra_id = obra_id
+            if data.get('observacoes'):
+                registro.observacoes = data.get('observacoes')
+            # `tipo_lancamento` só se veio no POST: o default 'trabalho_normal'
+            # rebaixaria um dia marcado `falta`, e
+            # `services/funcionario_metrics.py:124-128` deixaria de contá-la.
+            if data.get('tipo_lancamento'):
+                registro.tipo_registro = data.get('tipo_lancamento')
+
+        # O recálculo roda sobre o OBJETO, depois do merge — nunca sobre as
+        # variáveis locais parseadas do POST, que só conhecem a metade recebida.
         if registro.hora_entrada and registro.hora_saida:
             from utils import calcular_horas_trabalhadas
             horas_calc = calcular_horas_trabalhadas(
@@ -171,14 +269,18 @@ def novo_ponto():
             )
             registro.horas_trabalhadas = horas_calc['total']
             registro.horas_extras = horas_calc['extras']
-        
-        db.session.add(registro)
-        db.session.commit()
-        
-        logger.debug(f"[OK] DEBUG novo_ponto: Registro criado com sucesso, id={registro.id}")
 
-        # Emitir evento após commit — integração com diaristas V2 e outros módulos
-        tipo_ponto_canonico = 'entrada' if hora_entrada else None
+        db.session.commit()
+
+        logger.debug(
+            "[OK] DEBUG novo_ponto: registro %s id=%s (%sh)",
+            'CRIADO' if criado else 'ATUALIZADO', registro.id,
+            registro.horas_trabalhadas)
+
+        # Emitir evento após commit — integração com diaristas V2 e outros
+        # módulos. Olha o OBJETO: num merge de tarde, `hora_entrada` local é
+        # 13:00 mas o dia começou às 08:00, e é o dia que o custo precisa.
+        tipo_ponto_canonico = 'entrada' if registro.hora_entrada else None
         if tipo_ponto_canonico:
             try:
                 from event_manager import EventManager
@@ -188,11 +290,23 @@ def novo_ponto():
                 }, admin_id=admin_id)
             except Exception as ev_err:
                 logger.warning(f"[WARN] Evento ponto_registrado não emitido (manual): {ev_err}")
-        
+
+        if criado:
+            mensagem = 'Registro de ponto criado com sucesso!'
+        elif merge_turno_partido:
+            mensagem = ('Turno partido: o registro do dia agora vai de '
+                        f'{registro.hora_entrada:%H:%M} a '
+                        f'{registro.hora_saida:%H:%M}, com almoço de '
+                        f'{registro.hora_almoco_saida:%H:%M} a '
+                        f'{registro.hora_almoco_retorno:%H:%M}.')
+        else:
+            mensagem = 'Registro do dia atualizado.'
+
         return jsonify({
             'success': True,
-            'message': 'Registro de ponto criado com sucesso!',
-            'registro_id': registro.id
+            'message': mensagem,
+            'registro_id': registro.id,
+            'criado': criado
         })
         
     except Exception as e:

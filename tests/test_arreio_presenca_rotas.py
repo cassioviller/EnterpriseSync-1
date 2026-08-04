@@ -40,7 +40,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import main  # noqa: F401 — registra os blueprints antes de qualquer request
 from app import app, db
-from models import Allocation, AllocationEmployee, RegistroPonto
+from models import Allocation, AllocationEmployee, Obra, RegistroPonto
 
 from helpers_dinheiro import custos_obra, soma
 from helpers_tenant import cliente_de, um_tenant
@@ -120,15 +120,20 @@ def _pontos(tenant, dia=DIA):
 # (a) e (b) — /novo_ponto
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason='A10 — views/admin.py:150 cria registro '
-                                       'incondicional e event_manager.py:532 '
-                                       'sobrescreve em vez de somar')
 def test_dois_lancamentos_no_mesmo_dia_custeiam_as_horas_das_duas_metades():
     """Manhã de 4h + tarde de 4h. O dia custeado tem de valer 8h.
 
     Esta é a asserção que faltava: relacionar horas GRAVADAS com horas
-    CUSTEADAS. Hoje ficam 2 ``RegistroPonto`` (4h + 4h) e **um** ``CustoObra``
-    de meia jornada — o segundo lançamento sobrescreveu o primeiro.
+    CUSTEADAS. Antes da B1.6/B1.7 ficavam 2 ``RegistroPonto`` (4h + 4h) e **um**
+    ``CustoObra`` de meia jornada — o segundo lançamento sobrescrevia o primeiro.
+
+    🔬 **A regra que este teste congela foi uma decisão, não uma dedução.** O
+    mesmo formulário serve à correção e ao turno partido, e só os horários os
+    distinguem: lançamento que COMEÇA depois de o registrado terminar é a
+    segunda metade do dia; lançamento que se sobrepõe é correção (é o teste
+    seguinte). A alternativa descartada era tratar tudo como correção — o
+    sistema ficaria coerente consigo mesmo dizendo que o dia teve 4h, e a manhã
+    sumiria do registro do trabalhador.
     """
     with app.app_context():
         tenant = _cenario('duasmetades')
@@ -142,12 +147,91 @@ def test_dois_lancamentos_no_mesmo_dia_custeiam_as_horas_das_duas_metades():
         registros = _pontos(tenant)
         horas_gravadas = sum(float(r.horas_trabalhadas or 0) for r in registros)
 
+        assert len(registros) == 1, (
+            f'o dia deveria ter UM registro com almoço, e tem {len(registros)}')
         assert horas_gravadas == pytest.approx(8.0), (
             f'precondição falhou: as duas metades gravaram {horas_gravadas}h')
         assert custo_do_dia == pytest.approx(custo_da_manha * 2), (
             f'o dia gravou {horas_gravadas}h mas custeou o equivalente a '
             f'R$ {custo_do_dia:.2f}, contra R$ {custo_da_manha:.2f} da primeira '
             f'metade sozinha — a segunda sobrescreveu a primeira')
+
+        r = registros[0]
+        assert (r.hora_entrada.strftime('%H:%M'),
+                r.hora_almoco_saida.strftime('%H:%M'),
+                r.hora_almoco_retorno.strftime('%H:%M'),
+                r.hora_saida.strftime('%H:%M')) == ('08:00', '12:00', '13:00', '17:00'), (
+            f'o turno partido não virou almoço: {r.hora_entrada}-'
+            f'{r.hora_almoco_saida} / {r.hora_almoco_retorno}-{r.hora_saida}')
+
+
+def test_trocar_a_obra_do_dia_nao_cobra_o_dia_duas_vezes():
+    """Lançar na obra 1 e depois na obra 2, no mesmo dia.
+
+    Era o pior dos dois cenários do A10, e o menos citado: a chave do custo
+    incluía ``obra_id``, então os dois lançamentos não se enxergavam e viravam
+    DOIS ``CustoObra`` — o dia cobrado em dobro por horas que ninguém trabalhou.
+
+    A regra agora é: um custo de ponto por (funcionário, dia), na obra que o
+    registro do dia aponta. Corrigir a obra MOVE o custo; não deixa órfão atrás.
+    """
+    with app.app_context():
+        tenant = _cenario('trocaobra')
+
+        outra = Obra(nome=f'Obra 2 {tenant.marca}', codigo=f'{tenant.marca[:8]}2',
+                     admin_id=tenant.admin_id, cliente_id=tenant.cliente_id,
+                     data_inicio=DIA)
+        db.session.add(outra)
+        db.session.commit()
+
+        _lancar_ponto(tenant, '08:00', '17:00')
+
+        cli = cliente_de(tenant.admin_id)
+        cli.post('/novo_ponto', data={
+            'funcionario_id': str(tenant.funcionario_id),
+            'obra_id': str(outra.id),
+            'data': DIA.isoformat(),
+            'hora_entrada': '08:00',
+            'hora_saida': '17:00',
+            'tipo_lancamento': 'trabalho_normal',
+        })
+
+        registros = _pontos(tenant)
+        # `qualquer_obra=True` é o ponto do teste: a invariante é ENTRE obras.
+        linhas = custos_obra(tenant, DIA, CATEGORIA_PONTO, qualquer_obra=True)
+
+        assert len(registros) == 1, (
+            f'a troca de obra criou registro novo: {len(registros)} no dia')
+        assert len(linhas) == 1, (
+            f'o dia foi cobrado {len(linhas)} vezes — uma por obra. A chave do '
+            f'custo voltou a incluir obra_id')
+        assert linhas[0].obra_id == registros[0].obra_id == outra.id, (
+            f'o custo ficou na obra {linhas[0].obra_id} e o registro aponta '
+            f'{registros[0].obra_id} — o custo não seguiu a correção')
+
+
+def test_ponto_de_funcionario_de_outro_tenant_e_recusado():
+    """A rota é `@login_required` **sem** `@admin_required` (`views/admin.py:99`),
+    então o isolamento depende inteiramente do filtro por `admin_id` de `:118`.
+    Com o merge da B1.7, um vazamento aqui passaria a ALTERAR registro alheio em
+    vez de só criar um — o que torna esta asserção mais necessária que antes."""
+    with app.app_context():
+        a = _cenario('tenantA')
+        b = _cenario('tenantB')
+
+        cli = cliente_de(a.admin_id)
+        r = cli.post('/novo_ponto', data={
+            'funcionario_id': str(b.funcionario_id),
+            'obra_id': str(a.obra_id),
+            'data': DIA.isoformat(),
+            'hora_entrada': '08:00',
+            'hora_saida': '17:00',
+        })
+
+        assert r.status_code == 404, (
+            f'a rota respondeu {r.status_code} para funcionário de outro tenant')
+        assert len(_pontos(b)) == 0, (
+            'o tenant A gravou ponto no funcionário do tenant B')
 
 
 def test_corrigir_o_horario_do_mesmo_registro_continua_dando_uma_linha():

@@ -179,11 +179,21 @@ def filhos_beneficio(tenant, data=None):
     return filhos_por_categoria(tenant, CATEGORIAS_BENEFICIO, data)
 
 
-def custos_obra(tenant, data=None, categoria=None):
-    """``CustoObra`` da obra do tenant."""
+def custos_obra(tenant, data=None, categoria=None, qualquer_obra=False):
+    """``CustoObra`` da obra do tenant.
+
+    ``qualquer_obra=True`` amplia para TODAS as obras do tenant.
+
+    🔬 Não é conveniência: a invariante da B1.6 — um custo de ponto por
+    (funcionário, dia) — é **entre obras**, e um coletor preso a
+    ``tenant.obra_id`` não consegue nem enxergar a violação. Um teste de troca
+    de obra usando o escopo estreito acha zero linha e passa a acusar o oposto
+    do que investiga.
+    """
     _expirar()
-    q = CustoObra.query.filter_by(admin_id=tenant.admin_id,
-                                  obra_id=tenant.obra_id)
+    q = CustoObra.query.filter_by(admin_id=tenant.admin_id)
+    if not qualquer_obra:
+        q = q.filter(CustoObra.obra_id == tenant.obra_id)
     if data is not None:
         q = q.filter(CustoObra.data == data)
     if categoria is not None:
