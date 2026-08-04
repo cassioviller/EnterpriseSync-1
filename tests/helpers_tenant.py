@@ -49,12 +49,31 @@ class Tenant:
         return f'<Tenant {self.marca} admin={self.admin_id} obra={self.obra_id}>'
 
 
-def _um_tenant(prefixo, lado, data_ref):
-    """Admin + cliente + obra + funcionário + 3 fatos operacionais.
+def _um_tenant(prefixo, lado, data_ref, com_fatos=True,
+               tipo_remuneracao='salario', valor_diaria=None, salario=3000.0):
+    """Admin + cliente + obra + funcionário + (opcionalmente) 3 fatos operacionais.
 
     Os fatos (ponto com hora extra, alimentação, custo de obra) são o mínimo
     para os relatórios do p1 terem o que devolver — cada um deles lê uma
-    tabela diferente.
+    tabela diferente. São o DEFAULT porque os quatro consumidores originais
+    dependem deles.
+
+    ``com_fatos=False`` devolve o tenant **sem nenhum fato**: sem
+    ``RegistroPonto``, sem ``RegistroAlimentacao``, sem ``CustoObra``. É o que
+    o arreio de custo por rota (B0) precisa, e a razão é específica: o
+    ``RegistroPonto`` semeado na mesma data faz ``existe_ponto_no_dia``
+    (`event_manager.py:722-726`) pular o lançamento **antes** de o defeito de
+    custo ser alcançado. Quem semeia ponto e RDO no mesmo dia mede a guarda,
+    não o custo — foi assim que `tests/test_p1_dedup_cross_origem.py` ficou
+    verde sobre uma regressão.
+
+    ``tipo_remuneracao``/``valor_diaria``/``salario`` parametrizam o perfil do
+    funcionário. O domínio real da coluna tem **dois** valores
+    (`models.py:302`): ``'salario'`` e ``'diaria'``. Não existe ``'horista'``
+    como valor — quem o sistema trata por hora é um ``'salario'`` cujo custo
+    sai de ``horas * valor_hora`` (`utils.calcular_valor_hora_periodo`, via
+    `services/rdo_custos.py:405-413`). O eixo que separa os caminhos de custo
+    é, portanto, ``valor_diaria > 0`` — e não o rótulo.
     """
     marca = f'{prefixo.upper()}{lado}{uuid.uuid4().hex[:6].upper()}'
 
@@ -81,31 +100,49 @@ def _um_tenant(prefixo, lado, data_ref):
         codigo=marca[:10], nome=f'Funcionario {marca}',
         cpf=f'{uuid.uuid4().int % 10**11:011d}',
         data_admissao=date(2026, 1, 2), admin_id=admin.id, ativo=True,
-        salario=3000.0, tipo_remuneracao='salario')
+        salario=salario, tipo_remuneracao=tipo_remuneracao,
+        valor_diaria=valor_diaria)
     db.session.add(funcionario)
     db.session.flush()
 
-    db.session.add(RegistroPonto(
-        funcionario_id=funcionario.id, obra_id=obra.id, admin_id=admin.id,
-        data=data_ref, horas_trabalhadas=8.0, horas_extras=2.0))
+    if com_fatos:
+        db.session.add(RegistroPonto(
+            funcionario_id=funcionario.id, obra_id=obra.id, admin_id=admin.id,
+            data=data_ref, horas_trabalhadas=8.0, horas_extras=2.0))
 
-    db.session.add(RegistroAlimentacao(
-        funcionario_id=funcionario.id, obra_id=obra.id, admin_id=admin.id,
-        data=data_ref, tipo='almoco', valor=25.0))
+        db.session.add(RegistroAlimentacao(
+            funcionario_id=funcionario.id, obra_id=obra.id, admin_id=admin.id,
+            data=data_ref, tipo='almoco', valor=25.0))
 
-    db.session.add(CustoObra(
-        obra_id=obra.id, admin_id=admin.id, tipo='material',
-        descricao=f'Custo {marca}', valor=1234.0, data=data_ref))
+        db.session.add(CustoObra(
+            obra_id=obra.id, admin_id=admin.id, tipo='material',
+            descricao=f'Custo {marca}', valor=1234.0, data=data_ref))
 
     db.session.commit()
     return Tenant(marca, admin.id, obra.id, funcionario.id, cliente.id)
 
 
-def dois_tenants(prefixo, data_ref=None):
-    """(A, B) — dois tenants completos e sem nada em comum."""
+def dois_tenants(prefixo, data_ref=None, com_fatos=True, **perfil):
+    """(A, B) — dois tenants completos e sem nada em comum.
+
+    ``perfil`` repassa ``tipo_remuneracao``/``valor_diaria``/``salario`` para
+    os dois lados. Os defaults são os originais, de propósito: os quatro
+    consumidores que já existiam dependem dos três fatos semeados.
+    """
     data_ref = data_ref or date(2026, 6, 15)
-    return (_um_tenant(prefixo, 'A', data_ref),
-            _um_tenant(prefixo, 'B', data_ref))
+    return (_um_tenant(prefixo, 'A', data_ref, com_fatos=com_fatos, **perfil),
+            _um_tenant(prefixo, 'B', data_ref, com_fatos=com_fatos, **perfil))
+
+
+def um_tenant(prefixo, data_ref=None, com_fatos=True, **perfil):
+    """Um tenant só — para o arreio de comportamento, que não precisa de par.
+
+    O arreio de isolamento (p1) precisa de dois lados para ver vazamento; o de
+    custo por rota precisa de **um** tenant limpo. Semear o segundo ali só
+    encareceria o teste sem provar nada.
+    """
+    data_ref = data_ref or date(2026, 6, 15)
+    return _um_tenant(prefixo, 'U', data_ref, com_fatos=com_fatos, **perfil)
 
 
 def cliente_de(user_id):
