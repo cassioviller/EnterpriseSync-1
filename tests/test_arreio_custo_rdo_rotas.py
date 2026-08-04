@@ -41,7 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import main  # noqa: F401 — registra os blueprints antes de qualquer request
 from app import app, db
-from models import ContaReceber
+from models import ContaReceber, RDO
 
 from helpers_dinheiro import (custo_diario, filhos_mao_de_obra,
                               linhas_mao_de_obra, mao_de_obra, form_rdo,
@@ -267,43 +267,84 @@ def test_reexecutar_o_mesmo_rdo_nao_duplica_o_custo():
         assert soma(depois_de_duas) == pytest.approx(150.0)
 
 
-@pytest.mark.xfail(strict=True, reason='achado do arreio B0, sem item no plano '
-                                       '— o rateio proporcional documentado em '
-                                       'services/custo_funcionario_dia.py:9-19 '
-                                       'não é aplicado')
-def test_dois_rdos_no_mesmo_dia_nao_dobram_o_custo_do_dia():
-    """Dois RDOs no mesmo dia, mesmo funcionário, mesma obra, 8h cada.
+def test_mensalista_em_dois_rdos_custeia_as_horas_reportadas():
+    """Congela a regra do mensalista, que **não** tem teto diário — e não deveria ter.
 
-    O funcionário trabalhou um dia, não dois. `services/custo_funcionario_dia.py`
-    **documenta** a regra certa no próprio cabeçalho (`:9-11`):
+    🔬 Medido nos três arranjos, para deixar a regra sem ambiguidade:
+    8h em um RDO = R$ 124,00; 4h+4h em dois = R$ 62,00 + R$ 62,00 = R$ 124,00;
+    8h+8h em dois = R$ 248,00. O custo é ``horas × valor_hora``
+    (`services/custo_funcionario_dia.py:113-116`), e a soma do dia acompanha as
+    horas **reportadas**.
 
-        Rateio proporcional quando o funcionário aparece em >1 RDO no mesmo dia:
-          proporção = horas_neste_rdo / total_horas_no_dia
+    O ``proporcao`` de `:81` é aplicado ao diarista (`:97`) e a VA/VT (`:87-88`),
+    onde a unidade é o DIA, e deliberadamente **não** ao mensalista, onde a
+    unidade é a hora. Aplicá-lo ali quebraria o caso 4h+4h, que passaria a
+    custar meia jornada por uma jornada inteira.
 
-    e o `:18-19` promete recalcular os RDOs vizinhos "pois a proporção mudou".
-    O log do serviço confirma que o vizinho foi recalculado — e mesmo assim os
-    dois RDOs ficam com o custo integral do dia.
-
-    Medido: R$ 124,00 + R$ 124,00 = R$ 248,00 por um dia de 8 horas. O dedup de
-    `services/rdo_custos.py:422-428` não pega, porque a chave é
-    `(origem_tabela, origem_id, admin_id)` e `origem_id` é por RDO — dois RDOs
-    são duas chaves distintas, por construção.
-
-    É o espelho de A05: lá o custo some, aqui ele dobra. E acontece na rota que
-    o plano trata como referência.
+    Este teste existe porque a leitura ingênua do cabeçalho do módulo (`:9-11`,
+    "rateio proporcional quando o funcionário aparece em >1 RDO no mesmo dia")
+    sugere um teto que não existe para o mensalista. Se alguém "consertar" isso,
+    o teste explica por que não era defeito.
     """
     with app.app_context():
         tenant, tarefa = _cenario('doisrdo')
 
-        _via_flexivel(tenant, tarefa)
-        um_rdo = soma(filhos_mao_de_obra(tenant, DIA))
+        _via_flexivel(tenant, tarefa, horas=4.0)
+        depois_do_primeiro = soma(filhos_mao_de_obra(tenant, DIA))
 
-        _via_flexivel(tenant, tarefa)
-        dois_rdos = soma(filhos_mao_de_obra(tenant, DIA))
+        _via_flexivel(tenant, tarefa, horas=4.0)
+        linhas = filhos_mao_de_obra(tenant, DIA)
+        total = soma(linhas)
 
-        assert dois_rdos == pytest.approx(um_rdo), (
-            f'o dia custou R$ {um_rdo:.2f} com um RDO e R$ {dois_rdos:.2f} com '
-            f'dois — o rateio proporcional não foi aplicado')
+        assert len(linhas) == 2, (
+            f'dois RDOs deveriam render duas linhas de custo, achou {len(linhas)}')
+        assert total == pytest.approx(depois_do_primeiro * 2), (
+            f'as duas metades de 4h renderam R$ {total:.2f}, e a primeira '
+            f'sozinha rendeu R$ {depois_do_primeiro:.2f} — o custo do '
+            f'mensalista deve escalar com as horas reportadas')
+
+
+@pytest.mark.xfail(strict=True, reason='achado do arreio B0, sem item no plano '
+                                       '— o recálculo cruzado atualiza '
+                                       'RDOCustoDiario e não o GestaoCustoFilho '
+                                       'já criado')
+def test_o_razao_acompanha_o_recalculo_cruzado_da_diaria():
+    """Diarista em dois RDOs do mesmo dia: a fonte e o razão divergem.
+
+    A diária **tem** teto — é uma por dia, rateada entre os RDOs
+    (`services/custo_funcionario_dia.py:95-97`), e o módulo promete recalcular os
+    RDOs vizinhos quando a proporção muda (`:18-19`). A promessa é cumprida na
+    tabela de origem e **não** no razão:
+
+        RDOCustoDiario   = [75,00 · 75,00]  → R$ 150,00  ✅ uma diária
+        GestaoCustoFilho = [150,00 · 75,00] → R$ 225,00  ❌ uma diária e meia
+
+    O primeiro lançamento nasceu com 150,00 quando era o único RDO do dia.
+    Quando o segundo chegou e a proporção virou 50/50, o vizinho foi recalculado
+    na origem — mas a guarda de idempotência de `services/rdo_custos.py:422-428`
+    encontra o filho existente e faz ``continue``, em vez de atualizar o valor.
+    Idempotência que ignora mudança de valor vira dado velho.
+
+    **Isto importa para B1.1.** O desenho adotado é "o handler passa a ler
+    ``RDOCustoDiario``". Ler a tabela certa não basta se a linha do razão nunca
+    é revisada depois de criada.
+    """
+    with app.app_context():
+        tenant, tarefa = _cenario('razao', tipo_remuneracao='diaria',
+                                  valor_diaria=150.0)
+
+        _via_flexivel(tenant, tarefa, horas=8.0)
+        _via_flexivel(tenant, tarefa, horas=8.0)
+
+        no_razao = soma(filhos_mao_de_obra(tenant, DIA))
+        rdos = RDO.query.filter_by(obra_id=tenant.obra_id,
+                                   data_relatorio=DIA).all()
+        na_origem = sum(soma(custo_diario(r.id), campo='componente_folha')
+                        for r in rdos)
+
+        assert no_razao == pytest.approx(na_origem), (
+            f'a origem diz R$ {na_origem:.2f} e o razão diz R$ {no_razao:.2f} — '
+            f'o recálculo cruzado não alcançou o GestaoCustoFilho já criado')
 
 
 # ---------------------------------------------------------------------------
