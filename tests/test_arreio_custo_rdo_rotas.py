@@ -77,6 +77,27 @@ def _cenario(prefixo, **perfil):
     return tenant, tarefa
 
 
+def _servico_do_tenant(tenant):
+    """Um `Servico` ativo do tenant.
+
+    🔬 Só `POST /rdo/salvar` precisa disto, e o motivo é uma armadilha da rota:
+    quando o formulário não traz campo de subatividade, ela tenta um fallback
+    (`views/rdo.py:3183-3199`) que pega o PRIMEIRO `Servico` do admin; sem
+    nenhum, ela dá ``flash`` + ``redirect`` em `:3199` — **antes** de parsear a
+    mão de obra (`:3354`) e antes do bloco de custo. O RDO já criado fica órfão,
+    com `status='Finalizado'`, zero mão de obra e zero subatividade, e a rota
+    responde 302 como se nada houvesse. Sem este serviço, qualquer assert de
+    dinheiro sobre esta rota mede o abandono, não o lançamento.
+    """
+    from models import Servico
+    s = Servico(nome=f'Servico {tenant.marca}', categoria='geral',
+                unidade_medida='un', custo_unitario=100.0, ativo=True,
+                admin_id=tenant.admin_id)
+    db.session.add(s)
+    db.session.commit()
+    return s
+
+
 def _ok(resposta):
     """Status é PRÉ-FILTRO, nunca prova.
 
@@ -314,30 +335,29 @@ def test_mensalista_em_dois_rdos_custeia_as_horas_reportadas():
             f'mensalista deve escalar com as horas reportadas')
 
 
-@pytest.mark.xfail(strict=True, reason='achado do arreio B0, sem item no plano '
-                                       '— o recálculo cruzado atualiza '
-                                       'RDOCustoDiario e não o GestaoCustoFilho '
-                                       'já criado')
 def test_o_razao_acompanha_o_recalculo_cruzado_da_diaria():
-    """Diarista em dois RDOs do mesmo dia: a fonte e o razão divergem.
+    """Diarista em dois RDOs do mesmo dia: a fonte e o razão têm de fechar.
 
     A diária **tem** teto — é uma por dia, rateada entre os RDOs
     (`services/custo_funcionario_dia.py:95-97`), e o módulo promete recalcular os
-    RDOs vizinhos quando a proporção muda (`:18-19`). A promessa é cumprida na
-    tabela de origem e **não** no razão:
+    RDOs vizinhos quando a proporção muda (`:18-19`). Até a B1.5b a promessa era
+    cumprida na tabela de origem e **não** no razão:
 
         RDOCustoDiario   = [75,00 · 75,00]  → R$ 150,00  ✅ uma diária
         GestaoCustoFilho = [150,00 · 75,00] → R$ 225,00  ❌ uma diária e meia
 
-    O primeiro lançamento nasceu com 150,00 quando era o único RDO do dia.
-    Quando o segundo chegou e a proporção virou 50/50, o vizinho foi recalculado
-    na origem — mas a guarda de idempotência de `services/rdo_custos.py:422-428`
-    encontra o filho existente e faz ``continue``, em vez de atualizar o valor.
-    Idempotência que ignora mudança de valor vira dado velho.
+    O primeiro lançamento nascia com 150,00 quando era o único RDO do dia; quando
+    o segundo chegava e a proporção virava 50/50, o vizinho era recalculado na
+    origem, mas a guarda de idempotência encontrava o filho existente e fazia
+    ``continue`` em vez de atualizar o valor. **Idempotência que ignora mudança
+    de valor vira dado velho.**
 
-    **Isto importa para B1.1.** O desenho adotado é "o handler passa a ler
-    ``RDOCustoDiario``". Ler a tabela certa não basta se a linha do razão nunca
-    é revisada depois de criada.
+    🔬 Este teste nasceu `xfail(strict=True)` no B0 e a marca saiu na B1.5b, que
+    fez a chave larga de `event_manager.py:933` distinguir origem e reconciliar
+    valor. Ele é irmão de `test_mensalista_em_dois_rdos_custeia_as_horas_reportadas`:
+    os dois medem o mesmo dia partido em dois RDOs, e é a diferença entre eles
+    que define a regra — o diarista tem teto diário, o mensalista não, porque a
+    unidade de um é o DIA e a do outro é a HORA.
     """
     with app.app_context():
         tenant, tarefa = _cenario('razao', tipo_remuneracao='diaria',
@@ -355,6 +375,78 @@ def test_o_razao_acompanha_o_recalculo_cruzado_da_diaria():
         assert no_razao == pytest.approx(na_origem), (
             f'a origem diz R$ {na_origem:.2f} e o razão diz R$ {no_razao:.2f} — '
             f'o recálculo cruzado não alcançou o GestaoCustoFilho já criado')
+
+        _assert_pais_fecham_com_os_filhos(tenant)
+
+
+def test_editar_as_horas_para_baixo_corrige_o_custo_e_o_total_do_pai():
+    """Reprocessar o MESMO RDO com menos horas tem de reduzir o custo.
+
+    8h → R$ 124,00; as mesmas 8h corrigidas para 4h → R$ 62,00. O que o teste
+    exige é que os andares fechem: `GestaoCustoFilho` e `GestaoCustoPai.valor_total`.
+
+    🔬 **O que este teste NÃO prova, para não enganar quem o ler.** Medido: a
+    rota de edição APAGA o custo antes de reescrever
+    (`rdo_editar_sistema.py:357-363`), então ela nunca entra no ramo de
+    reconciliação da B1.5b — ela remove e insere. E, na inserção,
+    `registrar_custo_automatico` recomputa `pai.valor_total` somando os filhos
+    (`utils/financeiro_integration.py:177-181`), de modo que o pai se autocura
+    aqui mesmo sem o ajuste por delta do handler. Confirmado desligando o
+    ajuste: este teste continua verde.
+
+    Ele vale pelo que afirma de fato — que corrigir horas para baixo corrige o
+    dinheiro para baixo, nos dois andares — e o
+    `_assert_pais_fecham_com_os_filhos` fica como invariante de casa, não como
+    prova do delta.
+    """
+    with app.app_context():
+        tenant, tarefa = _cenario('reproc')
+
+        rdo = _via_editar(tenant, tarefa, horas=8.0)
+        oito_horas = soma(filhos_mao_de_obra(tenant, DIA))
+        assert oito_horas > 0, 'o cenário não gerou custo — nada a reprocessar'
+        _assert_pais_fecham_com_os_filhos(tenant)
+
+        cli = cliente_de(tenant.admin_id)
+        _ok(cli.post(f'/rdo/editar/{rdo.id}',
+                     data=form_rdo(tenant, DIA, tarefa_id=tarefa.id, horas=4.0)))
+
+        quatro_horas = soma(filhos_mao_de_obra(tenant, DIA))
+        assert quatro_horas == pytest.approx(oito_horas / 2), (
+            f'corrigir 8h para 4h deveria levar o custo de R$ {oito_horas:.2f} '
+            f'para R$ {oito_horas / 2:.2f}, e o razão diz R$ {quatro_horas:.2f} '
+            f'— a idempotência voltou a ignorar mudança de valor')
+
+        _assert_pais_fecham_com_os_filhos(tenant)
+
+
+def _assert_pais_fecham_com_os_filhos(tenant):
+    """`GestaoCustoPai.valor_total` tem de bater com a soma dos seus filhos.
+
+    🔬 O total do pai **não é derivado**: é somatório mantido à mão a cada
+    inserção (`utils/financeiro_integration.py:222`). Toda reconciliação de
+    valor de filho tem de ajustá-lo pelo delta, senão a B1.5b consertaria a
+    divergência entre origem e razão criando a mesma divergência um andar
+    acima — entre o pai e os próprios filhos.
+
+    Hoje a inserção que costuma vir logo depois recomputa o total somando os
+    filhos (`:177-181`) e encobre o problema; por isso este assert é
+    **invariante de casa**, não prova de um defeito atual. Ele existe para o
+    dia em que alguém reconciliar valor sem inserir nada em seguida.
+    """
+    from models import GestaoCustoPai, GestaoCustoFilho
+    db.session.expire_all()
+    pais = GestaoCustoPai.query.filter_by(admin_id=tenant.admin_id).all()
+    for pai in pais:
+        filhos = GestaoCustoFilho.query.filter_by(pai_id=pai.id).all()
+        if not filhos:
+            continue
+        soma_filhos = sum(float(f.valor or 0) for f in filhos)
+        assert float(pai.valor_total or 0) == pytest.approx(soma_filhos), (
+            f'pai {pai.id} ({pai.tipo_categoria}) diz R$ '
+            f'{float(pai.valor_total or 0):.2f} e seus {len(filhos)} filho(s) '
+            f'somam R$ {soma_filhos:.2f} — a reconciliação mexeu no filho e '
+            f'esqueceu o total do pai')
 
 
 # ---------------------------------------------------------------------------
@@ -412,25 +504,45 @@ def test_custo_diario_gravado_implica_lancamento_na_gestao_de_custos():
 
 
 # ---------------------------------------------------------------------------
-# (f) — congelar o gap conhecido de /rdo/salvar
+# (f) — /rdo/salvar entra na regra comum
 # ---------------------------------------------------------------------------
 
-def test_rdo_salvar_unificado_gera_custo_e_nao_recalcula_medicao():
-    """Congela o comportamento de `POST /rdo/salvar` (`views/rdo.py:2766`).
+def test_rdo_salvar_unificado_gera_custo_e_recalcula_medicao():
+    """`POST /rdo/salvar` (`views/rdo.py:2766`) depois da B1.5.
 
-    Não é xfail: não é defeito de A05, é um gap conhecido e diferente — a rota
-    lança custo e não emite `rdo_finalizado`. Fica registrado por teste para que
-    a correção de A05 não o altere sem que alguém veja.
+    🔬 Este teste nasceu ao contrário: até a B1.5 ele CONGELAVA o gap — a rota
+    lançava custo e não emitia `rdo_finalizado`, e o teste afirmava que a
+    sentinela sobrevivia, para que a correção de A05 não mudasse isso sem que
+    alguém visse. A B1.5 mudou de propósito (`views/rdo.py:3422`, chamada direta
+    → emit), e o teste foi virado junto, no mesmo commit.
+
+    Era o último caminho vivo que gerava custo e nunca recalculava medição: o
+    custo entrava no razão e a medição da obra ficava para trás em silêncio, até
+    que outro RDO da mesma obra passasse por uma rota que emite.
+
+    🔬 **A versão anterior deste teste era vacuosa e o nome mentia.** Ele postava
+    com as chaves ``cron_tarefa_*``, que esta rota **não parseia**
+    (`views/rdo.py:3292-3316` lê ``funcionario_<id>_nome``/``_horas``), então o
+    RDO nascia sem mão de obra, `gerar_custos_mao_obra_rdo` saía em
+    `services/rdo_custos.py:386-387` e não havia custo nenhum para gerar. A
+    sentinela sobrevivia por ausência de fato, não por ausência de emit — e o
+    "gera_custo" do nome nunca foi conferido por assert nenhum. Daí o
+    ``flat_func=True`` abaixo, e daí o primeiro assert.
     """
     with app.app_context():
         tenant, tarefa = _cenario('unif')
         _semear_cr_sentinela(tenant)
+        _servico_do_tenant(tenant)
 
         cli = cliente_de(tenant.admin_id)
-        form = form_rdo(tenant, DIA, tarefa_id=tarefa.id)
+        form = form_rdo(tenant, DIA, tarefa_id=tarefa.id, flat_func=True)
         form['funcionario_id'] = str(tenant.funcionario_id)
         _ok(cli.post('/rdo/salvar', data=form))
 
-        assert _sentinela_intacta(tenant), (
-            'a sentinela sumiu: /rdo/salvar passou a recalcular medição — '
-            'comportamento mudou e este teste precisa ser reavaliado')
+        assert len(filhos_mao_de_obra(tenant, DIA)) == 1, (
+            '/rdo/salvar deixou de gerar custo: a chamada direta saiu na B1.5 e '
+            'o emit que a substituiu não lançou no lugar dela')
+
+        assert not _sentinela_intacta(tenant), (
+            'a sentinela sobreviveu: /rdo/salvar ainda não recalcula medição — '
+            'o emit da B1.5 não chegou em recalcular_medicao_apos_rdo')

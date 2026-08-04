@@ -94,7 +94,8 @@ def mao_de_obra(rdo, tenant, horas=8.0, tarefa=None, funcao='Servente'):
     return linha
 
 
-def form_rdo(tenant, data, tarefa_id=None, horas=8.0, sub_mestre_id=None):
+def form_rdo(tenant, data, tarefa_id=None, horas=8.0, sub_mestre_id=None,
+             flat_func=False):
     """O dict de formulário com as chaves REAIS que as rotas parseiam.
 
     ``cron_tarefa_<tarefa_id>_func_<func_id>_horas`` casa com o regex de
@@ -106,6 +107,19 @@ def form_rdo(tenant, data, tarefa_id=None, horas=8.0, sub_mestre_id=None):
     mão de obra a partir do formulário (`rdo_editar_sistema.py:445-491`). Postar
     sem estas chaves zera a equipe, e o teste que olhasse dinheiro depois disso
     estaria medindo o próprio apagamento.
+
+    ``flat_func=True`` acrescenta ``funcionario_<id>_nome`` e ``_horas``.
+
+    🔬 **As rotas não parseiam todas o mesmo formulário, e isso já produziu um
+    teste vacuoso.** ``POST /rdo/salvar`` (`views/rdo.py:3292-3316`) **ignora**
+    as chaves ``cron_tarefa_*``/``sub_func_*``: ele lê ou os campos achatados
+    ``funcionario_<id>_nome`` + ``_horas`` (Path A), ou o JSON ``mao_obra``
+    (Path B). Postar nele sem ``flat_func=True`` cria um RDO **sem mão de obra
+    nenhuma** — e aí `gerar_custos_mao_obra_rdo` sai em
+    `services/rdo_custos.py:386-387` (``if not registros: return 0``) e todo
+    assert de dinheiro depois disso mede o vazio em vez de medir a rota. Foi
+    exatamente assim que `test_rdo_salvar_unificado_*` passou verde afirmando
+    no nome que a rota "gera custo", sem nunca ter conferido.
     """
     dados = {
         'obra_id': str(tenant.obra_id),
@@ -118,6 +132,10 @@ def form_rdo(tenant, data, tarefa_id=None, horas=8.0, sub_mestre_id=None):
     if sub_mestre_id:
         chave = f'sub_func_{sub_mestre_id}_{tenant.funcionario_id}_horas'
         dados[chave] = str(horas)
+    if flat_func:
+        dados[f'funcionario_{tenant.funcionario_id}_nome'] = (
+            f'Funcionario {tenant.marca}')
+        dados[f'funcionario_{tenant.funcionario_id}_horas'] = str(horas)
     return dados
 
 

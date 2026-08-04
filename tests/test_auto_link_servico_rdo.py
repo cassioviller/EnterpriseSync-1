@@ -212,6 +212,44 @@ class AutoLinkRunner:
         db.session.commit()
         return rdo
 
+    def _filho_do_rdo(self, rdo, funcionario):
+        """O `GestaoCustoFilho` de mão de obra que o handler criou para (rdo, func).
+
+        🔬 **A chave de origem mudou e este teste ficou vermelho sem ninguém
+        ver.** Até a B1.2 (`cefba5e7`) o handler gravava
+        ``('rdo_mao_obra', rdo.id)``; agora grava
+        ``('rdo_custo_diario', RDOCustoDiario.id)`` — que é exatamente a chave
+        que `remover_custos_rdo` sabe apagar (`services/rdo_custos.py:111`), e a
+        troca é o que torna evento e chamada direta mutuamente idempotentes.
+        Este teste procurava a chave antiga e falhou de `cefba5e7` até aqui,
+        porque o gate não foi re-rodado naquele commit.
+
+        Consultar pela linha de `RDOCustoDiario`, em vez de chumbar a string,
+        deixa o teste seguir a chave em vez de congelá-la — o `else` cobre o
+        fallback legado do próprio handler, para quando não há linha de custo
+        diário.
+        """
+        from models import RDOCustoDiario
+        cd = RDOCustoDiario.query.filter_by(
+            rdo_id=rdo.id, funcionario_id=funcionario.id,
+            admin_id=self.admin.id,
+        ).first()
+        q = (
+            GestaoCustoFilho.query
+            .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+            .filter(
+                GestaoCustoFilho.admin_id == self.admin.id,
+                GestaoCustoPai.entidade_id == funcionario.id,
+            )
+        )
+        if cd is not None:
+            q = q.filter(GestaoCustoFilho.origem_tabela == 'rdo_custo_diario',
+                         GestaoCustoFilho.origem_id == cd.id)
+        else:
+            q = q.filter(GestaoCustoFilho.origem_tabela == 'rdo_mao_obra',
+                         GestaoCustoFilho.origem_id == rdo.id)
+        return q.first()
+
     def run(self):
         with self.app.test_request_context('/'):
             self.setup()
@@ -225,17 +263,7 @@ class AutoLinkRunner:
                 )
                 lancar_custos_rdo({'rdo_id': rdo_a.id}, self.admin.id)
 
-                filho = (
-                    GestaoCustoFilho.query
-                    .filter_by(
-                        origem_tabela='rdo_mao_obra',
-                        origem_id=rdo_a.id,
-                        admin_id=self.admin.id,
-                    )
-                    .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
-                    .filter(GestaoCustoPai.entidade_id == self.func.id)
-                    .first()
-                )
+                filho = self._filho_do_rdo(rdo_a, self.func)
                 self._assert(filho is not None,
                              "Cenário A: filho criado para a diária do RDO")
                 if filho:
@@ -250,17 +278,7 @@ class AutoLinkRunner:
                 )
                 lancar_custos_rdo({'rdo_id': rdo_b.id}, self.admin.id)
 
-                filho_b = (
-                    GestaoCustoFilho.query
-                    .filter_by(
-                        origem_tabela='rdo_mao_obra',
-                        origem_id=rdo_b.id,
-                        admin_id=self.admin.id,
-                    )
-                    .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
-                    .filter(GestaoCustoPai.entidade_id == self.func2.id)
-                    .first()
-                )
+                filho_b = self._filho_do_rdo(rdo_b, self.func2)
                 self._assert(filho_b is not None,
                              "Cenário B: filho criado para a diária do RDO multi-serviço")
                 if filho_b:

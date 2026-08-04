@@ -2152,11 +2152,23 @@ def atualizar_rdo(id):
         except Exception as _ce:
             logger.warning("[custo-dia] gravar_custo_funcionario_rdo falhou em atualizar_rdo: %s", _ce)
 
-        try:
-            from services.rdo_custos import gerar_custos_mao_obra_rdo
-            gerar_custos_mao_obra_rdo(rdo, admin_id)
-        except Exception as _ce:
-            logger.warning("[rdo-custo] gerar_custos_mao_obra_rdo falhou em atualizar_rdo: %s", _ce)
+        # B1.5 — a chamada direta a `gerar_custos_mao_obra_rdo` saiu daqui.
+        # O `EventManager.emit` logo abaixo faz tudo o que ela fazia, com a
+        # MESMA chave de idempotência (`origem_tabela='rdo_custo_diario'`,
+        # `origem_id=RDOCustoDiario.id`, desde a B1.2) — quem chegasse primeiro
+        # vencia e o outro saía, então manter as duas era só uma corrida sem
+        # vencedor útil. O que o evento tem a mais: grava `CustoObra` (lida pelo
+        # dashboard de custos inteiro) e atende tenant v1, que
+        # `gerar_custos_mao_obra_rdo` recusa em `services/rdo_custos.py:337-341`.
+        #
+        # NÃO reintroduzir "só aqui": foi assim que a assimetria entre os seis
+        # caminhos de RDO nasceu (ver a mensagem do commit `31aed041`), e é a
+        # classe que `tests/test_p1_dedup_cross_origem.py:151-165` guarda por
+        # leitura de texto justamente porque teste de rota só a pega DEPOIS do
+        # efeito.
+        #
+        # `gravar_custo_funcionario_rdo` acima FICA: é o upsert idempotente de
+        # `RDOCustoDiario`, o handler o repete, e é dele que o handler lê.
 
         # Emitir evento rdo_finalizado (handlers legados continuam consumindo)
         try:
@@ -3419,12 +3431,30 @@ def rdo_salvar_unificado():
         except Exception as _ce:
             logger.warning("[custo-dia] gravar falhou no salvar_unificado: %s", _ce)
 
-        # Gera GestaoCustoFilho lendo valores de RDOCustoDiario (idempotente)
+        # B1.5 — a chamada direta vira emit. Esta era a única rota VIVA que
+        # gerava custo e nunca recalculava medição: o custo entrava no razão e a
+        # medição da obra ficava para trás, em silêncio, até que outro RDO da
+        # mesma obra passasse por uma das rotas que emitem. O Step E do p1 dizia
+        # ter eliminado essa situação; ela sobreviveu aqui.
+        #
+        # O emit é pós-commit (`:3413` acima), como nos outros cinco caminhos —
+        # o handler commita por dentro e não pode ver um RDO que ainda não
+        # existe. Payload completo desde a B1.4: sem `obra_id`,
+        # `recalcular_medicao_apos_rdo` sai em `event_manager.py:1529-1531`.
         try:
-            from services.rdo_custos import gerar_custos_mao_obra_rdo
-            gerar_custos_mao_obra_rdo(rdo, admin_id_correto)
-        except Exception as _ce:
-            logger.warning("[rdo-custo] gerar_custos falhou no salvar_unificado: %s", _ce)
+            from event_manager import EventManager
+            EventManager.emit('rdo_finalizado', {
+                'rdo_id': rdo.id,
+                'obra_id': rdo.obra_id,
+                'data_relatorio': str(rdo.data_relatorio)
+            }, admin_id_correto)
+            logger.info(
+                "[ALERT] Evento rdo_finalizado emitido para RDO %s "
+                "(rdo_salvar_unificado)", rdo.id)
+        except Exception as ev_err:
+            logger.error(
+                "[ERROR] Erro ao emitir evento rdo_finalizado "
+                "(rdo_salvar_unificado): %s", ev_err)
 
 
         if rdo_id:
@@ -4485,14 +4515,12 @@ def salvar_rdo_flexivel():
                     "salvar_rdo_flexivel (RDO %s): %s", rdo.id, _ce,
                 )
 
-            try:
-                from services.rdo_custos import gerar_custos_mao_obra_rdo
-                gerar_custos_mao_obra_rdo(rdo, admin_id)
-            except Exception as _ce:
-                logger.warning(
-                    "[rdo-custo] gerar_custos_mao_obra_rdo falhou em "
-                    "salvar_rdo_flexivel (RDO %s): %s", rdo.id, _ce,
-                )
+            # B1.5 — a chamada direta saiu. Esta rota era a REFERÊNCIA do arreio
+            # (`tests/test_arreio_custo_rdo_rotas.py`) por ser a única que chamava
+            # o serviço E emitia; agora só emite, como as outras. O emit logo
+            # abaixo cobre o mesmo terreno pela chave `rdo_custo_diario`.
+            # Ver o comentário longo em `atualizar_rdo` para o motivo de não
+            # reintroduzir a chamada direta aqui.
 
             # Emitir evento rdo_finalizado para lançamento automático de custos V2
             try:

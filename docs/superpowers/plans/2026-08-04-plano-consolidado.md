@@ -113,15 +113,20 @@ A ordem completa:
 | Bloco | Tasks | Entregues | Abertas | Esforço agregado |
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
-| B1 — parar de perder dado | 17 *(era 16)* | 4 | **13** | G |
+| B1 — parar de perder dado | 17 *(era 16)* | **6** | **11** | G |
 | B2 — o que o sistema informa errado | 20 | 0 | **20** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **62** | **10** | **52** | |
+| **Total** | **62** | **12** | **50** | |
 
-**Estado em 04/08, contra `060146ac`:** B0 fechado; A05 a duas Tasks de fechar
-(B1.5 e a B1.5b nascida do arreio). A contagem subiu de 61 para 62 porque o B0
-achou um defeito que nenhum recorte tinha visto — está na §4.1, Task B1.5b.
+**Estado em 04/08, fim do dia: A05 FECHADO.** B0 inteiro (6/6) e todo o A05
+(B1.1-B1.5b) entregues. O arreio de RDO está verde sem nenhum `xfail` — os seis
+que nasceram no B0 foram todos cobrados e removidos. A contagem subiu de 61 para
+62 porque o B0 achou um defeito que nenhum recorte tinha visto (B1.5b).
+
+**O que resta de B1 são as outras duas trilhas**, e elas não dependem de nada do
+que foi feito hoje: T2 (presença, B1.6-B1.11) e T3 (tenant + almoxarifado,
+B1.12-B1.16). Os cinco `xfail` vivos do arreio são o checklist delas.
 
 **Como este documento registra progresso.** Task entregue leva uma linha
 `**Status:**` logo abaixo do título, com o commit e — quando houve — o **desvio**
@@ -822,11 +827,61 @@ que a string existe; os três testes que chamam o handler
    `gerar_custos_mao_obra_rdo` → não delegar a ESCRITA, só o CÁLCULO. Deixar escrito no
    comentário do handler, porque é exatamente o tipo de refactor que parece limpeza.
 
-- [ ] **Step 1:** remover as duas chamadas diretas
-- [ ] **Step 2:** converter `:3425` em emit
-- [ ] **Step 3:** rodar B0.3 (os xfail (a)/(b)/(g) **já viraram XPASS em `cefba5e7`/`060146ac`** e as marcas já saíram; o que se confere aqui é que continuam verdes)
-- [ ] **Step 4:** `bash run_tests.sh --gate`
-- [ ] **Step 5:** commit — `fix(rdo): mecanismo único de custo — evento canônico, chamadas diretas removidas`
+- [x] **Step 1:** remover as duas chamadas diretas
+- [x] **Step 2:** converter `:3425` em emit
+- [x] **Step 3:** rodar B0.3 (os xfail (a)/(b)/(g) **já viraram XPASS em `cefba5e7`/`060146ac`** e as marcas já saíram; o que se confere aqui é que continuam verdes)
+- [x] **Step 4:** `bash run_tests.sh --gate`
+- [x] **Step 5:** commit — `fix(rdo): mecanismo único de custo — evento canônico, chamadas diretas removidas`
+
+**Status: ✅ entregue JUNTO da B1.5b, no mesmo commit — e essa fusão não é
+preferência de recorte, é a única forma correta.**
+
+**🔴 Desvio que corrige o próprio plano: B1.5 sozinha é uma REGRESSÃO DE
+DINHEIRO.** A §11.3 dizia que a B1.5b "depende de" B1.5. Depende — mas separá-las
+por um commit deixa o parque com custo a menos, medido pelo arreio no instante
+seguinte à remoção das chamadas diretas:
+
+```
+mensalista, 4h + 4h em dois RDOs do mesmo dia
+  antes da B1.5:  2 linhas × R$ 62,00 = R$ 124,00   ✅
+  com B1.5 só:    1 linha  × R$ 62,00 = R$  62,00   ❌ metade do dia some
+```
+
+A causa é a troca de guarda que a B1.5 provoca sem dizer. Enquanto havia chamada
+direta, quem criava as linhas era o guard de chave ESTREITA do serviço
+(`origem_id=RDOCustoDiario.id`, um por RDO). Removidas as chamadas, o único
+escritor passa a ser o handler, cujo guard é o de chave LARGA (`data` +
+`funcionário` + categoria, sem origem) — e ele colapsa todos os RDOs do dia num
+lançamento só. **A B1.5 não muda quem escreve o custo; ela muda qual guard
+decide, e os dois guards não são equivalentes.** Isso não estava no recorte, e é o
+tipo de coisa que só aparece medindo.
+
+**Os três Steps saíram como escritos** (as duas chamadas diretas fora, `:3425`
+convertida em emit pós-commit com payload completo). O que a execução acrescentou
+está na B1.5b.
+
+**Terceiro teste vacuoso da mesma família, achado aqui.**
+`test_rdo_salvar_unificado_*` afirmava no nome que a rota "gera custo" e **nunca
+conferiu**: ele postava com as chaves `cron_tarefa_*`, que esta rota não parseia
+(`views/rdo.py:3292-3316` lê `funcionario_<id>_nome`/`_horas`), então o RDO nascia
+sem mão de obra e não havia custo nenhum para gerar. A sentinela sobrevivia por
+ausência de fato, não por ausência de emit. Corrigido com `flat_func=True` em
+`form_rdo` e um assert de custo. **Padrão que já apareceu três vezes nesta rodada:
+o teste postava num formulário que a rota não lê, e media o vazio.**
+
+**Armadilha de rota registrada de passagem:** `POST /rdo/salvar` aborta em
+`views/rdo.py:3199` (flash + redirect) quando o tenant não tem nenhum `Servico` —
+**depois** de já ter criado e commitado o RDO, e **antes** de parsear a mão de obra.
+Sobra um RDO órfão com `status='Finalizado'`, zero mão de obra e zero subatividade,
+e a rota responde 302 como se nada houvesse. Não foi corrigido (fora do recorte);
+está congelado no docstring de `_servico_do_tenant` no arreio.
+
+**Dívida da B1.2 achada e paga aqui.** `tests/test_auto_link_servico_rdo.py`
+procurava a chave de origem ANTIGA (`'rdo_mao_obra'`/`rdo.id`) e estava
+**vermelho desde `cefba5e7`** — o gate não foi re-rodado naquele commit e ninguém
+viu. Confirmado rodando o teste com as mudanças de hoje guardadas no stash: já
+falhava antes. Passou a consultar pela linha de `RDOCustoDiario` em vez de chumbar
+a string, para seguir a chave em vez de congelá-la.
 
 ---
 
@@ -906,14 +961,59 @@ duas impressas.
    o guard está em `:460-467`. **Corrigir a citação do docstring junto**, senão a
    próxima leitura persegue linha errada.
 
-- [ ] **Step 1:** depois da B1.5, rodar o teste de novo e **medir qual guard sobrou** —
+- [x] **Step 1:** depois da B1.5, rodar o teste de novo e **medir qual guard sobrou** —
       as duas somas, com os valores impressos. Só então decidir o arquivo
-- [ ] **Step 2:** o guard passa a comparar valor e atualizar; `continue` só quando confere
-- [ ] **Step 3:** conferir o estado do pai antes de atualizar (risco 1)
-- [ ] **Step 4:** teste de não-escrita quando o valor confere (risco 3); corrigir a
+- [x] **Step 2:** o guard passa a comparar valor e atualizar; `continue` só quando confere
+- [x] **Step 3:** conferir o estado do pai antes de atualizar (risco 1)
+- [x] **Step 4:** teste de não-escrita quando o valor confere (risco 3); corrigir a
       citação de linha no docstring (risco 4)
-- [ ] **Step 5:** rodar o arreio inteiro — o `xfail` de `:317` deve virar XPASS e a marca sai
-- [ ] **Step 6:** commit — `fix(rdo): idempotência do custo de mão de obra compara valor, não só existência`
+- [x] **Step 5:** rodar o arreio inteiro — o `xfail` de `:317` deve virar XPASS e a marca sai
+- [x] **Step 6:** commit — `fix(rdo): idempotência do custo de mão de obra compara valor, não só existência`
+
+**Status: ✅ entregue junto da B1.5, no mesmo commit (ver o Status dela).**
+
+**Desvio: o Step 1 mudou o desenho da Task.** Estava escrito que o guard
+sobrevivente passaria a "comparar valor antes de sair". A medição mostrou que
+comparar valor é **metade** do conserto, e sozinha não resolveria nada: o guard
+que sobreviveu é o de chave LARGA do handler, e ele nem chegava a comparar valor
+porque saía antes, ao encontrar a linha de OUTRO RDO do mesmo dia. O cego tem
+dois lados, e os dois precisavam ceder:
+
+1. **Origem.** A chave larga tem de continuar larga para o **ponto** — é para
+   isso que o p1 Step D tirou o filtro de origem, e sem isso a diária entra duas
+   vezes. Mas irmã de outro RDO do mesmo dia **não é duplicata, é a outra metade
+   do dia**. O guard passa a distinguir: linha de origem fora da família do RDO
+   (o ponto) bloqueia; linha de origem `rdo_custo_diario` não bloqueia.
+2. **Valor.** Aí sim, comparar e reconciliar — na nossa linha e nas irmãs, cujo
+   valor muda quando este RDO entra e o rateio do dia vira.
+
+O resultado é que o razão do dia passa a **espelhar o conjunto de linhas de
+`RDOCustoDiario`**, uma por RDO, com o valor de agora — que é a formulação que a
+Task deveria ter tido desde o começo, e que só ficou visível depois de medir.
+Fecha os dois casos de uma vez, e são casos com respostas opostas:
+
+```
+diarista  150,00 rateado 75/75  →  2 linhas × R$ 75,00  = R$ 150,00  (tem teto)
+mensalista 4h + 4h              →  2 linhas × R$ 62,00  = R$ 124,00  (não tem)
+```
+
+**O risco 1 (pai já pago) foi respondido por leitura e virou outra coisa.** Não
+há estado de pagamento a conferir no caminho, mas há um problema vizinho que o
+recorte não tinha visto: `GestaoCustoPai.valor_total` **não é derivado** — é
+somatório mantido à mão (`utils/financeiro_integration.py:222`). Reconciliar o
+filho sem ajustar o pai consertaria a divergência entre origem e razão criando a
+mesma divergência um andar acima. O ajuste por delta entrou em
+`_reconciliar_valor`.
+
+**E o que a medição diz sobre esse ajuste, para não haver ilusão:** hoje
+**nenhum** caminho de rota depende dele. `registrar_custo_automatico` recomputa
+`pai.valor_total` somando os filhos a cada inserção (`:177-181`), então quando a
+reconciliação é seguida de inserção — o caso medido — o pai se autocura.
+Confirmado desligando o ajuste: os testes seguem verdes. Ele fica como defesa do
+caminho sem inserção depois (job de reprocesso, rota futura que não apague antes),
+e o `_assert_pais_fecham_com_os_filhos` do arreio fica como **invariante de casa,
+declaradamente não como prova de defeito atual**. Está escrito assim nos dois
+docstrings, para ninguém ler mais garantia do que existe.
 
 ---
 
@@ -3917,7 +4017,7 @@ colisão entre B1 e B2 — e é entre trilhas que, sem ela, seriam paralelas.
 | Depende | De | Motivo técnico |
 |---|---|---|
 | B1.5 | B1.2 | Remover as chamadas diretas antes da chave nova = perder a chave que `remover_custos_rdo` reconhece; a edição de RDO fica sem caminho de correção |
-| **B1.5b** | **B1.5** | O defeito é hoje observável pelo guard do serviço; a B1.5 deixa o handler como único escritor e é o guard **dele** que passa a valer. Corrigir antes = corrigir nos dois lugares e só depois descobrir qual sobreviveu |
+| **B1.5b** | **B1.5 — MESMO commit, sem exceção** | Escrito como "depende de", e **medido como inseparável**: a B1.5 troca o guard que decide (estreita do serviço → larga do handler) e, sozinha, colapsa os RDOs do dia num lançamento só — mensalista de 4h+4h perde metade do dia. Entre os dois commits o parque ficaria com custo a menos. Corrigido no lugar: as duas saem juntas |
 | B1.3 | B1.2 | A cláusula de resíduo em `remover_custos_rdo` precisa da chave certa para casar |
 | **B1.7** | **B1.6** | **Contraintuitivo, e é o mais importante da §11:** se `/novo_ponto` for corrigido antes da chave, o cenário da troca de obra fica **pior que hoje** — 1 `RegistroPonto` de 4h com 2 `CustoObra` de 4h, o dia cobrado em dobro sem linha que justifique. Com a chave estreitada primeiro, o pior caso intermediário é o custo de hoje |
 | B1.11 | B1.9, B1.10 | É a única que pode gerar registro duplicado; separada para ser descartável sem desfazer o resto |
@@ -3940,15 +4040,16 @@ colisão entre B1 e B2 — e é entre trilhas que, sem ela, seriam paralelas.
 
 ### 11.4 Ordem recomendada de entrega
 
-**Onde a entrega está, em 04/08 (`060146ac`):** passos 1 e metade do 2 feitos — B0
-inteiro e B1.1-B1.4. **O caminho crítico curto é B1.5 → B1.5b**, duas Tasks, e A05
-fecha. Depois disso T2 e T3 abrem em paralelo e a fila volta a ser larga.
+**Onde a entrega está, em 04/08:** passo 1 e a trilha T1 do passo 2 fechados — B0
+inteiro e A05 inteiro (B1.1-B1.5b). **O próximo trabalho são T2 e T3, que podem
+andar em paralelo entre si e não dependem de mais nada.**
 
 1. ~~**B0**~~ ✅ (a D3 foi respondida pelos fatos: entrou sozinho, com xfail strict —
-   o default recomendado).
-2. **B1.1-B1.5** (T1) e **B1.6-B1.11** (T2) em paralelo, respeitando a serialização do
-   guard inverso; **B1.12-B1.16** (T3) em paralelo com as duas.
-   *Estado: B1.1-B1.4 ✅; falta **B1.5** e a **B1.5b** nascida do arreio.*
+   o default recomendado, e os seis xfail funcionaram como checklist até o último).
+2. ~~**B1.1-B1.5b (T1)**~~ ✅ — **A05 fechado.** Faltam **B1.6-B1.11** (T2) e
+   **B1.12-B1.16** (T3), em paralelo. A serialização do guard inverso já foi
+   consumida por T1 (a B1.2 mudou `:379-390`), então **T2 não precisa mais esperar
+   nada de T1** — é o principal efeito prático de A05 ter fechado primeiro.
 3. **B2**, com T4/T5/T6/T7 em paralelo — lembrando **B1.13 antes de B2.8**.
 4. **B3**, T8 e T9 em paralelo.
 5. **B4**, por último, com o gate de produção de D11 antes do E02.
@@ -4018,6 +4119,27 @@ pacotes abaixo seguem existindo e valendo.**
 
 ## Histórico
 
+- **2026-08-04, fim do dia** — **A05 FECHADO** com B1.5 + B1.5b no mesmo commit.
+  Arreio de RDO verde, sem nenhum `xfail` restante no arquivo. O que esta entrega
+  ensinou, e que não estava em recorte nenhum:
+  1. **A B1.5, sozinha, era uma regressão de dinheiro.** Ela não muda quem escreve
+     o custo — muda **qual guard decide**, da chave estreita do serviço para a
+     chave larga do handler, e as duas não são equivalentes. Mensalista de 4h+4h
+     no mesmo dia passava de R$ 124,00 para R$ 62,00. Só apareceu porque o arreio
+     mede dinheiro por rota; um gate de asserção estrutural teria deixado passar.
+  2. **A B1.5b não era "comparar valor".** Era distinguir origem **e** comparar
+     valor. O guard tem de continuar cego a origem para o PONTO (invariante do p1)
+     e passar a enxergar origem para as IRMÃS — outro RDO do mesmo dia não é
+     duplicata, é a outra metade do dia. A formulação certa é "o razão do dia
+     espelha o conjunto de `RDOCustoDiario`", e ela só ficou visível medindo.
+  3. **Terceiro teste vacuoso da mesma família**, e o padrão agora está nomeado: o
+     teste posta num formulário que a rota não parseia e mede o vazio. Os três
+     casos: dois cenários no mesmo `app_context` (B0.3, duas vezes) e chaves de
+     formulário da rota errada (`/rdo/salvar`, aqui).
+  4. **Um teste estava vermelho desde `cefba5e7` e ninguém viu** —
+     `test_auto_link_servico_rdo.py` procurava a chave de origem antiga. O gate não
+     foi re-rodado naquele commit. **Re-rodar o gate no commit que muda uma chave
+     não é zelo, é o mínimo.**
 - **2026-08-04, tarde** — **B0 fechado (6/6) e B1.1-B1.4 entregues**, em `test/b0-arreio`,
   commits `88d3f924`..`060146ac`. Arreio: 29 passed, 6 xfailed. Três coisas que a
   execução ensinou e que não estavam no plano da manhã:

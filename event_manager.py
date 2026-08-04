@@ -730,6 +730,44 @@ def lancar_custos_rdo(data: dict, admin_id: int):
         gestao_criados = 0
         valor_total_custos = 0.0
 
+        def _reconciliar_valor(_filho, _novo, _porque):
+            """Atualiza o valor do filho **e** o total do pai.
+
+            B1.5b. `GestaoCustoPai.valor_total` não é derivado: é somatório
+            mantido à mão a cada inserção (`utils/financeiro_integration.py:222`).
+            Mexer no filho sem mexer nele deixaria o pai divergindo dos próprios
+            filhos — que é exatamente o defeito que esta Task fecha um andar
+            abaixo, e não faz sentido consertá-lo criando o mesmo no andar de
+            cima.
+
+            🔬 **Medido: hoje nenhum caminho de rota depende deste ajuste, e
+            ele fica assim mesmo.** `registrar_custo_automatico` recomputa
+            `pai.valor_total` somando os filhos a cada inserção
+            (`utils/financeiro_integration.py:177-181`), então sempre que a
+            reconciliação é seguida de uma inserção — o caso do rateio cruzado,
+            medido — o pai se autocura e o delta daqui é redundante. O caminho
+            que o exige é a reconciliação **sem** inserção depois: reemitir o
+            evento de um RDO cujo valor mudou sem que a linha tenha sido
+            apagada antes. As rotas de edição hoje apagam
+            (`rdo_editar_sistema.py:357-363`) e não chegam lá; um job de
+            reprocesso, ou qualquer rota futura que não apague, chega. Quatro
+            linhas de defesa contra um andar de dado silenciosamente velho
+            valem mais que a economia de removê-las.
+            """
+            _velho = Decimal(str(_filho.valor or 0))
+            if _velho == _novo:
+                return False
+            _filho.valor = _novo
+            _pai = GestaoCustoPai.query.get(_filho.pai_id)
+            if _pai is not None:
+                _pai.valor_total = (Decimal(str(_pai.valor_total or 0))
+                                    - _velho + _novo)
+            logger.info(
+                "[B1.5b] filho %s reconciliado R$ %s → R$ %s (%s); "
+                "pai %s ajustado pelo delta",
+                _filho.id, _velho, _novo, _porque, _filho.pai_id)
+            return True
+
         for func_id, mo_list in func_mo_map.items():
             # Tenant-safe: verificar que o funcionário pertence ao mesmo admin
             funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
@@ -930,7 +968,36 @@ def lancar_custos_rdo(data: dict, admin_id: int):
             # o plano supunha: aquela função serve TODAS as categorias, e
             # afrouxar a chave lá faria compras e almoxarifado passarem a se
             # deduplicar entre si. Aqui o alcance é exatamente mão de obra.
-            existing_filho = (
+            # ── B1.5b — a chave larga distingue ORIGEM, e o valor é reconciliado ──
+            # Medido pelo arreio depois que a B1.5 deixou este handler como
+            # único escritor. A chave larga acima responde só "existe alguma
+            # linha de mão de obra para (funcionário, dia)?", e com isso ela
+            # colapsava TODOS os RDOs do dia num lançamento só:
+            #
+            #   mensalista 4h + 4h em dois RDOs → 1 linha de R$ 62,00
+            #   (o certo é R$ 124,00: a unidade do mensalista é a HORA)
+            #   diarista   150,00 rateado 75/75 → 1 linha de R$ 150,00 estagnada
+            #   (o certo são duas de R$ 75,00: a diária TEM teto e foi rateada)
+            #
+            # Os dois erros são o mesmo cego, e ele tem dois lados:
+            #
+            #   1. **Origem.** A chave larga precisa ficar larga para o PONTO —
+            #      é para isso que o p1 Step D tirou o filtro de origem, e sem
+            #      isso a diária entra duas vezes, uma pelo ponto e outra pelo
+            #      RDO. Mas irmã de OUTRO RDO do mesmo dia não é duplicata: é a
+            #      outra metade do dia. Distinguir por origem preserva o p1 e
+            #      devolve as linhas por RDO.
+            #   2. **Valor.** Idempotência que só pergunta "existe?" e nunca
+            #      "vale o mesmo?" transforma rateio recalculado em dado velho.
+            #      `services/custo_funcionario_dia.py:18-19` promete recalcular
+            #      os RDOs vizinhos quando a proporção do dia muda; a promessa
+            #      era cumprida em `RDOCustoDiario` e não chegava ao razão.
+            #
+            # A fonte da verdade é `RDOCustoDiario`: o razão do dia deve espelhar
+            # o conjunto de linhas dela, uma por RDO, com o valor de agora.
+            _ORIGENS_RDO_FOLHA = ('rdo_custo_diario', 'rdo_mao_obra')
+
+            filhos_do_dia = (
                 db.session.query(GestaoCustoFilho)
                 .filter(
                     GestaoCustoFilho.data_referencia == data_rdo,
@@ -944,37 +1011,86 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                     GestaoCustoPai.tipo_categoria.in_(['SALARIO', 'MAO_OBRA_DIRETA']),
                     GestaoCustoPai.admin_id == admin_id,
                 )
-                .first()
+                .all()
             )
 
-            if not existing_filho:
-                # ``force_v2=True``: handler roda em background (sem
-                # ``current_user`` confiável). Tenant já validado acima
-                # (Funcionario.admin_id == admin_id). Sem isso, em
-                # contextos sem sessão (jobs, eventos repostos), a
-                # diária seria silenciosamente skipada enquanto o VA/VT
-                # abaixo seria gravado — assimetria que confunde o
-                # módulo financeiro.
-                filho = registrar_custo_automatico(
-                    admin_id=admin_id,
-                    tipo_categoria='SALARIO',
-                    entidade_nome=funcionario.nome,
-                    entidade_id=func_id,
-                    data=data_rdo,
-                    descricao=descricao,
-                    valor=valor_folha,
-                    obra_id=rdo.obra_id,
-                    origem_tabela='rdo_custo_diario',
-                    origem_id=custo_dia.id if custo_dia is not None else rdo.id,
-                    obra_servico_custo_id=obra_servico_custo_id_auto,
-                    force_v2=True,
-                )
-                if filho:
-                    gestao_criados += 1
-                else:
-                    logger.warning(f"⚠️ registrar_custo_automatico retornou None para {funcionario.nome}")
+            # Linha de OUTRO mecanismo (na prática, o ponto) manda: o fato
+            # medido é a batida, e o RDO se abstém. Este é o invariante do p1
+            # Step D e ele NÃO muda aqui.
+            bloqueio = next(
+                (f for f in filhos_do_dia
+                 if (f.origem_tabela or '') not in _ORIGENS_RDO_FOLHA),
+                None,
+            )
+
+            if bloqueio is not None:
+                logger.info(
+                    "⏭️ %s em %s já tem lançamento de outra origem "
+                    "(filho_id=%s, origem=%s) — RDO se abstém",
+                    funcionario.nome, data_rdo, bloqueio.id,
+                    bloqueio.origem_tabela)
             else:
-                logger.info(f"⏭️ GestaoCustoFilho já existe para {funcionario.nome} em {data_rdo} — skip")
+                _origem_id_nosso = (custo_dia.id if custo_dia is not None
+                                    else rdo.id)
+                _por_origem = {f.origem_id: f for f in filhos_do_dia
+                               if (f.origem_tabela or '') in _ORIGENS_RDO_FOLHA}
+
+                # (a) As irmãs — linhas de outros RDOs do mesmo dia, cujo valor
+                # pode ter mudado quando este RDO entrou e o rateio virou. Só
+                # ATUALIZA: criar linha de RDO que este handler não processou
+                # seria escrever por cima de um caminho que não é o nosso.
+                from models import RDOCustoDiario as _RDOCustoDiario
+                _irmas = _RDOCustoDiario.query.filter_by(
+                    funcionario_id=func_id, data=data_rdo,
+                    admin_id=admin_id, tipo_lancamento='rdo',
+                ).all()
+                for _irma in _irmas:
+                    if _irma.id == _origem_id_nosso:
+                        continue
+                    _filho_irma = _por_origem.get(_irma.id)
+                    if _filho_irma is None:
+                        continue
+                    _reconciliar_valor(
+                        _filho_irma,
+                        Decimal(str(_irma.componente_folha or 0)),
+                        f'rateio do dia mudou — {funcionario.nome} em {data_rdo}')
+
+                # (b) A nossa linha.
+                existing_filho = _por_origem.get(_origem_id_nosso)
+                if not existing_filho:
+                    # ``force_v2=True``: handler roda em background (sem
+                    # ``current_user`` confiável). Tenant já validado acima
+                    # (Funcionario.admin_id == admin_id). Sem isso, em
+                    # contextos sem sessão (jobs, eventos repostos), a
+                    # diária seria silenciosamente skipada enquanto o VA/VT
+                    # abaixo seria gravado — assimetria que confunde o
+                    # módulo financeiro.
+                    filho = registrar_custo_automatico(
+                        admin_id=admin_id,
+                        tipo_categoria='SALARIO',
+                        entidade_nome=funcionario.nome,
+                        entidade_id=func_id,
+                        data=data_rdo,
+                        descricao=descricao,
+                        valor=valor_folha,
+                        obra_id=rdo.obra_id,
+                        origem_tabela='rdo_custo_diario',
+                        origem_id=_origem_id_nosso,
+                        obra_servico_custo_id=obra_servico_custo_id_auto,
+                        force_v2=True,
+                    )
+                    if filho:
+                        gestao_criados += 1
+                    else:
+                        logger.warning(f"⚠️ registrar_custo_automatico retornou None para {funcionario.nome}")
+                elif _reconciliar_valor(
+                        existing_filho, Decimal(str(valor_folha)),
+                        f'RDO {rdo_id} reprocessado — {funcionario.nome}'):
+                    existing_filho.descricao = descricao
+                else:
+                    logger.info(
+                        "⏭️ GestaoCustoFilho de %s em %s já existe e confere — "
+                        "skip", funcionario.nome, data_rdo)
 
             # ── VA (Vale Alimentação) e VT (Vale Transporte) por dia trabalhado ──
             # Lê do cadastro do Funcionario (valor_va, valor_vt). Espelha o
