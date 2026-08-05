@@ -2814,10 +2814,16 @@ pacote pôde declarar "cinco fórmulas viram uma" com o gate verde.
    `logger.exception`. E a asserção 1 (mesmo número nas quatro rotas) faz a igualdade
    falhar em vez de passar em silêncio.
 
-- [ ] **Step 1:** `crud_rdo_completo.py` — detecção + ramo V1 incondicional
-- [ ] **Step 2:** rodar o teste de convergência inteiro — as quatro asserções verdes
-- [ ] **Step 3:** `bash run_tests.sh --gate`
-- [ ] **Step 4:** commit — `fix(rdo): família V1 de progresso converge nos seis call-sites vivos`
+- [x] **Step 1:** `crud_rdo_completo.py` — detecção + ramo V1 incondicional
+- [x] **Step 2:** rodar o teste de convergência inteiro — as quatro asserções verdes
+- [x] **Step 3:** `bash run_tests.sh --gate`
+- [x] **Step 4:** commit — `fix(rdo): família V1 de progresso converge nos seis call-sites vivos`
+
+⚠️ **Caixas marcadas retroativamente em 05/08** — o Status acima (`:2748`) já registrava
+a entrega; só as caixas ficaram para trás. Conferido no código: `crud_rdo_completo.py:96-97`
+(imports), `:113` (detecção por `obra_em_modo_v2`) e `:136-142` (chamada incondicional,
+com o `elif subatividades:` removido); `tests/test_a19_progresso_v1_convergencia.py`
+existe e passou no gate de 05/08 (1936 passed).
 
 ---
 
@@ -3384,11 +3390,21 @@ ser acionado pela UI e um dado velho fica sem conserto.
    **derivada da baseline** — item novo, fora de A06. **Registrar como pendência para não
    descobrir isso em produção.**
 
-- [ ] **Step 1:** `_aplicar_hierarquia` e `_recalc_e_resposta_vinculo`
-- [ ] **Step 2:** `criar_tarefa`, `excluir_tarefa` (com o sinalizador), `/recalcular`
-- [ ] **Step 3:** revisão ponto a ponto: cada chamada FORA do try do `ErroCiclo`
-- [ ] **Step 4:** `bash run_tests.sh --gate`
-- [ ] **Step 5:** commit — `fix(cronograma): os sete pontos de recálculo do editor replanejam a curva`
+- [x] **Step 1:** `_aplicar_hierarquia` e `_recalc_e_resposta_vinculo`
+- [x] **Step 2:** `criar_tarefa`, `excluir_tarefa` (com o sinalizador), `/recalcular`
+- [x] **Step 3:** revisão ponto a ponto: cada chamada FORA do try do `ErroCiclo`
+- [x] **Step 4:** `bash run_tests.sh --gate`
+- [x] **Step 5:** commit — `fix(cronograma): os sete pontos de recálculo do editor replanejam a curva`
+
+**Status: ✅ entregue em `19be5ea8`** — ⚠️ caixas marcadas **retroativamente** em 05/08.
+Conferido no código: `_replanejar_pos_commit` (`cronograma_views.py:121`) chamada em
+`:928`, `:1223`, `:1241`, `:1339`, `:1396`, `:1508` e `:1777`, e o sinalizador
+`recalculou = True` de `:1328` — a mitigação do risco 2, que impede replanejar por cima
+de um recálculo abortado em `excluir_tarefa`. O gate de 05/08 passou (1936 passed).
+
+⚠️ **A pendência do risco 6 continua aberta e não tem Task:** depois de A06 a linha
+"planejado" da Curva S é **plano corrente**, não compromisso, e a curva nunca mais mostra
+atraso contra o plano original. Falta uma curva planejada **derivada da `CronogramaBaseline`**.
 
 ---
 
