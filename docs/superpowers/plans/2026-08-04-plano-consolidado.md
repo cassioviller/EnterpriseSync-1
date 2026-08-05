@@ -4150,10 +4150,34 @@ armadilha do decorador nem a de emitir sem `obra_id`) e só afirma
 `valor_medido`/`saldo`/`status` da CR — **nunca olha `conta_contabil_codigo`, nunca olha
 `LancamentoContabil`, nunca olha o DRE**.
 
-- [ ] **Step 1:** o arquivo com as quatro asserções
-- [ ] **Step 2:** verde
-- [ ] **Step 3:** `bash run_tests.sh --gate`
-- [ ] **Step 4:** commit — `test(medicao): recebimento de medição liquida cliente sem inventar receita`
+- [x] **Step 1:** o arquivo com as quatro asserções
+- [x] **Step 2:** verde
+- [x] **Step 3:** `bash run_tests.sh --gate`
+- [x] **Step 4:** commit — `test(medicao): recebimento de medição liquida cliente sem inventar receita`
+
+**Status: ✅ entregue em `9e72db82`.** As quatro asserções saíram como especificadas.
+Gate: **1936 passed, 6 skipped, 2 xfailed, 0 falhas** (25min30).
+
+As duas mutações provam que nenhuma delas é vácua:
+
+* trocar a conta para `4.1.01.001` — a que o documento do A03 sugeria — derruba
+  **três** dos quatro testes, e o do DRE **mede** a dupla contagem: receita bruta
+  de 1.000 → **1.500** por causa de um RECEBIMENTO;
+* atribuir o código sem confirmar em `plano_contas` derruba o quarto com
+  `ForeignKeyViolation` → `PendingRollbackError` — o modo de falha em cascata do
+  risco 1 da B3.9, reproduzido.
+
+**🔴 Correção de proveniência, achada ao escrever o teste.** O plano (e a B3.9)
+credita o reconhecimento da receita a `contabilidade_utils.py:177`
+(`contabilizar_proposta_aprovada`). **Não é esse o código vivo.** Aquela função só é
+chamada por `contabilidade_views.py:1377` e credita **`4.1.02.002`**. Quem responde
+ao evento `proposta_aprovada` é `handlers/propostas_handlers.py:454-486`, que debita
+`1.1.02.001` e credita **`4.1.01.001`**.
+
+A premissa contábil da B3.9 **se sustenta** — o débito em `1.1.02.001` na aprovação
+existe nos dois —, mas quem quiser reconferir a regra precisa olhar o handler, não a
+função do plano. É também o que faz a asserção 3 valer 1.000: `receita_bruta` soma
+`4.1.01` e `4.1.02` no CRÉDITO, e é o handler vivo que põe lá.
 
 ---
 
