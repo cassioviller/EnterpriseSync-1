@@ -2891,7 +2891,14 @@ class FolhaPagamento(db.Model):
     atrasos = db.Column(db.Numeric(10, 2), default=0)
     
     # OUTROS DESCONTOS
-    adiantamentos = db.Column(db.Numeric(10, 2), default=0)
+    # B4.4 — a coluna `adiantamentos` saiu daqui em 05/08. Zero leitores e zero
+    # escritores vivos (o único escritor estava em `archive/`); a coluna do banco
+    # é NULLABLE sem default, então o INSERT sem ela funciona e **não há DROP**.
+    #
+    # ⚠️ NÃO confundir com o `backref='adiantamentos'` de `class Adiantamento`,
+    # ~85 linhas abaixo: aquele está VIVO, servindo `/folha/adiantamentos`. Um
+    # grep por `adiantamentos` em models.py devolve os dois, e são coisas
+    # diferentes.
     emprestimos = db.Column(db.Numeric(10, 2), default=0)
     outros_descontos = db.Column(db.Numeric(10, 2), default=0)
     total_descontos = db.Column(db.Numeric(10, 2), default=0)

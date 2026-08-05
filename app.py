@@ -424,11 +424,12 @@ try:
 except Exception as e:
     logging.warning(f"[WARN] Handler de propostas não carregado: {e}", exc_info=True)
 
-try:
-    import handlers.financeiro_handlers  # noqa: F401  (efeito colateral: auto-registra handler)
-    logging.info("[OK] Handler de financeiro registrado")
-except Exception as e:
-    logging.warning(f"[WARN] Handler de financeiro não carregado: {e}", exc_info=True)
+# B4.1 — o bloco de `handlers.financeiro_handlers` saiu daqui em 05/08, junto com
+# o arquivo. Era um handler de `nota_fiscal_paga` sem NENHUM emissor no
+# repositório. Arquivo e bloco no MESMO commit de propósito: deixar o import sem
+# o arquivo faria o `except` acima engolir o ModuleNotFoundError e o boot passaria
+# a logar um WARN permanente — o vício que o comentário de `folha_handlers`, logo
+# acima, registra ter sido corrigido uma vez.
 
 # Task #43 — Webhook para n8n (notificações externas).
 # Bootstrap: registra listener universal para a allowlist + thread de retry.

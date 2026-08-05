@@ -84,45 +84,18 @@ def event_handler(event_name: str):
 # HANDLERS DE EVENTOS - Implementações Práticas
 # ============================================================
 
-@event_handler('material_saida')
-def lancar_custo_material_obra(data: dict, admin_id: int):
-    """
-    Handler: Registro de saída de material do estoque (controle físico apenas).
-
-    REENGENHARIA SUPRIMENTOS — princípio central:
-    O custo de material é reconhecido UMA ÚNICA VEZ, na compra (GestaoCustoPai MATERIAL
-    criado em nova_post). A SAÍDA é exclusivamente controle físico de estoque —
-    nenhum lançamento financeiro ou contábil adicional é criado aqui.
-
-    Rastreabilidade de atribuição por obra (T5 — TRANSFERENCIA) deve ser implementada
-    em um fluxo explícito de transferência central→obra, com evento e handler próprios,
-    para não conflatar consumo genérico com transferência intencional.
-    """
-    try:
-        from models import AlmoxarifadoMovimento, AlmoxarifadoItem
-
-        movimento_id = data.get('movimento_id')
-        if not movimento_id:
-            logger.warning("⚠️ movimento_id não fornecido no evento material_saida")
-            return
-
-        movimento = AlmoxarifadoMovimento.query.filter_by(
-            id=movimento_id,
-            admin_id=admin_id,
-            tipo_movimento='SAIDA',
-        ).first()
-        if not movimento:
-            logger.info(f"⏭️ [SAIDA] AlmoxarifadoMovimento #{movimento_id} não encontrado")
-            return
-
-        item = AlmoxarifadoItem.query.get(movimento.item_id)
-        item_nome = item.nome if item else f'Item #{movimento.item_id}'
-        quantidade = float(movimento.quantidade or 0)
-        obra_info = f"→ obra {movimento.obra_id}" if movimento.obra_id else "(sem obra)"
-        logger.info(f"✅ [SAIDA] {item_nome} x{quantidade} {obra_info} — controle físico registrado (sem lançamento financeiro)")
-
-    except Exception as e:
-        logger.error(f"❌ Erro no handler material_saida: {e}", exc_info=True)
+# B4.2 — o handler de `material_saida` foi REMOVIDO em 05/08.
+#
+# Ele só logava: nenhum `add`, nenhum `commit`. E os dois emissores eram inertes
+# — um mandava `movimento_id` do último LOTE do laço em vez do id da saída, o
+# outro mandava `0` literal, e o handler saía cedo com id falsy.
+#
+# ⚠️ O corte foi feito por CONTEÚDO, do decorador ao fim do corpo, preservando as
+# duas linhas em branco abaixo. Parar uma linha depois do decorador deixaria
+# `@event_handler('material_saida')` vivo e sem função — e ele adotaria o
+# `criar_conta_pagar_entrada_material` logo abaixo, fazendo a ENTRADA de material
+# rodar duas vezes e duplicar `GestaoCustoPai` a cada nota. Nenhum grep vê isso;
+# só a inspeção de `EventManager._handlers`.
 
 
 @event_handler('material_entrada')

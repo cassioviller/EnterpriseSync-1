@@ -660,18 +660,11 @@ def processar_saida():
 
             db.session.commit()
 
-            try:
-                EventManager.emit('material_saida', {
-                    'movimento_id': movimento.id if movimento else 0,
-                    'item_id': item_id,
-                    'item_nome': item.nome,
-                    'quantidade': float(quantidade),
-                    'obra_id': obra_id,
-                    'funcionario_id': funcionario_id,
-                    'valor_total': 0
-                }, admin_id)
-            except Exception as e:
-                logger.warning(f'Integração automática falhou (não crítico): {e}')
+
+            # B4.3 — o emit de `material_saida` saiu daqui em 05/08. Era inerte:
+            # o handler saía cedo com `movimento_id` falsy, e o evento não está na
+            # WEBHOOK_EVENT_ALLOWLIST. O commit acontece ACIMA, e nada abaixo lia as
+            # variáveis deste bloco.
 
             flash(f'Saída processada com sucesso! {quantidade} {item.unidade} de "{item.nome}" entregues para {funcionario.nome}.', 'success')
 
@@ -948,21 +941,11 @@ def processar_saida_multipla():
 
         db.session.commit()
 
-        try:
-            for item_validado in itens_validados:
-                item = item_validado['item']
-                quantidade = item_validado.get('quantidade', 1)
-                EventManager.emit('material_saida', {
-                    'movimento_id': 0,
-                    'item_id': item.id,
-                    'item_nome': item.nome,
-                    'quantidade': quantidade,
-                    'obra_id': obra_id,
-                    'funcionario_id': funcionario_id,
-                    'valor_total': 0
-                }, admin_id)
-        except Exception as e:
-            logger.warning(f'Integração automática falhou (não crítico): {e}')
+
+            # B4.3 — o emit de `material_saida` saiu daqui em 05/08. Era inerte:
+            # o handler saía cedo com `movimento_id` falsy, e o evento não está na
+            # WEBHOOK_EVENT_ALLOWLIST. O commit acontece ACIMA, e nada abaixo lia as
+            # variáveis deste bloco.
 
         return jsonify({
             'success': True,
