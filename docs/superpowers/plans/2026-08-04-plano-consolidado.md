@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **5** | **15** | G |
+| B2 — o que o sistema informa errado | 20 | **6** | **14** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **27** | **34** | |
+| **Total** | **61** *(62 − 1 cortada)* | **28** | **33** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -2272,10 +2272,43 @@ vinculado conhecido; afirmar a distribuição nova e que a **soma** não mudou.
    B2.2, B2.3 e B2.5 → vai **por último** no A13, senão os testes das Tasks anteriores
    mudam de resposta no meio do caminho.
 
-- [ ] **Step 1:** trocar o peso + docstring
-- [ ] **Step 2:** teste da distribuição e da soma
-- [ ] **Step 3:** `bash run_tests.sh --gate`
-- [ ] **Step 4:** commit — `fix(custo): rateio do realizado não vinculado pesa por custo orçado`
+- [x] **Step 1:** trocar o peso + docstring
+- [x] **Step 2:** teste da distribuição e da soma
+- [x] **Step 3:** `bash run_tests.sh --gate`
+- [x] **Step 4:** commit
+
+**Status: ✅ entregue em 05/08 — e com ela o A13 fecha (B2.1 a B2.6).** Foi por
+último, como o Risco 4 mandava: é o único ponto do item que **escreve** no banco,
+e mexer nele antes mudaria a resposta dos testes das cinco Tasks anteriores no
+meio do caminho.
+
+**O cenário do teste separa as duas réguas ao máximo:** duas etapas com a MESMA
+venda (100k cada) e custos opostos (50k e 150k). Peso por venda: 50%/50%. Peso por
+custo: 25%/75%. Com R$ 20.000 de realizado não vinculado, era 10.000/10.000 e
+passa a 5.000/15.000 — **e a soma continua 20.000**, que é a asserção provando que
+se redistribuiu em vez de inventar ou perder dinheiro. **Cobrado por sabotagem:**
+peso de volta para `valor_orcado`, e a etapa A volta a 10.000.
+
+**Os quatro riscos, um a um:**
+
+1. **Rodar dentro de `after_flush_postexec`** — a consulta nova entra exatamente
+   onde as duas de `:130-155` já rodam, e não emite flush. O guard de
+   reentrância não é tocado.
+2. **Mapa vazio** — o fallback por serviço é `.get(s.id, _f(s.valor_orcado))`,
+   nunca zero: zerar o peso de um serviço jogaria a fatia dele nos vizinhos em
+   silêncio. E o rateio uniforme passou a **logar WARNING** com o valor que está
+   sendo distribuído às cegas.
+3. **Peso MISTO** (etapa com linhas ao lado de etapa manual) — está no docstring,
+   com a observação de que não é regressão: antes já misturava venda com custo. A
+   referência desatualizada em `services/destino_custo.py:24` foi corrigida junto,
+   e passou a citar a função em vez do número de linha, que é o que envelhece.
+4. **Ir por último** — cumprido.
+
+> **Fecho do A13, e a metade que continua aberta:** o consumo está fechado **onde
+> existe linha de custo**. Serviço sem linha segue com venda no lugar de custo em
+> todos os seis pontos, porque `custo_orcado_por_servico` cai para `valor_orcado`
+> ali — e **isso só a correção na ORIGEM resolve** (Decisão 3 de 03/08). Medido em
+> 05/08: **2.459 de 76.004 `ObraServicoCusto` (3,2%)** estão nesse regime.
 
 > **Fecho obrigatório do A13, para não esconder metade do problema:** *o consumo está
 > fechado onde existe linha de custo; o serviço sem linha continua com venda no lugar de
@@ -4573,6 +4606,40 @@ pacotes abaixo seguem existindo e valendo.**
 ---
 
 ## Histórico
+
+- **2026-08-05, fim da tarde** — **O A13 FECHOU: B2.1 a B2.6, seis Tasks, um
+  commit cada** (a B2.4 saiu junto da B2.3, por serem par). O bloco B2 vai a 6/20.
+
+  **Onde o usuário vê a diferença:**
+
+  | Onde | Antes | Depois |
+  |---|---|---|
+  | Alerta de estouro (Fundação/Baia) | dispara em **R$ 17.766** | dispara em **R$ 155.982,64** |
+  | Tela de planejamento, coluna Orçado | 173.747,83 (venda) | **155.982,64** (custo) |
+  | Histórico do catálogo, Δ% | **−7,9% verde** | **+2,6% vermelho** |
+  | Rateio do não vinculado (duas etapas) | 10.000 / 10.000 | **5.000 / 15.000** |
+
+  1. **A ordem do recorte estava certa e o motivo ficou visível na prática.** A
+     B2.6 é a única que ESCREVE; fosse ela primeiro, os testes das cinco
+     anteriores mudariam de resposta no meio do caminho.
+  2. **A D4 foi respondida por medição, e a resposta não era nenhuma das opções.**
+     73.545 de 76.004 etapas têm linhas de custo — em 96,8% das linhas da tela a
+     coluna Saldo não acrescenta nada com régua nenhuma. Ela saiu, e isso
+     destravou a B2.4 de graça.
+  3. **Sabotagem em todas as seis, e uma delas errou a pontaria.** Trocar
+     `if projecao:` por `if projecao is not None:` não mudou nada, e a leitura
+     certa não era "o teste é fraco": os dois guards são equivalentes naquele
+     ponto. **A sabotagem tem de mirar a diferença que o teste afirma.**
+  4. **O que o A13 NÃO fechou, e está escrito no fim da B2.6:** serviço sem linha
+     de custo segue com venda no lugar de custo nos seis pontos — 3,2% do parque.
+     Só a correção na origem resolve (Decisão 3 de 03/08).
+
+  ✅ **GATE VERDE ANTES do commit da B2.6:** `1877 passed, 6 skipped, 3 xfailed`,
+  zero falhas, 20m26s. Contra o gate da manhã (1865): **+12 testes, e a conta
+  fecha item por item** — 5 da B2.1, 4 da B2.2, 1 da B2.3, 1 da B2.5, 1 da B2.6.
+  Gate completo e não regressão focada porque **a B2.6 escreve no banco**: ela
+  reescreve `realizado_material/mao_obra/outros`, que é o que alimenta as outras
+  cinco telas do item.
 
 - **2026-08-05, tarde** — **B2 aberto: B2.1 e B2.2 entregues**, e o A13 passou a
   comparar custo com custo na primeira tela que o lia errado.

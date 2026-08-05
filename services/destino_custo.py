@@ -21,9 +21,11 @@ Rejeitadas de propósito, e o motivo:
     `responsavel_id` só vem preenchido por compras (compras_views.py:210).
   * por CENTRO DE CUSTO já gravado: 8 filhos de 1.823 tinham
     `centro_custo_id` em 2026-07-21. O campo está morto.
-  * por RATEIO proporcional ao orçado (o que `resumo_custos_obra.py:191`
-    faz em memória): gravar rateio é transformar estimativa em dado. É
-    exatamente a dívida que esta fase existe para pagar.
+  * por RATEIO proporcional ao orçado (o que `recalcular_obra`, em
+    `resumo_custos_obra.py`, faz em memória — e desde o A13 de 05/08 o peso
+    é o CUSTO orçado, não mais `valor_orcado`, que guarda venda): gravar
+    rateio é transformar estimativa em dado. É exatamente a dívida que esta
+    fase existe para pagar.
 """
 import logging
 

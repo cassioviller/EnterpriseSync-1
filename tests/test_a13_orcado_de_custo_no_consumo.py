@@ -28,6 +28,7 @@ correção. O 1º GET afirma zero notificação para 20.000 de realizado dentro 
 """
 import os
 import sys
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -36,8 +37,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import main  # noqa: F401 — registra os blueprints antes de qualquer request
 from app import app, db
-from models import (NotificacaoOrcamento, ObraServicoCusto,
-                    ObraServicoCustoItem, Servico)
+from models import (GestaoCustoFilho, GestaoCustoPai, NotificacaoOrcamento,
+                    ObraServicoCusto, ObraServicoCustoItem, Servico)
+from services.resumo_custos_obra import recalcular_obra
 
 from helpers_tenant import cliente_de, dois_tenants
 
@@ -50,6 +52,7 @@ LINHA_FAT_DIRETO = Decimal('87882.64')
 CUSTO = LINHA_VEKS + LINHA_FAT_DIRETO          # 155.982,64
 REALIZADO_DENTRO = Decimal('20000.00')
 REALIZADO_ESTOURANDO = Decimal('160000.00')
+DIA = date(2026, 6, 15)
 
 
 @pytest.fixture(autouse=True)
@@ -86,6 +89,27 @@ def _fundacao(t, realizado=REALIZADO_DENTRO):
         db.session.add(ObraServicoCustoItem(
             obra_servico_custo_id=osc.id, admin_id=t.admin_id,
             descricao=f'linha {fonte}', valor=valor, fonte=fonte))
+    db.session.commit()
+    return osc
+
+
+def _com_linhas(t, nome, venda, custo):
+    """Etapa com `valor_orcado` = venda e UMA linha de custo com o custo real.
+
+    É o par que separa as duas réguas: o campo agregado diz uma coisa, a linha
+    diz outra, e o A13 inteiro é sobre qual delas o consumidor lê.
+    """
+    osc = ObraServicoCusto(
+        obra_id=t.obra_id, admin_id=t.admin_id, nome=nome,
+        valor_orcado=Decimal(str(venda)),
+        realizado_material=0, realizado_mao_obra=0, realizado_outros=0,
+        mao_obra_a_realizar=Decimal(str(custo)),
+        material_a_realizar=0, outros_a_realizar=0)
+    db.session.add(osc)
+    db.session.flush()
+    db.session.add(ObraServicoCustoItem(
+        obra_servico_custo_id=osc.id, admin_id=t.admin_id,
+        descricao='linha', valor=Decimal(str(custo)), fonte='veks'))
     db.session.commit()
     return osc
 
@@ -222,6 +246,64 @@ def test_historico_do_catalogo_mede_delta_contra_custo_e_troca_de_sinal():
         assert '-7,9%' not in corpo, 'o Δ% contra a venda ainda está na tela'
         assert '155.982,64' in corpo, (
             'a coluna Orçado do histórico não mostra o custo')
+
+
+def test_rateio_do_realizado_nao_vinculado_pesa_por_custo():
+    """B2.6 — o ÚNICO ponto do A13 que escreve no banco.
+
+    Os outros cinco consertos são de leitura: erram a tela e a tela se corrige
+    sozinha no próximo GET. Este reescreve
+    ``realizado_material/mao_obra/outros``, que alimenta o alerta de estouro, a
+    tela de planejamento e o "custo médio realizado por unidade" do catálogo —
+    o número que precifica a proposta seguinte. Ratear custo real com peso de
+    preço de venda erra tudo isso de uma vez.
+
+    🔬 **As duas etapas têm a MESMA venda e custos opostos**, que é o cenário
+    onde as duas réguas se separam ao máximo:
+
+    ======  =====  =====  ==========  ==========
+    Etapa   Venda  Custo  peso VENDA  peso CUSTO
+    ======  =====  =====  ==========  ==========
+    A       100k    50k      50%         25%
+    B       100k   150k      50%         75%
+    ======  =====  =====  ==========  ==========
+
+    Com R$ 20.000 de realizado não vinculado: era 10.000/10.000, passa a
+    5.000/15.000. **E a soma continua 20.000** — a asserção que prova que se
+    redistribuiu em vez de inventar ou perder dinheiro.
+    """
+    with app.app_context():
+        a, _b = dois_tenants('a13rat')
+
+        etapa_a = _com_linhas(a, 'Etapa A', venda=100000, custo=50000)
+        etapa_b = _com_linhas(a, 'Etapa B', venda=100000, custo=150000)
+
+        pai = GestaoCustoPai(admin_id=a.admin_id, tipo_categoria='MATERIAL',
+                             entidade_nome='Fornecedor solto',
+                             valor_total=Decimal('20000'))
+        db.session.add(pai)
+        db.session.flush()
+        db.session.add(GestaoCustoFilho(
+            pai_id=pai.id, obra_id=a.obra_id, admin_id=a.admin_id,
+            data_referencia=DIA, valor=Decimal('20000'),
+            descricao='sem vínculo', obra_servico_custo_id=None))
+        db.session.commit()
+
+        recalcular_obra(a.obra_id, admin_id=a.admin_id)
+        db.session.commit()
+        db.session.refresh(etapa_a)
+        db.session.refresh(etapa_b)
+
+        ra = float(etapa_a.realizado_material)
+        rb = float(etapa_b.realizado_material)
+
+        assert ra == pytest.approx(5000.0), (
+            f'etapa A ficou com {ra} — 10.000 é o rateio pela venda, e as duas '
+            f'etapas vendem igual mas custam 3x diferente')
+        assert rb == pytest.approx(15000.0), f'etapa B ficou com {rb}'
+        assert ra + rb == pytest.approx(20000.0), (
+            f'a soma virou {ra + rb} — o rateio tem de redistribuir os '
+            f'R$ 20.000, não criar nem perder dinheiro')
 
 
 def test_projecao_indisponivel_cai_no_caminho_antigo_e_avisa(monkeypatch, caplog):

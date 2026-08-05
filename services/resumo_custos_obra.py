@@ -114,10 +114,32 @@ def recalcular_obra(obra_id: int, admin_id=None) -> bool:
         ``obra_servico_custo_id``, o valor é somado ao realizado daquele
         serviço (na categoria correspondente — material/mão de obra/outros).
       - O restante (filhos não vinculados) é rateado entre os demais
-        serviços proporcionalmente ao ``valor_orcado``; quando não há
-        orçado, aplica rateio uniforme.
+        serviços proporcionalmente ao **custo orçado** (A13, 05/08); quando
+        não há custo nenhum, aplica rateio uniforme — e avisa no log.
       - Serviços com ``override_realizado_manual=True`` nunca são
         sobrescritos (nem por vínculo direto nem por rateio).
+
+    ## Por que o peso deixou de ser ``valor_orcado`` (A13, Task B2.6)
+
+    ``ObraServicoCusto.valor_orcado`` guarda **preço de venda** na cadeia
+    comercial (o listener da Task #82 herda ``valor_comercial``). Ratear custo
+    real com peso de preço de venda distribui errado sempre que a margem varia
+    entre etapas — e o resultado não fica só na tela: **este é o ponto que
+    ESCREVE** ``realizado_material/mao_obra/outros`` no banco, alimentando o
+    alerta de estouro, a tela de planejamento e o "custo médio realizado por
+    unidade" do catálogo, que é o número usado para precificar a proposta
+    seguinte.
+
+    O peso agora vem de ``services.custo_orcado.custo_orcado_por_servico`` —
+    linha de custo quando existe, agregado quando não existe. **O total
+    distribuído não muda** (Σw = 1 nos dois regimes); muda a fatia de cada
+    serviço.
+
+    ⚠️ **Peso MISTO, que não é regressão mas precisa estar escrito.** Numa obra
+    com etapa importada (peso = soma das linhas, custo de verdade) ao lado de
+    etapa manual sem linhas (peso = ``valor_orcado`` digitado), as duas unidades
+    convivem no mesmo rateio. Antes disso convivia venda com custo pelo mesmo
+    motivo; a cura é na ORIGEM (Decisão 3 de 03/08), não aqui.
     """
     try:
         from models import (
@@ -189,13 +211,30 @@ def recalcular_obra(obra_id: int, admin_id=None) -> bool:
             db.session.flush()
             return True
 
-        total_orcado = sum(_f(s.valor_orcado) for s in alvos)
+        # A13 — peso por CUSTO orçado, não por venda. Uma consulta por obra,
+        # no mesmo ponto onde as de cima já rodam. Chave ausente cai para
+        # `valor_orcado`, nunca para zero: zerar o peso de um serviço jogaria a
+        # fatia dele nos vizinhos em silêncio.
+        from services.custo_orcado import custo_orcado_por_servico
+        custo_por_svc = custo_orcado_por_servico(obra_id, admin_id)
+
+        def _peso_base(s):
+            return _f(custo_por_svc.get(s.id, _f(s.valor_orcado)))
+
+        total_orcado = sum(_peso_base(s) for s in alvos)
         use_proporcional = total_orcado > 0
         n_alvos = len(alvos)
 
+        if not use_proporcional and (rest_material or rest_mao_obra or rest_outros):
+            logger.warning(
+                'recalcular_obra(%s): nenhum custo orçado nos %d serviço(s) '
+                'alvo — rateando R$ %.2f de realizado não vinculado de forma '
+                'UNIFORME', obra_id, n_alvos,
+                rest_material + rest_mao_obra + rest_outros)
+
         for s in alvos:
             if use_proporcional:
-                w = _f(s.valor_orcado) / total_orcado
+                w = _peso_base(s) / total_orcado
             else:
                 w = 1.0 / n_alvos
             d = direto.get(s.id, {'material': 0.0, 'mao_obra': 0.0, 'outros': 0.0})
