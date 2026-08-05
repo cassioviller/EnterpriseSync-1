@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **4** | **16** | G |
+| B2 — o que o sistema informa errado | 20 | **5** | **15** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **26** | **35** | |
+| **Total** | **61** *(62 − 1 cortada)* | **27** | **34** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -2203,9 +2203,33 @@ B2.2, afirmando o Δ% no corpo.
 2. Manter o fallback `mapa.get(c.id, float(c.valor_orcado or 0))` — nunca
    `mapa.get(id, 0)`.
 
-- [ ] **Step 1:** memoização por obra + troca da base
-- [ ] **Step 2:** teste de rota do Δ%
-- [ ] **Step 3:** commit — `fix(catalogo): histórico do serviço compara realizado contra custo orçado`
+- [x] **Step 1:** memoização por obra + troca da base
+- [x] **Step 2:** teste de rota do Δ%
+- [x] **Step 3:** commit
+
+**Status: ✅ entregue em 05/08.** A rota é
+`/catalogo/servicos/<id>/historico-obras` — o recorte a chamava de
+`/catalogo/servico/<id>/historico`, que não existe.
+
+**O teste escolheu o caso que troca de SINAL, e essa escolha é a Task inteira.**
+Com realizado 160.000 contra custo 155.982,64 e venda 173.747,83, o Δ% vai de
+**−7,9% (verde, "saiu abaixo do orçado")** para **+2,6% (vermelho, estourou)**. Um
+teste com realizado bem abaixo dos dois passaria com qualquer das duas réguas —
+seria mais um instrumento medindo o vazio. **Cobrado por sabotagem:** voltando a
+base para `c.valor_orcado`, o teste cai.
+
+**Memoização como o Risco 1 pedia:** um `custo_orcado_por_servico` por OBRA, num
+dict montado antes do laço a partir de `{c.obra_id for c in custos}` — o laço já
+faz um SELECT de quantidade por linha, e consultar o custo por linha seria o
+segundo N+1 na mesma volta. Fallback `.get(c.id, float(c.valor_orcado or 0))`,
+nunca `.get(id, 0)`.
+
+**Dois rótulos foram junto**, pelo mesmo argumento da B2.3: "Orçado (R$)" virou
+"Custo Orçado (R$)" e "Δ Realizado vs Orçado" virou "Δ Realizado vs Custo
+Orçado". Trocar o número e deixar o rótulo é continuar chamando venda de orçado.
+
+**O `from models import ItemMedicaoComercial` saiu de dentro do laço**, onde
+estava por acidente. Zero risco, e eu já estava editando aquele bloco.
 
 ---
 

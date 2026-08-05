@@ -666,16 +666,32 @@ def servico_historico(servico_id):
         .all()
     )
     obras_map = {o.id: o for o in Obra.query.filter_by(admin_id=aid).all()}
+
+    # A13 — o "Orçado" desta tela era `valor_orcado`, que guarda VENDA, e o Δ%
+    # comparava custo realizado contra preço de venda. É a tela usada para
+    # precificar proposta nova: o número errado aqui vira preço errado lá.
+    #
+    # UMA chamada por OBRA, memoizada — o loop varre serviços de várias obras e
+    # já faz um SELECT de quantidade por linha; consultar o custo por linha
+    # seria o segundo N+1 na mesma volta.
+    from services.custo_orcado import custo_orcado_por_servico
+    from models import ItemMedicaoComercial
+    custo_por_obra = {
+        obra_id: custo_orcado_por_servico(obra_id, aid)
+        for obra_id in {c.obra_id for c in custos}
+    }
+
     linhas = []
     soma_realizado = 0.0
     soma_orcado = 0.0
     soma_qtd = 0.0  # soma de quantidade total (de medições) por obra para custo médio por unidade
     for c in custos:
         realizado = float(c.realizado_material or 0) + float(c.realizado_mao_obra or 0) + float(c.realizado_outros or 0)
-        orcado = float(c.valor_orcado or 0)
+        # Chave ausente é "não sei" — cai para o campo do modelo, nunca para zero:
+        # com zero, todo serviço apareceria com Δ% nulo e orçado desaparecido.
+        orcado = custo_por_obra.get(c.obra_id, {}).get(c.id, float(c.valor_orcado or 0))
         delta_pct = ((realizado - orcado) / orcado * 100.0) if orcado > 0 else None
         # quantidade da obra: soma quantidade dos ItemMedicaoComercial vinculados ao serviço naquela obra
-        from models import ItemMedicaoComercial
         qtd_obra = db.session.query(db.func.coalesce(db.func.sum(ItemMedicaoComercial.quantidade), 0)).filter(
             ItemMedicaoComercial.admin_id == aid,
             ItemMedicaoComercial.obra_id == c.obra_id,

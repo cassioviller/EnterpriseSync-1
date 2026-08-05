@@ -21,7 +21,7 @@
       <div class="h5 mb-0">{{ medias.realizado_medio_por_obra|brl }}</div>
     </div></div></div>
     <div class="col-md-3"><div class="card border-0 bg-light"><div class="card-body py-2">
-      <div class="small text-muted">Δ Realizado vs Orçado (global)</div>
+      <div class="small text-muted">Δ Realizado vs Custo Orçado (global)</div>
       <div class="h5 mb-0 {% if medias.delta_pct_global is not none and medias.delta_pct_global > 0 %}text-danger{% elif medias.delta_pct_global is not none %}text-success{% endif %}">
         {% if medias.delta_pct_global is not none %}{% if medias.delta_pct_global > 0 %}+{% endif %}{{ medias.delta_pct_global|num(1) }}%{% else %}—{% endif %}
       </div>
@@ -36,7 +36,7 @@
           <tr>
             <th>Obra</th>
             <th class="text-end">Quantidade</th>
-            <th class="text-end">Orçado (R$)</th>
+            <th class="text-end">Custo Orçado (R$)</th>
             <th class="text-end">Realizado (R$)</th>
             <th class="text-end">Custo Unit. Real (R$)</th>
             <th class="text-end">Δ (%)</th>

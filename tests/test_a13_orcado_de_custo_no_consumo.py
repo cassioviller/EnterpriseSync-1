@@ -37,7 +37,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import main  # noqa: F401 — registra os blueprints antes de qualquer request
 from app import app, db
 from models import (NotificacaoOrcamento, ObraServicoCusto,
-                    ObraServicoCustoItem)
+                    ObraServicoCustoItem, Servico)
 
 from helpers_tenant import cliente_de, dois_tenants
 
@@ -177,6 +177,51 @@ def test_a_coluna_orcado_da_tela_exibe_custo_e_nao_venda():
         assert '135.982,64' in corpo, (
             'A Realizar continua mostrando o orçado inteiro, como se nada '
             'tivesse sido gasto')
+
+
+def test_historico_do_catalogo_mede_delta_contra_custo_e_troca_de_sinal():
+    """B2.5 — a tela usada para precificar proposta nova.
+
+    O Δ% do histórico cross-obra comparava custo REALIZADO contra preço de
+    VENDA. Com 11,4% de markup, um serviço que estourou o custo ainda aparecia
+    **verde** — "saiu abaixo do orçado" — porque não tinha passado a venda.
+    O número errado nesta tela vira preço errado na próxima proposta.
+
+    🔬 **O caso escolhido é o que troca de SINAL**, que é o único desconfortável:
+    realizado 160.000 contra custo 155.982,64 e venda 173.747,83.
+
+    * antes: (160.000 − 173.747,83) / 173.747,83 = **−7,9%**, verde
+    * agora: (160.000 − 155.982,64) / 155.982,64 = **+2,6%**, vermelho
+
+    Um teste com realizado bem abaixo dos dois passaria com qualquer das duas
+    réguas — mediria o vazio. Este só passa com a régua certa.
+    """
+    with app.app_context():
+        a, _b = dois_tenants('a13cat')
+
+        svc_catalogo = Servico(
+            nome=f'Fundação catálogo {a.marca}', categoria='geral',
+            unidade_medida='m2', custo_unitario=100.0, ativo=True,
+            admin_id=a.admin_id)
+        db.session.add(svc_catalogo)
+        db.session.flush()
+
+        osc = _fundacao(a, realizado=Decimal('160000.00'))
+        osc.servico_catalogo_id = svc_catalogo.id
+        db.session.commit()
+
+        r = cliente_de(a.admin_id).get(
+            f'/catalogo/servicos/{svc_catalogo.id}/historico-obras')
+        assert r.status_code == 200
+        corpo = r.get_data(as_text=True)
+
+        assert '+2,6%' in corpo, (
+            'o Δ% não trocou de sinal — o histórico continua comparando o '
+            'realizado com o preço de venda, e um estouro de custo aparece '
+            'como economia')
+        assert '-7,9%' not in corpo, 'o Δ% contra a venda ainda está na tela'
+        assert '155.982,64' in corpo, (
+            'a coluna Orçado do histórico não mostra o custo')
 
 
 def test_projecao_indisponivel_cai_no_caminho_antigo_e_avisa(monkeypatch, caplog):
