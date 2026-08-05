@@ -3626,9 +3626,12 @@ chegar com o cliente escolhido.
    de `:499`, em bloco próprio: se dentro, uma falha zera funcionários e serviços junto
    (o fallback de `:513-514`).
 
-- [ ] **Step 1:** GET lê os args + render
-- [ ] **Step 2:** template com fallback e hidden `lead_id`
-- [ ] **Step 3:** commit — `feat(obras): nova obra pré-preenche o cliente que o CRM manda`
+- [x] **Step 1:** GET lê os args + render
+- [x] **Step 2:** template com fallback e hidden `lead_id`
+- [x] **Step 3:** commit — `feat(obras): nova obra pré-preenche o cliente que o CRM manda`
+
+**Status: ✅ entregue em `1394d907`** — ⚠️ marcado **retroativamente** em 05/08; ver a
+nota de reconferência ao fim da B3.5. Âncora conferida: `views/obras.py:553-557`.
 
 ---
 
@@ -3673,10 +3676,13 @@ perdendo tudo no 302. **Separar produz um commit que passa em revisão e não mu
    mundo em que o vínculo não existia. É uma linha, e deixá-la para depois significa
    nunca.
 
-- [ ] **Step 1:** allowlist no alias + leitura em `nova()`
-- [ ] **Step 2:** flash de `crm_views.py:930-934`
-- [ ] **Step 3:** T1 e T2 verdes
-- [ ] **Step 4:** commit — `feat(propostas): nova proposta recebe cliente_id e lead_id do CRM`
+- [x] **Step 1:** allowlist no alias + leitura em `nova()`
+- [x] **Step 2:** flash de `crm_views.py:930-934`
+- [x] **Step 3:** T1 e T2 verdes
+- [x] **Step 4:** commit — `feat(propostas): nova proposta recebe cliente_id e lead_id do CRM`
+
+**Status: ✅ entregue em `1394d907`** — ⚠️ marcado **retroativamente** em 05/08; ver a
+nota ao fim da B3.5. Âncora conferida: `propostas_consolidated.py:558-568`.
 
 ---
 
@@ -3708,10 +3714,13 @@ vazios**. O campo `cliente_cpf_cnpj` de `:94` fica intocado nesta rodada (ver **
    validação falhar, o usuário perde o vínculo com o lead e refaz tudo → repassar
    `cliente_id`/`lead_id` nesse redirect e nos de `:569`, `:573` e `:595` também.
 
-- [ ] **Step 1:** select + hidden no template
-- [ ] **Step 2:** leitura e atribuição em `criar()`; redirects preservando os args
-- [ ] **Step 3:** T3 verde na metade do `cliente_id`
-- [ ] **Step 4:** commit — `feat(propostas): select de cliente no formulário manual grava proposta.cliente_id`
+- [x] **Step 1:** select + hidden no template
+- [x] **Step 2:** leitura e atribuição em `criar()`; redirects preservando os args
+- [x] **Step 3:** T3 verde na metade do `cliente_id`
+- [x] **Step 4:** commit — `feat(propostas): select de cliente no formulário manual grava proposta.cliente_id`
+
+**Status: ✅ entregue em `1394d907`** — ⚠️ marcado **retroativamente** em 05/08; ver a
+nota ao fim da B3.5. Âncora conferida: `templates/propostas/nova_proposta.html:83-84`.
 
 ---
 
@@ -3748,10 +3757,14 @@ executa.**
 3. A escrita de `nova_obra` fica dentro do try de `:297-496`, logo participa do rollback
    de `:494` — que é o certo: obra e vínculo commitam juntos ou nenhum dos dois.
 
-- [ ] **Step 1:** `lead.proposta_id` em `criar()`
-- [ ] **Step 2:** `lead.obra_id` em `nova_obra` POST
-- [ ] **Step 3:** T3 e T6 verdes
-- [ ] **Step 4:** commit — `feat(crm): lead ganha proposta_id e obra_id — as FKs deixam de ser letra morta`
+- [x] **Step 1:** `lead.proposta_id` em `criar()`
+- [x] **Step 2:** `lead.obra_id` em `nova_obra` POST
+- [x] **Step 3:** T3 e T6 verdes
+- [x] **Step 4:** commit — `feat(crm): lead ganha proposta_id e obra_id — as FKs deixam de ser letra morta`
+
+**Status: ✅ entregue em `27a823f0`** — ⚠️ marcado **retroativamente** em 05/08; ver a
+nota ao fim da B3.5. Âncoras conferidas: `propostas_consolidated.py:776`
+(`lead.proposta_id`) e `views/obras.py:453-461` (`lead.obra_id`).
 
 ---
 
@@ -3809,10 +3822,28 @@ vermelho na hora.**
    `ja_existem` é montado por (obra, servico) lendo `ServicoObraReal` da obra (`:205-208`),
    e a obra é a mesma.
 
-- [ ] **Step 1:** as duas linhas em `:385`, sem criar função nenhuma
-- [ ] **Step 2:** T5 verde (as duas variantes: `skip_contabil` e valor zero), reemitindo para idempotência
-- [ ] **Step 3:** T4 verde — a cadeia fecha
-- [ ] **Step 4:** commit — `fix(propostas): valor zero e importação também semeiam serviços e fecham o lead`
+- [x] **Step 1:** as duas linhas em `:385`, sem criar função nenhuma
+- [x] **Step 2:** T5 verde (as duas variantes: `skip_contabil` e valor zero), reemitindo para idempotência
+- [x] **Step 3:** T4 verde — a cadeia fecha
+- [x] **Step 4:** commit — `fix(propostas): valor zero e importação também semeiam serviços e fecham o lead`
+
+**Status: ✅ entregue em `27a823f0`** — ⚠️ marcado **retroativamente** em 05/08. Âncora
+conferida: `handlers/propostas_handlers.py:392-393` (`_semear_servicos_reais` e
+`_fechar_lead_da_proposta` no terceiro caminho, antes do `return`).
+
+> ### ⚠️ Nota sobre as marcações retroativas de B3.1–B3.5
+>
+> **As caixas destas cinco Tasks foram marcadas em 05/08, depois do fato, e não por
+> quem as executou.** O que sustenta cada marcação é (a) a implementação conferida
+> no código, âncora por âncora, nos pontos citados em cada Status, e (b) o gate
+> completo de 05/08 — **1936 passed, 6 skipped, 2 xfailed, zero falhas** —, que
+> inclui os testes T1–T7 nomeados nos Steps.
+>
+> **O que isso NÃO atesta:** que cada Step foi cumprido na ordem prescrita, que os
+> testes foram vistos vermelhos antes, ou que não houve desvio de escopo silencioso
+> na execução. As entregas saíram em `1394d907` e `27a823f0`, e o `aa6cfce9`
+> atualizou a prosa deste plano sem marcar as caixas — foi essa defasagem que
+> escondeu o estado real até aqui.
 
 **Backfill — o que fazer com o que já nasceu sem os IDs.** São dois problemas distintos e
 a resposta é diferente para cada um.
