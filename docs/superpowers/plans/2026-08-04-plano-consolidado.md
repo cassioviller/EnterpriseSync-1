@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | 0 | **20** | G |
+| B2 — o que o sistema informa errado | 20 | **1** | **19** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **22** | **39** | |
+| **Total** | **61** *(62 − 1 cortada)* | **23** | **38** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -1959,9 +1959,35 @@ passaria a estourar. É a armadilha central do item. Manter o try/except do mód
 (`:88`, `:126`) devolvendo dict vazio — e o chamador trata dict vazio como "não sei",
 nunca como zero.
 
-- [ ] **Step 1:** o helper
-- [ ] **Step 2:** teste de unidade dos dois regimes
-- [ ] **Step 3:** commit — `feat(custo): projecao_de_custo_por_servico — a_realizar_efetivo num lugar só`
+- [x] **Step 1:** o helper
+- [x] **Step 2:** teste de unidade dos dois regimes
+- [x] **Step 3:** commit
+
+**Status: ✅ entregue em 05/08. Primeira Task do B2.** Entregue como o recorte
+mandava, com dois desvios pequenos e um método aplicado:
+
+1. **A agregação virou `_servicos_e_somas`, e `custo_orcado_por_servico` passou a
+   chamá-la.** O recorte dizia "reaproveitando a agregação de `:113-122`"; copiá-la
+   seria criar o segundo lugar onde "linha vence agregado" mora — que é exatamente
+   o defeito que este módulo nasceu para acabar. Extração pura, sem mudança de
+   comportamento; o único consumidor vivo de `custo_orcado_por_servico` é
+   `services/cronograma_fisico_financeiro.py:288`.
+2. **O teste foi para `tests/test_p3_p9_orcado_e_contrato.py`**, não para arquivo
+   novo: mesmo módulo sob teste, mesmos helpers, e o teste de convergência do p3
+   já mora lá.
+3. **Os dois regimes foram cobrados por SABOTAGEM, não por leitura.** Os cinco
+   testes passaram de primeira, e nesta rodada isso não conta como prova (lição de
+   04/08, noite, item 3). Trocando o helper pelo ramo errado, um por vez:
+   *sempre* `a_realizar_total` → caem os dois de linhas; *sempre*
+   `max(orcado − realizado, 0)` → cai o de fluxo manual. **Cada ramo tem quem o
+   cobre**, e nenhum dos cinco é vacuoso.
+
+**O que o teste da obra Baia trava, e é a razão do item inteiro:** com linhas, o
+`a_realizar_total` gravado É o orçado (155.982,64) — identidade de
+`recalcular_osc_dos_itens`. `projetado = realizado + a_realizar_total` daria
+**175.982,64** para uma etapa que orçou 155.982,64 e gastou 20.000. Qualquer
+realizado > 0 estoura. É a avalanche que o §11.3 previu, e agora ela tem um teste
+com o número dela dentro.
 
 ---
 
@@ -4330,6 +4356,41 @@ passo 3 — o B2 —, e ele não espera nada.**
 3. **B2**, com T4/T5/T6/T7 em paralelo — lembrando **B1.13 antes de B2.8**.
 4. **B3**, T8 e T9 em paralelo.
 5. **B4**, por último, com o gate de produção de D11 antes do E02.
+
+### 11.5 A armadilha de construção que apareceu quatro vezes, agora com mecanismo
+
+**"O segundo cliente no mesmo `app_context` não completa"** está registrado três
+vezes neste documento como fato observado, sem explicação. Em **05/08 o mecanismo
+foi isolado, e ele não é o que a frase sugere** — o segundo cliente completa muito
+bem; ele completa **como o primeiro usuário**.
+
+**`g` pertence ao APP context, não ao request.** O Flask-Login guarda o usuário
+resolvido em `g._login_user`, e dentro de um único `with app.app_context():` esse
+cache sobrevive de uma requisição de teste para a seguinte. O segundo
+`cliente_de(...)` monta a sessão certa, mas a rota nunca chega a resolvê-la:
+`current_user` já está preenchido com quem entrou primeiro. Medido: dois clientes
+no mesmo contexto, `g._login_user.id` == admin de **A** depois do GET de A, e o
+GET seguinte de B na obra de A responde **200**; o mesmo GET, com o cliente de B
+sozinho, responde **404** — a rota está certa, o instrumento é que mentia.
+
+**O perigo real é o falso VERDE, não o vermelho.** Um teste de isolamento escrito
+assim afirma "B não enxerga o dado de A" enquanto na verdade A está olhando os
+próprios dados — e passa. Foi por sorte que as três ocorrências anteriores
+falharam em vez de passarem.
+
+**Varredura do repositório em 05/08: quatro blocos** usam dois ou mais clientes no
+mesmo `app_context` (`test_clausulas_configuraveis.py:192`,
+`test_cronograma_revisao_obra_gate.py:200`,
+`test_e2e_proposta_aprovacao_cliente.py:230`, `test_orcamento_formato_br.py:110`).
+**Nenhum está contaminado:** os quatro usam o par "logado + anônimo" contra rota
+pública por token que não lê `current_user` em lugar nenhum (conferido em
+`propostas_consolidated.py:2507`). Não há dívida a pagar — há uma regra a seguir.
+
+**A regra: um request AUTENTICADO por `app_context`. O resto é precondição
+semeada no banco.** É o que a B1.16 já tinha feito por tentativa e erro
+(`test_arreio_almoxarifado_e_tenant.py:167`); daqui em diante se faz sabendo
+por quê. O achado saiu do teste de tenant da **B2.2**, que deu vermelho por
+motivo falso e mandou investigar em vez de "consertar" a rota — que estava certa.
 
 ---
 

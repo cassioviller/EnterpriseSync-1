@@ -24,7 +24,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import app, db
 from models import ObraServicoCusto, ObraServicoCustoItem
 from helpers_tenant import dois_tenants
-from services.custo_orcado import custo_orcado_da_obra, custo_orcado_por_servico
+from services.custo_orcado import (custo_orcado_da_obra,
+                                   custo_orcado_por_servico,
+                                   projecao_de_custo_por_servico)
 
 pytestmark = pytest.mark.integration
 
@@ -130,6 +132,137 @@ def test_o_orcado_nao_atravessa_tenants():
     db.session.commit()
 
     assert custo_orcado_da_obra(a.obra_id, a.admin_id) == 0.0
+
+
+# ---------------------------------------------------------------------------
+# B2.1 — projecao_de_custo_por_servico (A13, T4)
+# ---------------------------------------------------------------------------
+
+def _servico_com_projecao(t, valor_orcado, linhas=(), realizado=0,
+                          a_realizar=None):
+    """Serviço com o A REALIZAR gravado como o sistema real grava.
+
+    Quando há linhas, `recalcular_osc_dos_itens` grava
+    `mao_obra_a_realizar = Σ fonte != 'fat_direto'` e
+    `material_a_realizar = Σ fonte == 'fat_direto'` — ou seja, o
+    `a_realizar_total` gravado **é a soma das linhas**. Semear isso é o que faz
+    o teste medir a armadilha, e não uma versão dela.
+
+    `linhas` é uma sequência de `(valor, fonte)`. `a_realizar` só é usado no
+    regime SEM linhas, onde o campo é manual.
+    """
+    veks = sum(v for v, fonte in linhas if fonte != 'fat_direto')
+    fat_direto = sum(v for v, fonte in linhas if fonte == 'fat_direto')
+
+    if linhas:
+        mao_obra, material = veks, fat_direto
+    else:
+        mao_obra, material = (a_realizar or 0), 0
+
+    osc = ObraServicoCusto(
+        obra_id=t.obra_id, admin_id=t.admin_id, nome=f'Etapa {t.marca}',
+        valor_orcado=Decimal(str(valor_orcado)),
+        realizado_material=Decimal(str(realizado)),
+        realizado_mao_obra=0, realizado_outros=0,
+        mao_obra_a_realizar=Decimal(str(mao_obra)),
+        material_a_realizar=Decimal(str(material)),
+        outros_a_realizar=0)
+    db.session.add(osc)
+    db.session.flush()
+    for valor, fonte in linhas:
+        db.session.add(ObraServicoCustoItem(
+            obra_servico_custo_id=osc.id, admin_id=t.admin_id,
+            descricao='linha', valor=Decimal(str(valor)), fonte=fonte))
+    db.session.commit()
+    return osc
+
+
+def test_com_linhas_o_a_realizar_efetivo_desconta_o_realizado():
+    """O caso da obra Baia, que é onde o defeito foi medido.
+
+    🔬 **A armadilha que este teste existe para travar.** Com linhas, o
+    `a_realizar_total` GRAVADO é o próprio orçado (155.982,64) — identidade de
+    `recalcular_osc_dos_itens`, não coincidência. Quem fizer
+    `projetado = realizado + a_realizar_total` obtém **175.982,64** para uma
+    etapa que orçou 155.982,64 e gastou 20.000: qualquer realizado > 0 estoura.
+
+    O número certo é 155.982,64 — o realizado já está DENTRO do orçado, e o que
+    falta gastar é a diferença.
+    """
+    t = _tenant()
+    osc = _servico_com_projecao(
+        t, valor_orcado=173747.83,
+        linhas=((68100.00, 'veks'), (87882.64, 'fat_direto')),
+        realizado=20000)
+
+    p = projecao_de_custo_por_servico(t.obra_id, t.admin_id)[osc.id]
+
+    assert p['tem_linhas'] is True
+    assert p['orcado'] == pytest.approx(155982.64), (
+        'o orçado tem de vir das linhas (custo), não do valor_orcado (venda)')
+    assert p['a_realizar_efetivo'] == pytest.approx(135982.64)
+    assert p['projetado'] == pytest.approx(155982.64), (
+        f"projetado deu {p['projetado']} — 175982.64 é o defeito: soma o "
+        f"realizado ao orçado inteiro e faz qualquer gasto estourar a etapa")
+    assert p['saldo'] == pytest.approx(0.0)
+
+
+def test_sem_linhas_o_a_realizar_gravado_e_respeitado():
+    """Fluxo manual: sem linha, o campo é do gestor e ninguém o recalcula.
+
+    Aqui NÃO cabe `orcado - realizado`: o `a_realizar` não é derivado do
+    orçado, é digitado. Descontar o realizado dele seria inventar um número que
+    ninguém escreveu.
+    """
+    t = _tenant()
+    osc = _servico_com_projecao(t, valor_orcado=50000, realizado=12000,
+                                a_realizar=30000)
+
+    p = projecao_de_custo_por_servico(t.obra_id, t.admin_id)[osc.id]
+
+    assert p['tem_linhas'] is False
+    assert p['orcado'] == pytest.approx(50000.0)
+    assert p['a_realizar_efetivo'] == pytest.approx(30000.0)
+    assert p['projetado'] == pytest.approx(42000.0)
+    assert p['saldo'] == pytest.approx(8000.0)
+
+
+def test_realizado_acima_do_orcado_nao_encolhe_a_projecao():
+    """Estourar não faz o gasto desaparecer — faz o saldo ficar negativo.
+
+    Sem o `max(..., 0)`, `a_realizar_efetivo` viria negativo e o `projetado`
+    encolheria de volta para o orçado, escondendo exatamente o estouro que a
+    tela precisa mostrar.
+    """
+    t = _tenant()
+    osc = _servico_com_projecao(t, valor_orcado=10000,
+                                linhas=((6000.00, 'veks'),), realizado=9000)
+
+    p = projecao_de_custo_por_servico(t.obra_id, t.admin_id)[osc.id]
+
+    assert p['a_realizar_efetivo'] == 0.0
+    assert p['projetado'] == pytest.approx(9000.0), (
+        'a projeção não pode ser menor que o que já foi gasto')
+    assert p['saldo'] == pytest.approx(-3000.0)
+
+
+def test_obra_sem_servico_devolve_dict_vazio_que_significa_nao_sei():
+    """`{}` é "não sei", e o chamador não pode lê-lo como zero.
+
+    É a mesma disciplina do `except` do módulo: falha e ausência devolvem a
+    mesma coisa, e tratar isso como "orçado zero" transformaria indisponibilidade
+    em estouro de orçamento na tela.
+    """
+    t = _tenant()
+    assert projecao_de_custo_por_servico(t.obra_id, t.admin_id) == {}
+
+
+def test_a_projecao_nao_atravessa_tenants():
+    """Mesma guarda do `custo_orcado_da_obra`, na função nova."""
+    a, b = dois_tenants('proj')
+    _servico_com_projecao(b, valor_orcado=9999, linhas=((5000.00, 'veks'),))
+
+    assert projecao_de_custo_por_servico(a.obra_id, a.admin_id) == {}
 
 
 # ---------------------------------------------------------------------------

@@ -90,6 +90,37 @@ def custo_orcado_da_obra(obra_id: int, admin_id=None) -> float:
         return 0.0
 
 
+def _servicos_e_somas(obra_id: int, admin_id=None):
+    """`(servicos, {osc_id: soma_das_linhas})` — DUAS queries, nunca por serviço.
+
+    Ponto único da agregação. Existe para que `custo_orcado_por_servico` e
+    `projecao_de_custo_por_servico` não façam a mesma pergunta ao banco de dois
+    jeitos — foi assim que a regra "linha vence agregado" se espalhou antes de
+    virar este módulo.
+    """
+    from models import ObraServicoCusto, ObraServicoCustoItem, db
+    from sqlalchemy import func as sqlfunc
+
+    q = ObraServicoCusto.query.filter_by(obra_id=obra_id)
+    if admin_id is not None:
+        q = q.filter_by(admin_id=admin_id)
+    servicos = q.all()
+    if not servicos:
+        return [], {}
+
+    somas = dict(
+        db.session.query(
+            ObraServicoCustoItem.obra_servico_custo_id,
+            sqlfunc.coalesce(sqlfunc.sum(ObraServicoCustoItem.valor), 0),
+        )
+        .filter(ObraServicoCustoItem.obra_servico_custo_id.in_(
+            [s.id for s in servicos]))
+        .group_by(ObraServicoCustoItem.obra_servico_custo_id)
+        .all()
+    )
+    return servicos, somas
+
+
 def custo_orcado_por_servico(obra_id: int, admin_id=None) -> dict:
     """`{obra_servico_custo_id: custo}` pela mesma regra, serviço a serviço.
 
@@ -100,29 +131,77 @@ def custo_orcado_por_servico(obra_id: int, admin_id=None) -> dict:
     """
     resultado: dict = {}
     try:
-        from models import ObraServicoCusto, ObraServicoCustoItem, db
-        from sqlalchemy import func as sqlfunc
-
-        q = ObraServicoCusto.query.filter_by(obra_id=obra_id)
-        if admin_id is not None:
-            q = q.filter_by(admin_id=admin_id)
-        servicos = q.all()
-        if not servicos:
-            return resultado
-
-        somas = dict(
-            db.session.query(
-                ObraServicoCustoItem.obra_servico_custo_id,
-                sqlfunc.coalesce(sqlfunc.sum(ObraServicoCustoItem.valor), 0),
-            )
-            .filter(ObraServicoCustoItem.obra_servico_custo_id.in_(
-                [s.id for s in servicos]))
-            .group_by(ObraServicoCustoItem.obra_servico_custo_id)
-            .all()
-        )
+        servicos, somas = _servicos_e_somas(obra_id, admin_id)
         for s in servicos:
             linhas = _f(somas.get(s.id))
             resultado[s.id] = linhas if linhas > 0 else _f(s.valor_orcado)
     except Exception:
         logger.exception('custo_orcado_por_servico falhou (obra=%s)', obra_id)
+    return resultado
+
+
+def projecao_de_custo_por_servico(obra_id: int, admin_id=None) -> dict:
+    """`{osc_id: {orcado, tem_linhas, realizado, a_realizar_efetivo, projetado, saldo}}`.
+
+    ## O fato que este helper existe para não deixar ninguém esquecer
+
+    **Quando um serviço TEM linhas de custo, o `a_realizar_total` gravado É o
+    próprio orçado.** Não é coincidência, é identidade:
+    `services/cronograma_fisico_financeiro.py` (`recalcular_osc_dos_itens`)
+    grava `mao_obra_a_realizar = Σ linhas fonte != 'fat_direto'`,
+    `material_a_realizar = Σ linhas fonte == 'fat_direto'` e
+    `outros_a_realizar = 0` — logo `a_realizar_total == Σ linhas == orcado`.
+
+    Quem então calcula `projetado = realizado + a_realizar_total` está somando
+    `realizado + orcado`, e **qualquer** realizado > 0 estoura o orçamento. É a
+    armadilha central do A13, e é por isso que trocar a base de comparação sem
+    passar por aqui vira avalanche de alarme falso.
+
+    ## A regra
+
+    * `orcado` — a mesma de `custo_orcado_por_servico`: linha vence agregado.
+    * `tem_linhas` — soma das linhas > 0. É o divisor entre os dois regimes.
+    * `a_realizar_efetivo` — **`max(orcado - realizado, 0)` quando há linhas**,
+      porque ali o campo gravado é o orçado e o que falta gastar é o que sobra
+      dele; e o `a_realizar_total` gravado quando NÃO há linhas, que é o fluxo
+      manual, onde o gestor mantém o campo à mão e ninguém o recalcula.
+    * `projetado = realizado + a_realizar_efetivo`; `saldo = orcado - projetado`.
+
+    O `max(..., 0)` é o que impede projeção menor que o realizado: estourar o
+    orçado não faz o que já foi gasto desaparecer — faz o saldo ficar negativo,
+    que é o que se quer mostrar.
+
+    Duas queries por obra, nada por serviço (`realizado_total` e
+    `a_realizar_total` são properties sobre colunas já carregadas).
+
+    **Dict vazio significa "não sei", nunca zero** — o `except` devolve `{}`
+    tanto para obra sem serviço quanto para falha, e o chamador tem de tratar a
+    ausência da chave como ausência de informação.
+    """
+    resultado: dict = {}
+    try:
+        servicos, somas = _servicos_e_somas(obra_id, admin_id)
+        for s in servicos:
+            linhas = _f(somas.get(s.id))
+            tem_linhas = linhas > 0
+            orcado = linhas if tem_linhas else _f(s.valor_orcado)
+            realizado = _f(s.realizado_total)
+
+            if tem_linhas:
+                a_realizar_efetivo = max(orcado - realizado, 0.0)
+            else:
+                a_realizar_efetivo = _f(s.a_realizar_total)
+
+            projetado = realizado + a_realizar_efetivo
+            resultado[s.id] = {
+                'orcado': orcado,
+                'tem_linhas': tem_linhas,
+                'realizado': realizado,
+                'a_realizar_efetivo': a_realizar_efetivo,
+                'projetado': projetado,
+                'saldo': orcado - projetado,
+            }
+    except Exception:
+        logger.exception('projecao_de_custo_por_servico falhou (obra=%s)', obra_id)
+        return {}
     return resultado

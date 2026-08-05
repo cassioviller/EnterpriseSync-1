@@ -164,12 +164,17 @@ def test_a_nota_de_um_tenant_nao_recusa_a_entrada_do_outro():
     número o tempo todo; a numeração é sequencial por emitente, não universal.
 
     🔬 **UM POST só, e a nota de A é semeada direto no banco.** A primeira versão
-    postava pelas duas rotas e media errado: o segundo cliente não completa
-    dentro do mesmo ``app_context`` — é o mesmo defeito de construção que já
-    apareceu duas vezes nesta rodada (`tests/test_arreio_custo_rdo_rotas.py`
-    registra os dois casos). O que interessa aqui é a **precondição** (existe
-    NF-1000 em A) e **uma** ação (B posta), então o cenário não precisa da
-    segunda rota — e sem ela o teste mede o que diz medir.
+    postava pelas duas rotas e media errado. O que interessa aqui é a
+    **precondição** (existe NF-1000 em A) e **uma** ação (B posta), então o
+    cenário não precisa da segunda rota — e sem ela o teste mede o que diz medir.
+
+    🔬 **05/08 — o mecanismo disso foi isolado, e a frase antiga estava errada.**
+    Não é que "o segundo cliente não completa": ele completa **como o primeiro
+    usuário**. `g` pertence ao APP context, não ao request, e o Flask-Login guarda
+    o usuário resolvido em `g._login_user` — dentro de um único ``app_context``, o
+    segundo cliente monta a sessão certa e a rota nunca chega a lê-la. A regra que
+    fica: **um request autenticado por `app_context`; o resto é semeado.** Ver
+    §11.5 do plano consolidado.
     """
     with app.app_context():
         a = um_tenant('nfA', data_ref=DIA, com_fatos=False)
