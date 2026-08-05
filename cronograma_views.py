@@ -921,6 +921,11 @@ def criar_tarefa(obra_id: int):
         db.session.rollback()
         return jsonify({'status': 'error', 'msg': str(exc)}), 400
 
+    # A06/B2.20 — FORA do try acima, e por um motivo concreto: lá dentro o
+    # commit interno do replanejamento (utils/cronograma_engine) rodaria ANTES
+    # do `db.session.rollback()`, e a criação que o ciclo mandou desfazer
+    # ficaria gravada.
+    _replanejar_pos_commit(obra_id, admin_id, cliente_mode)
     logger.info(f"[OK] TarefaCronograma criada id={tarefa.id} obra_id={obra_id} (editor v2)")
     vmap, _, t2l, _ = _mapas_vinculos(obra_id, admin_id, cliente_mode)
     _kw = dict(vinculos_por_sucessora=vmap, tarefa_para_linha=t2l)
@@ -1315,14 +1320,23 @@ def excluir_tarefa(obra_id: int, tarefa_id: int):
     # o guard é só defensivo (dado sujo pré-existente não pode derrubar a
     # exclusão).
     afetadas: list = []
+    recalculou = False
     if flag_on:
         try:
             resultado = recalcular_obra(obra_id, admin_id, cliente=cliente_mode)
             afetadas = resultado.tarefas_afetadas
+            recalculou = True
         except ErroCiclo as exc:
             db.session.rollback()
             logger.warning('[editor-v2] recálculo pós-exclusão pulado '
                            '(ciclo pré-existente na obra %s): %s', obra_id, exc)
+
+    # A06/B2.20 — guardado pelo sinalizador, e não incondicional: este `except`
+    # é o único do módulo que faz rollback e **segue** (não retorna). Replanejar
+    # depois de um recálculo abortado gravaria uma curva planejada derivada de
+    # datas que o rollback acabou de descartar.
+    if recalculou:
+        _replanejar_pos_commit(obra_id, admin_id, cliente_mode)
 
     # Devolver lista atualizada para o frontend re-renderizar hierarquia
     todas = TarefaCronograma.query.filter_by(
@@ -1373,6 +1387,13 @@ def recalcular(obra_id: int):
         ok = recalcular_cronograma(obra_id, admin_id, cliente=cliente_mode)
         if not ok:
             return jsonify({'status': 'error', 'msg': 'Erro ao recalcular cronograma'}), 500
+
+    # A06/B2.20 — o **gatilho manual**: é a única rota que conserta uma curva
+    # planejada envelhecida sem exigir uma edição. Depois do if/else, e não
+    # dentro do `if flag_on`: os dois ramos só chegam aqui em caso de sucesso
+    # (o v2 retorna 400 no ErroCiclo, o legado retorna 500 quando `ok` é falso),
+    # então uma linha cobre os dois — inclusive o parque ainda não migrado.
+    _replanejar_pos_commit(obra_id, admin_id, cliente_mode)
 
     tarefas = (
         TarefaCronograma.query
@@ -1480,6 +1501,11 @@ def _recalc_e_resposta_vinculo(obra_id: int, admin_id: int, cliente_mode: bool,
         db.session.rollback()
         return jsonify({'status': 'error', 'msg': str(exc)}), 400
 
+    # A06/B2.20 — ponto único das três rotas de vínculo (criar/atualizar/
+    # excluir). ANTES do `_mapas_vinculos`, não depois: se o replanejamento
+    # falhar e rolar back, a serialização re-consulta o banco em vez de ler
+    # objetos ORM expirados pelo rollback.
+    _replanejar_pos_commit(obra_id, admin_id, cliente_mode)
     vmap, _, t2l, _ = _mapas_vinculos(obra_id, admin_id, cliente_mode)
     _kw = dict(vinculos_por_sucessora=vmap, tarefa_para_linha=t2l)
     corpo = {
@@ -1744,6 +1770,11 @@ def _aplicar_hierarquia(obra_id: int, admin_id: int, cliente_mode: bool,
     except ErroCiclo as exc:
         db.session.rollback()
         return None, (jsonify({'status': 'error', 'msg': str(exc)}), 400)
+    # A06/B2.20 — duas linhas que cobrem QUATRO rotas (recuar, desrecuar,
+    # mover e criar-posicionado): mudar hierarquia recalcula datas, e a curva
+    # planejada dos apontamentos já gravados tem de acompanhar. FORA do try:
+    # com ciclo, o rollback acima já desfez tudo e não há o que replanejar.
+    _replanejar_pos_commit(obra_id, admin_id, cliente_mode)
     return resultado, None
 
 

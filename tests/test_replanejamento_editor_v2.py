@@ -42,11 +42,14 @@ def _config():
         yield
 
 
-def _client_v2(admin_id):
+def _client_v2(admin_id, flag=True):
     """Cliente autenticado com o editor v2 LIGADO no tenant.
 
     A flag mora numa coluna de `ConfiguracaoEmpresa` — mesmo helper da Fase 1,
     usado por `tests/test_cronograma_grade_api.py`.
+
+    `flag=False` mantém o usuário V2 (é `versao_sistema`, outro eixo) e desliga
+    só o editor novo — é assim que se alcança o ramo LEGADO de `/recalcular`.
     """
     from models import ConfiguracaoEmpresa
 
@@ -55,7 +58,7 @@ def _client_v2(admin_id):
         config = ConfiguracaoEmpresa(admin_id=admin_id,
                                      nome_empresa=f'Empresa {admin_id}')
         db.session.add(config)
-    config.cronograma_editor_v2 = True
+    config.cronograma_editor_v2 = flag
     db.session.commit()
 
     c = app.test_client()
@@ -72,6 +75,29 @@ def _cenario():
                 data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 14))
     ap = _rdo_apontado(obra, admin, t, date(2026, 7, 8), 0, 0, 30, 99.0)
     return admin, obra, t, ap
+
+
+def _vizinhas(obra, admin):
+    """Duas folhas SEM apontamento, ao lado da 'Alvenaria' do `_cenario`.
+
+    Elas são o alvo das rotas que não editam a tarefa apontada — criar
+    vínculo, recuar, excluir. A 'Alvenaria' fica intocada de propósito: o que
+    o teste mede é o **efeito colateral** da rota sobre a curva planejada da
+    obra inteira, e não uma edição direta daquela tarefa. Como a 'Alvenaria'
+    tem apontamento, o motor a trata como ancorada e não move as datas dela —
+    então o planejado correto é sempre 60,0%, e um 99,0% que sobrevive
+    significa que a rota não replanejou nada.
+    """
+    p = _tarefa(obra, admin, 'Pintura', ordem=1, duracao_dias=5,
+                data_inicio=date(2026, 7, 15), data_fim=date(2026, 7, 21))
+    a = _tarefa(obra, admin, 'Acabamento', ordem=2, duracao_dias=5,
+                data_inicio=date(2026, 7, 22), data_fim=date(2026, 7, 28))
+    return p, a
+
+
+def _planejado(ap):
+    db.session.expire_all()
+    return db.session.get(type(ap), ap.id).percentual_planejado
 
 
 # ---------------------------------------------------------------------------
@@ -223,3 +249,274 @@ def test_sem_sincronizar_o_replanejamento_ainda_acontece():
     db.session.refresh(ap)
     assert ap.percentual_planejado == 60.0
     assert rel['apontamentos_replanejados'] == 1
+
+
+# ---------------------------------------------------------------------------
+# B2.20 — os outros CINCO pontos de recálculo
+#
+# O título da Task diz "seis"; o campo Files dela lista cinco funções, e é
+# cinco: `_aplicar_hierarquia`, `_recalc_e_resposta_vinculo`, `criar_tarefa`,
+# `excluir_tarefa` e `recalcular`. Os dois ramos de `atualizar_tarefa` são da
+# B2.19 e já estão acima.
+# ---------------------------------------------------------------------------
+
+def test_criar_tarefa_replaneja_a_curva():
+    """`criar_tarefa` — o ramo simples (append no fim), depois do commit.
+
+    Nascer uma tarefa recalcula a obra; a curva planejada dos apontamentos já
+    gravados tem de acompanhar. A chamada fica FORA do `try` do `ErroCiclo`:
+    lá dentro o commit interno do replanejamento rodaria antes do
+    `db.session.rollback()` e gravaria o que o ciclo mandou desfazer.
+    """
+    _admin, obra, _t, ap = _cenario()
+    cli = _client_v2(ap.admin_id)
+
+    r = cli.post(f'/cronograma/obra/{obra.id}/tarefa',
+                 json={'nome_tarefa': 'Pintura', 'duracao_dias': 5,
+                       'data_inicio': '2026-07-15'})
+    assert r.status_code == 201, f'a rota respondeu {r.status_code}: {r.data[:300]}'
+
+    assert _planejado(ap) == pytest.approx(60.0), (
+        'criar tarefa não replanejou a curva — o apontamento de 08/07 seguiu '
+        'com os 99% do plano órfão')
+
+
+def test_criar_tarefa_posicionada_replaneja_a_curva():
+    """`_aplicar_hierarquia` pelo lado do `criar_tarefa` posicionado.
+
+    Mesmo helper do recuar/desrecuar/mover, outra porta de entrada — e a que
+    prova que a chamada está no helper, não copiada dentro de cada rota.
+    """
+    _admin, obra, t, ap = _cenario()
+    cli = _client_v2(ap.admin_id)
+
+    r = cli.post(f'/cronograma/obra/{obra.id}/tarefa',
+                 json={'nome_tarefa': 'Pintura', 'duracao_dias': 5,
+                       'data_inicio': '2026-07-15',
+                       'posicao': 'abaixo', 'ref_tarefa_id': t.id})
+    assert r.status_code == 201, f'a rota respondeu {r.status_code}: {r.data[:300]}'
+
+    assert _planejado(ap) == pytest.approx(60.0), (
+        'criar tarefa posicionada não replanejou — _aplicar_hierarquia é o '
+        'ponto que serve criar-posicionado, recuar, desrecuar e mover')
+
+
+def test_recuar_tarefa_replaneja_a_curva():
+    """`_aplicar_hierarquia` — duas linhas que cobrem quatro rotas.
+
+    Recuar 'Acabamento' para dentro de 'Pintura' renumera e recalcula a obra
+    inteira. A 'Alvenaria' apontada nem entra na operação: é justamente por
+    isso que ela mede o efeito colateral sobre a curva.
+    """
+    _admin, obra, _t, ap = _cenario()
+    _p, acab = _vizinhas(obra, _admin)
+    cli = _client_v2(ap.admin_id)
+
+    r = cli.post(f'/cronograma/obra/{obra.id}/tarefa/{acab.id}/recuar')
+    assert r.status_code == 200, f'a rota respondeu {r.status_code}: {r.data[:300]}'
+
+    assert _planejado(ap) == pytest.approx(60.0), (
+        'recuar não replanejou a curva — _aplicar_hierarquia serve recuar, '
+        'desrecuar, mover e criar-posicionado, e nenhuma delas tocaria o '
+        'planejado')
+
+
+def test_criar_vinculo_replaneja_a_curva():
+    """`_recalc_e_resposta_vinculo` — serve criar, atualizar e excluir vínculo.
+
+    O vínculo é entre as duas vizinhas; a 'Alvenaria' apontada fica fora dele.
+    A chamada tem de entrar DEPOIS do commit e ANTES do `_mapas_vinculos`: se o
+    replanejamento falhar e rolar back, a serialização re-consulta o banco em
+    vez de ler objetos ORM expirados.
+    """
+    _admin, obra, _t, ap = _cenario()
+    pint, acab = _vizinhas(obra, _admin)
+    cli = _client_v2(ap.admin_id)
+
+    r = cli.post(f'/cronograma/obra/{obra.id}/vinculo',
+                 json={'predecessora_id': pint.id, 'sucessora_id': acab.id,
+                       'tipo': 'TI'})
+    assert r.status_code == 201, f'a rota respondeu {r.status_code}: {r.data[:300]}'
+
+    assert _planejado(ap) == pytest.approx(60.0), (
+        'criar vínculo não replanejou a curva — _recalc_e_resposta_vinculo é '
+        'o ponto único das três rotas de vínculo')
+
+
+def test_falha_no_replanejamento_nao_derruba_a_rota_de_vinculo(monkeypatch):
+    """A chamada é PÓS-COMMIT: quebrar aqui não pode desfazer a edição.
+
+    🔬 O `rollback()` do `except` do helper expira os objetos ORM. Se a chamada
+    estivesse depois da serialização — ou sem o try/except — este cenário
+    devolveria 500 e o usuário perderia um vínculo que já estava gravado. Aqui
+    a resposta sai completa e o vínculo continua no banco.
+    """
+    from models import TarefaVinculo
+    import utils.cronograma_engine as engine
+
+    _admin, obra, _t, ap = _cenario()
+    pint, acab = _vizinhas(obra, _admin)
+
+    def _explode(*_a, **_kw):
+        raise RuntimeError('replanejamento quebrado de propósito')
+
+    monkeypatch.setattr(engine, 'replanejar_curvas_obra', _explode)
+
+    cli = _client_v2(ap.admin_id)
+    r = cli.post(f'/cronograma/obra/{obra.id}/vinculo',
+                 json={'predecessora_id': pint.id, 'sucessora_id': acab.id,
+                       'tipo': 'TI'})
+
+    assert r.status_code == 201, (
+        f'a falha do replanejamento derrubou a rota ({r.status_code}) — ela é '
+        f'pós-commit e nunca pode desfazer a edição: {r.data[:300]}')
+    assert r.get_json()['vinculo']['id'], 'a resposta saiu sem o vínculo'
+    assert TarefaVinculo.query.filter_by(
+        obra_id=obra.id, predecessora_id=pint.id,
+        sucessora_id=acab.id).first() is not None, (
+        'o vínculo já commitado sumiu junto com o replanejamento que falhou')
+
+
+def test_excluir_tarefa_replaneja_a_curva():
+    """`excluir_tarefa` — depois do recálculo pós-exclusão.
+
+    Excluir reflui as ex-sucessoras, e as datas que mudam são exatamente as
+    que a curva planejada dos apontamentos já gravados estava fotografando.
+    """
+    _admin, obra, _t, ap = _cenario()
+    _pint, acab = _vizinhas(obra, _admin)
+    cli = _client_v2(ap.admin_id)
+
+    r = cli.delete(f'/cronograma/obra/{obra.id}/tarefa/{acab.id}')
+    assert r.status_code == 200, f'a rota respondeu {r.status_code}: {r.data[:300]}'
+
+    assert _planejado(ap) == pytest.approx(60.0), (
+        'excluir tarefa não replanejou a curva')
+
+
+def test_excluir_tarefa_com_ciclo_preexistente_nao_replaneja():
+    """Risco 2 da B2.20 — o `except ErroCiclo` que **não retorna**.
+
+    🔬 Em `excluir_tarefa` o `except` do recálculo pós-exclusão só faz
+    `rollback()` + `logger.warning` e **deixa o fluxo seguir**. Uma chamada
+    incondicional depois do bloco replanejaria por cima de um recálculo que
+    foi abortado e revertido — gravaria uma curva planejada derivada de datas
+    que o rollback acabou de descartar. Por isso a chamada é guardada por um
+    sinalizador levantado DENTRO do `try`.
+
+    O ciclo é semeado direto no banco (A→B e B→A): a rota de vínculo recusaria
+    o segundo, e é assim mesmo que o dado sujo pré-existente chega em produção.
+    """
+    from models import TarefaVinculo
+
+    _admin, obra, _t, ap = _cenario()
+    pint, acab = _vizinhas(obra, _admin)
+    for pred, suc in ((pint.id, acab.id), (acab.id, pint.id)):
+        db.session.add(TarefaVinculo(admin_id=ap.admin_id, obra_id=obra.id,
+                                     predecessora_id=pred, sucessora_id=suc,
+                                     tipo='TI', lag_dias=0))
+    db.session.commit()
+
+    # Uma terceira folha, fora do ciclo, para ser a excluída.
+    alvo = _tarefa(obra, _admin, 'Limpeza', ordem=3, duracao_dias=2,
+                   data_inicio=date(2026, 7, 29), data_fim=date(2026, 7, 30))
+    cli = _client_v2(ap.admin_id)
+
+    r = cli.delete(f'/cronograma/obra/{obra.id}/tarefa/{alvo.id}')
+    assert r.status_code == 200, f'a rota respondeu {r.status_code}: {r.data[:300]}'
+
+    assert _planejado(ap) == pytest.approx(99.0), (
+        'o replanejamento rodou por cima de um recálculo abortado — o '
+        'except ErroCiclo de excluir_tarefa faz rollback e SEGUE, então a '
+        'chamada precisa de um sinalizador levantado dentro do try')
+
+
+def test_recalcular_replaneja_a_curva():
+    """`/recalcular` — o **gatilho manual**.
+
+    É a única rota que conserta dado velho sem exigir uma edição: sem ela, uma
+    obra cuja curva envelheceu antes do A06 não teria como ser reparada pela
+    UI.
+    """
+    _admin, obra, _t, ap = _cenario()
+    cli = _client_v2(ap.admin_id)
+
+    r = cli.post(f'/cronograma/obra/{obra.id}/recalcular')
+    assert r.status_code == 200, f'a rota respondeu {r.status_code}: {r.data[:300]}'
+
+    assert _planejado(ap) == pytest.approx(60.0), (
+        '/recalcular não replanejou — é o gatilho manual, e sem ele um dado '
+        'velho fica sem conserto')
+
+
+def test_recalcular_no_ramo_legado_tambem_replaneja():
+    """`/recalcular` com o editor v2 DESLIGADO.
+
+    O ramo legado devolve 500 quando o recálculo falha, então tudo que passa
+    do if/else é sucesso — a chamada depois dele cobre os dois ramos com uma
+    linha. Este teste é o que impede que ela seja escondida dentro de um
+    `if flag_on`, o que deixaria o parque não migrado sem o conserto.
+    """
+    _admin, obra, _t, ap = _cenario()
+    cli = _client_v2(ap.admin_id, flag=False)
+
+    r = cli.post(f'/cronograma/obra/{obra.id}/recalcular')
+    assert r.status_code == 200, f'a rota respondeu {r.status_code}: {r.data[:300]}'
+
+    assert _planejado(ap) == pytest.approx(60.0), (
+        'o ramo legado de /recalcular não replanejou a curva')
+
+
+# ---------------------------------------------------------------------------
+# B2.19, teste 3 — o CUSTO
+# ---------------------------------------------------------------------------
+
+def test_editar_tarefa_nao_dispara_avalanche_de_queries():
+    """O teto que trava a volta dos dois `calcular_progresso_geral_obra_v2`.
+
+    🔬 **Este teste faltava, e quem apontou foi o agente que executou a B2.20** —
+    a tabela da B2.19 o lista como "teste 3 — o custo" e ele não foi escrito na
+    entrega de `318b294d`. Registrado aqui em vez de esquecido.
+
+    Por que ele importa: `replanejar_curvas_obra` no modo cheio faz DUAS
+    varreduras da obra inteira só para montar `progresso_antes`/`progresso_depois`.
+    O editor v2 chama o replanejamento **a cada edição de data**. Se alguém um dia
+    trocar `com_relatorio=False` por `True` "para ter o relatório", a tela fica
+    lenta de um jeito que nenhum teste funcional acusa — todos continuariam
+    verdes.
+
+    🔬 **O teto de 60 que o recorte sugeria NÃO distinguia nada, e a sabotagem
+    cobrou.** Medido neste cenário: **39 queries** com `com_relatorio=False` e
+    **49** com `True` — as duas abaixo de 60, então o teste passava dos dois
+    jeitos e era decoração. O teto é **45**, que fica entre os dois valores
+    medidos.
+
+    Um teto tão justo tem um custo honesto: se a semente deste arquivo crescer,
+    ele pode ficar vermelho sem que nada tenha regredido. É preferível a um teto
+    que nunca acusa — e o vermelho, se vier, é uma linha para reajustar com uma
+    nova medição, não um mistério.
+    """
+    from sqlalchemy import event as sa_event
+
+    _admin, obra, t, _ap = _cenario()
+    admin_id = t.admin_id
+    cli = _client_v2(admin_id)
+
+    contador = {'n': 0}
+
+    def _conta(conn, cursor, statement, params, context, executemany):
+        contador['n'] += 1
+
+    sa_event.listen(db.engine, 'before_cursor_execute', _conta)
+    try:
+        r = cli.put(f'/cronograma/obra/{obra.id}/tarefa/{t.id}',
+                    json={'duracao_dias': 30})
+    finally:
+        sa_event.remove(db.engine, 'before_cursor_execute', _conta)
+
+    assert r.status_code == 200, f'a rota respondeu {r.status_code}'
+    assert contador['n'] < 45, (
+        f'{contador["n"]} queries numa edição de UMA tarefa. Medido: 39 com o '
+        f'modo enxuto e 49 com o relatório ligado — estourar 45 significa que as '
+        f'duas varreduras de calcular_progresso_geral_obra_v2 voltaram ao '
+        f'caminho do editor')
