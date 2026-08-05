@@ -1,11 +1,18 @@
 """Task #76 — Alertas de estouro de orçamento por serviço.
 
-Helpers para detectar quando um ObraServicoCusto ultrapassa o valor orçado
-(realizado + a_realizar > valor_orcado) e materializar isso como uma
-NotificacaoOrcamento persistida (1 por serviço, com upsert/idempotência).
+Helpers para detectar quando um ObraServicoCusto ultrapassa o orçamento e
+materializar isso como uma NotificacaoOrcamento persistida (1 por serviço, com
+upsert/idempotência).
+
+**A13, 05/08 — a régua mudou, e é a mudança inteira do item.** A comparação era
+`realizado + a_realizar > valor_orcado`, e `valor_orcado` guarda **preço de
+venda**: o alerta disparava quando o gasto passava da MARGEM da etapa. Agora é
+`projetado > custo orçado`, com os dois números vindos de
+`services/custo_orcado.projecao_de_custo_por_servico`. O caminho antigo continua
+existindo como fallback, e só como fallback — ver `servico_estourou`.
 
 Exporta:
-    - servico_estourou(svc) -> dict | None
+    - servico_estourou(svc, projecao=None) -> dict | None
     - verificar_estouros_obra(obra_id, admin_id=None) -> list[dict]
     - listar_notificacoes_ativas(admin_id, obra_id=None) -> list[NotificacaoOrcamento]
     - marcar_resolvida(notif_id, admin_id) -> bool
@@ -30,19 +37,45 @@ def _f(v) -> float:
         return 0.0
 
 
-def servico_estourou(svc) -> dict | None:
+def servico_estourou(svc, projecao=None) -> dict | None:
     """Retorna dict com info do estouro ou None se está dentro do orçamento.
 
-    Considera estouro quando (realizado_total + a_realizar_total) > valor_orcado
-    e valor_orcado > 0. Serviços sem orçamento (valor_orcado = 0) não disparam
-    alerta — não há referência para comparar.
+    ## Com `projecao`, compara CUSTO com CUSTO — que é o ponto do A13
+
+    `ObraServicoCusto.valor_orcado` guarda **preço de venda**, não custo (o
+    listener comercial herda `valor_comercial`; ver `services/custo_orcado.py`).
+    Comparar o projetado contra ele faz o alerta disparar quando o gasto passa da
+    **margem** da etapa, não do orçamento dela — na obra Baia, a partir de
+    R$ 17.766 numa etapa que custa R$ 155.982,64. Alarme falso cedo demais, com
+    uma mensagem que chama venda de "orçado".
+
+    `projecao` é a entrada deste serviço em
+    `custo_orcado.projecao_de_custo_por_servico`. Com ela, `orcado` e `projetado`
+    vêm de lá — e o `projetado` já traz o `a_realizar_efetivo`, sem o qual a troca
+    da base viraria avalanche: com linhas, `a_realizar_total` É o orçado, então
+    `realizado + a_realizar_total > orcado` para qualquer realizado > 0.
+
+    **Sem `projecao`, o comportamento é o de sempre** — a compatibilidade existe
+    porque o mapa pode vir vazio (falha de query engolida em `custo_orcado.py`), e
+    aí o caminho antigo é melhor que zero: tratar ausência como orçado zero
+    transformaria indisponibilidade em estouro universal.
+
+    Serviços sem orçamento (`orcado <= 0`) não disparam alerta — não há referência
+    para comparar, e o gate vale sobre o número que estiver sendo usado.
     """
-    valor_orcado = _f(getattr(svc, 'valor_orcado', 0))
+    if projecao:
+        valor_orcado = _f(projecao.get('orcado'))
+        realizado = _f(projecao.get('realizado'))
+        a_realizar = _f(projecao.get('a_realizar_efetivo'))
+        projetado = _f(projecao.get('projetado'))
+    else:
+        valor_orcado = _f(getattr(svc, 'valor_orcado', 0))
+        realizado = _f(getattr(svc, 'realizado_total', 0))
+        a_realizar = _f(getattr(svc, 'a_realizar_total', 0))
+        projetado = realizado + a_realizar
+
     if valor_orcado <= 0:
         return None
-    realizado = _f(getattr(svc, 'realizado_total', 0))
-    a_realizar = _f(getattr(svc, 'a_realizar_total', 0))
-    projetado = realizado + a_realizar
     if projetado <= valor_orcado:
         return None
     excesso = projetado - valor_orcado
@@ -72,7 +105,8 @@ def _upsert_notificacao(admin_id, obra_id, info):
     )
     mensagem = (
         f"Serviço '{info['nome']}' estourou o orçamento: "
-        f"projetado R$ {info['valor_projetado']:.2f} vs orçado R$ {info['valor_orcado']:.2f} "
+        f"projetado R$ {info['valor_projetado']:.2f} vs custo orçado "
+        f"R$ {info['valor_orcado']:.2f} "
         f"({info['percentual']:.1f}% — excesso R$ {info['excesso']:.2f})."
     )
     if notif is None:
@@ -147,8 +181,20 @@ def verificar_estouros_obra(obra_id, admin_id=None) -> list[dict]:
             q = q.filter_by(admin_id=tenant_admin_id)
         servicos = q.all()
 
+        # A13 — uma consulta por obra, antes do loop. Mapa vazio significa "não
+        # sei" (obra sem serviço, ou falha engolida em custo_orcado.py) e cai
+        # para o caminho antigo: tratá-lo como orçado zero faria uma falha de
+        # query virar estouro universal na tela.
+        from services.custo_orcado import projecao_de_custo_por_servico
+        projecoes = projecao_de_custo_por_servico(obra_id, tenant_admin_id)
+        if servicos and not projecoes:
+            logger.warning(
+                'verificar_estouros_obra(%s): projeção de custo vazia para %d '
+                'serviço(s) — comparando pelo caminho antigo (valor_orcado)',
+                obra_id, len(servicos))
+
         for svc in servicos:
-            info = servico_estourou(svc)
+            info = servico_estourou(svc, projecao=projecoes.get(svc.id))
             if info is None:
                 _resolver_notificacao(tenant_admin_id, obra_id, svc.id)
             else:

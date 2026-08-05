@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **1** | **19** | G |
+| B2 — o que o sistema informa errado | 20 | **2** | **18** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **23** | **38** | |
+| **Total** | **61** *(62 − 1 cortada)* | **24** | **37** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -2052,10 +2052,38 @@ que é justamente o divisor entre os dois regimes.
    (`:62-103`) reescreve a linha e `_resolver_notificacao` (`:106-123`) desativa quem
    deixou de estourar, ambas no primeiro GET. **Nenhum backfill.**
 
-- [ ] **Step 1:** escrever o teste e vê-lo VERMELHO no 1º GET (hoje acha uma notificação ativa)
-- [ ] **Step 2:** `utils/notifications.py` + a leitura na rota
-- [ ] **Step 3:** teste verde nos três blocos de asserção
-- [ ] **Step 4:** commit — `fix(custo): alerta de estouro compara custo com custo, não com preço de venda`
+- [x] **Step 1:** teste VERMELHO no 1º GET — achou 1 notificação ativa, como previsto
+- [x] **Step 2:** `utils/notifications.py` — ⚠️ **a leitura na rota NÃO entrou aqui**, ver desvio 1
+- [x] **Step 3:** teste verde nos três blocos, mais um quarto
+- [x] **Step 4:** commit
+
+**Status: ✅ entregue em 05/08.** Os três blocos de asserção saíram como o recorte
+previu, inclusive os números: 1º GET com zero notificação, 2º GET com
+`valor_orcado == 155982.64` (custo) e não `173747.83` (venda). **O vermelho de
+partida foi exatamente o defeito descrito** — o 1º GET gravava uma notificação
+ativa porque `20.000 + 155.982,64 = 175.982,64 > 173.747,83`.
+
+**Desvio 1 — a rota ficou de fora, e de propósito.** A linha *Files* do recorte
+lista `views/planejamento_custos_views.py`, mas o **Step 1 da B2.3 é literalmente
+"rota passa `projecao`"**, e é a B2.3 que consome a variável no template. Passá-la
+aqui seria entregar variável que nenhum template lê e nenhum teste afirma — um
+oitavo instrumento vacuoso, do tipo que esta rodada passou a semana caçando. A
+rota entra na B2.3, junto de quem a usa.
+
+**Desvio 2 — um quarto teste, para o ramo que nunca roda.** O Risco 2 do recorte
+manda não cair para zero quando o mapa vier vazio. Ramo de compatibilidade é, por
+natureza, o que não executa em condição normal: sem cobertura vira código morto
+que ninguém descobre estar quebrado no dia em que precisa dele. Com
+`projecao_de_custo_por_servico` forçada a `{}`, o comportamento tem de ser o de
+antes do A13 (alertar pela venda) **e** logar WARNING. **Cobrado por sabotagem:**
+trocando o `if projecao:` por `projecao = projecao or {}`, o teste cai — ausência
+viraria orçado zero, e uma falha de query viraria estouro universal na tela.
+
+**Nota de método sobre a primeira sabotagem, que não provou nada.** Trocar
+`if projecao:` por `if projecao is not None:` deixou os quatro testes verdes, e a
+leitura certa não é "o teste é fraco": é que `projecoes.get(svc.id)` devolve
+`None` ou o dict inteiro, **nunca `{}`** — os dois guards são equivalentes ali. A
+sabotagem tem de mirar a diferença que o teste afirma, não uma vizinha dela.
 
 ---
 
@@ -4456,6 +4484,33 @@ pacotes abaixo seguem existindo e valendo.**
 ---
 
 ## Histórico
+
+- **2026-08-05, tarde** — **B2 aberto: B2.1 e B2.2 entregues**, e o A13 passou a
+  comparar custo com custo na primeira tela que o lia errado.
+
+  **O número que muda para o usuário:** na etapa Fundação da obra Baia, o alerta
+  de estouro deixa de disparar a partir de R$ 17.766 e passa a disparar a partir
+  de R$ 155.982,64 — de 11% do custo da etapa para 100% dele. Não era alerta tarde
+  demais; era **alarme falso cedo demais**, comparando gasto com margem.
+
+  1. **A avalanche previu-se e não aconteceu, porque o helper veio primeiro.** Com
+     linhas de custo, o `a_realizar_total` gravado É o orçado — trocar a base sem
+     o `a_realizar_efetivo` faria QUALQUER realizado > 0 estourar. A asserção do
+     1º GET é o que trava isso, e ela vale nas duas direções: falha com o defeito
+     de hoje e falha com a correção ingênua.
+  2. **Um ramo de compatibilidade só existe se alguém o exercita.** O fallback de
+     mapa vazio ganhou teste próprio com a função forçada a `{}` — sem isso é
+     código morto que ninguém descobre estar quebrado no dia em que precisa dele.
+  3. **A primeira sabotagem não provou nada, e a leitura certa não era "o teste é
+     fraco".** `if projecao:` e `if projecao is not None:` são equivalentes ali,
+     porque o mapa devolve `None` ou o dict inteiro, nunca `{}`. **Sabotagem tem
+     de mirar a diferença que o teste afirma**, não uma vizinha dela — é a
+     primeira vez nesta rodada que o método falhou por pontaria, e não por
+     ausência.
+  4. **A rota ficou fora da B2.2 de propósito**, apesar de estar na linha *Files*
+     do recorte: o Step 1 da B2.3 é "rota passa `projecao`", e é a B2.3 que a
+     consome no template. Entregar a variável antes de quem a lê seria o oitavo
+     instrumento vacuoso da rodada.
 
 - **2026-08-05** — **O BLOCO B1 FECHOU**, com a B1.15 entregue. Sai *"o sistema
   está perdendo dado"*; o próximo é o B2, *"o número exibido mente"*.
