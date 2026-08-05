@@ -533,11 +533,39 @@ def nova():
             []
         )
 
+        # A07 + A22 — a lista de Clientes do tenant existe para o <select>, e
+        # `cliente_pre` existe para marcar a option que o CRM escolheu. Os
+        # dois hints são OPCIONAIS: sem args, nada muda.
+        # Cliente de outro tenant: não pré-seleciona e NÃO chama abort(404) —
+        # o `except Exception` logo abaixo engoliria o abort e devolveria 302
+        # para propostas.index, escondendo o vazamento em vez de expô-lo. O
+        # tenant se prova pelo conteúdo renderizado, não pelo status.
+        clientes = safe_db_operation(
+            lambda: Cliente.query
+                .filter_by(admin_id=admin_id)
+                .order_by(Cliente.nome.asc())
+                .all(),
+            []
+        )
+        _cliente_arg = (request.args.get('cliente_id') or '').strip()
+        cliente_pre = None
+        if _cliente_arg.isdigit():
+            cliente_pre = safe_db_operation(
+                lambda: Cliente.query.filter_by(
+                    id=int(_cliente_arg), admin_id=admin_id).first(),
+                None
+            )
+        _lead_arg = (request.args.get('lead_id') or '').strip()
+        lead_id_pre = int(_lead_arg) if _lead_arg.isdigit() else None
+
         return render_template('propostas/nova_proposta.html',
                              templates=[],
                              templates_proposta=templates_proposta,
                              config=config,
-                             engenheiros=engenheiros)
+                             engenheiros=engenheiros,
+                             clientes=clientes,
+                             cliente_pre=cliente_pre,
+                             lead_id_pre=lead_id_pre)
         
     except Exception as e:
         logger.error(f"ERRO NOVA PROPOSTA: {str(e)}")
@@ -549,6 +577,9 @@ def nova():
 @admin_required
 def criar():
     """Criar nova proposta COM processamento de itens"""
+    # A07 — inicializado FORA do try: o `except` lá embaixo redireciona para
+    # `propostas.nova` e precisa dos args mesmo se a exceção vier cedo.
+    _args_form = {}
     try:
         admin_id = get_admin_id()
         
@@ -558,20 +589,47 @@ def criar():
         cliente_telefone = request.form.get('cliente_telefone', '').strip()
         cliente_documento = request.form.get('cliente_cpf_cnpj', request.form.get('cliente_documento', '')).strip()
         cliente_endereco = request.form.get('cliente_endereco', '').strip()
-        
+
+        # A22 — o formulário manual passou a mandar `cliente_id` (<select>) em
+        # vez de digitar o nome. Sem essa FK a proposta chega ao
+        # `obter_ou_criar_cliente` (`event_manager.py`) com None, o resolver cai
+        # no dedup por nome/e-mail e, se o nome digitado divergir do cadastro,
+        # nasce um Cliente DUPLICADO — com a obra amarrada nele.
+        # Escopo de tenant no `filter_by`: `cliente_id` é dado do usuário.
+        cliente_ref = None
+        _cliente_id_raw = (request.form.get('cliente_id') or '').strip()
+        if _cliente_id_raw.isdigit():
+            cliente_ref = Cliente.query.filter_by(
+                id=int(_cliente_id_raw), admin_id=admin_id).first()
+        if cliente_ref:
+            # O cadastro é a fonte quando o campo de texto veio vazio; texto
+            # preenchido continua vencendo (retrocompatibilidade com quem
+            # posta o form antigo).
+            cliente_nome = cliente_nome or (cliente_ref.nome or '').strip()
+            cliente_email = cliente_email or (cliente_ref.email or '').strip()
+            cliente_telefone = cliente_telefone or (cliente_ref.telefone or '').strip()
+
+        # A07 — os args que o CRM mandou têm de sobreviver a QUALQUER volta ao
+        # formulário: sem eles o usuário refaz tudo e perde o vínculo do lead.
+        if _cliente_id_raw.isdigit():
+            _args_form['cliente_id'] = _cliente_id_raw
+        _lead_id_raw = (request.form.get('lead_id') or '').strip()
+        if _lead_id_raw.isdigit():
+            _args_form['lead_id'] = _lead_id_raw
+
         # Aceitar 'assunto' ou 'titulo' (compatibilidade)
         titulo = request.form.get('assunto', request.form.get('titulo', '')).strip()
         descricao = request.form.get('objeto', request.form.get('descricao', '')).strip()
-        
+
         # Validações básicas
         if not cliente_nome:
             flash('Nome do cliente é obrigatório', 'error')
-            return redirect(url_for('propostas.nova'))
-        
+            return redirect(url_for('propostas.nova', **_args_form))
+
         if not titulo:
             flash('Assunto/Título da proposta é obrigatório', 'error')
-            return redirect(url_for('propostas.nova'))
-        
+            return redirect(url_for('propostas.nova', **_args_form))
+
         # Gerar número da proposta
         numero_proposta_input = request.form.get('numero_proposta', '').strip()
         if numero_proposta_input:
@@ -592,7 +650,7 @@ def criar():
                         break
                 if not numero_proposta:
                     flash(f'Número "{numero_proposta_input}" e suas variantes já estão em uso. Gere automaticamente.', 'danger')
-                    return redirect(url_for('propostas.nova'))
+                    return redirect(url_for('propostas.nova', **_args_form))
             else:
                 numero_proposta = numero_proposta_input
         else:
@@ -649,6 +707,9 @@ def criar():
         proposta.titulo = titulo
         proposta.descricao = descricao
         proposta.cliente_nome = cliente_nome
+        # A22 — a FK que faltava. `cliente_nome` continua sendo gravado
+        # (coluna NOT NULL, e é o que o PDF imprime).
+        proposta.cliente_id = cliente_ref.id if cliente_ref else None
         proposta.cliente_email = cliente_email
         proposta.cliente_telefone = cliente_telefone
         proposta.cliente_endereco = cliente_endereco
@@ -876,7 +937,7 @@ def criar():
         import traceback
         traceback.print_exc()
         flash(f'Erro ao criar proposta: {str(e)}', 'error')
-        return redirect(url_for('propostas.nova'))
+        return redirect(url_for('propostas.nova', **_args_form))
 
 @propostas_bp.route('/<int:id>')
 @login_required
@@ -1184,8 +1245,21 @@ def listar():
 @login_required
 @admin_required
 def nova_proposta():
-    """Alias para compatibilidade com sistema antigo"""
-    return redirect(url_for('propostas.nova'))
+    """Alias para compatibilidade com sistema antigo.
+
+    A07 — este alias é o ÚNICO chamador de produção vindo do CRM
+    (`crm_views.py:936-939`), e o 302 descartava a query string inteira.
+    Allowlist explícita de duas chaves: `**request.args` seria um `MultiDict`
+    e `url_for` interpreta `_external`/`_anchor`/`_scheme`/`_method` como
+    diretiva de construção, não como query — qualquer um deles colado na URL
+    viraria redirect para host externo.
+    """
+    _args = {}
+    for _chave in ('cliente_id', 'lead_id'):
+        _valor = (request.args.get(_chave) or '').strip()
+        if _valor.isdigit():
+            _args[_chave] = _valor
+    return redirect(url_for('propostas.nova', **_args))
 
 @propostas_bp.route('/criar-proposta', methods=['GET', 'POST'])
 @login_required

@@ -73,10 +73,31 @@
                     <!-- Dados do Cliente -->
                     <div class="col-md-6">
                         <h6 class="text-primary mb-3">Dados do Cliente</h6>
+                        {# A22 — o cliente deixa de ser texto livre e passa a ser
+                           o cadastro. Sem `cliente_id` a proposta chega ao
+                           `obter_ou_criar_cliente` do event_manager com None, o
+                           resolver cai no dedup por nome/e-mail e um nome
+                           digitado diferente do cadastro cria Cliente
+                           DUPLICADO — com a obra amarrada nele. #}
                         <div class="mb-3">
-                            <label class="form-label">Nome do Cliente *</label>
-                            <input type="text" class="form-control" name="cliente_nome" data-testid="proposta-cliente-nome" required>
+                            <label class="form-label" for="cliente_id">Cliente *</label>
+                            <select class="form-select" name="cliente_id" id="cliente_id"
+                                    data-testid="proposta-cliente-id" required>
+                                <option value="">— Selecione o cliente —</option>
+                                {% for c in (clientes if clientes is defined and clientes else []) %}
+                                <option value="{{ c.id }}"{% if cliente_pre is defined and cliente_pre and cliente_pre.id == c.id %} selected{% endif %}>
+                                    {{ c.nome }}{% if c.email %} ({{ c.email }}){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted d-block mt-1">
+                                Só clientes já cadastrados. O nome, e-mail e telefone
+                                da proposta saem do cadastro.
+                            </small>
                         </div>
+                        {# A07 — o lead que originou a proposta viaja até o POST. #}
+                        <input type="hidden" name="lead_id"
+                               value="{{ lead_id_pre if lead_id_pre is defined and lead_id_pre else '' }}">
                         <div class="mb-3">
                             <label class="form-label">Email</label>
                             <input type="email" class="form-control" name="cliente_email" data-testid="proposta-cliente-email">

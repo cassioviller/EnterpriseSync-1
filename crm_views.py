@@ -927,9 +927,14 @@ def gerar_proposta(lead_id):
             except Exception:
                 db.session.rollback()
 
+    # A07 — o texto antigo mandava "vincule esta proposta ao lead pela edição
+    # do lead", descrevendo o mundo em que o formulário perdia os IDs no 302.
+    # O cliente agora chega selecionado e o lead viaja escondido no form.
+    # NÃO prometer aqui que o vínculo é gravado: quem escreve
+    # `Lead.proposta_id` é a Task B3.4, e afirmar antes seria repetir o mesmo
+    # defeito pelo outro lado — texto descrevendo mundo que não existe.
     flash(
-        f'Crie a proposta para o lead "{lead.nome}". '
-        'Após salvar, vincule esta proposta ao lead pela edição do lead.',
+        f'Crie a proposta para o lead "{lead.nome}" — o cliente já vem selecionado.',
         'info',
     )
     # Procura o blueprint propostas.nova_proposta

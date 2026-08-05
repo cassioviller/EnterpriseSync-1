@@ -513,14 +513,39 @@ def nova_obra():
         funcionarios = []
         servicos_disponiveis = []
     
+    # A07 (perna da obra) — o CRM manda `cliente_id` e `lead_id` na query
+    # string (`crm_views.py:974-977`, rota direta, sem alias no meio) e este
+    # ramo os descartava. Bloco PRÓPRIO, fora do try acima de propósito: se
+    # uma falha aqui caísse no `except` de cima, o fallback zeraria
+    # funcionários e serviços junto e o formulário nasceria mutilado.
+    # Cliente de outro tenant: não pré-seleciona e NÃO aborta — o `except`
+    # do POST e o fallback do GET transformariam um 404 em redirect, e o
+    # vazamento ficaria escondido atrás de um status inocente.
+    cliente_pre = None
+    lead_id_pre = None
+    try:
+        _cliente_arg = (request.args.get('cliente_id') or '').strip()
+        if _cliente_arg.isdigit():
+            cliente_pre = Cliente.query.filter_by(
+                id=int(_cliente_arg), admin_id=admin_id).first()
+        _lead_arg = (request.args.get('lead_id') or '').strip()
+        if _lead_arg.isdigit():
+            lead_id_pre = int(_lead_arg)
+    except Exception as e:
+        logger.warning(f"NOVA OBRA: pré-preenchimento do CRM ignorado: {e}")
+        cliente_pre = None
+        lead_id_pre = None
+
     from services.dropdown_service import get_opcoes_valores
     opcoes_obra_status = get_opcoes_valores('obra_status', admin_id)
-    return render_template('obra_form.html', 
-                         titulo='Nova Obra', 
-                         obra=None, 
-                         funcionarios=funcionarios, 
+    return render_template('obra_form.html',
+                         titulo='Nova Obra',
+                         obra=None,
+                         funcionarios=funcionarios,
                          servicos_disponiveis=servicos_disponiveis,
-                         opcoes_obra_status=opcoes_obra_status)
+                         opcoes_obra_status=opcoes_obra_status,
+                         cliente_pre=cliente_pre,
+                         lead_id_pre=lead_id_pre)
 
 # ========== SISTEMA DE SERVIÇOS DA OBRA - REFATORADO COMPLETO ==========
 

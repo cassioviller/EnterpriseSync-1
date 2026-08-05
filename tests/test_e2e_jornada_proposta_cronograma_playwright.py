@@ -58,6 +58,7 @@ class Contexto:
     # preenchidos em runtime:
     insumo_id = None
     servico_id = None
+    cliente_id = None   # A22/B3.3 — o form usa select de Cliente cadastrado
     template_id = None
     proposta_id = None
     token = None
@@ -79,12 +80,36 @@ def _db(fn):
         return fn()
 
 
+def _garantir_cliente(nome):
+    """A22/B3.3 — cria (ou reusa) o Cliente do tenant e devolve o id.
+
+    O formulário de nova proposta deixou de aceitar nome digitado: passou a ser
+    um `select` de Cliente JÁ CADASTRADO, que é o ponto do A22 — digitar nome
+    livre era o que duplicava cliente a cada proposta. A jornada, que criava um
+    cliente novo por corrida digitando o nome, precisa cadastrá-lo antes.
+    """
+    def _fn():
+        from app import db
+        from models import Cliente, Usuario
+        admin = Usuario.query.filter_by(username=DEMO_USER).first()
+        assert admin, f"usuario {DEMO_USER} nao encontrado"
+        aid = getattr(admin, 'admin_id', None) or admin.id
+        c = Cliente.query.filter_by(nome=nome, admin_id=aid).first()
+        if c is None:
+            c = Cliente(nome=nome, admin_id=aid)
+            db.session.add(c)
+            db.session.commit()
+        return c.id
+    return _db(_fn)
+
+
 def _nova_proposta_via_ui(pg, numero, cliente):
     """Cria uma proposta via UI usando o template e o serviço já criados na
     jornada (CTX.template_id / CTX.servico_id). Retorna (proposta_id, token)."""
     pg.goto(f"{BASE_URL}/propostas/nova")
     pg.wait_for_load_state("networkidle")
-    pg.fill("[data-testid=proposta-cliente-nome]", cliente)
+    pg.select_option("[data-testid=proposta-cliente-id]",
+                     value=str(_garantir_cliente(cliente)))
     pg.fill("[data-testid=proposta-numero]", numero)
     pg.fill("[data-testid=proposta-assunto]", f"Obra {numero}")
     pg.select_option("[data-testid=proposta-template]", value=str(CTX.template_id))
@@ -275,7 +300,9 @@ class TestJornadaPropostaCronograma:
     def test_05_criar_proposta(self, page: Page):
         page.goto(f"{BASE_URL}/propostas/nova")
         page.wait_for_load_state("networkidle")
-        page.fill("[data-testid=proposta-cliente-nome]", CTX.cliente_nome)
+        CTX.cliente_id = _garantir_cliente(CTX.cliente_nome)
+        page.select_option("[data-testid=proposta-cliente-id]",
+                           value=str(CTX.cliente_id))
         page.fill("[data-testid=proposta-cliente-email]", "cliente.e2e@example.com")
         page.fill("[data-testid=proposta-cliente-telefone]", "(11) 90000-0000")
         page.fill("[data-testid=proposta-numero]", CTX.numero_proposta)

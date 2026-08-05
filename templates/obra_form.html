@@ -392,12 +392,20 @@
                                                    name="cliente_busca"
                                                    autocomplete="off"
                                                    placeholder="Digite nome, e-mail, telefone ou CNPJ do cliente..."
-                                                   value="{{ (obra.cliente_ref.nome if obra and obra.cliente_ref else '') }}"
+                                                   {# A07 — o fallback de `cliente_pre` só vale quando NÃO há obra:
+                                                      este template é compartilhado com a edição, e deixar a query
+                                                      string vencer ali trocaria o cliente da obra existente. #}
+                                                   value="{{ (obra.cliente_ref.nome if obra and obra.cliente_ref else (cliente_pre.nome if not obra and cliente_pre is defined and cliente_pre else '')) }}"
                                                    required>
                                             <input type="hidden"
                                                    id="cliente_id"
                                                    name="cliente_id"
-                                                   value="{{ obra.cliente_id if obra and obra.cliente_id else '' }}">
+                                                   value="{{ obra.cliente_id if obra and obra.cliente_id else (cliente_pre.id if not obra and cliente_pre is defined and cliente_pre else '') }}">
+                                            {# A07 — o lead que originou a obra viaja escondido até o POST. #}
+                                            <input type="hidden"
+                                                   id="lead_id"
+                                                   name="lead_id"
+                                                   value="{{ lead_id_pre if not obra and lead_id_pre is defined and lead_id_pre else '' }}">
                                             <div id="cliente_resultados"
                                                  class="list-group position-absolute w-100 shadow-sm"
                                                  style="z-index: 1050; max-height: 280px; overflow-y: auto; display: none;"></div>
