@@ -1040,6 +1040,105 @@ def _progresso_fallback_subatividades(obra_id: int) -> float:
     return round(sum(s.percentual_conclusao or 0 for s in subs) / len(subs), 1)
 
 
+def progresso_v1_acumulado(obra_id: int, admin_id: int, ate_data) -> float:
+    """Progresso V1 acumulado da obra — o ponto único da família V1 (A19).
+
+    ## O que existia antes
+
+    **Sete geradores** respondiam "qual o progresso V1 desta obra", cada um de um
+    jeito, e nenhum deles do mesmo jeito. Esta função é o destino de seis; o
+    sétimo (`views/obras.py:calcular_progresso_real_servico`) responde outra
+    pergunta e por isso morre em vez de convergir (Task B2.8).
+
+    **Não confundir com `_progresso_fallback_subatividades`**, logo acima: aquela
+    responde "média das subatividades do ÚLTIMO RDO" — um retrato de um dia, que
+    decresce quando o apontador corrige para baixo. Ela segue existindo para o seu
+    único consumidor (`progresso_geral_para_kpi`) e não deve receber mais nenhum.
+
+    ## A fórmula, e por que cada peça é assim
+
+    Para cada chave ``(servico_id, nome_subatividade)`` da obra, o **MAIOR**
+    ``percentual_conclusao`` registrado em qualquer RDO até ``ate_data``; a média
+    simples desses máximos.
+
+    * **MAX, e não "o último por data"** — é a única forma monotônica no tempo.
+      Os comentários de `views/rdo.py:2520-2524` e `:217-218` já prometiam
+      monotonicidade; só uma das sete variantes entregava.
+    * **Chave COMPOSTA com `servico_id`** — agrupar só por `nome_subatividade`
+      colapsa homônimos de serviços diferentes e sub-conta o denominador.
+    * **`admin_id` obrigatório** — duas das variantes consultavam `RDO` sem
+      filtrar tenant.
+    * **`ate_data` obrigatório** — sem teto de data, toda linha de uma lista de
+      RDOs mostra o mesmo número, o de hoje.
+    * **Sem filtro por `RDOServicoSubatividade.ativo`** — nenhuma das variantes
+      que esta função substitui filtra por ele hoje. Acrescentar aqui mudaria
+      número por um motivo que não é este item.
+
+    UMA consulta, com `GROUP BY` e `MAX` no banco: a média é sobre o resultado
+    agregado, sem laço em Python e sem N+1.
+
+    Devolve 0.0 quando não há chave nenhuma — obra sem apontamento V1 está em 0,
+    não em "não sei".
+    """
+    from models import RDO, RDOServicoSubatividade, db
+    from sqlalchemy import func as _sqlfunc
+
+    maximos = (
+        db.session.query(
+            _sqlfunc.max(RDOServicoSubatividade.percentual_conclusao)
+        )
+        .join(RDO, RDOServicoSubatividade.rdo_id == RDO.id)
+        .filter(
+            RDO.obra_id == obra_id,
+            RDO.admin_id == admin_id,
+            RDO.data_relatorio <= ate_data,
+        )
+        .group_by(RDOServicoSubatividade.servico_id,
+                  RDOServicoSubatividade.nome_subatividade)
+        .all()
+    )
+    if not maximos:
+        return 0.0
+    return round(sum(float(m[0] or 0) for m in maximos) / len(maximos), 1)
+
+
+def obra_em_modo_v2(obra_id: int, admin_id: int) -> bool:
+    """Esta obra opera em modo V2 (cronograma)? — o único jeito de perguntar.
+
+    ## Por que existe
+
+    Havia **quatro** predicados vivos e diferentes para esta mesma pergunta:
+    `views/rdo.py:1380` (com `is_v2_active()`), `views/rdo.py:2504`,
+    `crud_rdo_completo.py:111` e `services/rdo_pdf_service.py:186` (os três sem).
+    Os quatro consultavam `TarefaCronograma.query` direto, **sem `ativa` e sem
+    `is_cliente`** — ou seja, saindo do caminho que
+    `TarefaCronograma.do_cronograma_interno` estabeleceu justamente para que
+    esquecer o escopo custasse esforço.
+
+    O efeito concreto: uma tarefa **cópia-cliente** basta para jogar o PDF do RDO
+    para V2 enquanto a tela do mesmo RDO fica em V1 — mesma obra, mesmo dia, dois
+    números, e o PDF é o documento que o cliente assina.
+
+    ## A regra
+
+    ``is_v2_active()`` **E** existir tarefa no cronograma **interno e vivo** da
+    obra — `do_cronograma_interno`, que já filtra `ativa=True` e
+    `is_cliente=False`.
+
+    ⚠️ **Isto MUDA de ramo obras que hoje caem em V2** por causa de uma tarefa
+    cópia-cliente ou arquivada. É intencional, é metade da convergência do A19, e
+    por ser mudança de número visível **tem de entrar no mesmo commit que a
+    fórmula, em cada call-site** — nunca sozinho.
+    """
+    from models import TarefaCronograma
+    from utils.tenant import is_v2_active
+
+    if not is_v2_active():
+        return False
+    return TarefaCronograma.do_cronograma_interno(
+        obra_id, admin_id).first() is not None
+
+
 def progresso_ponderado_armazenado(obra_id: int, admin_id: int, *,
                                    responsavel: str | None = None) -> float:
     """Média ponderada do `percentual_concluido` GRAVADO nas tarefas-folha.

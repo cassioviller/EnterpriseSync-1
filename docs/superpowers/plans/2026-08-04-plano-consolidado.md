@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **6** | **14** | G |
+| B2 — o que o sistema informa errado | 20 | **7** | **13** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **28** | **33** | |
+| **Total** | **61** *(62 − 1 cortada)* | **29** | **32** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -2406,9 +2406,42 @@ jeito de responder "esta obra é V2?".
    cópia-cliente — **intencional, e é metade da convergência**, mas é mudança de número
    visível e precisa entrar no mesmo commit que a fórmula em cada call-site.
 
-- [ ] **Step 1:** as duas funções + teste de unidade
-- [ ] **Step 2:** nenhum call-site trocado ainda — nada muda em produção
-- [ ] **Step 3:** commit — `feat(cronograma): progresso_v1_acumulado e obra_em_modo_v2 como ponto único`
+- [x] **Step 1:** as duas funções + teste de unidade (9 casos)
+- [x] **Step 2:** nenhum call-site trocado — **nada muda em produção neste commit**
+- [x] **Step 3:** commit
+
+**Status: ✅ entregue em 05/08.** As duas funções em `utils/cronograma_engine.py`,
+entre `_progresso_fallback_subatividades` e `progresso_ponderado_armazenado`, com
+`tests/test_a19_progresso_v1_ponto_unico.py` novo. Nenhum call-site trocado: este
+commit é puro acréscimo, e é de propósito — a troca de cada um vem com a mudança
+de número visível, nas Tasks seguintes.
+
+**🟢 Achado que barateia a T5 inteira: o predicado estrito JÁ EXISTIA.**
+`TarefaCronograma.do_cronograma_interno` (`models.py`) filtra `ativa=True` e
+`is_cliente=False` e foi criado na varredura P1 de 27/07 **exatamente para isto** —
+o docstring dele diz "esquecer o escopo passa a exigir sair do caminho padrão".
+**Os quatro predicados V2 vivos saem do caminho padrão**, os quatro usando
+`.query` direto. O `obra_em_modo_v2` não inventa regra: chama o classmethod que já
+era a regra. Os números daquela varredura valem como medida do risco: **141 obras
+com as duas visões ativas** e **217 tarefas arquivadas em 187 obras**.
+
+**Sabotagem em cada decisão da fórmula, uma por vez — e a terceira cobrou um
+instrumento vacuoso MEU:**
+
+| Sabotagem | Caiu |
+|---|---|
+| `MAX` → `MIN` | monotonicidade e teto de data |
+| chave composta → só `nome_subatividade` | homônimos |
+| remover `RDO.admin_id` | **nada** ⚠️ |
+| `do_cronograma_interno` → `.query` direto | cópia-cliente e arquivada |
+
+⚠️ **A terceira não derrubou nada, e o teste era meu.** O cenário semeava o RDO na
+OBRA de B — mas a consulta já filtra `RDO.obra_id`, então o `admin_id` nunca era
+exercitado: o teste passava com e sem o filtro que dizia provar. Reescrito com o
+RDO **na obra de A e o `admin_id` de B**, que é o que a FK permite (mesmo buraco da
+B1.12 com `ServicoObraReal`). Agora a sabotagem derruba. **É o nono instrumento
+defeituoso da rodada e o primeiro que a própria disciplina de sabotagem pegou no
+mesmo minuto em que nasceu** — antes eles só apareciam sessões depois.
 
 ---
 
