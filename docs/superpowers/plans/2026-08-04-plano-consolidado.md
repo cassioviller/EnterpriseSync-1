@@ -116,8 +116,8 @@ A ordem completa:
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
 | B2 — o que o sistema informa errado | 20 | **18** | **2** | G |
 | B3 — os elos que morrem a um passo | 10 | **3** | **7** | M |
-| B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **43** | **18** | |
+| B4 — aposentadorias | 9 | **7** | **2** | M |
+| **Total** | **61** *(62 − 1 cortada)* | **53** | **8** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -4236,9 +4236,11 @@ asserção primeiro — é barata e já monta o arquivo que os passos seguintes 
    comentário de `app.py:415-419` registra ter sido corrigido para `folha_handlers`. →
    **arquivo e bloco no mesmo commit.** O bloco irmão de propostas (`:421-425`) fica intacto.
 
-- [ ] **Step 1:** asserção do cenário 4 no arquivo de teste
-- [ ] **Step 2:** remover arquivo + bloco de `app.py`
-- [ ] **Step 3:** commit — `chore(handlers): remove handler órfão de nota_fiscal_paga`
+- [x] **Step 1:** cenário 4 escrito e VERMELHO
+- [x] **Step 2:** arquivo + bloco de `app.py`, no mesmo commit
+- [x] **Step 3:** commit `940e759e`
+
+**Status: ✅ entregue em 05/08.**
 
 ---
 
@@ -4266,9 +4268,25 @@ falha aqui, isolado.
    `event_manager.py:1539`) → nenhuma ação: `list_events()` só alimenta esses dois logs e
    nenhum teste ou rota assere o número.
 
-- [ ] **Step 1:** cortar `:87-125`, preservando as linhas em branco
-- [ ] **Step 2:** cenário 4 verde, com a asserção do handler único
-- [ ] **Step 3:** commit — `chore(eventos): remove handler write-nothing de material_saida`
+- [x] **Step 1:** cortado **por CONTEÚDO**, do decorador ao fim do corpo
+- [x] **Step 2:** cenário 4 verde
+- [x] **Step 3:** commit `940e759e`
+
+**Status: ✅ entregue em 05/08.**
+
+**🔴 A ASSERÇÃO QUE O RECORTE INDICA NÃO FECHA A ARMADILHA, e a sabotagem
+provou.** O recorte manda afirmar que `_handlers['material_entrada']` tem um
+único elemento. Devolvendo o decorador solto, essa asserção **não cai**: o
+decorador registra a função sob **`material_saida`**, então `material_entrada`
+continua com um elemento.
+
+O invariante certo é outro: **`criar_conta_pagar_entrada_material` tem de
+aparecer em EXATAMENTE UM evento.**
+
+**E o efeito real também é outro, e pior do que o recorte descreve.** Não é "a
+entrada de material passa a rodar duas vezes" — é que **dar SAÍDA de material
+passaria a criar `GestaoCustoPai` como se fosse ENTRADA**, enquanto os emissores
+de saída existissem.
 
 ---
 
@@ -4299,9 +4317,13 @@ falsy, o handler retornava em `:106-107`. E `material_saida` **não está** em
 2. **NÃO remover** o `from event_manager import EventManager` de `:8` — os quatro emits
    de `'material_entrada'` (`:138`, `:189`, `:347`, `:391`) continuam vivos.
 
-- [ ] **Step 1:** remover os dois blocos
-- [ ] **Step 2:** cenário 3 verde
-- [ ] **Step 3:** commit — `chore(almox): rotas de saída deixam de emitir evento sem handler`
+- [x] **Step 1:** os dois blocos, cortados por conteúdo
+- [x] **Step 2:** regressão de almoxarifado verde (46 passed)
+- [x] **Step 3:** commit `940e759e`
+
+**Status: ✅ entregue em 05/08.** Os quatro emits de `material_entrada` e o
+`from event_manager import EventManager` ficaram intactos, conferidos por grep
+depois do corte.
 
 ---
 
@@ -4329,9 +4351,11 @@ continua criando `FolhaPagamento`.
    coluna do banco é zero. Escrever no commit, em uma linha, que a coluna fica no banco de
    propósito.
 
-- [ ] **Step 1:** remover a linha
-- [ ] **Step 2:** gate verde
-- [ ] **Step 3:** commit — `chore(models): FolhaPagamento.adiantamentos sai do modelo (coluna fica inerte no banco)`
+- [x] **Step 1:** remover a linha
+- [x] **Step 2:** gate verde
+- [x] **Step 3:** commit — `chore(models): FolhaPagamento.adiantamentos sai do modelo (coluna fica inerte no banco)`
+
+**Status: ✅ entregue em 05/08, commit `940e759e` (B4.4) / o das três de E10.**
 
 ---
 
@@ -4353,9 +4377,11 @@ rodado o cenário 2, se algo quebrar o passo culpado é óbvio.
 `gerar_cronograma_cliente` continua referenciada em
 `templates/obras/detalhes_obra_profissional.html:2326` — **essa NÃO sai**.
 
-- [ ] **Step 1:** remover a rota
-- [ ] **Step 2:** cenário 2 verde
-- [ ] **Step 3:** commit — `chore(obras): remove rota órfã de edição do cronograma do cliente`
+- [x] **Step 1:** rota removida **por nome**, não por linha (o range do recorte estava 33 linhas acima)
+- [x] **Step 2:** cenário 2 verde
+- [x] **Step 3:** commit — `chore(obras): remove rota órfã de edição do cronograma do cliente`
+
+**Status: ✅ entregue em 05/08, commit `940e759e` (B4.4) / o das três de E10.**
 
 ---
 
@@ -4373,9 +4399,11 @@ chamando `deduplicar_tarefas_cronograma`.
 **Risco → mitigação.** O `try/except Exception: pass` de `:3134-3140` é o que hoje engole
 erro na tabela legada; ao removê-lo, conferir que nada mais no bloco depende dele.
 
-- [ ] **Step 1:** remover o bloco
-- [ ] **Step 2:** cenário 2 verde
-- [ ] **Step 3:** commit — `chore(obras): geração do cronograma do cliente deixa de limpar a tabela legada`
+- [x] **Step 1:** remover o bloco
+- [x] **Step 2:** cenário 2 verde
+- [x] **Step 3:** commit — `chore(obras): geração do cronograma do cliente deixa de limpar a tabela legada`
+
+**Status: ✅ entregue em 05/08, commit `940e759e` (B4.4) / o das três de E10.**
 
 ---
 
@@ -4399,9 +4427,11 @@ variável vem de `views/obras.py:1983-1990` (consulta `TarefaCronograma`) e é p
 `:2283`. **Se alguém reapontar o template para o atributo do objeto, o badge zera
 silenciosamente** — a asserção do cenário 2 é o que fixa o comportamento correto.
 
-- [ ] **Step 1:** remover modelo + token do import
-- [ ] **Step 2:** cenário 2 e gate verdes
-- [ ] **Step 3:** commit — `chore(models): remove CronogramaCliente (tabela fica parada no banco)`
+- [x] **Step 1:** remover modelo + token do import
+- [x] **Step 2:** cenário 2 e gate verdes
+- [x] **Step 3:** commit — `chore(models): remove CronogramaCliente (tabela fica parada no banco)`
+
+**Status: ✅ entregue em 05/08, commit `940e759e` (B4.4) / o das três de E10.**
 
 ---
 

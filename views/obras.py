@@ -1,7 +1,7 @@
 from flask import render_template, request, redirect, url_for, flash, jsonify, abort
 from werkzeug.exceptions import HTTPException
 from flask_login import login_required, current_user
-from models import db, TipoUsuario, Funcionario, Obra, Cliente, RDO, Servico, ServicoObraReal, RDOServicoSubatividade, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao, RelatorioCompraMapa, ConfiguracaoEmpresa
+from models import db, TipoUsuario, Funcionario, Obra, Cliente, RDO, Servico, ServicoObraReal, RDOServicoSubatividade, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao, RelatorioCompraMapa, ConfiguracaoEmpresa
 from auth import admin_required
 from utils.autorizacao import obra_required, obras_visiveis
 from utils.tenant import get_tenant_admin_id
@@ -3163,13 +3163,11 @@ def gerar_cronograma_cliente(obra_id):
         ).delete(synchronize_session=False)
         db.session.flush()
 
-        # Legacy: limpa também a tabela antiga (não é mais lida pelo portal)
-        try:
-            CronogramaCliente.query.filter_by(
-                obra_id=obra_id, admin_id=admin_id
-            ).delete(synchronize_session=False)
-        except Exception:
-            pass
+        # B4.6 — o delete da tabela legada `cronograma_cliente` saiu daqui em
+        # 05/08. A tabela não é lida por ninguém desde a migration #117, e a FK
+        # dela é ON DELETE CASCADE, então tabela parada não trava exclusão de
+        # obra. A limpeza que IMPORTA é a de `TarefaCronograma(is_cliente=True)`,
+        # logo acima — e ela fica.
 
         # 3) Clonar — primeiro passo: criar todas as tarefas SEM pai/predecessora
         old_to_new: dict[int, int] = {}
@@ -3230,58 +3228,14 @@ def gerar_cronograma_cliente(obra_id):
     return redirect(url_for('main.detalhes_obra', id=obra_id))
 
 
-@main_bp.route('/obras/<int:obra_id>/cronograma-cliente/<int:item_id>/editar', methods=['POST'])
-@login_required
-@admin_required
-def editar_cronograma_cliente(obra_id, item_id):
-    """Atualiza nome, datas e percentual de uma entrada no CronogramaCliente."""
-    try:
-        admin_id = get_tenant_admin_id()
-        item = CronogramaCliente.query.filter_by(
-            id=item_id, obra_id=obra_id, admin_id=admin_id
-        ).first()
-        if not item:
-            flash('Tarefa não encontrada.', 'danger')
-            return redirect(url_for('main.detalhes_obra', id=obra_id))
-
-        nome = request.form.get('nome_tarefa', '').strip()
-        if nome:
-            item.nome_tarefa = nome
-
-        data_ini_raw = request.form.get('data_inicio_apresentacao', '').strip()
-        data_fim_raw = request.form.get('data_fim_apresentacao', '').strip()
-        from datetime import datetime as _dt
-        if data_ini_raw:
-            try:
-                item.data_inicio_apresentacao = _dt.strptime(data_ini_raw, '%Y-%m-%d').date()
-            except ValueError:
-                pass
-        else:
-            item.data_inicio_apresentacao = None
-
-        if data_fim_raw:
-            try:
-                item.data_fim_apresentacao = _dt.strptime(data_fim_raw, '%Y-%m-%d').date()
-            except ValueError:
-                pass
-        else:
-            item.data_fim_apresentacao = None
-
-        perc = request.form.get('percentual_apresentacao', '').strip()
-        if perc:
-            try:
-                item.percentual_apresentacao = max(0.0, min(100.0, float(perc)))
-            except ValueError:
-                pass
-
-        db.session.commit()
-        flash('Tarefa do cronograma atualizada.', 'success')
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Erro ao editar cronograma cliente item {item_id}: {e}")
-        flash('Erro ao salvar alterações. Tente novamente.', 'danger')
-
-    return redirect(url_for('main.detalhes_obra', id=obra_id))
+# B4.5 — a rota POST `/obras/<id>/cronograma-cliente/<item_id>/editar` foi
+# REMOVIDA em 05/08. Zero leitores: nenhum `url_for` em templates/, static/ ou
+# Python — só chegável por URL digitada. Ela editava `CronogramaCliente`, tabela
+# que a migration #117 aposentou quando o cronograma do cliente passou a viver
+# em `TarefaCronograma(is_cliente=True)`.
+#
+# `gerar_cronograma_cliente`, logo acima, FICA — é linkada por
+# `detalhes_obra_profissional.html` e exercitada por testes.
 
 
 # ===== MAPA DE CONCORRÊNCIA V2 =====

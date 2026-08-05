@@ -7123,34 +7123,18 @@ class RelatorioCompraMapa(db.Model):
         return f'<RelatorioCompraMapa #{self.id} mapa={self.mapa_id} v{self.versao}>'
 
 
-class CronogramaCliente(db.Model):
-    """
-    Cronograma editável exclusivo para apresentação ao cliente no Portal.
-    Gerado a partir de TarefaCronograma mas editável independentemente,
-    sem impactar métricas internas.
-    """
-    __tablename__ = 'cronograma_cliente'
-
-    id = db.Column(db.Integer, primary_key=True)
-    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    nome_tarefa = db.Column(db.String(200), nullable=False)
-    data_inicio_apresentacao = db.Column(db.Date, nullable=True)
-    data_fim_apresentacao = db.Column(db.Date, nullable=True)
-    percentual_apresentacao = db.Column(db.Float, default=0.0, nullable=False)
-    ordem = db.Column(db.Integer, default=0, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    obra = db.relationship('Obra', backref=db.backref('cronograma_cliente_items', lazy='dynamic', cascade='all,delete-orphan'))
-
-    def __repr__(self):
-        return f'<CronogramaCliente #{self.id} obra={self.obra_id} "{self.nome_tarefa}">'
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SUBEMPREITEIRO — Cadastro, alocação no RDO e custos vinculados (Migration 113)
-# ─────────────────────────────────────────────────────────────────────────────
+# B4.7 — o modelo `CronogramaCliente` foi REMOVIDO em 05/08 (E10). A tabela
+# `cronograma_cliente` CONTINUA no banco: a FK dela é ON DELETE CASCADE, então
+# tabela parada não trava exclusão de obra, e nenhuma migração é necessária.
+#
+# Os dois únicos leitores saíram nas Tasks B4.5 e B4.6, nesta ordem — o modelo
+# só pôde sair depois.
+#
+# ⚠️ HOMONÍMIA, e ela quase derrubou o item: o backref daqui se chamava
+# `cronograma_cliente_items`, e `detalhes_obra_profissional.html` renderiza uma
+# variável com EXATAMENTE esse nome. Ela não vem daqui — vem de uma consulta a
+# `TarefaCronograma(is_cliente=True)` em `views/obras.py`, passada como variável
+# local. É homonímia, não leitor.
 
 class Subempreiteiro(db.Model):
     """Equipe terceirizada gerida pela própria empresa, com produtividade mensurável."""
