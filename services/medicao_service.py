@@ -308,6 +308,58 @@ def _recalcular_imc_avanco(obra_id, admin_id):
     return total_medido.quantize(Decimal('0.01'))
 
 
+def _resolver_conta_contabil_medicao(admin_id, codigo):
+    """Devolve `codigo` se ele existir e aceitar lançamento no tenant; senão `None`.
+
+    ⚠️ **Existe por causa de uma FK COMPOSTA.** `ContaReceber` referencia
+    (`admin_id`, `conta_contabil_codigo`) → (`plano_contas.admin_id`,
+    `plano_contas.codigo`) (`models.py:2489-2499`). Atribuir um código às cegas num
+    tenant sem plano semeado dá **IntegrityError no commit** de
+    `recalcular_medicao_obra` — que é chamado pelo handler
+    `recalcular_medicao_apos_rdo`, cujo `except` loga e **não faz rollback**, e o
+    `emit` do EventManager engole. A sessão fica suja e os handlers SEGUINTES de
+    `rdo_finalizado` quebram com `PendingRollbackError`. Um defeito contábil viraria
+    uma quebra em cascata do RDO.
+
+    Por isso o código só volta daqui **depois de confirmado** em `plano_contas`.
+
+    O seed é chamado **só quando a conta falta**: no caminho comum — tenant já
+    semeado — não há INSERT nenhum, e a sessão não é exposta sem necessidade.
+    `seed_plano_contas_if_needed` é idempotente e usa `flush`, não `commit`, então
+    as contas novas entram no mesmo commit da medição.
+
+    Nunca levanta. Não achou ou falhou ⇒ `None`, a CR fica sem conta contábil, e o
+    warning de B3.6 na baixa torna isso visível em vez de silencioso.
+    """
+    from models import PlanoContas
+
+    def _confirmada():
+        return PlanoContas.query.filter_by(
+            admin_id=admin_id, codigo=codigo, aceita_lancamento=True).first()
+
+    try:
+        if _confirmada():
+            return codigo
+
+        from contabilidade_utils import seed_plano_contas_if_needed
+        seed_plano_contas_if_needed(admin_id)
+        if _confirmada():
+            return codigo
+
+        logger.warning(
+            f"⚠️ [A03] conta contábil {codigo} não existe (ou não aceita "
+            f"lançamento) para admin_id={admin_id} nem após o seed — a CR de "
+            f"medição fica SEM conta contábil"
+        )
+        return None
+    except Exception as e:
+        logger.warning(
+            f"⚠️ [A03] não foi possível resolver a conta contábil {codigo} "
+            f"(admin_id={admin_id}): {e} — a CR de medição fica SEM conta contábil"
+        )
+        return None
+
+
 def recalcular_medicao_obra(obra_id, admin_id):
     """Task #94 — recalcula avanço dos IMC + UPSERT da ContaReceber única
     por obra (`origem_tipo='OBRA_MEDICAO'`, `origem_id=obra.id`,
@@ -365,10 +417,22 @@ def recalcular_medicao_obra(obra_id, admin_id):
             except (TypeError, ValueError):
                 prazo_dias = 30
 
+    # A03/B3.9 — a CR de medição passa a nascer com conta contábil.
+    #
+    # A regra vem de QUANDO a receita foi reconhecida. Obra oriunda de proposta já
+    # teve o reconhecimento na aprovação — `contabilidade_utils.py:177` debita
+    # `1.1.02.001` contra o valor da proposta —, então a medição apenas movimenta
+    # o direito contra o cliente: **1.1.02.001 (Clientes)**. Obra sem proposta (IMC
+    # lançado à mão por `medicao_views.py`) não teve reconhecimento nenhum antes, e
+    # a receita nasce aqui: **4.1.01.001**.
+    _codigo_alvo = '1.1.02.001' if proposta_origem_id else '4.1.01.001'
+    conta_contabil = _resolver_conta_contabil_medicao(admin_id, _codigo_alvo)
+
     if cr is None:
         cr = ContaReceber(
             cliente_nome=cliente_nome,
             obra_id=obra_id,
+            conta_contabil_codigo=conta_contabil,
             numero_documento=f"OBR-MED-{obra_id:05d}",
             descricao=descricao,
             valor_original=valor_medido,
@@ -391,6 +455,15 @@ def recalcular_medicao_obra(obra_id, admin_id):
         cr.cliente_nome = cliente_nome
         cr.descricao = descricao
         cr.valor_original = valor_medido
+        # Só preenche quando está NULL: código posto à mão pelo usuário não é
+        # sobrescrito. É ESTE ramo que cura as CRs já existentes **sem migração**,
+        # porque ele roda a cada RDO finalizado da obra.
+        if conta_contabil and not cr.conta_contabil_codigo:
+            cr.conta_contabil_codigo = conta_contabil
+            logger.info(
+                f"[OK] [A03] CR OBRA_MEDICAO {cr.id} (obra={obra_id}) adotou a "
+                f"conta contábil {conta_contabil} — estava NULL"
+            )
         recebido = Decimal(str(cr.valor_recebido or 0))
         novo_saldo = valor_medido - recebido
         if novo_saldo < 0:
