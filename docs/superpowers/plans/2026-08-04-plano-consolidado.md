@@ -4601,10 +4601,35 @@ um**; depois os três tokens de import; depois o modelo `models.py:3057-3094`.
 3. `crud_rdo_completo.py` usa flash+redirect, não `abort` — **não introduzir abort** nesta
    passagem.
 
-- [ ] **Step 1:** contagem em produção
-- [ ] **Step 2 (se 0):** os três pontos, na ordem, com o cenário 1 entre cada
-- [ ] **Step 3:** os três tokens de import + o modelo + o comentário corrigido
-- [ ] **Step 4:** commit — `chore(models): remove NotificacaoCliente e os três pontos de limpeza`
+- [x] ~~**Step 1:** contagem em produção~~ — ⚠️ **NÃO CUMPRIDO COMO ESCRITO** (ver abaixo)
+- [x] **Step 2 (se 0):** os três pontos, na ordem, com o cenário 1 entre cada
+- [x] **Step 3:** os três tokens de import + o modelo + o comentário corrigido
+- [x] **Step 4:** commit — `chore(models): remove NotificacaoCliente e os três pontos de limpeza`
+
+**Status: ⚠️ entregue em `ab626765` COM O GATE SUBSTITUÍDO.**
+
+**O Step 1 não foi cumprido.** A contagem de **produção** nunca foi obtida — o
+agente não tem acesso a esse banco. O que existe é a contagem deste ambiente
+(`helium/heliumdb`), que é **0** e que esta própria Task declara sem valor como
+evidência. O usuário, depois de o risco ser enunciado, decidiu explicitamente
+tratar o 0 local como gate. **A decisão é dele e está registrada aqui para que
+ninguém a leia como evidência de produção.**
+
+O resto seguiu o recorte: ordem interna respeitada (`crud_rdo_completo.py` →
+`views/rdo.py` → `services/importacao_fisico_financeiro.py`), com o cenário 1
+rodado entre cada ponto (4, 61 e 40 passed), depois os três tokens de import,
+depois o modelo. O comentário das quatro FKs foi **reescrito para três**, como o
+risco 2 manda — não apagado.
+
+**🔴 MEDIDO, e é mais afiado do que o risco descrevia.** Com **uma** linha em
+`notificacao_cliente` apontando para o RDO, a exclusão depois desta Task **falha em
+silêncio**: a rota responde **200**, o RDO **sobrevive** e nada é anulado — sem o
+modelo, o SQLAlchemy não tem mais `relationship` para anular a FK `NO ACTION`.
+Não há erro visível; o sintoma é alguém reclamar que o RDO não some.
+
+**Consequência operacional:** se a migração 279 registrar `'failed'` no deploy
+(tabela não vazia), **este commit tem de ser revertido** — `git revert ab626765`.
+O código já estará sem a limpeza e a tabela ainda lá.
 
 ---
 
@@ -4630,10 +4655,30 @@ linha semeada, confirmar `failed` sem `DROP`.
 **Risco → mitigação.** Dropar tabela vazia não é remover dado. Se a contagem em produção
 divergir entre a Task B4.8 e o deploy, o guard da própria migração pega.
 
-- [ ] **Step 1:** escrever a migração com o guard de contagem
-- [ ] **Step 2:** registrar em `migrations.py:6343`
-- [ ] **Step 3:** testar os dois caminhos (vazia → sucesso; com linha → failed)
-- [ ] **Step 4:** commit — `feat(migrations): 279 — drop de notificacao_cliente com guard de contagem`
+- [x] **Step 1:** escrever a migração com o guard de contagem
+- [x] **Step 2:** registrar em `migrations.py:6343`
+- [x] **Step 3:** testar os dois caminhos (vazia → sucesso; com linha → failed)
+- [x] **Step 4:** commit — `feat(migrations): 279 — drop de notificacao_cliente com guard de contagem`
+
+**Status: ✅ entregue em `84e17260`.** As três peças que a tornam segura por
+construção foram conferidas no código, não presumidas: `run_migration_safe` grava
+`'failed'` com rollback e **sem propagar** (`migrations.py:186-199`), e
+`is_migration_executed` só aceita `'success'` (`:83-85`) — a 279 que falha **não
+fica marcada como aplicada** e retenta a cada boot, repetindo o erro no log.
+
+Step 3 cumprido em **três** caminhos, com a tabela recriada por DDL para
+reconstituir o estado anterior (o boot de `app.py:683-684` já aplica a 279, então
+no ambiente ela já não existia quando o teste começou):
+
+| Caminho | Resultado |
+|---|---|
+| 1 linha semeada | levanta `DROP ABORTADO` e a tabela **sobrevive** |
+| tabela vazia | dropa |
+| reexecução sem a tabela | no-op via `to_regclass`, não levanta |
+
+⚠️ **Esta migração é a rede que sobra** se a substituição do gate da B4.8 estiver
+errada. Ela impede a perda de dado — **mas não conserta a exclusão de RDO**, que
+já estará quebrada pelo código da B4.8. Por isso o alerta de reverter.
 
 ---
 
