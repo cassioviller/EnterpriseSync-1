@@ -1218,7 +1218,9 @@ def progresso_geral_para_kpi(obra_id: int, admin_id: int) -> float:
     return _progresso_fallback_subatividades(obra_id)
 
 
-def replanejar_curvas_obra(obra_id: int, admin_id: int) -> dict:
+def replanejar_curvas_obra(obra_id: int, admin_id: int, *,
+                           com_relatorio: bool = True,
+                           sincronizar: bool = True) -> dict:
     """Recalcula `RDOApontamentoCronograma.percentual_planejado` de TODOS os
     apontamentos da obra com as datas VIGENTES das tarefas (M06 §4.3).
 
@@ -1231,12 +1233,31 @@ def replanejar_curvas_obra(obra_id: int, admin_id: int) -> dict:
     ``{apontamentos_replanejados, tarefas_sem_historico_reconciliado,
     progresso_antes, progresso_depois}`` — arquivadas com apontamento
     entram na lista para revisão manual (histórico não reconciliado).
+
+    ## Modo enxuto (A06, Task B2.17)
+
+    Os dois keyword-only existem para o editor v2, que precisa replanejar a
+    curva **a cada edição de data** e não pode pagar por um relatório que
+    ninguém vai ler:
+
+    * ``com_relatorio=False`` pula as **duas** chamadas a
+      `calcular_progresso_geral_obra_v2` — que varrem a obra inteira — e devolve
+      `progresso_antes`/`progresso_depois` como ``None``;
+    * ``sincronizar=False`` pula `sincronizar_percentuais_obra`, para quem já
+      vai sincronizar por conta própria depois.
+
+    **Os defaults preservam o comportamento de hoje byte a byte**, e é
+    deliberado: `services/cronograma_versao_service.py:443` chama sem argumentos,
+    e `tests/test_replanejamento.py` afirma `progresso_antes`/`progresso_depois`
+    como float. Inverter a chave (um `leve=True`, por exemplo) quebraria o gate
+    do M06 por um motivo que não é este item.
     """
     from models import RDO, RDOApontamentoCronograma, TarefaCronograma, db
 
     hoje = date.today()
-    progresso_antes = calcular_progresso_geral_obra_v2(
-        obra_id, hoje, admin_id)['progresso_geral_pct']
+    progresso_antes = (
+        calcular_progresso_geral_obra_v2(obra_id, hoje, admin_id)['progresso_geral_pct']
+        if com_relatorio else None)
 
     cal = get_calendario(admin_id)
     sab, dom = cal.considerar_sabado, cal.considerar_domingo
@@ -1276,10 +1297,12 @@ def replanejar_curvas_obra(obra_id: int, admin_id: int) -> dict:
             replanejados += 1
 
     db.session.commit()
-    sincronizar_percentuais_obra(obra_id, admin_id, cliente=False)
+    if sincronizar:
+        sincronizar_percentuais_obra(obra_id, admin_id, cliente=False)
 
-    progresso_depois = calcular_progresso_geral_obra_v2(
-        obra_id, hoje, admin_id)['progresso_geral_pct']
+    progresso_depois = (
+        calcular_progresso_geral_obra_v2(obra_id, hoje, admin_id)['progresso_geral_pct']
+        if com_relatorio else None)
     return {
         'apontamentos_replanejados': replanejados,
         'tarefas_sem_historico_reconciliado':

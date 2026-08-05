@@ -10,6 +10,7 @@ from functools import wraps
 
 from flask import Blueprint, jsonify, redirect, render_template, request, send_file, url_for, flash
 from flask_login import current_user, login_required
+from werkzeug.exceptions import HTTPException
 
 from models import (
     db, Obra, TarefaCronograma, TarefaVinculo, RDOApontamentoCronograma,
@@ -115,6 +116,55 @@ def _editor_v2_on() -> bool:
     """
     from utils.tenant import cronograma_editor_v2_ativo
     return cronograma_editor_v2_ativo()
+
+
+def _replanejar_pos_commit(obra_id: int, admin_id: int, cliente_mode: bool) -> None:
+    """Ponto ÚNICO onde o editor v2 replaneja a curva planejada (A06, B2.18).
+
+    ## O que isto conserta
+
+    O editor recalcula datas o dia inteiro e **nunca tocava
+    `RDOApontamentoCronograma.percentual_planejado`**. A curva planejada dos
+    apontamentos já gravados continuava apontando para um plano que não existe
+    mais, e quem a lê — a curva de avanço da obra, o PDF do RDO, o EVM — comparava
+    o realizado com um planejado órfão.
+
+    ## Por que um helper, e não sete chamadas
+
+    São sete call-sites, e cada um repetiria as mesmas três armadilhas. Sete
+    cópias de um try/except são sete chances de errar uma:
+
+    1. **`cliente_mode` é no-op, e não por elegância.** `replanejar_curvas_obra`
+       filtra tarefas com `is_cliente=False` fixo, mas varre **TODOS** os
+       apontamentos da obra — no modo cliente seria uma varredura inteira que não
+       replaneja coisa nenhuma.
+    2. **Falha aqui NUNCA desfaz a edição já commitada.** É pós-commit: o
+       `rollback()` do `except` desfaz apenas o que este helper tentou. Mesma
+       postura de `services/cronograma_versao_service._motor_pos_commit`.
+    3. **`except HTTPException: raise` antes do catch-all** — regra da casa. O
+       guard de tenancy já rodou muito antes e o helper é pós-commit, mas a ordem
+       das cláusulas não custa nada e fecha a classe inteira.
+
+    **Chame ANTES de serializar a resposta.** O `rollback()` do `except` expira os
+    objetos ORM; chamando antes, `_tarefa_to_dict`/`_mapas_vinculos` re-hidratam do
+    banco já commitado em vez de tocarem instância expirada.
+
+    Não devolve nada: o replanejamento não entra na resposta HTTP.
+    """
+    if cliente_mode:
+        return
+    try:
+        from utils.cronograma_engine import replanejar_curvas_obra
+        replanejar_curvas_obra(obra_id, admin_id,
+                               com_relatorio=False, sincronizar=False)
+    except HTTPException:
+        raise
+    except Exception:
+        from models import db
+        db.session.rollback()
+        logger.exception(
+            '[A06] replanejamento pós-commit falhou (obra=%s) — a edição já '
+            'commitada NÃO foi desfeita', obra_id)
 
 
 def _com_undo(tipo_acao: str):
@@ -1160,6 +1210,12 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
         if perc_manual is not None and precisa_recalc:
             tarefa.percentual_concluido = perc_manual
             db.session.commit()
+        # A06/B2.19 — DEPOIS de reaplicar `perc_manual`, e só quando houve
+        # recálculo de data. A ordem é o núcleo do item: antes daqui, com
+        # `sincronizar=True`, o percentual que o usuário acabou de digitar seria
+        # reescrito a partir do último apontamento. Renomear não paga a varredura.
+        if precisa_recalc:
+            _replanejar_pos_commit(obra_id, admin_id, cliente_mode)
     else:
         db.session.commit()
         logger.info(f"[OK] TarefaCronograma atualizada id={tarefa_id}")
@@ -1175,6 +1231,9 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
             if perc_manual is not None:
                 tarefa.percentual_concluido = perc_manual
                 db.session.commit()
+            # A06/B2.19 — o gêmeo do ramo v2, mesma posição relativa: depois de
+            # reaplicar `perc_manual`, dentro da guarda de campo de agendamento.
+            _replanejar_pos_commit(obra_id, admin_id, cliente_mode)
 
     # Devolver tarefa atualizada + lista completa após recalc para redesenho do Gantt
     db.session.refresh(tarefa)
