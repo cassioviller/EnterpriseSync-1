@@ -275,7 +275,9 @@ def processar_entrada_multipla():
             ).first()
             if not fornecedor:
                 logger.warning(f"⚠️ Tentativa de usar fornecedor {fornecedor_id} que não pertence ao tenant {admin_id}")
-                return jsonify({'success': False, 'message': 'Fornecedor não encontrado ou sem permissão'}), 403
+                # 404, nunca 403: 403 confirma que o fornecedor existe em outra
+                # empresa e transforma a rota em oráculo de enumeração.
+                return jsonify({'success': False, 'message': 'Fornecedor não encontrado ou sem permissão'}), 404
         # FASE 1: VALIDAÇÃO PRÉVIA COMPLETA
         # ========================================
         erros = []

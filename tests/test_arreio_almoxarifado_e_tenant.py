@@ -17,13 +17,20 @@ O que ele cobre, e por que cada caso existe:
   `ServicoObraReal.admin_id` e `Servico.ativo` — e **nunca `Servico.admin_id`**.
   O fallback logo abaixo (`:856`) faz certo, com `s.admin_id = :admin_id`: é a
   mesma pergunta feita duas vezes no mesmo arquivo, com respostas diferentes.
+* **B1.15 — o 403 que conta o que não devia** (T5, escrito em 05/08). A rota JSON
+  `processar-entrada-multipla` filtra `admin_id` e não vaza dado nenhum; vaza o
+  **status**, porque 403 responde "existe, não é seu" e 404 responde "não existe".
+  ⚠️ **Este caso estava no recorte da T3 desde o começo e não foi escrito** — o
+  plano marcou o Step 1 da B1.12 incluindo o T5, e `grep` pelo nome da rota em
+  `tests/` devolvia vazio. Ficou de aviso: checkbox de arreio se confere com grep.
 
-O que ele deliberadamente NÃO cobre: `almoxarifado_utils.py:257`. Confirmado hoje
-que `processar_xml_nfe` (`:250`) **não tem chamador vivo** — `grep` fora de
-`archive/` devolve só a definição. Corrigi-la sozinha pioraria: com `admin_id` na
-consulta o fluxo passaria a alcançar o `flush()` e estouraria `IntegrityError`
-contra o UNIQUE **global** de `NotaFiscal.chave_acesso` (`models.py:2550`),
-trocando uma mensagem amigável errada por um 500.
+O que ele deliberadamente NÃO cobre: `almoxarifado_utils.py:257`. Confirmado que
+`processar_xml_nfe` (`:250`) **não tem chamador vivo** — `grep` fora de `archive/`
+devolve só a definição. Corrigi-la sozinha pioraria: com `admin_id` na consulta o
+fluxo passaria a alcançar o `flush()` e estouraria `IntegrityError` contra o
+UNIQUE **global** de `NotaFiscal.chave_acesso` (`models.py:2626`), trocando uma
+mensagem amigável errada por um 500. Foi essa a razão do **corte da Task B1.14 em
+05/08** (§8.1 do plano consolidado).
 """
 import os
 import sys
@@ -282,3 +289,67 @@ def test_a_obra_de_outro_tenant_responde_404():
         assert r.status_code == 404, (
             f'obra de outro tenant respondeu {r.status_code} — 403 já confirma '
             f'que ela existe, e 200 é vazamento')
+
+
+# ---------------------------------------------------------------------------
+# T5 — fornecedor de outro tenant na entrada múltipla (B1.15)
+# ---------------------------------------------------------------------------
+
+def test_fornecedor_de_outro_tenant_na_entrada_multipla_responde_404():
+    """Mesma doutrina do T4, na rota JSON: **404, nunca 403**.
+
+    `views/almoxarifado/movimentos.py:271-278` já filtra `admin_id` — o dado não
+    vaza. O que vaza é o **código**: 403 responde "existe, mas não é seu" e 404
+    responde "não existe", e para quem está do lado de fora a diferença entre os
+    dois é um oráculo de enumeração. Chuta `fornecedor_id` de 1 a 5000 e o 403
+    desenha a base de fornecedores das outras empresas.
+
+    É o critério que `955aeb9f` fixou e que o T4 já cobra na rota de obra. Este
+    arquivo respondia a mesma pergunta de dois jeitos — e a rota irmã
+    `processar_entrada` (`:71-74`) responde de um terceiro, por flash+redirect,
+    que não é oráculo e por isso fica como está.
+
+    A segunda asserção é a que importa tanto quanto o status: recusar **e gravar**
+    seria pior que não recusar.
+
+    🔬 **A terceira asserção é o Step 2 da B1.15 virado em teste.** O recorte
+    mandava "conferir o `fetch` de `templates/almoxarifado/entrada.html:428`, que
+    pode ramificar por `response.status === 403`". Conferido: **não ramifica** —
+    faz `await response.json()` e decide por `result.success` (`:441-450`), então
+    o código nunca chega a ele. Mas o que o JS **exige** é que o corpo continue
+    sendo JSON: um 404 que caísse no handler de erro do Flask devolveria HTML, o
+    `response.json()` estouraria e o usuário veria "tente novamente" em vez da
+    mensagem. Conferência de olho não impede regressão; a asserção impede.
+    """
+    with app.app_context():
+        a = um_tenant('fornA', data_ref=DIA, com_fatos=False)
+        b = um_tenant('fornB', data_ref=DIA, com_fatos=False)
+        item_a, _ = _almoxarifado_de(a)
+        _item_b, forn_b = _almoxarifado_de(b)
+
+        antes = len(_movimentos(a))
+
+        cli = cliente_de(a.admin_id)
+        r = cli.post('/almoxarifado/processar-entrada-multipla', json={
+            'itens': [{
+                'item_id': item_a.id,
+                'tipo_controle': 'CONSUMIVEL',
+                'quantidade': 7,
+                'valor_unitario': 25.00,
+            }],
+            'nota_fiscal': 'NF-T5',
+            'fornecedor_id': forn_b.id,
+            'observacoes': '',
+        })
+
+        assert r.status_code == 404, (
+            f'fornecedor de outro tenant respondeu {r.status_code} — 403 '
+            f'confirma que ele existe e transforma a rota em oráculo de '
+            f'enumeração')
+        assert len(_movimentos(a)) == antes, (
+            'a rota recusou o fornecedor alheio E gravou movimento — recusar '
+            'gravando é pior que não recusar')
+        assert r.is_json and r.get_json().get('success') is False, (
+            f'o 404 saiu como {r.content_type} em vez de JSON — o fetch de '
+            f'entrada.html:441 faz response.json() e decide por result.success; '
+            f'com HTML no corpo o usuário perde a mensagem')

@@ -113,16 +113,19 @@ A ordem completa:
 | Bloco | Tasks | Entregues | Abertas | Esforço agregado |
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
-| B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **15** | **1** | G |
+| B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
 | B2 — o que o sistema informa errado | 20 | 0 | **20** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **21** | **40** | |
+| **Total** | **61** *(62 − 1 cortada)* | **22** | **39** | |
 
-**Estado ao fim de 04/08: A05, A10, A16-a e A09 FECHADOS.** B0 inteiro (6/6), a
-trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e três das cinco da T3
-(B1.12, B1.13, B1.16). A contagem subiu de 61 para 62 porque o B0 achou um
-defeito que nenhum recorte tinha visto (B1.5b).
+**Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
+fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
+a T3 (B1.12, B1.13, B1.15, B1.16 — com a **B1.14 cortada**, §8.1). A contagem
+subiu de 61 para 62 porque o B0 achou um defeito que nenhum recorte tinha visto
+(B1.5b), e voltou a 61 com o corte.
+
+**O próximo trabalho é o B2**, e ele não espera nada.
 
 **Sobram TRÊS `xfail` no repositório inteiro, e nenhum é dívida técnica** —
 todos esperam decisão ou Task futura:
@@ -145,17 +148,17 @@ que está fechado.
 Dos oito xfail que o B0 plantou, sete foram cobrados e removidos pelo próprio
 mecanismo que corrigiram.
 
-**O que resta do bloco B1 é UMA Task, e não é trabalho de fôlego:**
+**As duas últimas do B1, e o que aconteceu com cada uma:**
 
-* **B1.15** — 🟡 aberta e sem impedimento: 403 → 404 na entrada múltipla. Ficou
-  fora por ordem de trabalho, não por dúvida.
+* **B1.15** — ✅ **entregue em 05/08**: 403 → 404 na entrada múltipla. Fechou o
+  bloco. O T5 que a prova **não existia** apesar de a B1.12 marcar o Step 1 como
+  feito — escrito antes da correção e visto vermelho.
 * **B1.14** — ⛔ **CORTADA em 05/08** (decisão do Cássio: seguir a recomendação).
   Mexia em função sem chamador vivo onde a correção isolada troca uma mensagem
   errada por um 500. Ver §8.1.
 
-Depois disso o B1 fecha e começa o **B2** — o maior bloco, 20 Tasks, e onde o
-assunto muda: sai *"o sistema está perdendo dado"* e entra *"o número exibido
-mente"*.
+Com o B1 fechado começa o **B2** — o maior bloco, 20 Tasks, e onde o assunto
+muda: sai *"o sistema está perdendo dado"* e entra *"o número exibido mente"*.
 
 **Como este documento registra progresso.** Task entregue leva uma linha
 `**Status:**` logo abaixo do título, com o commit e — quando houve — o **desvio**
@@ -1604,7 +1607,9 @@ trazer nome, categoria, unidade e `custo_unitario` alheios para a tela.
    fallback) → o teste afirma o **valor** 40.0, não apenas "não explodiu", e confere no
    `caplog` que rodou o caminho principal (log `[STATS]` de `:824`), não o fallback.
 
-- [x] **Step 1:** arreio vermelho (T1, T2, T4, T5)
+- [x] **Step 1:** arreio vermelho (T1, T2, T4) — ⚠️ **o T5 estava nesta lista e
+  NÃO foi escrito.** Marcado por engano em 04/08; corrigido e entregue em 05/08,
+  junto da B1.15 que ele prova. Ver o Status da B1.15
 - [x] **Step 2:** o filtro
 - [x] **Step 3:** commit — ~~`fix(tenant): ...`~~ → **renomeado**, ver abaixo
 
@@ -1757,23 +1762,45 @@ registrou. **Conferir o JS de `templates/almoxarifado/entrada.html:428`** (`fetc
 `processar_entrada_multipla`): se ele ramifica por `response.status === 403`, o handler
 tem que passar a tratar 404.
 
-- [ ] **Step 1:** 403 → 404
-- [ ] **Step 2:** conferir e ajustar o `fetch` do template
-- [ ] **Step 3:** commit — `fix(tenant): recurso de outro tenant responde 404 na entrada múltipla`
+- [x] **Step 1:** 403 → 404
+- [x] **Step 2:** conferir e ajustar o `fetch` do template — **nada a ajustar**, ver abaixo
+- [x] **Step 3:** commit
 
-**Status: 🟡 ABERTA e pronta para execução — não tem impedimento.** Ficou de fora
-desta sessão só por ordem de trabalho, não por dúvida.
+**Status: ✅ entregue em 05/08. Com ela o bloco B1 FECHA.** O ponto era um só:
+`views/almoxarifado/movimentos.py:278` respondia `403` quando o `fornecedor_id`
+era de outro tenant. A consulta já filtrava `admin_id` — **o dado nunca vazou;
+vazava o código**, que é um oráculo de enumeração: chutando `fornecedor_id` de 1 a
+5000, o 403 desenha a base de fornecedores das outras empresas e o 404 não conta
+nada.
 
-O ponto exato está conferido: `views/almoxarifado/movimentos.py`, no bloco de
-validação de fornecedor da rota `processar-entrada-multipla`, responde
-`403 'Fornecedor não encontrado ou sem permissão'` quando o `fornecedor_id` é de
-outro tenant. **403 confirma que o recurso existe** — é o vazamento de existência
-que a Task descreve. Vira 404, e o `fetch` do template precisa ser conferido
-junto, porque hoje pode estar tratando os dois códigos de forma diferente.
+**🔴 O T5 NÃO EXISTIA, e o Step 1 da B1.12 estava marcado dizendo que sim.** O
+recorte manda "**Teste que prova:** T5", e a B1.12 tem `[x] Step 1: arreio
+vermelho (T1, T2, T4, T5)` — mas `grep entrada.multipla tests/` devolvia **vazio**.
+O arreio da T3 nasceu com T1-T4 e o T5 nunca foi escrito. Escrito agora, antes da
+correção, e visto **vermelho pelo motivo certo** (403 ≠ 404, zero movimentos
+gravados) — `tests/test_arreio_almoxarifado_e_tenant.py`,
+`test_fornecedor_de_outro_tenant_na_entrada_multipla_responde_404`. **É o oitavo
+instrumento defeituoso da rodada e o primeiro de um tipo novo: os sete anteriores
+mediam o vazio; este não existia e a caixa estava marcada.** A lição de método é
+outra, e mais barata: *antes de marcar o checkbox de um arreio, `grep` pelo nome
+da rota.*
 
-**Nota:** a rota de formulário (`processar-entrada`) já usa 404 em
-`'Item não encontrado'` — mais uma vez o mesmo arquivo responde a mesma pergunta
-de dois jeitos, que foi o padrão desta sessão inteira.
+**O Step 2 não deu trabalho, e virou asserção em vez de conferência.** O `fetch`
+de `templates/almoxarifado/entrada.html:428` **não ramifica por
+`response.status`** — faz `await response.json()` e decide por `result.success`
+(`:441-450`), então 403 e 404 são indistinguíveis para ele. Nenhum JS do
+repositório ramifica por 403 (`grep 'status === 403'`: vazio). Mas o que o JS
+**exige** é que o corpo siga sendo JSON — um 404 que caísse no handler de erro do
+Flask devolveria HTML, o `response.json()` estouraria e o usuário veria "tente
+novamente" no lugar da mensagem. Como aqui é `jsonify(...), 404` explícito, o
+handler não entra; **e o teste passou a afirmar isso**, porque conferência de olho
+não impede regressão.
+
+**Nota:** a rota de formulário (`processar_entrada`) já usa 404 em
+`'Item não encontrado'` e resolve fornecedor alheio por flash+redirect — mais uma
+vez o mesmo arquivo responde a mesma pergunta de dois jeitos, que foi o padrão
+desta sessão inteira. O flash+redirect **não é oráculo** (não devolve status
+distinguível), então fica como está.
 
 ---
 
@@ -4286,16 +4313,16 @@ colisão entre B1 e B2 — e é entre trilhas que, sem ela, seriam paralelas.
 
 ### 11.4 Ordem recomendada de entrega
 
-**Onde a entrega está, em 05/08:** passo 1 fechado e o passo 2 a **uma Task** do
-fim. Da T3 saíram B1.12, B1.13 e B1.16; a B1.14 foi **cortada** (§8.1). **O que
-resta do B1 inteiro é a B1.15, e ela não espera nada.**
+**Onde a entrega está, em 05/08:** **passos 1 e 2 fechados.** Da T3 saíram B1.12,
+B1.13, B1.15 e B1.16; a B1.14 foi **cortada** (§8.1). **O próximo trabalho é o
+passo 3 — o B2 —, e ele não espera nada.**
 
 1. ~~**B0**~~ ✅ (a D3 foi respondida pelos fatos: entrou sozinho, com xfail strict —
    o default recomendado, e os oito xfail funcionaram como checklist até o fim:
    sete caíram cobrados pelo próprio mecanismo que corrigiram).
-2. ~~**B1.1-B1.5b (T1)**~~ ✅ **A05 fechado.** ~~**B1.6-B1.11 (T2)**~~ ✅ **A10 e
-   A16-a fechados.** Da T3 falta só a **B1.15** — B1.12, B1.13 e B1.16 entregues,
-   B1.14 cortada (§8.1). A serialização do guard inverso
+2. ~~**B1 inteiro**~~ ✅ **A05, A10, A16-a e A09 fechados.** T1 (B1.1-B1.5b), T2
+   (B1.6-B1.11) e T3 (B1.12, B1.13, B1.15, B1.16), com a **B1.14 cortada** (§8.1).
+   A serialização do guard inverso
    foi consumida pela T1 (a B1.2 mudou `:379-390`) e a T2 nunca precisou esperar —
    foi o principal efeito prático de A05 ter fechado primeiro.
    *Fica aberto de T2 só o que depende de gente: rodar a `q7` em PRODUÇÃO (B1.8
@@ -4368,6 +4395,36 @@ pacotes abaixo seguem existindo e valendo.**
 ---
 
 ## Histórico
+
+- **2026-08-05** — **O BLOCO B1 FECHOU**, com a B1.15 entregue. Sai *"o sistema
+  está perdendo dado"*; o próximo é o B2, *"o número exibido mente"*.
+
+  **A B1.15 era uma linha, e o que ela ensinou não foi sobre a linha.** 403 vira
+  404 em `views/almoxarifado/movimentos.py:278`, e o dado nunca vazou — a consulta
+  já filtrava `admin_id`. O que vazava era o **código**: 403 e 404 respondem
+  perguntas diferentes para quem enumera `fornecedor_id`.
+
+  🔴 **O teste que a prova — o T5 — não existia, e a B1.12 tinha o Step 1 marcado
+  dizendo que sim** (`[x] arreio vermelho (T1, T2, T4, T5)`). `grep` pelo nome da
+  rota em `tests/` devolvia vazio: o arreio da T3 nasceu com T1-T4. **É o oitavo
+  instrumento defeituoso da rodada, e o primeiro de um tipo novo** — os sete
+  anteriores mediam o vazio; este estava ausente com a caixa marcada. A lição de
+  método é mais barata que as anteriores: *antes de marcar o checkbox de um
+  arreio, `grep` pelo nome da rota.* Escrito agora antes da correção e visto
+  vermelho pelo motivo certo (403 ≠ 404, zero movimentos gravados).
+
+  **O Step 2 virou asserção em vez de conferência de olho.** O `fetch` de
+  `entrada.html:428` não ramifica por `response.status` — decide por
+  `result.success`; nenhum JS do repositório ramifica por 403. Mas ele **exige**
+  JSON no corpo, e um 404 que caísse no handler do Flask devolveria HTML e mataria
+  a mensagem. O teste passou a afirmar isso.
+
+  ✅ **GATE VERDE ANTES do commit, desta vez:** `1865 passed, 6 skipped,
+  3 xfailed`, zero falhas, 18m54s. Contra o gate de 04/08: **+1 teste, e é o T5** —
+  a diferença bate com a entrega, item por item. **Nenhum `.py` foi tocado entre o
+  início do gate e o commit**, então o resultado vale para a árvore commitada.
+  Ontem foi ao contrário (commit primeiro, gate depois, ressalva no corpo que
+  ninguém relê); a ordem certa custou espera e mais nada.
 
 - **2026-08-05** — **B1.14 CORTADA**, por decisão do Cássio sobre a recomendação
   que a sessão anterior deixou pendurada. É o **primeiro corte de uma Task deste
