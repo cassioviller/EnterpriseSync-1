@@ -26,7 +26,8 @@ MIGRATION_48_TABLES = [
     'centro_custo', 'receita', 'orcamento_obra',
     'fluxo_caixa', 'registro_alimentacao',
     'rdo_mao_obra', 'rdo_equipamento', 'rdo_ocorrencia', 'rdo_foto',
-    'notificacao_cliente', 'proposta_itens', 'proposta_arquivos'
+    'proposta_itens', 'proposta_arquivos'
+    # E02/B4.8 — `notificacao_cliente` saiu: a tabela é dropada pela migração 279.
 ]
 
 

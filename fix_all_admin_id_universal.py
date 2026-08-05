@@ -14,7 +14,8 @@ BACKFILL_STRATEGIES = {
     'servico_obra_real': 'obra_id',
     'orcamento_obra': 'obra_id',
     'custo_obra': 'obra_id',
-    'notificacao_cliente': 'obra_id',
+    # E02/B4.8 — `notificacao_cliente` saiu: a tabela é dropada pela migração 279,
+    # e este módulo roda no boot (o backfill tentaria uma tabela inexistente).
     'rdo': 'obra_id',
     'alocacao_equipe': 'obra_id',
     'allocation': 'obra_id',

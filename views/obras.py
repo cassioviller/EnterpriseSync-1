@@ -1226,7 +1226,6 @@ TABELAS_DEPENDENTES_OBRA = [
     'custo_veiculo',
     'frota_despesa',
     'movimentacao_estoque',
-    'notificacao_cliente',
     'rdo',                         # CASCADE remove os filhos do RDO
     'orcamento_obra',
     'outro_custo',
@@ -1243,6 +1242,11 @@ TABELAS_DEPENDENTES_OBRA = [
 # existe no banco. Cada uma disparava um erro por exclusão, engolido pelo
 # `except` da rota — ruído que escondia os erros de verdade no log. O
 # `fk_column_map` foi junto: só mapeava essas duas.
+#
+# E02/B4.8 — `notificacao_cliente` saiu pelo mesmo motivo, e é o QUARTO ponto
+# vivo do E02: o recorte listava três, todos achados por grep do MODELO. Este
+# cita a tabela pelo NOME, então nenhum grep de `NotificacaoCliente` o
+# encontrava. Quem o pegou foi `test_lista_nao_tem_tabela_fantasma`.
 
 
 # CRUD OBRAS - Excluir Obra
