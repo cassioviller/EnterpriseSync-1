@@ -3909,8 +3909,15 @@ contabilidade: é diagnóstico para as etapas seguintes.
 **Risco → mitigação.** **Não mexer no `except` de `:380-385`**: o rollback ali é
 intencional e só descarta o lançamento (o recebimento já foi commitado em `:329`).
 
-- [ ] **Step 1:** o `else` com warning
-- [ ] **Step 2:** commit — `fix(financeiro): gate de partida dobrada loga quando pula por falta de conta contábil`
+- [x] **Step 1:** o `else` com warning
+- [x] **Step 2:** commit — `fix(financeiro): gate de partida dobrada loga quando pula por falta de conta contábil`
+
+**Status: ✅ entregue em `01883756`.** Um desvio de escopo, para mais: o warning
+entrou nos **DOIS** pontos de baixa de `financeiro_service.py`, não só no `:332`
+que a Task nomeia. O outro tem o mesmo gate mudo e o mesmo `if` sem `else` — deixar
+metade calada responderia errado a pergunta "quantas CRs estão fora da
+contabilidade", que é a razão de ser da Task. O `except` do lançamento não foi
+tocado, como o risco manda.
 
 ---
 
@@ -3938,8 +3945,12 @@ como RECEBIDO (`services/importacao_excel.py:2478`).
    `services/medicao_service.py:400`, que grava `'QUITADA'`, enquanto
    `baixar_recebimento` grava `'RECEBIDO'` (`financeiro_service.py:315`). Testar os dois.
 
-- [ ] **Step 1:** a guarda
-- [ ] **Step 2:** commit — `fix(financeiro): conta a receber já liquidada não aceita nova baixa`
+- [x] **Step 1:** a guarda
+- [x] **Step 2:** commit — `fix(financeiro): conta a receber já liquidada não aceita nova baixa`
+
+**Status: ✅ entregue em `0fc44bc6`.** Sem desvio, e a ordem contra a B3.8 foi
+respeitada: a guarda está no commit ANTERIOR ao que passa a escrever `FluxoCaixa`.
+O teste ficou parametrizado em `RECEBIDO` e `QUITADA`, como o risco 2 exige.
 
 ---
 
@@ -4018,12 +4029,35 @@ justamente a linha que a rota não escreve.
    (valor, data) antes de cunhar CR nova) é **item PRÓPRIO, fora deste recorte**: mexer no
    dedup do import junto com esta mudança é o jeito de repetir a história do p1.
 
-- [ ] **Step 1:** escrever o teste e vê-lo vermelho (zero linhas após o 1º POST)
-- [ ] **Step 2:** GET com `categorias_fc`
-- [ ] **Step 3:** template com checkbox `value="1"` e select
-- [ ] **Step 4:** escrita do FluxoCaixa no POST, em try próprio
-- [ ] **Step 5:** os cinco casos verdes; verificar que remover o checkbox ou o `obra_id` deixa o teste VERMELHO
-- [ ] **Step 6:** commit — `feat(financeiro): baixa de conta a receber grava FluxoCaixa ENTRADA`
+- [x] **Step 1:** escrever o teste e vê-lo vermelho (zero linhas após o 1º POST)
+- [x] **Step 2:** GET com `categorias_fc`
+- [x] **Step 3:** template com checkbox `value="1"` e select
+- [x] **Step 4:** escrita do FluxoCaixa no POST, em try próprio
+- [x] **Step 5:** os cinco casos verdes; verificar que remover o checkbox ou o `obra_id` deixa o teste VERMELHO
+- [x] **Step 6:** commit — `feat(financeiro): baixa de conta a receber grava FluxoCaixa ENTRADA`
+
+**Status: ✅ entregue em `95912e7c`.** A reescrita da Task (`e22b165f`) se confirmou
+na execução: as três edições foram `contas_receber.html:275-299` (o modal vivo),
+`listar_contas_receber` (as `categorias_fc`, a edição que Task nenhuma previa) e o
+POST de `receber_conta`. `receber_conta.html` **não foi tocada** — continua órfã, e
+mexer nela teria entregado a Task inerte.
+
+O Step 5 foi cumprido nos dois braços, em worktree descartável: trocar
+`name="criar_fluxo_caixa"` derruba **só**
+`test_o_modal_da_listagem_manda_o_campo_criar_fluxo_caixa` (1 failed, 5 passed);
+remover `obra_id=conta.obra_id` derruba **só**
+`test_recebimento_grava_fluxo_caixa_de_entrada_com_a_obra`, com
+`AssertionError: obra_id veio None` (1 failed, 5 passed). São seis casos, não cinco
+— a parametrização de B3.7 em `RECEBIDO`/`QUITADA` conta dois.
+
+⚠️ **O "vermelho" do Step 1 não foi observado nesta sessão** — o teste chegou junto
+com a implementação. As duas mutações acima são a prova retroativa de que ele não é
+vacuoso, e valem mais do que a observação teria valido.
+
+⚠️ **O lado PAGAR segue com o mesmo defeito** e agora é a assimetria visível do
+módulo: `contas_pagar.html` também não manda `criar_fluxo_caixa`, então aquele
+`FluxoCaixa` SAIDA só nasce por URL digitada à mão, e sem `obra_id`. **Não há Task
+para isso no plano** — é candidato a backlog, não a escopo desta entrega.
 
 ---
 
