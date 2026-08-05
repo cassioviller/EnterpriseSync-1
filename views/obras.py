@@ -724,75 +724,21 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
         traceback.print_exc()
         return 0
 
-def calcular_progresso_real_servico(obra_id, servico_id, admin_id=None):
-    """
-    Calcula o progresso real de um serviço baseado no ÚLTIMO percentual de CADA subatividade
-    ao longo de TODOS os RDOs (corrige bug de regressão de progresso).
-    
-    Args:
-        obra_id: ID da obra
-        servico_id: ID do serviço
-        admin_id: tenant, OPCIONAL — ver a nota de B1.13 abaixo
-
-    Returns:
-        float: Percentual médio de conclusão (0.0 a 100.0)
-
-    B1.13 — **defesa em profundidade, não correção de vazamento vivo.** A cadeia
-    inteira foi aberta antes de mexer: os únicos chamadores são `:846` e `:898`,
-    ambos dentro de `obter_servicos_da_obra` (`:776`); os dela são `:1104`
-    (`editar_obra`, que resolve a obra com
-    `obras_visiveis().filter(...).first_or_404()`) e `:1884` (`detalhes_obra`,
-    com `@obra_required()`); `utils/autorizacao.py:73-99` filtra
-    `Obra.admin_id == tenant` SEMPRE; e a consulta já é fechada por obra
-    (`WHERE r.obra_id = :obra_id`). **Nada vaza hoje**, e isto não deve entrar
-    em changelog como `fix(tenant)`.
-
-    O parâmetro é OPCIONAL de propósito: com default `None` a consulta se
-    comporta exatamente como antes, e o teste de fórmula que a chama direto
-    (`tests/test_cronograma_engine_unificado.py:114`) segue valendo sem edição.
-    Quem tem o tenant à mão passa e ganha a segunda barreira.
-    """
-    try:
-        from sqlalchemy import text
-
-        # Query corrigida: busca último percentual de CADA subatividade (não apenas último RDO)
-        # O filtro de tenant entra por interpolação condicional porque `text()`
-        # não aceita cláusula variável: com `admin_id=None` a linha some e o SQL
-        # é byte a byte o de antes.
-        _filtro_tenant = 'AND r.admin_id = :admin_id' if admin_id is not None else ''
-        query = text(f"""
-            SELECT AVG(rss.percentual_conclusao) as progresso_medio
-            FROM rdo_servico_subatividade rss
-            WHERE rss.id IN (
-                -- Para cada subatividade, pegar o registro mais recente
-                SELECT MAX(rss2.id)  -- Usar MAX(id) como proxy para data mais recente
-                FROM rdo_servico_subatividade rss2
-                JOIN rdo r ON rss2.rdo_id = r.id
-                WHERE r.obra_id = :obra_id
-                  AND rss2.servico_id = :servico_id
-                  AND rss2.ativo = true
-                  {_filtro_tenant}
-                GROUP BY rss2.nome_subatividade
-            )
-            AND rss.ativo = true
-        """)
-
-        _params = {'obra_id': obra_id, 'servico_id': servico_id}
-        if admin_id is not None:
-            _params['admin_id'] = admin_id
-        result = db.session.execute(query, _params).fetchone()
-        
-        if result and result[0] is not None:
-            progresso = float(result[0])
-            logger.info(f"[STATS] Serviço {servico_id}: Progresso calculado = {progresso:.1f}% (último valor de cada subatividade)")
-            return round(progresso, 1)
-        else:
-            logger.info(f"[INFO] Serviço {servico_id}: Sem RDOs registrados")
-            return 0.0
-            
-    except Exception as e:
-        logger.error(f"[ERROR] Erro ao calcular progresso real do serviço {servico_id}: {e}")
-        return 0.0
+# A19/B2.8 — `calcular_progresso_real_servico` foi REMOVIDA em 05/08.
+#
+# Ela era a sétima variante da família V1 de progresso e a única que respondia
+# outra pergunta: progresso de um SERVIÇO, não da obra. Por isso morreu em vez
+# de convergir para `utils.cronograma_engine.progresso_v1_acumulado` — forçá-la
+# a virar progresso de obra seria trocar um número por outro que responde
+# outra coisa.
+#
+# O que ela calculava era DESCARTADO: os dois laços que a chamavam gravavam em
+# `servico['progresso']`, e nenhum template lê essa chave (`editar_obra` guarda
+# só os ids; `detalhes_obra.html` não é renderizado por rota nenhuma). Some uma
+# SQL por serviço a cada GET /obras/<id> e a cada GET /obras/<id>/editar.
+#
+# A consulta usava `MAX(rss2.id)` como proxy de data — o próprio comentário
+# dela admitia — e agrupava só por `nome_subatividade`, colapsando homônimos.
 
 def obter_servicos_da_obra(obra_id, admin_id=None):
     """Obtém lista de serviços da obra usando NOVA TABELA servico_obra_real"""
@@ -860,14 +806,13 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
                     'data_fim_planejada': servico_obra_real.data_fim_planejada.isoformat() if servico_obra_real.data_fim_planejada else None,
                     'observacoes': servico_obra_real.observacoes or ''
                 })
-            
-            # [OK] CALCULAR PROGRESSO REAL BASEADO EM RDOs
-                logger.info(f"[STATS] Calculando progresso real dos serviços baseado em RDOs...")
-            for servico in servicos_lista:
-                progresso_real = calcular_progresso_real_servico(obra_id, servico['id'], admin_id)
-                servico['progresso'] = progresso_real
-            
-                logger.info(f"[OK] {len(servicos_lista)} serviços encontrados na NOVA TABELA para obra {obra_id}")
+
+            # A19/B2.8 — o laço que sobrescrevia `progresso` com
+            # `calcular_progresso_real_servico` saiu daqui. O valor que fica é o
+            # de `:857` (`percentual_concluido` do ServicoObraReal), e a tela não
+            # nota: nenhum template lê esta chave. Ver o docstring da função
+            # removida no commit da B2.8.
+            logger.info(f"[OK] {len(servicos_lista)} serviços encontrados na NOVA TABELA para obra {obra_id}")
             return servicos_lista
             
         except SQLAlchemyError as sql_error:
@@ -912,14 +857,10 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
                     'progresso': 0.0,
                     'ativo': True
                 })
-            
-            # [OK] CALCULAR PROGRESSO REAL BASEADO EM RDOs (FALLBACK)
-                logger.info(f"[STATS] Calculando progresso real dos serviços baseado em RDOs (FALLBACK)...")
-            for servico in servicos_lista:
-                progresso_real = calcular_progresso_real_servico(obra_id, servico['id'], admin_id)
-                servico['progresso'] = progresso_real
-            
-                logger.info(f"[OK] FALLBACK: {len(servicos_lista)} serviços encontrados")
+
+            # A19/B2.8 — idem ao caminho principal: o laço saiu, e `progresso`
+            # fica no 0.0 de `:911`. Também não é lido por template nenhum.
+            logger.info(f"[OK] FALLBACK: {len(servicos_lista)} serviços encontrados")
             return servicos_lista
         except Exception as e2:
             logger.error(f"Erro no fallback de busca de serviços: {e2}")

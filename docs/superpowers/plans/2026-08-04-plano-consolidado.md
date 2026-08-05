@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **7** | **13** | G |
+| B2 — o que o sistema informa errado | 20 | **8** | **12** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **29** | **32** | |
+| **Total** | **61** *(62 − 1 cortada)* | **30** | **31** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -2481,9 +2481,54 @@ caracterização, e o T4 da Task B1.13 continua verde (o valor 40.0 vem do outro
 2. O docstring de `tests/test_cronograma_engine_unificado.py:1-14` nomeia a função em
    `:5` → corrigir junto, registrando **por que** (número descartado, não migrado).
 
-- [ ] **Step 1:** grep de confirmação em `templates/` e `static/`
-- [ ] **Step 2:** remover função, laços e o teste de caracterização; corrigir o docstring
-- [ ] **Step 3:** commit — `chore(obras): remove calcular_progresso_real_servico — o número era descartado`
+- [x] **Step 1:** grep de confirmação em `templates/` e `static/`
+- [x] **Step 2:** remover função, laços e o teste de caracterização; corrigir o docstring
+- [x] **Step 3:** commit
+
+**Status: ✅ entregue em 05/08.** 70 linhas de função e os dois laços fora; some
+uma SQL por serviço a cada `GET /obras/<id>` e a cada `GET /obras/<id>/editar`.
+
+**Step 1 conferido, e bateu com o recorte:** `servicos_obra` só aparece em
+`templates/obra_form.html:663,666` (ids para marcar checkbox) e em
+`templates/obras/detalhes_obra.html:245,261` — e **nenhuma rota Python renderiza
+esse segundo template** (`grep detalhes_obra.html` fora de
+`detalhes_obra_profissional`: vazio). Nada em `static/`.
+
+**🔴 Uma armadilha que o recorte não previu, e que teria quebrado o arquivo.** Os
+dois `logger.info` que anunciam o cálculo estavam **dentro** dos laços, por
+indentação acidental:
+
+```python
+            # [OK] CALCULAR PROGRESSO REAL BASEADO EM RDOs
+                logger.info(...)          # <- dentro do laço de append, acima
+            for servico in servicos_lista:
+                progresso_real = calcular_progresso_real_servico(...)
+                servico['progresso'] = progresso_real
+
+                logger.info(f"[OK] {len(...)} serviços encontrados")  # <- DENTRO do for
+            return servicos_lista
+```
+
+Remover "só o laço" deixaria o segundo `logger.info` órfão e o módulo pararia de
+importar. Os dois foram tratados: o primeiro sai (anunciava um cálculo que não
+existe mais) e o segundo subiu para o nível do `return`, que é onde sempre devia
+ter estado — de quebra, ele deixa de logar uma vez por serviço.
+
+**No lugar da função ficou um bloco de comentário**, não o silêncio: quem for
+procurar por que o progresso do serviço sumiu precisa achar a resposta onde ela
+estava, e a resposta é "o número era descartado". O teste de caracterização D
+saiu de `tests/test_cronograma_engine_unificado.py` **e o docstring diz por quê**
+— número descartado, não migrado. Apontá-lo para `progresso_v1_acumulado` seria
+caracterizar outra pergunta.
+
+**O T4 da B1.13 seguiu verde**, como o recorte previa: o valor 40.0 vem do outro
+caminho.
+
+✅ **GATE VERDE ANTES do commit:** `1885 passed, 6 skipped, 3 xfailed`, zero
+falhas, 22m09s. Contra o gate anterior (1877): **+8, e a conta fecha** — +9 da
+B2.7, **−1** do teste de caracterização D que esta Task removeu. Gate completo
+porque em remoção o risco não está no que se apaga, e sim no que ficou apoiado
+no que se apagou — foi exatamente o caso do `logger.info` órfão.
 
 ---
 

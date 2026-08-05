@@ -1047,8 +1047,10 @@ def progresso_v1_acumulado(obra_id: int, admin_id: int, ate_data) -> float:
 
     **Sete geradores** respondiam "qual o progresso V1 desta obra", cada um de um
     jeito, e nenhum deles do mesmo jeito. Esta função é o destino de seis; o
-    sétimo (`views/obras.py:calcular_progresso_real_servico`) responde outra
-    pergunta e por isso morre em vez de convergir (Task B2.8).
+    sétimo (`views/obras.py:calcular_progresso_real_servico`) respondia outra
+    pergunta — progresso de um SERVIÇO — e por isso **foi removido em 05/08 em
+    vez de convergir** (Task B2.8), com o número que produzia sendo descartado
+    pelos próprios chamadores.
 
     **Não confundir com `_progresso_fallback_subatividades`**, logo acima: aquela
     responde "média das subatividades do ÚLTIMO RDO" — um retrato de um dia, que
