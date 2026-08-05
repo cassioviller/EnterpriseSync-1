@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **12** | **8** | G |
+| B2 — o que o sistema informa errado | 20 | **13** | **7** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **34** | **27** | |
+| **Total** | **61** *(62 − 1 cortada)* | **35** | **26** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -2638,8 +2638,35 @@ principal `:2508-2541` e o gêmeo do `except` `:2648-2682`
 3. Inserir `except HTTPException: raise` antes do catch-all de `:2613`, que hoje
    engoliria um `abort()`.
 
-- [ ] **Step 1:** as duas metades
-- [ ] **Step 2:** commit — `fix(rdo): consolidada — mesmo ramo e mesma fórmula no caminho feliz e no fallback`
+- [x] **Step 1:** as duas metades
+- [x] **Step 2:** commit
+
+**Status: ✅ entregue em 05/08.** As duas metades chamam as mesmas duas funções, e
+o ramo `obra_em_modo_v2` vem **primeiro nos dois**.
+
+**A inversão era bug que muda número, e o pior dela é qual número o usuário via.**
+O caminho principal testava V2 primeiro; o fallback testava `total_subatividades
+> 0` primeiro. Obra híbrida — cronograma V2 **e** subatividades V1 apontadas —
+devolvia V2 no caminho feliz e V1 no fallback: mesma rota, mesma obra, dois
+números, e **o que decidia qual deles aparecia era a migração 48 ter rodado ou
+não** naquele ambiente.
+
+**A guarda `elif total_subatividades > 0` saiu**, e essa é a segunda metade da
+correção. Ela olhava as subatividades DESTE RDO para decidir se calculava o
+acumulado da OBRA — então um dia sem apontamento exibia 0 para uma obra a 80%.
+`progresso_v1_acumulado` já devolve 0.0 quando não há chave nenhuma, então
+mantê-la anularia metade do conserto.
+
+**Os três riscos:**
+
+1. A inversão — corrigida, e é o ponto da Task.
+2. **O bloco de fallback NÃO foi deletado.** Ele é o que segura a rota quando o
+   schema está atrás da migração 48; o `except` que o alimenta é explícito sobre
+   isso. Convergir os dois é diferente de matar um.
+3. **`except HTTPException: raise` entrou antes do catch-all** — sem ele, um
+   `abort()` seria engolido e a rota responderia 200 com o fallback em vez do
+   401/403/404 pedido. Quatro linhas, e o `HTTPException` já estava importado no
+   arquivo desde `:2` (usado em `:314`).
 
 ---
 

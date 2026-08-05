@@ -160,8 +160,9 @@ def rdos():
         # normalização de horas via utils/rdo_horas. Mantém a média simples
         # de subatividades como fallback V1.
         from models import RDOApontamentoCronograma as _RAC
-        from models import TarefaCronograma as _TC
-        from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+        from utils.cronograma_engine import (calcular_progresso_geral_obra_v2,
+                                             obra_em_modo_v2,
+                                             progresso_v1_acumulado)
         from utils.rdo_horas import normalizar_horas_funcionario as _norm_horas
 
         _cache_prog_v2: dict = {}
@@ -2373,8 +2374,9 @@ def funcionario_rdo_consolidado():
         # Memoize: a obra usa V2 (tem TarefaCronograma)?
         _cache_obra_v2: dict = {}
         from models import RDOApontamentoCronograma as _RAC
-        from models import TarefaCronograma as _TC
-        from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+        from utils.cronograma_engine import (calcular_progresso_geral_obra_v2,
+                                             obra_em_modo_v2,
+                                             progresso_v1_acumulado)
         from utils.rdo_horas import normalizar_horas_funcionario as _norm_horas
         for rdo, obra in rdos_paginated.items:
             # Contadores básicos com proteção contra erros de schema
@@ -2398,12 +2400,13 @@ def funcionario_rdo_consolidado():
                     _entradas.append((_mo.funcionario_id, _key, _h))
                 total_horas_trabalhadas = round(sum(e[2] for e in _norm_horas(_entradas)), 1)
 
-                # ── Detectar se a obra opera em modo V2 (cronograma) ──
+                # ── A19/B2.10 — o único jeito de perguntar "esta obra é V2?" ──
+                # Era `_TC.query` cru: sem `ativa`, sem `is_cliente`, sem
+                # `is_v2_active()`. Uma tarefa cópia-cliente bastava para a obra
+                # inteira mudar de ramo.
                 if obra.id not in _cache_obra_v2:
-                    _cache_obra_v2[obra.id] = (
-                        _TC.query.filter_by(obra_id=obra.id, admin_id=admin_id_correto)
-                        .first() is not None
-                    )
+                    _cache_obra_v2[obra.id] = obra_em_modo_v2(
+                        obra.id, admin_id_correto)
                 obra_em_v2 = _cache_obra_v2[obra.id]
 
                 # ── Contador "X atividades" (Task #140 + Task #61) ──
@@ -2425,32 +2428,23 @@ def funcionario_rdo_consolidado():
                         )
                     progresso_medio = _cache_prog_v2[cache_key]['progresso_geral_pct']
                     progresso_label = 'Progresso geral'
-                elif total_subatividades > 0:
-                    # V1: progresso GERAL ACUMULADO até a data deste RDO.
-                    # Para cada nome_subatividade único da obra, pega o MAIOR
-                    # percentual_conclusao registrado em qualquer RDO até a
-                    # data atual; depois média desses máximos. Garante que o
-                    # card mostre o avanço acumulado (monotônico no tempo),
-                    # não a média de um único dia.
+                else:
+                    # A19/B2.10 — V1 pelo ponto único. A guarda
+                    # `elif total_subatividades > 0` saiu: ela olhava as
+                    # subatividades DESTE RDO para decidir se calculava o
+                    # acumulado da OBRA, então um dia sem apontamento exibia 0
+                    # para uma obra a 80%. `progresso_v1_acumulado` já devolve
+                    # 0.0 quando não há chave nenhuma.
+                    #
+                    # A consulta que estava aqui agrupava só por
+                    # `nome_subatividade`, fundindo homônimos de serviços
+                    # diferentes.
                     ck_v1 = (obra.id, rdo.data_relatorio)
                     if ck_v1 not in _cache_prog_v1:
-                        rows_v1 = db.session.query(
-                            RDOServicoSubatividade.nome_subatividade,
-                            db.func.max(RDOServicoSubatividade.percentual_conclusao),
-                        ).join(RDO, RDOServicoSubatividade.rdo_id == RDO.id).filter(
-                            RDO.obra_id == obra.id,
-                            RDO.admin_id == admin_id_correto,
-                            RDO.data_relatorio <= rdo.data_relatorio,
-                        ).group_by(RDOServicoSubatividade.nome_subatividade).all()
-                        _cache_prog_v1[ck_v1] = (
-                            sum((pct or 0) for _, pct in rows_v1) / len(rows_v1)
-                            if rows_v1 else 0
-                        )
+                        _cache_prog_v1[ck_v1] = progresso_v1_acumulado(
+                            obra.id, admin_id_correto, rdo.data_relatorio)
                     progresso_medio = _cache_prog_v1[ck_v1]
                     progresso_label = 'Progresso geral'
-                else:
-                    progresso_medio = 0
-                    progresso_label = 'Progresso'
 
                 logger.debug(f"DEBUG RDO {rdo.id}: {total_atividades} atividades, {total_funcionarios} func, {total_horas_trabalhadas}h, {progresso_medio:.1f}% ({progresso_label})")
             except Exception as e:
@@ -2521,6 +2515,11 @@ def funcionario_rdo_consolidado():
                                  'order_by': request.args.get('order_by', 'data_desc')
                              })
         
+    except HTTPException:
+        # A19/B2.10, Risco 3 — o catch-all abaixo engoliria um `abort()`:
+        # a rota responderia 200 com o fallback em vez do 401/403/404 pedido.
+        # Este ramo vem ANTES por isso, e não muda mais nada.
+        raise
     except Exception as e:
         logger.error(f"ERRO RDO CONSOLIDADO: {str(e)}")
         logger.debug(f"[LIST] FALLBACK ATIVADO - Motivo: {type(e).__name__}: {str(e)}")
@@ -2538,8 +2537,10 @@ def funcionario_rdo_consolidado():
             _fb_cache_prog_v2: dict = {}
             # Cache de detecção V2 por obra_id.
             _fb_cache_obra_v2: dict = {}
-            from models import TarefaCronograma as _TC_fb, RDOApontamentoCronograma as _RAC_fb
-            from utils.cronograma_engine import calcular_progresso_geral_obra_v2 as _calc_v2_fb
+            from models import RDOApontamentoCronograma as _RAC_fb
+            from utils.cronograma_engine import (
+                calcular_progresso_geral_obra_v2 as _calc_v2_fb,
+                obra_em_modo_v2, progresso_v1_acumulado)
             for rdo in rdos_basicos:
                 # [CONFIG] CALCULAR VALORES REAIS NO FALLBACK
                 try:
@@ -2551,35 +2552,20 @@ def funcionario_rdo_consolidado():
                     mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
                     total_funcionarios = len({mo.funcionario_id for mo in mao_obra_lista if mo.funcionario_id})
 
-                    # Detectar se a obra opera em modo V2 (cache por obra_id).
+                    # A19/B2.10 — mesmo predicado do caminho principal.
                     if rdo.obra_id not in _fb_cache_obra_v2:
-                        _fb_cache_obra_v2[rdo.obra_id] = (
-                            _TC_fb.query
-                            .filter_by(obra_id=rdo.obra_id, admin_id=admin_id_correto)
-                            .first() is not None
-                        )
+                        _fb_cache_obra_v2[rdo.obra_id] = obra_em_modo_v2(
+                            rdo.obra_id, admin_id_correto)
                     obra_em_v2_fb = _fb_cache_obra_v2[rdo.obra_id]
 
-                    # Progresso geral acumulado — espelha exatamente o path principal:
-                    # V1: max % por subatividade única até a data, depois média.
-                    # V2 puro: calcular_progresso_geral_obra_v2 (monotônico no tempo).
-                    if total_subatividades > 0:
-                        ck_v1 = (rdo.obra_id, rdo.data_relatorio)
-                        if ck_v1 not in _fb_cache_prog_v1:
-                            rows_v1 = db.session.query(
-                                RDOServicoSubatividade.nome_subatividade,
-                                db.func.max(RDOServicoSubatividade.percentual_conclusao),
-                            ).join(RDO, RDOServicoSubatividade.rdo_id == RDO.id).filter(
-                                RDO.obra_id == rdo.obra_id,
-                                RDO.admin_id == admin_id_correto,
-                                RDO.data_relatorio <= rdo.data_relatorio,
-                            ).group_by(RDOServicoSubatividade.nome_subatividade).all()
-                            _fb_cache_prog_v1[ck_v1] = (
-                                sum((pct or 0) for _, pct in rows_v1) / len(rows_v1)
-                                if rows_v1 else 0
-                            )
-                        progresso_medio = _fb_cache_prog_v1[ck_v1]
-                    elif obra_em_v2_fb:
+                    # ⚠️ A ORDEM DOS RAMOS ESTAVA INVERTIDA AQUI, e isso é bug
+                    # que muda número, não estilo: o caminho principal testa V2
+                    # primeiro e este testava `total_subatividades > 0` primeiro.
+                    # Obra híbrida — cronograma V2 **e** subatividades V1
+                    # apontadas — devolvia V2 no caminho feliz e V1 no fallback:
+                    # mesma rota, mesma obra, dois números, e qual deles o
+                    # usuário via dependia de a migração 48 ter rodado.
+                    if obra_em_v2_fb:
                         ck_v2 = (rdo.obra_id, rdo.data_relatorio)
                         if ck_v2 not in _fb_cache_prog_v2:
                             _fb_cache_prog_v2[ck_v2] = _calc_v2_fb(
@@ -2590,7 +2576,11 @@ def funcionario_rdo_consolidado():
                         if total_subatividades == 0:
                             total_subatividades = _RAC_fb.query.filter_by(rdo_id=rdo.id).count()
                     else:
-                        progresso_medio = 0
+                        ck_v1 = (rdo.obra_id, rdo.data_relatorio)
+                        if ck_v1 not in _fb_cache_prog_v1:
+                            _fb_cache_prog_v1[ck_v1] = progresso_v1_acumulado(
+                                rdo.obra_id, admin_id_correto, rdo.data_relatorio)
+                        progresso_medio = _fb_cache_prog_v1[ck_v1]
 
                     # Calcular horas trabalhadas reais (normalizadas)
                     from utils.rdo_horas import normalizar_horas_funcionario as _norm_horas
