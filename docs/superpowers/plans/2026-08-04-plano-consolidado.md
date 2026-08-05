@@ -4092,8 +4092,29 @@ reconhecido antes.
 3. Obras paradas seguem sem conta — e o warning de B3.6 torna isso visível em vez de
    silencioso.
 
-- [ ] **Step 1:** seed + verificação em `PlanoContas` + atribuição nos dois ramos
-- [ ] **Step 2:** commit — `fix(medicao): CR de medição nasce com conta contábil (liquidação de cliente)`
+- [x] **Step 1:** seed + verificação em `PlanoContas` + atribuição nos dois ramos
+- [x] **Step 2:** commit — `fix(medicao): CR de medição nasce com conta contábil (liquidação de cliente)`
+
+**Status: ✅ entregue em `352719a0`.** Um desvio na mitigação do risco 1, para menos
+exposição: a Task manda chamar `seed_plano_contas_if_needed` **e** confirmar em
+`PlanoContas`; a implementação inverte a ordem e **só chama o seed quando a conta
+falta**. No caminho comum — tenant já semeado — não há INSERT nenhum, e a sessão
+não é exposta sem necessidade. A confirmação em `PlanoContas` continua sendo o que
+libera a atribuição, como o risco exige.
+
+A resolução saiu para `_resolver_conta_contabil_medicao`, que **nunca levanta**:
+qualquer falha vira NULL + warning, porque derrubar o recálculo inteiro da medição
+por causa da contabilidade seria pior do que a CR ficar sem conta.
+
+Verificado à mão antes do commit, nos quatro comportamentos: nasce com `4.1.01.001`
+sem proposta, com `1.1.02.001` com proposta, **cura o NULL** no recálculo seguinte,
+e não sobrescreve código posto à mão. Regressão nas suítes de medição/RDO/A02 e no
+`test_fase06_d4_plano_contas_por_tenant`: 51 passed.
+
+⚠️ **Isso não substitui a B3.10.** A verificação chamou `recalcular_medicao_obra`
+direto; o que falta provar é o **caminho de produção** — `EventManager.emit
+('rdo_finalizado')` → handler → commit — que é justamente onde mora o risco da FK
+composta, e onde uma sessão suja quebraria os handlers seguintes.
 
 ---
 
