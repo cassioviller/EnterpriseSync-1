@@ -147,3 +147,80 @@ def test_conta_ja_liquidada_nao_aceita_nova_baixa(status):
         assert len(_fluxos(t)) == 0, (
             'a re-baixa recusada ainda assim gravou FluxoCaixa')
 
+
+# ---------------------------------------------------------------------------
+# B3.8 — o recebimento grava FluxoCaixa ENTRADA
+# ---------------------------------------------------------------------------
+
+def test_o_modal_da_listagem_manda_o_campo_criar_fluxo_caixa():
+    """🔴 **O teste que teria pego a Task nascendo inerte.**
+
+    O recorte original mandava pôr o checkbox em
+    `templates/financeiro/receber_conta.html` — página que **nenhum link do app
+    alcança**. O POST vivo sai do modal `formBaixaRecebimento`, na LISTAGEM, e
+    esse modal não mandava o campo. `criar_fluxo_caixa` seria sempre ausente,
+    `criar_fc` sempre `False`, e **nenhum `FluxoCaixa` nasceria** — com todos os
+    outros testes verdes.
+
+    Por isso a asserção é sobre o HTML da listagem, e não sobre a página órfã.
+    """
+    with app.app_context():
+        t = um_tenant('a02modal', data_ref=DIA, com_fatos=False)
+        _conta(t)
+
+        r = cliente_de(t.admin_id).get('/financeiro/contas-receber')
+        assert r.status_code == 200, f'a listagem respondeu {r.status_code}'
+        corpo = r.get_data(as_text=True)
+
+        assert 'name="criar_fluxo_caixa"' in corpo, (
+            'o modal de baixa da LISTAGEM não manda criar_fluxo_caixa — sem '
+            'isso o campo nunca chega ao servidor e a Task fica inerte')
+        assert 'name="categoria_fluxo_caixa_id"' in corpo, (
+            'o select de categoria não chegou ao modal')
+
+
+def test_recebimento_grava_fluxo_caixa_de_entrada_com_a_obra():
+    """O dinheiro entra e aparece no fluxo de caixa — com `obra_id`.
+
+    🔬 **O `obra_id` não é enfeite.** `financeiro_service` filtra
+    `FluxoCaixa.obra_id` ao montar o realizado por obra; sem ele o recebimento
+    entra no fluxo geral e **some do fluxo da obra**. O lado "pagar", que o
+    recorte mandava copiar como padrão, não preenche esse campo — copiar aquele
+    padrão traria o defeito junto.
+    """
+    with app.app_context():
+        t = um_tenant('a02fc', data_ref=DIA, com_fatos=False)
+        cr = _conta(t)
+
+        _post_baixa(t, cr, criar_fluxo_caixa='1')
+
+        fluxos = _fluxos(t)
+        assert len(fluxos) == 1, (
+            f'{len(fluxos)} FluxoCaixa para um recebimento de R$ 1.000')
+        fc = fluxos[0]
+        assert fc.tipo_movimento == 'ENTRADA', (
+            f'tipo_movimento veio {fc.tipo_movimento}')
+        assert fc.referencia_tabela == 'conta_receber' and fc.referencia_id == cr.id, (
+            'o FluxoCaixa não aponta de volta para a ContaReceber que o gerou')
+        assert Decimal(fc.valor) == Decimal('1000.00')
+        assert fc.obra_id == t.obra_id, (
+            f'obra_id veio {fc.obra_id} — sem ele o recebimento some do fluxo '
+            f'de caixa POR OBRA')
+
+
+def test_sem_o_checkbox_nenhum_fluxo_e_criado():
+    """O par do teste acima, e sem ele o anterior seria meia-verdade.
+
+    Se a rota gravasse `FluxoCaixa` incondicionalmente, o teste de cima passaria
+    — e o operador perderia a opção de não duplicar um lançamento que já
+    registrou por outro meio, que é justamente o que o checkbox existe para
+    permitir.
+    """
+    with app.app_context():
+        t = um_tenant('a02nofc', data_ref=DIA, com_fatos=False)
+        cr = _conta(t)
+
+        _post_baixa(t, cr)  # sem criar_fluxo_caixa
+
+        assert len(_fluxos(t)) == 0, (
+            'a rota gravou FluxoCaixa sem o operador ter pedido')

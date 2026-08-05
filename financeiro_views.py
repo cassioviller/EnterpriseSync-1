@@ -502,11 +502,22 @@ def listar_contas_receber():
         'recebidas_mes': recebidas_mes
     }
     
+    # A02/B3.8 — as categorias do modal de baixa.
+    #
+    # ⚠️ ESTA VIEW É A EDIÇÃO QUE O RECORTE NÃO PREVIA. O formulário de baixa é um
+    # MODAL desta listagem, não a página `receber_conta.html` — que existe, é
+    # renderizada pelo GET e **nenhum link do app alcança**. Carregar as
+    # categorias lá deixaria o `<select>` do modal vazio e a Task inerte.
+    categorias_fc = CategoriaFluxoCaixa.query.filter_by(
+        admin_id=admin_id, tipo='ENTRADA').order_by(
+        CategoriaFluxoCaixa.nome).all()
+
     return render_template(
         'financeiro/contas_receber.html',
         contas=contas,
         obras=obras,
         bancos=bancos,
+        categorias_fc=categorias_fc,
         resumo=resumo,
         status_selecionado=status,
         obra_selecionada=obra_id,
@@ -683,7 +694,45 @@ def receber_conta(conta_id):
                 forma_recebimento=forma_recebimento,
                 banco_id=banco_id
             )
-            
+
+            # A02/B3.8 — o recebimento vira FluxoCaixa ENTRADA.
+            #
+            # Em try PRÓPRIO: `baixar_recebimento` já commitou, e falhar aqui não
+            # pode desfazer a baixa. Sem `abort()` — o `except Exception` desta
+            # rota engoliria o HTTPException e devolveria 200.
+            #
+            # ⚠️ `obra_id` NÃO é enfeite: o realizado por obra filtra
+            # `FluxoCaixa.obra_id`, e sem ele o recebimento some do fluxo da obra.
+            # O lado "pagar", que o recorte mandava copiar como padrão, não
+            # preenche esse campo — copiar aquele padrão traria o defeito junto.
+            if request.form.get('criar_fluxo_caixa') == '1':
+                try:
+                    _cat_id = request.form.get('categoria_fluxo_caixa_id', type=int) or None
+                    if _cat_id and not CategoriaFluxoCaixa.query.filter_by(
+                            id=_cat_id, admin_id=admin_id).first():
+                        _cat_id = None
+                    db.session.add(FluxoCaixa(
+                        admin_id=admin_id,
+                        obra_id=conta.obra_id,
+                        tipo_movimento='ENTRADA',
+                        categoria='receita',
+                        categoria_fluxo_caixa_id=_cat_id,
+                        banco_id=banco_id,
+                        descricao=f'Recebimento {conta.numero_documento or conta.id}',
+                        valor=valor_recebido,
+                        data_movimento=data_recebimento,
+                        referencia_tabela='conta_receber',
+                        referencia_id=conta.id,
+                    ))
+                    db.session.commit()
+                except Exception as _e_fc:
+                    db.session.rollback()
+                    logger.error(
+                        "[A02] recebimento baixado mas FluxoCaixa NAO gravado "
+                        "(conta=%s): %s", conta.id, _e_fc, exc_info=True)
+                    flash('Recebimento registrado, mas não foi possível lançar '
+                          'no fluxo de caixa.', 'warning')
+
             flash(f'Recebimento de R$ {valor_recebido} registrado com sucesso!', 'success')
             return redirect(url_for('financeiro.listar_contas_receber'))
             

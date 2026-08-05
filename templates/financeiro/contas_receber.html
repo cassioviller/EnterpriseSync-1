@@ -275,6 +275,29 @@
                             {% endfor %}
                         </select>
                     </div>
+                    {# A02/B3.8 — o checkbox mora AQUI, no modal da listagem, e não
+                       em receber_conta.html: aquela página existe mas nenhum link
+                       do app a alcança, e o POST vivo sai daqui. #}
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input"
+                               id="criarFluxoCaixaRecebimento"
+                               name="criar_fluxo_caixa" value="1" checked>
+                        <label class="form-check-label" for="criarFluxoCaixaRecebimento">
+                            Registrar no fluxo de caixa
+                            <small class="text-muted d-block">
+                                Desmarque se este recebimento já foi registrado por outro meio.
+                            </small>
+                        </label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Categoria do fluxo de caixa</label>
+                        <select name="categoria_fluxo_caixa_id" class="form-select">
+                            <option value="">Sem categoria</option>
+                            {% for cat in categorias_fc or [] %}
+                            <option value="{{ cat.id }}">{{ cat.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
