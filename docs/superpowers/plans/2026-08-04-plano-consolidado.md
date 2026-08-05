@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **10** | **10** | G |
+| B2 — o que o sistema informa errado | 20 | **12** | **8** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **32** | **29** | |
+| **Total** | **61** *(62 − 1 cortada)* | **34** | **27** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -2958,9 +2958,27 @@ que hoje está mentindo.
    corresponde a efeito nenhum; quem depende dele depende de uma alucinação, e o 501 é a
    primeira informação verdadeira que recebe.
 
-- [ ] **Step 1:** o corpo novo
-- [ ] **Step 2:** TESTE B verde
-- [ ] **Step 3:** commit — `fix(relatorios): agendamento responde 501 em vez de fingir sucesso`
+- [x] **Step 1:** o corpo novo
+- [x] **Step 2:** TESTE B verde
+- [x] **Step 3:** commit
+
+**Status: ✅ entregue em 05/08, junto da B2.16 no mesmo commit.** O recorte pedia
+commits separados para B2.14 e este par; foi o que se fez — a folha saiu sozinha
+em `43f7cf8c`. **B2.15 e B2.16 é que ficaram juntas**, e o motivo é o Risco 1 da
+B2.16: a ordem obrigatória é rota-antes-de-classe, e entre os dois commits o
+módulo ficaria com um import quebrado por um instante. Não havia janela útil
+entre elas.
+
+**A asserção que importa no TESTE B é a do BANCO, e é uma AUSÊNCIA** — que é
+exatamente o que a rota negava ao responder 200. Como `models.py` não declara
+tabela de agendamento (não há o que contar porque não existe), o teste ancora no
+`WebhookEntrega`, a única tabela de saída externa do sistema: idêntica antes e
+depois do POST. **Cobrado por sabotagem:** devolvendo `success: True` com um
+`job_id` falso, o teste acusa o 200.
+
+**Sem `try` nenhum na rota**, como o Risco 2 mandava — a casa já pagou caro por
+`except Exception` amplo engolindo resposta de erro. E o `logger.warning` nomeia
+o `Referer`, para que o dia em que alguém realmente chamar a rota deixe rastro.
 
 ---
 
@@ -2986,9 +3004,21 @@ estrutura que aceite um agendamento e o descarte em silêncio.
    recorte. O painel que dá 500 e o SMTP não configurado continuam como estão, sob a
    Decisão 7 — este recorte **não a antecipa**.
 
-- [ ] **Step 1:** remover classe + `timedelta`
-- [ ] **Step 2:** gate verde
-- [ ] **Step 3:** commit — `chore(relatorios): remove SistemaAgendamentoRelatorios (agenda em memória sem leitor)`
+- [x] **Step 1:** remover classe + `timedelta`
+- [x] **Step 2:** gate verde
+- [x] **Step 3:** commit — junto da B2.15, ver o Status dela
+
+**Status: ✅ entregue em 05/08.** 49 linhas fora. Os três riscos conferidos: a
+única referência viva à classe era a `:823`, que a B2.15 já tinha apagado (grep
+fora de `archive/`: vazio); `timedelta` só era usado dentro dela e saiu junto,
+preservando `datetime`; e **o blueprint e as outras cinco rotas ficaram intactos**
+— o painel que dá 500 e o SMTP não configurado seguem como estão, sob a Decisão 7,
+que este recorte não antecipa.
+
+**No lugar da classe ficou um bloco de comentário**, pela mesma razão da B2.8:
+quem for procurar onde estava a agenda precisa achar por que ela não está mais lá,
+e a resposta é "era uma agenda em memória sem leitor, e a rota devolvia
+`success: True` por cima dela".
 
 ---
 

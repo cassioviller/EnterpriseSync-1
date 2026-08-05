@@ -25,10 +25,11 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import main  # noqa: F401 — registra os blueprints antes de qualquer request
 from app import app, db
 from models import FolhaProcessada
 
-from helpers_tenant import um_tenant
+from helpers_tenant import cliente_de, um_tenant
 
 pytestmark = pytest.mark.integration
 
@@ -138,6 +139,45 @@ def test_inss_patronal_gravado_por_subtracao_e_nao_por_fator():
             f'aritmética" de "trocaram um número mágico por outro"')
         soma, esperado = _invariante(linha)
         assert soma == esperado == Decimal('855.00')
+
+
+def test_agendar_relatorio_responde_501_em_vez_de_fingir_sucesso():
+    """TESTE B (B2.15) — a rota que confirmava por escrito o que nunca aconteceu.
+
+    `agendar_relatorio` devolvia `{'success': True, 'job_id': ...}` para um
+    agendamento que morria no fim da requisição: o objeto era instanciado novo a
+    cada request, escrevia num dict de instância que ninguém lê, e não há tabela
+    de agendamento nem `MAIL_*` configurado.
+
+    🔬 **A asserção que importa é a do BANCO, e ela é uma AUSÊNCIA** — que é
+    exatamente o que a rota negava ao responder 200. `models.py` não declara
+    tabela de agendamento (não há o que contar porque não existe), então o teste
+    ancora no `WebhookEntrega`, a única tabela de saída externa do sistema:
+    idêntica antes e depois do POST. O par "resposta honesta ↔ banco vazio" é o
+    que estava mentindo.
+    """
+    from models import WebhookEntrega
+
+    with app.app_context():
+        t = um_tenant('agenda', data_ref=date(ANO, MES, 15), com_fatos=False)
+        antes = WebhookEntrega.query.count()
+
+        r = cliente_de(t.admin_id).post('/relatorios/exportacao/agendar', json={
+            'frequencia': 'semanal',
+            'formato': 'pdf',
+            'destinatarios': ['contato@exemplo.local'],
+            'incluir_graficos': True,
+        })
+
+        assert r.status_code == 501, (
+            f'a rota respondeu {r.status_code} — 200 confirma um agendamento '
+            f'que não existe em lugar nenhum')
+        payload = r.get_json()
+        assert payload['success'] is False
+        assert 'job_id' not in payload, (
+            'a resposta ainda devolve um job_id que não identifica nada')
+        assert WebhookEntrega.query.count() == antes, (
+            'o POST produziu efeito externo — não devia produzir nenhum')
 
 
 def test_a_chave_inss_patronal_chega_ao_consumidor():

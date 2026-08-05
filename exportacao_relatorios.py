@@ -13,7 +13,7 @@ Funcionalidades:
 
 from flask import Blueprint, render_template, request, jsonify, send_file, flash, redirect, url_for, current_app
 from flask_login import login_required, current_user
-from datetime import datetime, timedelta
+from datetime import datetime
 from sqlalchemy import func
 import logging
 from io import BytesIO
@@ -754,87 +754,64 @@ def api_preview_dados():
         logger.error(f"Erro no preview: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
-# ===== SISTEMA DE AGENDAMENTO ===
-
-class SistemaAgendamentoRelatorios:
-    """Sistema para agendamento automático de relatórios"""
-    
-    def __init__(self):
-        self.jobs_agendados = {}
-    
-    def agendar_relatorio_periodico(self, admin_id, configuracao):
-        """Agenda relatório periódico"""
-        try:
-            # Configuração contém:
-            # - frequencia: 'diario', 'semanal', 'mensal'
-            # - formato: 'pdf', 'excel'
-            # - destinatarios: lista de emails
-            # - incluir_graficos: boolean
-            
-            job_id = f"relatorio_{admin_id}_{datetime.now().timestamp()}"
-            
-            # Agendar com celery ou sistema de jobs
-            # Por ora, implementação simplificada
-            
-            self.jobs_agendados[job_id] = {
-                'admin_id': admin_id,
-                'configuracao': configuracao,
-                'status': 'agendado',
-                'proximo_envio': self._calcular_proximo_envio(configuracao['frequencia'])
-            }
-            
-            logger.info(f"Relatório agendado: {job_id}")
-            return job_id
-            
-        except Exception as e:
-            logger.error(f"Erro ao agendar relatório: {e}")
-            return None
-    
-    def _calcular_proximo_envio(self, frequencia):
-        """Calcula próximo envio baseado na frequência"""
-        hoje = datetime.now()
-        
-        if frequencia == 'diario':
-            return hoje + timedelta(days=1)
-        elif frequencia == 'semanal':
-            return hoje + timedelta(weeks=1)
-        elif frequencia == 'mensal':
-            return hoje + timedelta(days=30)
-        else:
-            return hoje + timedelta(days=1)
+# ===== SISTEMA DE AGENDAMENTO =====
+#
+# `SistemaAgendamentoRelatorios` foi REMOVIDA em 05/08 (E12a, Task B2.16).
+#
+# Ela era instanciada nova a cada request, `__init__` criava
+# `self.jobs_agendados = {}`, o método escrevia uma chave nesse dict e o
+# objeto morria no fim da requisição. `jobs_agendados` não era lido por linha
+# nenhuma do repositório: era uma agenda em memória sem leitor, e a rota
+# `/agendar` devolvia `success: True` por cima dela.
+#
+# Depois desta remoção não sobra no repositório nenhuma estrutura que aceite
+# um agendamento e o descarte em silêncio. O que falta para o recurso existir
+# — persistência de agenda e envio de e-mail — é a Decisão 7 (SMTP × n8n), e
+# **este recorte não a antecipa**: o painel que dá 500 e o SMTP não
+# configurado seguem como estão.
 
 @exportacao_bp.route('/agendar', methods=['POST'])
 @login_required
 @admin_required
 def agendar_relatorio():
-    """Agenda relatório automático"""
-    admin_id = get_admin_id()
-    
-    try:
-        dados = request.get_json()
-        
-        configuracao = {
-            'frequencia': dados.get('frequencia', 'semanal'),
-            'formato': dados.get('formato', 'pdf'),
-            'destinatarios': dados.get('destinatarios', []),
-            'incluir_graficos': dados.get('incluir_graficos', True)
-        }
-        
-        sistema_agendamento = SistemaAgendamentoRelatorios()
-        job_id = sistema_agendamento.agendar_relatorio_periodico(admin_id, configuracao)
-        
-        if job_id:
-            return jsonify({
-                'success': True,
-                'job_id': job_id,
-                'message': 'Relatório agendado com sucesso'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'Erro ao agendar relatório'
-            })
-        
-    except Exception as e:
-        logger.error(f"Erro ao agendar: {e}")
-        return jsonify({'success': False, 'error': str(e)})
+    """Agendamento de relatórios — NÃO IMPLEMENTADO, e responde dizendo isso.
+
+    ## O que esta rota fazia (E12a, Task B2.15)
+
+    Devolvia `{'success': True, 'job_id': ...}` para um agendamento que **nunca
+    existiu**. `SistemaAgendamentoRelatorios()` era instanciado novo a cada
+    request, `__init__` criava `self.jobs_agendados = {}`, o método escrevia uma
+    chave nesse dict — e o objeto morria no fim da requisição. `jobs_agendados`
+    não é lido por linha nenhuma do repositório. Não há modelo de agendamento em
+    `models.py`. Não há envio: nenhum `MAIL_*` configurado.
+
+    Ou seja: a rota confirmava por escrito um relatório que nunca seria enviado.
+
+    ## Por que 501, e não 404 nem 503
+
+    * **404** é indistinguível de erro de rota e apagaria o registro de que o
+      recurso foi prometido;
+    * **503** promete que volta;
+    * **501** é o que se afirma com honestidade enquanto a Decisão 7 (SMTP × n8n)
+      não vem — e é **correto em qualquer desfecho dela**.
+
+    Quem já POSTava e recebia 200 passa a receber 501. O 200 de hoje não
+    corresponde a efeito nenhum: quem depende dele depende de uma alucinação, e o
+    501 é a primeira informação verdadeira que recebe.
+
+    Sem `try` nenhum, de propósito: a casa já pagou caro por `except Exception`
+    amplo engolindo resposta de erro.
+    """
+    logger.warning(
+        "POST /relatorios/exportacao/agendar recusado com 501 — agendamento "
+        "de relatórios não existe (sem persistência de agenda e sem envio de "
+        "e-mail). admin=%s origem=%s",
+        get_admin_id(), request.headers.get('Referer') or 'sem referer')
+
+    return jsonify({
+        'success': False,
+        'implementado': False,
+        'error': 'Agendamento de relatórios não implementado: não há envio de '
+                 'e-mail configurado nem persistência de agenda. Nenhum '
+                 'relatório será enviado.',
+    }), 501
