@@ -176,34 +176,39 @@ def _normalizar_horas(mao_obra_rows):
     return {(e[0], e[1]): e[2] for e in norm}
 
 
-def _progresso_geral(rdo, subatividades_count):
-    """Mesma regra do card unificado: V2 = média ponderada do cronograma;
-    V1 = máximo de % por subatividade única até a data, depois média."""
-    admin_id = rdo.admin_id or (rdo.obra.admin_id if rdo.obra else None)
-    try:
-        from models import TarefaCronograma as _TC
-        from utils.cronograma_engine import calcular_progresso_geral_obra_v2
-        v2 = db.session.query(_TC).filter_by(
-            obra_id=rdo.obra_id, admin_id=admin_id,
-        ).first() is not None
-        if v2:
-            res = calcular_progresso_geral_obra_v2(rdo.obra_id, rdo.data_relatorio, admin_id)
-            return float(res.get('progresso_geral_pct') or 0)
-    except Exception:
-        pass
+def _progresso_geral(rdo):
+    """Progresso da obra no PDF — as mesmas duas funções que a TELA usa (A19).
 
-    if subatividades_count > 0:
-        rows = db.session.query(
-            RDOServicoSubatividade.nome_subatividade,
-            db.func.max(RDOServicoSubatividade.percentual_conclusao),
-        ).join(RDO, RDOServicoSubatividade.rdo_id == RDO.id).filter(
-            RDO.obra_id == rdo.obra_id,
-            RDO.admin_id == admin_id,
-            RDO.data_relatorio <= rdo.data_relatorio,
-        ).group_by(RDOServicoSubatividade.nome_subatividade).all()
-        if rows:
-            return sum((p or 0) for _, p in rows) / len(rows)
-    return 0.0
+    ## Por que este é o call-site mais pesado dos sete
+
+    Não porque mova dinheiro — nenhum da família V1 move —, mas porque vira
+    **papel assinado**: este PDF é o documento por trás do ato de ciência do
+    cliente. Um número aqui diferente do que o apontador vê na tela do mesmo RDO
+    é uma divergência que chega ao cliente por escrito.
+
+    ## O que mudou, e por que o `except` sumiu
+
+    Antes: predicado V2 próprio (sem `ativa`, sem `is_cliente`, sem
+    `is_v2_active()`) e uma reimplementação da fórmula V1 agrupando só por
+    `nome_subatividade`. Um `try/except Exception: pass` em volta **engolia a
+    falha e caía em V1 em silêncio** — e PDF que mente o percentual é pior que
+    PDF que falha. Agora a exceção sobe.
+
+    O parâmetro `subatividades_count` saiu: ele decidia ramo, e
+    `progresso_v1_acumulado` já devolve 0.0 quando não há chave.
+    """
+    from utils.cronograma_engine import (calcular_progresso_geral_obra_v2,
+                                         obra_em_modo_v2,
+                                         progresso_v1_acumulado)
+
+    admin_id = rdo.admin_id or (rdo.obra.admin_id if rdo.obra else None)
+
+    if obra_em_modo_v2(rdo.obra_id, admin_id):
+        res = calcular_progresso_geral_obra_v2(
+            rdo.obra_id, rdo.data_relatorio, admin_id)
+        return float(res.get('progresso_geral_pct') or 0)
+
+    return progresso_v1_acumulado(rdo.obra_id, admin_id, rdo.data_relatorio)
 
 
 # ─── Styles ─────────────────────────────────────────────────────────────────
@@ -521,7 +526,7 @@ def gerar_pdf_rdo(rdo):
         horas_por_funcionario[mo.funcionario_id] = horas_por_funcionario.get(mo.funcionario_id, 0.0) + h
         funcoes_por_funcionario.setdefault(mo.funcionario_id, mo.funcao_exercida or '—')
 
-    progresso_geral = _progresso_geral(rdo, len(subatividades))
+    progresso_geral = _progresso_geral(rdo)
 
     buf = BytesIO()
     doc = SimpleDocTemplate(

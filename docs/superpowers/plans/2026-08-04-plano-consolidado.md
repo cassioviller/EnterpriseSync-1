@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **8** | **12** | G |
+| B2 — o que o sistema informa errado | 20 | **9** | **11** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **30** | **31** | |
+| **Total** | **61** *(62 − 1 cortada)* | **31** | **30** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -2572,9 +2572,51 @@ com `SubatividadeMestre` cadastrada e não apontada, e deixa de poder passar de 
 
 **Teste:** ver Task B2.12.
 
-- [ ] **Step 1:** `_progresso_geral` + `visualizar_rdo`, juntos
-- [ ] **Step 2:** conferir o rótulo de `:1258` preservado
-- [ ] **Step 3:** commit — `fix(rdo): PDF e detalhe do RDO usam a mesma fórmula de progresso V1`
+- [x] **Step 1:** `_progresso_geral` + `visualizar_rdo`, juntos
+- [x] **Step 2:** rótulo de `:1258` preservado — e com o predicado estrito no ramo V2
+- [x] **Step 3:** commit
+
+**Status: ✅ entregue em 05/08. −245 linhas em `views/rdo.py`**, e três
+implementações da mesma fórmula viraram uma chamada.
+
+**A D5 foi seguida no default recomendado:** o percentual do detalhe em obra V1
+passa a ser calculado sobre as subatividades **apontadas**. Obra com 10
+`SubatividadeMestre` e 2 apontadas a 100% sai de 20% para 100% — **e deixa de
+poder passar de 100%**, que era possível quando numerador e denominador vinham de
+universos diferentes. O rótulo "N subatividades total" segue exibindo o catálogo
+planejado logo ao lado, que é o que torna a diferença atribuível na tela.
+
+**O teste que a Task promete é o de NÃO-divergência**, e ele é a razão de o
+commit ser um só: `test_pdf_e_tela_do_mesmo_rdo_nao_divergem`. **Cobrado por
+sabotagem** — devolvendo ao PDF a fórmula antiga (agrupar só por nome), o teste
+acusa **tela 60,0% e PDF 80,0% para o mesmo RDO**, que é exatamente a janela que
+separar as duas correções abriria. E a segunda asserção existe porque convergir
+não basta: os dois poderiam concordar em 80,0, que é o número errado.
+
+**Os cinco riscos:**
+
+1. **PDF e tela no mesmo commit** — cumprido, e agora com teste que quebra se
+   alguém os separar de novo.
+2. **`total_subatividades_obra` preservado** — o cálculo do catálogo mestre
+   continua ali, com o fallback para as combinações apontadas, **desacoplado do
+   percentual**. Se o rótulo mudasse de significado no mesmo commit em que o
+   número muda, ninguém conseguiria atribuir a diferença.
+3. **A contagem do ramo V2 ganhou o escopo estrito** — era `_TC.query` cru, então
+   cópia-cliente e arquivada entravam no denominador exibido; passou a
+   `do_cronograma_interno`.
+4. **`peso_por_subatividade` saiu do `render_template`** — conferido que nenhum
+   template o lê.
+5. **O `try/except Exception: pass` do PDF sumiu** — ele engolia falha de import e
+   caía em V1 em silêncio. PDF que mente o percentual é pior que PDF que falha.
+
+**🔴 O que quase quebrou, e foi o teste que pegou:** entre os dois blocos que
+colapsaram morava o cálculo de `total_horas_trabalhadas`, sem relação nenhuma com
+progresso. Ele foi junto na primeira passada, e
+`test_rdo_ciclo_completo::test_ciclo_completo_rdo_v2` acusou
+`name 'total_horas_trabalhadas' is not defined`. **É a segunda vez nesta trilha
+que uma remoção grande leva junto um vizinho inocente** — a primeira foi o
+`logger.info` órfão da B2.8. Em bloco longo, o que morre no meio não é só o que
+se quer matar.
 
 ---
 

@@ -1228,183 +1228,83 @@ def visualizar_rdo(id):
         total_subatividades = len(subatividades)
         total_funcionarios = len(funcionarios)
         
-        # Calcular progresso real da obra baseado no total de subatividades (fórmula correta)
-        progresso_obra = 0
-        total_subatividades_obra = 0
-        peso_por_subatividade = 0
-        
-        try:
-            # PASSO 1: Buscar APENAS os serviços QUE TÊM SUBATIVIDADES no RDO
-            # Buscar serviços com subatividades executadas nesta obra
-            from models import ServicoObra, SubatividadeMestre
-            
-            # Buscar apenas serviços que foram utilizados nos RDOs desta obra
-            servicos_utilizados = db.session.query(
-                RDOServicoSubatividade.servico_id
-            ).join(RDO).filter(
-                RDO.obra_id == rdo.obra_id
-            ).distinct().subquery()
-            
-            servicos_da_obra = ServicoObra.query.filter(
-                ServicoObra.obra_id == rdo.obra_id,
-                ServicoObra.servico_id.in_(servicos_utilizados)
-            ).all()
-            
-            total_subatividades_obra = 0
-            servicos_encontrados = []
-            
-            # Para cada serviço da obra, buscar suas subatividades no cadastro mestre (apenas ativas)
-            for servico_obra in servicos_da_obra:
-                subatividades_servico = SubatividadeMestre.query.filter_by(
-                    servico_id=servico_obra.servico_id,
-                    ativo=True
-                ).all()
-                
-                total_subatividades_obra += len(subatividades_servico)
-                servicos_encontrados.append({
-                    'servico_id': servico_obra.servico_id,
-                    'subatividades': len(subatividades_servico)
-                })
-            
-                logger.debug(f"DEBUG SERVIÇOS CADASTRADOS NA OBRA: {len(servicos_da_obra)}")
-                logger.debug(f"DEBUG DETALHES SERVIÇOS: {servicos_encontrados}")
-                logger.debug(f"DEBUG TOTAL SUBATIVIDADES PLANEJADAS: {total_subatividades_obra}")
-            
-            # Se não há serviços cadastrados, usar fallback das subatividades já executadas
-            if total_subatividades_obra == 0:
-                logger.info("FALLBACK: Usando subatividades executadas como base")
-                # Buscar todas as combinações únicas já executadas
-                subatividades_query = db.session.query(
-                    RDOServicoSubatividade.servico_id,
-                    RDOServicoSubatividade.nome_subatividade
-                ).join(RDO).filter(RDO.obra_id == rdo.obra_id).distinct().all()
-                
-                combinacoes_unicas = set()
-                for servico_id, nome_subatividade in subatividades_query:
-                    combinacoes_unicas.add(f"{servico_id}_{nome_subatividade}")
-                
-                total_subatividades_obra = len(combinacoes_unicas)
-                logger.debug(f"DEBUG FALLBACK TOTAL: {total_subatividades_obra}")
-            
-                logger.debug(f"DEBUG TOTAL SUBATIVIDADES PLANEJADAS DA OBRA: {total_subatividades_obra}")
-            
-            # Definir combinacoes_unicas para todos os casos
-            combinacoes_unicas = set()
-            if total_subatividades_obra == 0:
-                # Já definido acima no bloco if
-                pass
-            else:
-                # Para quando há serviços cadastrados, criar conjunto vazio para compatibilidade
-                combinacoes_unicas = set()
-            
-                logger.debug(f"DEBUG COMBINAÇÕES: {len(combinacoes_unicas)} encontradas")
-            
-            if total_subatividades_obra > 0:
-                # PASSO 2: Calcular peso de cada subatividade
-                peso_por_subatividade = 100.0 / total_subatividades_obra
-                logger.debug(f"DEBUG PESO POR SUBATIVIDADE: {peso_por_subatividade:.2f}%")
-                
-                # PASSO 3: Buscar progresso das subatividades executadas vs planejadas
-                subatividades_executadas = db.session.query(RDOServicoSubatividade).join(
-                    RDO
-                ).filter(
-                    RDO.obra_id == rdo.obra_id
-                ).order_by(RDO.data_relatorio.desc()).all()
-                
-                progresso_por_subatividade = {}
-                for sub in subatividades_executadas:
-                    chave_subatividade = f"{sub.servico_id}_{sub.nome_subatividade}"
-                    
-                    # Manter apenas o progresso mais recente de cada subatividade
-                    if chave_subatividade not in progresso_por_subatividade:
-                        progresso_por_subatividade[chave_subatividade] = sub.percentual_conclusao or 0
-                
-                # PASSO 4: Calcular progresso real da obra - LÓGICA CORRIGIDA
-                # Exemplo: 3 serviços com 2,4,4 subatividades = 10 subatividades total
-                # 1 subatividade com 100% = 10% da obra (100/10)
-                # 2 subatividades: 1 com 100% + 1 com 50% = 15% da obra ((100+50)/10)
-                
-                progresso_total_pontos = 0.0
-                
-                # Somar TODOS os percentuais das subatividades executadas
-                for chave, percentual in progresso_por_subatividade.items():
-                    progresso_total_pontos += percentual
-                
-                # FÓRMULA CORRETA: média simples das subatividades
-                # 1 subatividade com 100% de 16 total = 100/16 = 6.25%
-                progresso_obra = round(progresso_total_pontos / total_subatividades_obra, 1)
-                
-                logger.debug(f"DEBUG PROGRESSO DETALHADO (FÓRMULA CORRETA):")
-                logger.debug(f" - Subatividades TOTAIS: {total_subatividades_obra}")
-                logger.debug(f" - Subatividades EXECUTADAS: {len(progresso_por_subatividade)}")
-                logger.debug(f" - Soma total dos percentuais: {progresso_total_pontos}%")
-                logger.debug(f" - Fórmula: {progresso_total_pontos} ÷ {total_subatividades_obra} = {progresso_obra}%")
-                logger.debug(f" - Progresso final da obra: {progresso_obra}%")
-                
-                # Mostrar quais subatividades faltam executar
-                subatividades_faltam = total_subatividades_obra - len(progresso_por_subatividade)
-                if subatividades_faltam > 0:
-                    logger.debug(f" - Subatividades ainda não iniciadas: {subatividades_faltam}")
-            
-        except Exception as e:
-            logger.error(f"ERRO CÁLCULO PROGRESSO OBRA: {str(e)}")
-            # Fallback para cálculo simples baseado no dia atual - LÓGICA CORRIGIDA
-            if subatividades:
-                # Buscar todas as subatividades únicas já executadas na obra como total
-                subatividades_unicas = db.session.query(
-                    RDOServicoSubatividade.servico_id,
-                    RDOServicoSubatividade.nome_subatividade
-                ).join(RDO).filter(RDO.obra_id == rdo.obra_id).distinct().all()
-                
-                total_subatividades_obra = len(subatividades_unicas)
-                progresso_total_pontos = sum(sub.percentual_conclusao or 0 for sub in subatividades)
-                # Aplicar mesma fórmula: soma das porcentagens / (100 * total_subatividades_obra)
-                progresso_obra = round(progresso_total_pontos / (100 * total_subatividades_obra), 1) * 100 if total_subatividades_obra > 0 else 0
-                peso_por_subatividade = 100.0 / total_subatividades_obra if total_subatividades_obra > 0 else 0
-        
         # Calcular total de horas trabalhadas (funcionarios agora é lista de
         # dicts agregados por funcionário — somar a chave já normalizada).
         total_horas_trabalhadas = sum(func.get('horas_trabalhadas') or 0 for func in funcionarios)
 
-        # Task #61b — Paridade lista↔detalhe para obras V2 (cronograma):
-        # quando a obra está em V2, o cálculo V1 acima retorna 0
-        # subatividades / 0% (porque RDOs V2 não usam RDOServicoSubatividade).
-        # Aqui sobrescrevemos progresso_obra, total_subatividades e
-        # total_subatividades_obra com a MESMA lógica que a lista usa
-        # (calcular_progresso_geral_obra_v2 + contagem de TarefaCronograma).
-        try:
-            from utils.tenant import is_v2_active
-            from models import RDOApontamentoCronograma as _RAC, TarefaCronograma as _TC
-            from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+        # ── A19/B2.9 — progresso da obra: AS MESMAS duas funções do PDF ──
+        #
+        # Aqui viviam DOIS blocos que se sobrescreviam: um cálculo V1 inline
+        # (:1236-1348), um `except` que reimplementava a fórmula uma terceira
+        # vez dentro da mesma função (:1349-1363), e uma sobrescrita V2
+        # (:1371-1406) que rodava depois e desfazia o primeiro. Os três saíram.
+        #
+        # ⚠️ O NÚMERO DESTA TELA MUDA em obra V1 (D5 do plano consolidado): o
+        # denominador deixa de ser o CATÁLOGO de SubatividadeMestre cadastrado
+        # e passa a ser o nº de chaves APONTADAS. Obra com 10 mestres e 2
+        # apontadas a 100% ia de 20% para 100% — e deixa de poder passar de
+        # 100%, que era possível quando o numerador vinha de um universo e o
+        # denominador de outro. O rótulo "N subatividades total", logo ao lado,
+        # segue exibindo o catálogo planejado, e é o que torna a diferença
+        # atribuível na tela.
+        from utils.cronograma_engine import (calcular_progresso_geral_obra_v2,
+                                             obra_em_modo_v2,
+                                             progresso_v1_acumulado)
+        from models import RDOApontamentoCronograma as _RAC, TarefaCronograma as _TC
+        from models import ServicoObra, SubatividadeMestre
 
-            obra_em_v2 = is_v2_active() and (
-                db.session.query(_TC).filter_by(
-                    obra_id=rdo.obra_id, admin_id=admin_id_atual
-                ).first() is not None
-            )
-            if obra_em_v2:
-                aps_count = db.session.query(_RAC).filter_by(rdo_id=rdo.id).count()
-                # V2 puro: sem RDOServicoSubatividade — usar contagem
-                # de apontamentos do cronograma (ex.: 5 atividades).
-                if not subatividades:
-                    total_subatividades = aps_count
-                # Total da obra = nº de tarefas no cronograma (denominador
-                # da média ponderada do calcular_progresso_geral_obra_v2).
-                tarefas_count = db.session.query(_TC).filter_by(
-                    obra_id=rdo.obra_id, admin_id=admin_id_atual
-                ).count()
-                if tarefas_count > 0:
-                    total_subatividades_obra = tarefas_count
-                    peso_por_subatividade = 100.0 / tarefas_count
-                try:
-                    prog_v2 = calcular_progresso_geral_obra_v2(
-                        rdo.obra_id, rdo.data_relatorio, admin_id_atual
-                    )
-                    progresso_obra = round(prog_v2.get('progresso_geral_pct', 0) or 0, 1)
-                except Exception as _e_p:
-                    logger.warning(f"[Task#61b] V2 progresso falhou RDO {rdo.id}: {_e_p}")
-        except Exception as _e_v2:
-            logger.warning(f"[Task#61b] detecção V2 detalhe falhou: {_e_v2}")
+        progresso_obra = 0
+        total_subatividades_obra = 0
+
+        if obra_em_modo_v2(rdo.obra_id, admin_id_atual):
+            try:
+                _prog = calcular_progresso_geral_obra_v2(
+                    rdo.obra_id, rdo.data_relatorio, admin_id_atual)
+                progresso_obra = round(_prog.get('progresso_geral_pct') or 0, 1)
+            except Exception as _e_p:
+                logger.warning(f"[A19] V2 progresso falhou RDO {rdo.id}: {_e_p}")
+
+            # V2 puro: RDO sem RDOServicoSubatividade — a contagem "X
+            # atividades" vem dos apontamentos de cronograma.
+            if not subatividades:
+                total_subatividades = db.session.query(_RAC).filter_by(
+                    rdo_id=rdo.id).count()
+
+            # Rótulo: nº de tarefas do cronograma INTERNO e VIVO. Antes contava
+            # `_TC.query` cru, então cópia-cliente e arquivada entravam no
+            # denominador exibido.
+            total_subatividades_obra = _TC.do_cronograma_interno(
+                rdo.obra_id, admin_id_atual).count()
+        else:
+            progresso_obra = progresso_v1_acumulado(
+                rdo.obra_id, admin_id_atual, rdo.data_relatorio)
+
+            # O rótulo — e SÓ o rótulo — continua sendo o catálogo planejado.
+            # Desacoplado do percentual de propósito: se ele mudasse de
+            # significado no mesmo commit em que o número muda, ninguém
+            # conseguiria atribuir a diferença.
+            try:
+                _servicos_usados = db.session.query(
+                    RDOServicoSubatividade.servico_id
+                ).join(RDO).filter(RDO.obra_id == rdo.obra_id).distinct().subquery()
+
+                for _so in ServicoObra.query.filter(
+                        ServicoObra.obra_id == rdo.obra_id,
+                        ServicoObra.servico_id.in_(_servicos_usados)).all():
+                    total_subatividades_obra += SubatividadeMestre.query.filter_by(
+                        servico_id=_so.servico_id, ativo=True).count()
+
+                # Obra sem catálogo cadastrado: o rótulo cai para as
+                # combinações (serviço, subatividade) já apontadas.
+                if total_subatividades_obra == 0:
+                    total_subatividades_obra = db.session.query(
+                        RDOServicoSubatividade.servico_id,
+                        RDOServicoSubatividade.nome_subatividade
+                    ).join(RDO).filter(
+                        RDO.obra_id == rdo.obra_id).distinct().count()
+            except Exception as _e_rot:
+                logger.warning(
+                    f"[A19] rótulo de subatividades falhou RDO {rdo.id}: {_e_rot}")
         
         logger.debug(f"DEBUG VISUALIZAR RDO: ID={id}, Número={rdo.numero_rdo}")
         logger.debug(f"DEBUG SUBATIVIDADES: {len(subatividades)} encontradas")
@@ -1632,7 +1532,6 @@ def visualizar_rdo(id):
                              total_funcionarios=total_funcionarios,
                              progresso_obra=progresso_obra,
                              total_subatividades_obra=total_subatividades_obra,
-                             peso_por_subatividade=peso_por_subatividade,
                              total_horas_trabalhadas=total_horas_trabalhadas,
                              apontamentos_cronograma=apontamentos_cronograma,
                              grupos_apontamentos=agrupar_atividades_por_caminho(
