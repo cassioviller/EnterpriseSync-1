@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **2** | **18** | G |
+| B2 — o que o sistema informa errado | 20 | **4** | **16** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **24** | **37** | |
+| **Total** | **61** *(62 − 1 cortada)* | **26** | **35** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -2109,9 +2109,32 @@ não fecha** (orçado − realizado − a_realizar dá negativo por construção
 as duas metades em regras diferentes**: ou sai com a **D4** respondida, ou o
 cabeçalho renomeado deixa explícito que Saldo ainda é a régua antiga.
 
-- [ ] **Step 1:** rota passa `projecao`
-- [ ] **Step 2:** coluna Orçado + cabeçalho
-- [ ] **Step 3:** commit — `fix(ui): coluna Orçado da tela de planejamento passa a exibir custo`
+- [x] **Step 1:** rota passa `projecao`
+- [x] **Step 2:** coluna Orçado + cabeçalho — **e mais duas mudanças, ver abaixo**
+- [x] **Step 3:** commit
+
+**Status: ✅ entregue em 05/08, com a D4 respondida no meio do caminho** (§10) — e
+a resposta não foi (a) nem (b): **a coluna Saldo saiu.** Ver a D4 para o fato que
+decidiu e a medição de 96,8%.
+
+**Duas mudanças além do recorte, e as duas são a mesma frase do próprio recorte:
+"não deixar as duas metades em regras diferentes".**
+
+1. **A coluna "A Realizar" entrou junto.** Com linhas de custo, o
+   `a_realizar_total` gravado É o orçado — trocar só a coluna Orçado deixaria a
+   linha dizendo **Orçado 155.982,64 / A Realizar 155.982,64** numa etapa com
+   R$ 20.000 já gastos: a tela afirmaria que nada foi gasto. Passou a exibir
+   `a_realizar_efetivo`.
+2. **A coluna Saldo saiu** (D4), e com ela o `colspan` da linha vazia foi de 8
+   para 7.
+
+**Fallback em vez de zero, nos dois pontos.** Chave ausente no mapa é "não sei", e
+o template cai para o campo do modelo (`s.valor_orcado`, `s.a_realizar_total`) —
+nunca para zero. É a mesma disciplina do fallback da B2.2.
+
+**Cobrado por sabotagem:** voltando a coluna Orçado para `s.valor_orcado`, o teste
+novo cai. O teste afirma as três coisas no corpo do GET — que 155.982,64 aparece,
+que 173.747,83 **não** aparece, e que 135.982,64 aparece (o A Realizar efetivo).
 
 ---
 
@@ -2133,9 +2156,26 @@ remover: property em modelo é o convite mais barato para o vício voltar.
 `custo_orcado_por_servico`: property de modelo que dispara duas queries por linha
 renderizada é N+1 garantido na lista. E remover antes de B2.3 quebra a tela.
 
-- [ ] **Step 1:** grep de confirmação
-- [ ] **Step 2:** remoção
-- [ ] **Step 3:** commit — `chore(models): remove ObraServicoCusto.saldo (sem leitor após A13)`
+- [x] **Step 1:** grep de confirmação
+- [x] **Step 2:** remoção
+- [x] **Step 3:** commit
+
+**Status: ✅ entregue em 05/08, no mesmo commit da B2.3.** O grep confirmou o que o
+recorte previu: depois de a coluna Saldo sair, **zero leitores** de
+`ObraServicoCusto.saldo` no repositório — os outros acertos de `.saldo` são
+`GestaoCustoPai` (coluna de verdade, escrita em `gestao_custos_views.py`) e
+`ContaReceber`/`ContaPagar` em `financeiro_service.py`, classes diferentes.
+
+**Saiu junto da B2.3 e não em commit separado**, porque as duas eram um par: a
+remoção antes da B2.3 quebra a tela, e a B2.3 sem a remoção deixa no modelo a
+property que convida o vício a voltar. Separá-las abriria uma janela de tela
+quebrada por nada.
+
+**Escolhida a remoção, não o docstring.** No lugar ficou um comentário dizendo
+onde mora o custo **e** por que não recolocar a property como chamada ao módulo
+novo: property de modelo que consulta o banco é N+1 garantido numa lista
+renderizada linha a linha. É o Risco do recorte, escrito onde alguém o leria antes
+de repetir.
 
 ---
 
@@ -4084,6 +4124,31 @@ então a decisão **não bloqueia** `utils/notifications.py`, `views/catalogo_vi
 não vier a tempo da Task B2.3, entregar só a coluna Orçado com o cabeçalho renomeado para
 "Custo Orçado", deixando explícito que Saldo ainda é a régua antiga; **o que não pode é
 deixar as duas metades em regras diferentes sem dizer.**
+
+---
+
+✅ **RESPONDIDA em 05/08 — e a resposta foi NENHUMA DAS DUAS: a coluna sai.**
+
+**O fato que decidiu, e que nenhum dos dois textos previa.** Montando a linha com
+os números da Baia apareceu que, para serviço COM linhas, `a_realizar_efetivo` já
+é `orçado − realizado` — que é exatamente a definição (a). **A opção (a) faz o
+Saldo virar cópia literal da coluna "A Realizar".** As duas opções ficam ruins no
+mesmo caso: uma duplica coluna, a outra vira coluna de zeros.
+
+**Medido no banco de dev antes de decidir** (a mesma disciplina da B1.11, que foi
+decidida por consulta e não por opinião): **76.004 `ObraServicoCusto`, 73.545 com
+linhas de custo — 96,8%.** Só 2.459 estão no fluxo manual, que é o único regime
+onde (a) e (b) diferem de verdade. Ou seja: em 96,8% das linhas da tela a coluna
+Saldo não acrescenta informação nenhuma, escolhendo-se o que se escolher.
+
+**Decisão do Cássio:** tirar a coluna. O estouro continua sinalizado — pelo alerta
+da B2.2, que é onde a informação importa e onde ela é acionável. **Efeito
+colateral útil: destrava a B2.4 de graça**, porque `lista.html:98` era o único
+leitor da property `ObraServicoCusto.saldo` em todo o repositório (conferido; os
+outros acertos de `.saldo` são `GestaoCustoPai` e `ContaReceber`, outras classes).
+
+**Reversível:** é uma coluna de template. Se a tela sentir falta, volta com uma
+linha.
 
 ---
 

@@ -148,6 +148,37 @@ def test_estouro_de_verdade_alerta_com_os_numeros_de_custo():
             f'excesso {n.valor_excesso}, esperado {REALIZADO_ESTOURANDO - CUSTO}')
 
 
+def test_a_coluna_orcado_da_tela_exibe_custo_e_nao_venda():
+    """B2.3 — o corpo do GET traz 155.982,64, e NÃO 173.747,83.
+
+    A tela mostrava, na mesma página, um card "Valor Custo Orç." com o custo
+    (vindo de `calcular_resumo_obra`) e uma coluna "Orçado" com a venda. Dois
+    números para a mesma pergunta, a três centímetros um do outro.
+
+    A coluna "A Realizar" entra junto, e não é zelo: com linhas de custo o
+    `a_realizar_total` gravado É o orçado, então deixá-la como estava mostraria
+    Orçado 155.982,64 e A Realizar 155.982,64 numa etapa com R$ 20.000 já gastos
+    — a linha diria que nada foi gasto. Trocar uma metade e não a outra é o que o
+    recorte chama de "deixar as duas metades em regras diferentes".
+    """
+    with app.app_context():
+        a, _b = dois_tenants('a13col')
+        _fundacao(a)
+
+        r = cliente_de(a.admin_id).get(
+            f'/obras/{a.obra_id}/planejamento-custos/')
+        assert r.status_code == 200
+        corpo = r.get_data(as_text=True)
+
+        assert '155.982,64' in corpo, (
+            'o custo orçado da etapa não aparece na tela')
+        assert '173.747,83' not in corpo, (
+            'o preço de venda ainda está sendo exibido como "Orçado"')
+        assert '135.982,64' in corpo, (
+            'A Realizar continua mostrando o orçado inteiro, como se nada '
+            'tivesse sido gasto')
+
+
 def test_projecao_indisponivel_cai_no_caminho_antigo_e_avisa(monkeypatch, caplog):
     """Mapa vazio é "não sei", e "não sei" não pode virar "orçado zero".
 

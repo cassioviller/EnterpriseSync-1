@@ -7326,9 +7326,12 @@ class ObraServicoCusto(db.Model):
     def a_realizar_total(self):
         return float(self.material_a_realizar or 0) + float(self.mao_obra_a_realizar or 0) + float(self.outros_a_realizar or 0)
 
-    @property
-    def saldo(self):
-        return float(self.valor_orcado or 0) - (self.realizado_total + self.a_realizar_total)
+    # A13, 05/08 — a property `saldo` foi REMOVIDA (Task B2.4). Ela fazia
+    # `valor_orcado - realizado - a_realizar`, e `valor_orcado` guarda PREÇO DE
+    # VENDA nesta cadeia: o número era margem disfarçada de saldo de orçamento.
+    # Custo se pede a `services/custo_orcado.py`. **Não recolocar como chamada
+    # àquele módulo**: property de modelo que consulta o banco é N+1 garantido
+    # numa lista renderizada linha a linha — é uma consulta por obra, no serviço.
 
     def __repr__(self):
         return f'<ObraServicoCusto #{self.id} obra={self.obra_id} {self.nome}>'

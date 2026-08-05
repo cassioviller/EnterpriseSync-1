@@ -65,10 +65,9 @@
           <tr>
             <th>Serviço</th>
             <th>Item Comercial</th>
-            <th class="text-end">Orçado</th>
+            <th class="text-end">Custo Orçado</th>
             <th class="text-end">Realizado</th>
             <th class="text-end">A Realizar</th>
-            <th class="text-end">Saldo</th>
             <th class="text-end">Valor Medido</th>
             <th class="text-center">Ações</th>
           </tr>
@@ -92,10 +91,12 @@
                 <span class="text-muted small">— sem vínculo —</span>
               {% endif %}
             </td>
-            <td class="text-end">R$ {{ '{:,.2f}'.format(s.valor_orcado|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            {# A13 — custo, não venda. Chave ausente é "não sei": cai para o
+               campo do modelo, nunca para zero. #}
+            {% set p = (projecao or {}).get(s.id) %}
+            <td class="text-end">R$ {{ '{:,.2f}'.format((p.orcado if p else s.valor_orcado)|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
             <td class="text-end text-danger">R$ {{ '{:,.2f}'.format(s.realizado_total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-            <td class="text-end text-warning">R$ {{ '{:,.2f}'.format(s.a_realizar_total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-            <td class="text-end {{ 'text-success' if s.saldo >= 0 else 'text-danger' }}">R$ {{ '{:,.2f}'.format(s.saldo).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td class="text-end text-warning">R$ {{ '{:,.2f}'.format((p.a_realizar_efetivo if p else s.a_realizar_total)|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
             <td class="text-end">
               {% if s.item_medicao %}
                 R$ {{ '{:,.2f}'.format(s.item_medicao.valor_executado_acumulado|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
@@ -111,7 +112,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="8" class="text-center text-muted py-4">Nenhum serviço de custo cadastrado. Clique em "Novo Serviço de Custo".</td></tr>
+          <tr><td colspan="7" class="text-center text-muted py-4">Nenhum serviço de custo cadastrado. Clique em "Novo Serviço de Custo".</td></tr>
           {% endfor %}
         </tbody>
       </table>

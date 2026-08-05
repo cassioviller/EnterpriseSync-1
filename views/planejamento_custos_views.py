@@ -46,6 +46,7 @@ from utils.notifications import (
     listar_notificacoes_ativas,
     marcar_resolvida,
 )
+from services.custo_orcado import projecao_de_custo_por_servico
 
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,11 @@ def lista(obra_id):
     estouros = verificar_estouros_obra(obra_id, admin_id=admin_id)
     estouros_por_svc = {e['obra_servico_custo_id']: e for e in estouros}
     notificacoes = listar_notificacoes_ativas(admin_id, obra_id=obra_id)
+    # A13 — a tabela passa a exibir CUSTO. `valor_orcado` guarda venda, e a
+    # coluna que dizia "Orçado" mostrava um número que não fecha com o card
+    # "Valor Custo Orç." do próprio cabeçalho (:46, via calcular_resumo_obra).
+    # Chave ausente = "não sei": o template cai para os campos do modelo.
+    projecao = projecao_de_custo_por_servico(obra_id, admin_id)
     return render_template(
         'obras/planejamento_custos/lista.html',
         obra=obra,
@@ -105,6 +111,7 @@ def lista(obra_id):
         resumo=resumo,
         estouros_por_svc=estouros_por_svc,
         notificacoes=notificacoes,
+        projecao=projecao,
     )
 
 
