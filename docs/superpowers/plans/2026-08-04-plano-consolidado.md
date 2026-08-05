@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **15** | **5** | G |
-| B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
+| B2 — o que o sistema informa errado | 20 | **18** | **2** | G |
+| B3 — os elos que morrem a um passo | 10 | **3** | **7** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **37** | **24** | |
+| **Total** | **61** *(62 − 1 cortada)* | **43** | **18** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -3219,9 +3219,13 @@ continuam verdes. Verde ali é a prova de que `aplicar_versao`/`restaurar_versao
 `progresso_depois` como float e a idempotência do contador; qualquer default novo quebra
 o gate do M06 sem que a regressão seja de A06.
 
-- [ ] **Step 1:** os dois keyword-only
-- [ ] **Step 2:** rodar os dois arquivos de teste, intocados
-- [ ] **Step 3:** commit — `feat(cronograma): replanejar_curvas_obra com modo enxuto (sem relatório, sem sincronização)`
+- [x] **Step 1:** os dois keyword-only
+- [x] **Step 2:** os dois arquivos rodaram **intocados** — 18 passed
+- [x] **Step 3:** commit `318b294d`, junto de B2.18 e B2.19
+
+**Status: ✅ entregue em 05/08.** Verde nos dois arquivos **sem tocar uma linha
+deles** é a prova de que os defaults preservam o comportamento — e é por isso que
+o recorte pedia exatamente isso, em vez de um teste novo.
 
 ---
 
@@ -3253,8 +3257,13 @@ repetindo try/except são sete chances de errar.
    serialização da resposta, para que `_tarefa_to_dict`/`_mapas_vinculos` re-hidratem do
    banco já commitado.
 
-- [ ] **Step 1:** o helper
-- [ ] **Step 2:** commit — `feat(cronograma): _replanejar_pos_commit — ponto único do replanejamento no editor`
+- [x] **Step 1:** o helper
+- [x] **Step 2:** commit `318b294d` — **junto da B2.19**, não sozinho
+
+**Status: ✅ entregue em 05/08.** Saiu com a B2.19 e não em commit próprio: o
+helper é código morto até alguém chamá-lo, e é a B2.19 que valida o desenho dele.
+Mesmo critério de B2.3+B2.4 e B2.15+B2.16 — não entregar peça que nenhum teste
+alcança.
 
 ---
 
@@ -3300,10 +3309,35 @@ teste do repositório emite `PUT /cronograma/obra/<id>/tarefa/<id>` e depois olh
 `:1180-1181`, que `com_relatorio=False` desliga. **O teste roda igual em qualquer dia do
 mês.**
 
-- [ ] **Step 1:** escrever os três testes
-- [ ] **Step 2:** ligar os dois ramos de `atualizar_tarefa`
-- [ ] **Step 3:** testes verdes — se o desenho estiver errado, aparece aqui e não depois de sete edições
-- [ ] **Step 4:** commit — `fix(cronograma): atualizar_tarefa replaneja a curva após o recálculo de datas`
+- [x] **Step 1:** os testes — **com o cenário trocado, ver abaixo**
+- [x] **Step 2:** os dois ramos ligados
+- [x] **Step 3:** verdes
+- [x] **Step 4:** commit `318b294d`
+
+**Status: ✅ entregue em 05/08.**
+
+**🔴 O CENÁRIO DE TESTE DO RECORTE ERA INEXECUTÁVEL.** A tabela manda
+`PUT {"data_inicio": "2026-08-03"}` numa tarefa que tem apontamento de RDO. Com o
+editor v2 ligado, isso é **bloqueado por um guard**: tarefa "iniciada" tem o
+início congelado (`cronograma_views.py:975-981`, `ids_tarefas_iniciadas`), e a
+rota responde **400**. E "iniciada" inclui *ter apontamento de RDO* — ou seja,
+**toda tarefa que satisfaz a semente do teste é, por definição, bloqueada**.
+Nenhum dos dois primeiros casos da tabela era executável como escrito.
+
+Trocado para `duracao_dias`, que está em `_SCHEDULING_FIELDS`, não é bloqueado, e
+exercita o mesmo caminho: a tarefa vai de 10 para 30 dias e os mesmos 6 dias
+úteis até 08/07 passam de **60% para 20%**.
+
+**A sabotagem errou o alvo na primeira tentativa, e isso é a lição.** Inverter a
+ORDEM da chamada **não quebrou nada** — com o replanejamento antes, o
+`perc_manual` é reaplicado depois e ganha. O risco real é o oposto: **manter a
+posição e ligar o `sincronizar`**. Assim o teste acusa **77% (digitado pelo
+usuário) virando 30% (o que o apontamento diz)**. É a segunda vez nesta rodada
+que a sabotagem precisa mirar exatamente a diferença que o teste afirma — a
+primeira foi na B2.2, e as duas ensinaram o mesmo.
+
+**Um terceiro teste entrou:** renomear tarefa não paga a varredura. É a guarda de
+`precisa_recalc`, e sem teste ela é uma linha que ninguém defende.
 
 ---
 
@@ -4386,6 +4420,8 @@ que não cabiam no recorte onde foram achados. Cada um precisa de decisão próp
 |---|---|---|
 | **`rdo_crud.listar_rdos` e as rotas irmãs estão SOMBREADAS** (05/08, achado da B2.12) | `views/rdo.py:rdos()` registra `/rdos`, `/rdo`, `/rdo/` **e** `/rdo/lista` no `main_bp`. As três do prefixo `/rdo` resolvem para ela; `rdo_crud.listar_rdos` existe no `url_map` e **nunca recebe requisição**. A §5.2 classificava a variante D como "alimenta a segunda lista" — a segunda lista não é alcançável por URL | Aposentar rota é a mesma classe de decisão da B1.14 (função sem chamador vivo), e merece a mesma disciplina: conferir o parque antes, e decidir sobre o **blueprint inteiro**, não sobre uma função. A B2.12 corrigiu a fórmula assim mesmo — seis linhas — para que o dia em que alguém desregistrar uma das quatro rotas não acorde a função **com o defeito dentro** |
 | **`views/rdo.py:1111-1113` responde 302 a RDO de outro tenant** (registrado no recorte da B2.12) | Usa `flash` + `redirect` em vez de 404. Contraria a regra da casa que a B1.15 acabou de aplicar no almoxarifado | É anterior a este item e não é da família V1. O teste de convergência registra o comportamento vigente; a correção vira item separado |
+| **O teste de jornada foi ajustado e NÃO foi executado** (05/08, B3.3) | A B3.3 remove o campo `proposta-cliente-nome`, que `tests/test_e2e_jornada_proposta_cronograma_playwright.py:87` e `:278` preenchiam. Os dois passaram a cadastrar o `Cliente` antes (helper `_garantir_cliente`, pelo mesmo `_db()` que a jornada já usa) e a usar `select_option` no `data-testid` novo | **Chromium não sobe neste ambiente** (falta `libnspr4.so`), então a mudança coleta (19 tests) mas não roda. Não entra no `--gate`; entra no `--jornada` e no `--suite`. **Rodar `bash run_tests.sh --jornada` antes de confiar nela** |
+| **Dependência de ordem em `test_e2e_orcamento_operacional_e_metricas_views.py`** (05/08) | O arquivo passa 7/7 inteiro, mas `test_post_salvar_item_cria_nova_versao_a_partir_de_hoje` falha quando selecionado sozinho: o fixture `ctx` é `scope='module'` e quem cria o `ObraOrcamentoOperacional` é o **efeito colateral do primeiro teste do módulo** | Fragilidade pré-existente, exposta por um filtro `-k`. Não é regressão de nenhuma Task. Consertar é criar o `ObraOrcamentoOperacional` no próprio fixture — pequeno, mas fora de todo recorte |
 
 ### 8.2 Adiados — voltam quando a trava sair
 
