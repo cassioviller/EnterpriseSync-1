@@ -163,16 +163,20 @@ def test_aprovar_proposta_com_valor_gera_o_lancamento_contabil():
 # (b) — o branch de valor zero
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason='A14 — handlers/propostas_handlers.py:378-385 '
-                                       'dá return antes de semear e fechar')
 def test_aprovar_proposta_de_valor_zero_semeia_servicos_reais():
     """O terceiro caminho do handler.
 
     Por ele passam toda proposta de valor zero **e** a importação
     físico-financeira (`services/importacao_fisico_financeiro.py:572-578`, com
-    ``skip_contabil=True``). O ``return`` de `:378-384` acontece antes das
-    chamadas de `:427-428` e `:493-494`, então nem serviço é semeado nem lead
-    é fechado — e nenhum teste que chame a função direto enxerga isso.
+    ``skip_contabil=True``). O ``return`` do ramo
+    `if valor_total <= 0 or skip_contabil:` acontecia antes das chamadas que
+    os outros dois ramos já faziam, então nem serviço era semeado nem lead
+    fechado — e nenhum teste que chame a função direto enxerga isso.
+
+    **Era `xfail(strict=True)`**, plantado pelo B0 como checklist do A14.
+    A Task B3.5 pôs `_semear_servicos_reais` e `_fechar_lead_da_proposta`
+    dentro do ramo; a marca saiu no MESMO trabalho porque `strict` transforma
+    XPASS em FAILED.
     """
     with app.app_context():
         tenant = um_tenant('zero', com_fatos=False)

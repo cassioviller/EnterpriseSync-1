@@ -207,7 +207,7 @@ def test_fechar_lead_e_idempotente():
     assert _fechar_lead_da_proposta(p.id, t.admin_id) == 0
 
 
-def test_forma_o_handler_chama_os_dois_nos_dois_caminhos_conhecidos():
+def test_forma_o_handler_chama_os_dois_nos_tres_caminhos_conhecidos():
     """**GUARDA DE FORMA — não prova comportamento.**
 
     Conta ocorrências no texto do handler para pegar quem remover uma das
@@ -215,20 +215,24 @@ def test_forma_o_handler_chama_os_dois_nos_dois_caminhos_conhecidos():
 
     ⚠️ **A docstring anterior estava errada** e vale registrar por quê: ela
     dizia que este teste cobria "o caminho de importação (`skip_contabil`)".
-    Não cobre — contar ``== 2`` ocorrências não diz por onde a execução passa.
-    🔬 04/08: o handler tem um **terceiro** caminho de saída
-    (`handlers/propostas_handlers.py:378-385`) que dá ``return`` **antes** das
+    Não cobre — contar ocorrências não diz por onde a execução passa.
+    🔬 04/08: o handler tinha um **terceiro** caminho de saída
+    (`if valor_total <= 0 or skip_contabil:`) que dava ``return`` **antes** das
     duas chamadas, e é justamente por ele que a importação físico-financeira
-    (`services/importacao_fisico_financeiro.py:572-578`) e toda proposta de
-    valor zero passam. O contador de strings ficou verde o tempo todo.
+    e toda proposta de valor zero passam. O contador ficou verde em ``== 2``
+    o tempo todo.
+    🔧 05/08 (Task B3.5 / A14): as duas chamadas entraram naquele ramo — o
+    contador vira **3**, um por caminho de saída. Se voltar a 2, alguém
+    reabriu o A14.
 
     **A prova de comportamento mora em**
-    ``tests/test_arreio_aprovacao_proposta_rotas.py``, que aprova pela rota e
-    afirma sobre ``ServicoObraReal``.
+    ``tests/test_arreio_aprovacao_proposta_rotas.py`` (valor zero pela rota) e
+    ``tests/test_cadeia_crm_proposta_obra_lead.py`` (T5, pelo evento, nas duas
+    variantes), que afirmam sobre ``ServicoObraReal`` e sobre o ``Lead``.
     """
     caminho = os.path.join(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))), 'handlers', 'propostas_handlers.py')
     with open(caminho, encoding='utf-8') as fh:
         texto = fh.read()
-    assert texto.count('_semear_servicos_reais(proposta_id, admin_id)') == 2
-    assert texto.count('_fechar_lead_da_proposta(proposta_id, admin_id)') == 2
+    assert texto.count('_semear_servicos_reais(proposta_id, admin_id)') == 3
+    assert texto.count('_fechar_lead_da_proposta(proposta_id, admin_id)') == 3

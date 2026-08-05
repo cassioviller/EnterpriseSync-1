@@ -382,6 +382,15 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         )
         _propagar_proposta_para_obra(proposta_id, admin_id)
         _materializar_cronograma_se_houver()
+        # A14 — este ramo dava `return` aqui e os outros dois não. Por ele
+        # passam a importação físico-financeira
+        # (`services/importacao_fisico_financeiro.py`, com skip_contabil=True)
+        # e TODA proposta de valor zero: a obra nascia sem `ServicoObraReal`
+        # (nada para o RDO apontar) e o lead do CRM ficava aberto para sempre.
+        # A ordem importa: as duas leem `proposta.obra_id`, gravado acima por
+        # `_propagar_proposta_para_obra` / pelo importador antes do emit.
+        _semear_servicos_reais(proposta_id, admin_id)
+        _fechar_lead_da_proposta(proposta_id, admin_id)
         return
 
     # Garantir plano de contas antes de inserir PartidaContabil (FK constraint).

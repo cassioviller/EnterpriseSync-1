@@ -57,7 +57,7 @@ except ImportError as e:
 from app import db
 from models import (
     Proposta, PropostaItem, PropostaHistorico, PropostaArquivo,
-    ConfiguracaoEmpresa, TipoUsuario, Cliente,
+    ConfiguracaoEmpresa, TipoUsuario, Cliente, Lead,
     PropostaTemplate, PropostaClausula, PropostaTemplateClausula,
 )
 
@@ -752,6 +752,34 @@ def criar():
 
         db.session.add(proposta)
         db.session.flush()  # Obter ID da proposta antes de criar itens
+
+        # E05 — o escritor que faltava. `Lead.proposta_id` existe no modelo,
+        # está indexado, e NADA o escrevia: o filtro de
+        # `handlers/propostas_handlers.py:263` devolvia lista vazia sempre, e o
+        # `:275` que grava `lead.obra_id` na aprovação nunca executava.
+        # Escopo de tenant no `filter_by`: `lead_id` é dado do usuário.
+        # NÃO mexe em `lead.status` — criar rascunho de proposta não fecha
+        # lead; quem fecha é `_fechar_lead_da_proposta`, na aprovação, e é lá
+        # que mora a guarda de não reabrir lead PERDIDO.
+        if _lead_id_raw.isdigit():
+            _lead = Lead.query.filter_by(
+                id=int(_lead_id_raw), admin_id=admin_id).first()
+            if _lead:
+                if _lead.proposta_id and _lead.proposta_id != proposta.id:
+                    # Sobrescrever é o comportamento certo (o lead segue a
+                    # proposta viva), mas desamarra a anterior — registrar.
+                    logger.info(
+                        f"E05: lead {_lead.id} trocou de proposta "
+                        f"{_lead.proposta_id} → {proposta.id}; a anterior fica "
+                        f"sem lead vinculado"
+                    )
+                _lead.proposta_id = proposta.id
+                logger.info(
+                    f"E05: lead {_lead.id} vinculado à proposta {proposta.id}")
+            else:
+                logger.info(
+                    f"E05: lead_id={_lead_id_raw} não pertence ao tenant "
+                    f"{admin_id} — vínculo ignorado")
 
         # Task #174 — cláusulas configuráveis. Prioridade:
         #   1) Se o form indicou um PropostaTemplate (`template_id`) que

@@ -442,6 +442,32 @@ def nova_obra():
             db.session.add(nova_obra)
             db.session.flush()  # Para obter o ID da obra
 
+            # E05 — o segundo escritor que faltava. O botão "criar obra" do
+            # CRM (`crm_views.py:945-980`) cria a obra DIRETO, sem passar por
+            # proposta nenhuma: `_fechar_lead_da_proposta`, que só roda na
+            # aprovação, nunca cobre este lead. Escopo de tenant no
+            # `filter_by` — `lead_id` é dado do usuário. NÃO mexe em
+            # `lead.status`: criar obra não é a mesma decisão que "proposta
+            # aprovada". Dentro do try, logo participa do rollback de `:494` —
+            # obra e vínculo commitam juntos ou nenhum dos dois.
+            _lead_id_raw = (request.form.get('lead_id') or '').strip()
+            if _lead_id_raw.isdigit():
+                from models import Lead as _Lead
+                _lead = _Lead.query.filter_by(
+                    id=int(_lead_id_raw), admin_id=admin_id).first()
+                if _lead:
+                    if _lead.obra_id and _lead.obra_id != nova_obra.id:
+                        logger.info(
+                            f"E05: lead {_lead.id} trocou de obra "
+                            f"{_lead.obra_id} → {nova_obra.id}")
+                    _lead.obra_id = nova_obra.id
+                    logger.info(
+                        f"E05: lead {_lead.id} vinculado à obra {nova_obra.id}")
+                else:
+                    logger.info(
+                        f"E05: lead_id={_lead_id_raw} não pertence ao tenant "
+                        f"{admin_id} — vínculo ignorado")
+
             # Fase 2 — primeira linha do histórico: a obra nasceu.
             from models import ObraTransicaoEstado as _OTE
             db.session.add(_OTE(
