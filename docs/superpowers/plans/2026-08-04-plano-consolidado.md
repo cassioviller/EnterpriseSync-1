@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **13** | **7** | G |
+| B2 — o que o sistema informa errado | 20 | **15** | **5** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **35** | **26** | |
+| **Total** | **61** *(62 − 1 cortada)* | **37** | **24** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -2693,9 +2693,23 @@ número deixa de cair quando o RDO mais recente traz correção para baixo.
    `:236` já faz com a variável local; qualquer `commit()` posterior tentaria persistir,
    e se não for coluna, apenas suja a identity map.
 
-- [ ] **Step 1:** as duas cópias + chave de cache
-- [ ] **Step 2:** conferir `RDO.progresso_total` em `models.py`
-- [ ] **Step 3:** commit — `fix(rdo): lista de RDOs mostra o acumulado até a data da própria linha`
+- [x] **Step 1:** as duas cópias + chave de cache
+- [x] **Step 2:** `RDO.progresso_total` conferido — **não é coluna**
+- [x] **Step 3:** commit
+
+**Status: ✅ entregue em 05/08.** As duas cópias trocadas juntas, como o Risco 1
+mandava: deixar uma seria reintroduzir a divergência **dentro de uma única rota**.
+
+**O cache era por `obra_id`, sem teto de data** — então toda linha da lista da
+mesma obra exibia o mesmo número, o de hoje. Um RDO de 10/06 mostrava o progresso
+de 12/06, o que torna a lista inútil justamente para o que ela serve: ver a
+evolução. E a consulta pegava "o mais recente por nome", não o máximo: a correção
+de 60 para 40 no dia 12 derrubava o número de **todas** as linhas de uma vez,
+inclusive as de dias em que 40 nunca foi verdade.
+
+**Risco 2 conferido:** `RDO.progresso_total` **não é coluna** — a atribuição só
+sujava a identity map, sem risco de persistir. Ficou como está (o recorte só
+exigia trocar por dict paralelo *se* fosse coluna).
 
 ---
 
@@ -2730,6 +2744,47 @@ dia 11, **40 no dia 12** (a correção para baixo, que separa MAX de "último");
 O número do PDF sai chamando `services.rdo_pdf_service._progresso_geral` com o mesmo
 `rdo` (os bytes não são inspecionáveis, mas é a mesma função que `:524` usa); o da tela
 sai do HTML renderizado (`templates/rdo/visualizar_rdo_moderno.html:1256`).
+
+**Status da B2.12: ✅ entregue em 05/08 — e com ela o A19 FECHA (B2.7 a B2.12).**
+
+**🔴 ACHADO QUE MUDA A PREMISSA DO ITEM: `listar_rdos` está SOMBREADA.**
+`views/rdo.py:rdos()` registra **quatro** rotas no `main_bp` — `/rdos`, `/rdo`,
+`/rdo/` e `/rdo/lista` — e as três do prefixo `/rdo` resolvem para ela.
+`rdo_crud.listar_rdos` existe no `url_map` e **nunca recebe requisição**:
+
+```
+/rdo/        SERVIDA POR main.rdos
+/rdo         SERVIDA POR main.rdos
+/rdo/lista   SERVIDA POR main.rdos
+```
+
+A §5.2 classificava a variante D como "alimenta a segunda lista". **A segunda
+lista não é alcançável por URL.** Isto não foi descoberto lendo — foi descoberto
+escrevendo o teste, quando o GET veio com o HTML da outra função.
+
+**O que se fez, e por quê.** A correção entrou assim mesmo: são seis linhas, e o
+dia em que alguém desregistrar uma das quatro rotas de `main_bp` a função vira
+viva **com o defeito dentro**. Mas o teste **não finge que um GET a alcança** —
+ele chama `listar_rdos()` dentro de um `test_request_context`. Fingir seria o
+instrumento medindo o vazio outra vez, e desta vez passando.
+
+**O que fica aberto, como item próprio:** decidir se `rdo_crud.listar_rdos` e as
+rotas irmãs do `rdo_crud_bp` devem ser aposentadas. **Não é escopo deste
+recorte** — é a mesma classe de decisão da B1.14 (função sem chamador) e merece a
+mesma disciplina de conferir o parque antes.
+
+**A correção em si.** O `elif subatividades:` saiu, e essa é a segunda metade: ele
+olhava as subatividades DAQUELE RDO para decidir se calculava o acumulado da
+OBRA, então um dia sem apontamento exibia **0** para uma obra a 60%. O rótulo
+`'Progresso do dia'` foi junto — os dois ramos entregam acumulado agora, e um
+rótulo dizendo "do dia" estaria descrevendo o cálculo antigo.
+
+**Sabotagem, e ela mostra o antes inteiro numa linha:** voltando à média do
+próprio RDO com a guarda, o teste acusa **`[0.0, 25.0, 40.0, 80.0]`** — quatro
+números diferentes para a mesma obra, com o `0.0` do dia vazio e o `80.0` dos
+homônimos fundidos.
+
+---
 
 **Por que o atual não pegava.** `tests/test_p4_formula_unica_progresso.py` não exercita
 nenhuma rota da família V1: `:141-146` abre `portal_obras_views.py` e checa
@@ -3049,6 +3104,50 @@ e a resposta é "era uma agenda em memória sem leitor, e a rota devolvia
 
 ---
 
+> ## ⚠️ DESLOCAMENTO DE LINHAS — leia antes de abrir qualquer arquivo desta seção
+>
+> **Reconhecimento de 05/08, à noite, contra `fe2cbfc2`.** Os números de linha
+> desta seção foram escritos em 04/08 e **as próprias Tasks deste plano os
+> moveram no dia seguinte**. A regra prática, por arquivo:
+>
+> | Arquivo | Correção | Causa |
+> |---|---|---|
+> | `utils/cronograma_engine.py` | **+101 em TODO ref acima de `:1043`**; nada abaixo | `9bc86477` (B2.7) inseriu 101 linhas em `:1043` |
+> | `views/obras.py` | **−18** | `db85ba04` (B2.8) removeu `calcular_progresso_real_servico` |
+> | `services/rdo_pdf_service.py` | **+5** | `fe2cbfc2`/`b32b3629` (B2.9, B2.10) |
+> | `cronograma_views.py` | **nenhuma** — congelado desde 03/08, todos os refs batem byte a byte | — |
+>
+> Consequência concreta: quem abrir `utils/cronograma_engine.py:1120` procurando
+> `replanejar_curvas_obra` vai cair em `progresso_ponderado_armazenado`. A função
+> está em **`:1221`**, corpo `:1237-1289`. E o campo `'planejado'` de
+> `views/obras.py` está em **`:2830`**, não em `:2841-2848` — lá hoje mora o
+> `except` da rota e o começo de `nova_compra_obra`.
+>
+> **Cinco refs já nasceram errados**, e o arquivo nem mudou: em
+> `utils/cronograma_engine.py`, `sincronizar_percentuais_obra` zera o percentual
+> em `:551-552` (não `:553-554`), o `percentual_realizado` está em `:561` (não
+> `:557`), o `commit()` em `:579` (não `:577`), `calcular_progresso_rdo` por
+> folha em `:940` (não `:938`) e a agregação em `:943` (não `:939`). Em
+> `cronograma_views.py`, a coluna "planejado" da grade é `:2454` (não
+> `:2458`/`:2461`) — **a conclusão do plano sobre ela segue correta**, só o
+> número estava errado.
+>
+> ## ⚠️ "Os outros SEIS pontos" da B2.20 são CINCO
+>
+> O título da B2.20 briga com o campo *Files* da própria B2.20, que lista cinco
+> funções, e com a aritmética da §5.5 (sete pontos menos os dois ramos de
+> `atualizar_tarefa`, que são da B2.19). Só chega a seis contando os dois ramos
+> de `/recalcular` separadamente — e a §5.5 conta `/recalcular` como **um** ponto
+> com dois ramos. **São cinco locais de edição**, todos com linhas conferidas e
+> corretas: `_aplicar_hierarquia` (`:1652`), `_recalc_e_resposta_vinculo`
+> (`:1411`), `criar_tarefa` (`:565`), `excluir_tarefa` (`:1209`) e `recalcular`
+> (`:1291`).
+>
+> **O resto do recorte foi conferido e CONFERE**, incluindo o chamador único de
+> `replanejar_curvas_obra` (`services/cronograma_versao_service.py:443`), a
+> ausência de `_replanejar_pos_commit`, os dois pontos de `perc_manual`
+> (`:1160-1162` e `:1175-1177`), e os quatro riscos citados.
+
 ### 5.5 A06 — replanejar a curva planejada após os recálculos de data do editor v2
 
 **Uma premissa do enunciado está DESMENTIDA.** O que fica obsoleto é UMA coisa só:
@@ -3258,6 +3357,72 @@ ser acionado pela UI e um dado velho fica sem conserto.
 - [ ] **Step 5:** commit — `fix(cronograma): os sete pontos de recálculo do editor replanejam a curva`
 
 ---
+
+> ## ⚠️ RECONFERÊNCIA DE 05/08, À NOITE — leia antes de abrir qualquer Task do B3
+>
+> Três coisas mudaram de estado desde 04/08, e uma delas **faria a B3.8 nascer
+> inerte**.
+>
+> ### 🔴 1. A B3.8 edita duas páginas que a UI NUNCA renderiza
+>
+> O Step 3 manda pôr o checkbox `criar_fluxo_caixa` em
+> `templates/financeiro/receber_conta.html`, copiando o "padrão já estabelecido"
+> de `pagar_conta.html`. **As duas premissas são falsas:**
+>
+> * `grep -rn receber_conta templates/` devolve **ZERO** — nada no app linka para
+>   o GET. O POST vivo sai do **modal** `formBaixaRecebimento`
+>   (`templates/financeiro/contas_receber.html:242-283`), com a `action` montada
+>   em JS (`:296`);
+> * esse modal **não manda `criar_fluxo_caixa`** (grep: ausente). Logo
+>   `criar_fc` é sempre `False` e o `FluxoCaixa` ENTRADA **nunca nasceria**;
+> * o "padrão do lado pagar" é letra morta pelo mesmo motivo: `contas_pagar.html`
+>   posta pelo modal de `:402`/`:466`, também sem o checkbox. O `FluxoCaixa`
+>   SAIDA de hoje provavelmente só nasce por URL digitada à mão.
+>
+> **Consequência:** sem tocar o MODAL, a B3.8 entrega código que não executa — e
+> as três camadas de defesa contra dupla contagem viram uma só (a guarda da
+> B3.7). É exatamente a falha silenciosa que o Risco 4 da própria Task descreve,
+> vinda pelo lado que ela não olhou. **A Task precisa ser reescrita para editar
+> `contas_receber.html:242-296`, não `receber_conta.html`.**
+>
+> ### 🔴 2. Um `xfail(strict=True)` vira FAILED no commit da B3.5
+>
+> `tests/test_arreio_aprovacao_proposta_rotas.py:166` está marcado com
+> `strict=True` e a razão "A14 — `handlers/propostas_handlers.py:378-385` dá
+> return antes de semear e fechar". **No instante em que a B3.5 entrar, ele passa
+> — e `strict` transforma XPASS em FAILED.** A marca tem de sair **no mesmo
+> commit**. É o nono xfail que o B0 plantou funcionando como checklist, e o
+> primeiro que cobra fora do bloco B1.
+>
+> ### ⚠️ 3. Deslocamento sistemático de linhas em `models.py` e `event_manager.py`
+>
+> | Citação do plano | Onde está hoje | O que há na linha citada |
+> |---|---|---|
+> | `models.py:3571-3572` (`Proposta.cliente_id`/`cliente_nome`) | **`:3647-3648`** | `class TabelaComposicao` |
+> | `models.py:8043-8050` (`Lead.proposta_id`/`obra_id`) | **`:8177-8184`** | `class CrmResponsavel` |
+> | `models.py:2413-2425` (FK composta de `ContaReceber`) | **`:2489-2500`** | colunas de **`ContaPagar`** |
+> | `event_manager.py:973` (`propagar_proposta_para_obra`) | **`:1230-1231`** | um `else: custo = CustoObra(...)` |
+> | `event_manager.py:1014-1020` (`obter_ou_criar_cliente`) | **`:1270-1277`** | — |
+> | `event_manager.py:1518-1535` (`recalcular_medicao_apos_rdo`) | **`:1775-1810`** | corpo de **`handle_folha_processada`** |
+>
+> O **comportamento** descrito confere em todos os casos — só a localização
+> envelheceu (~+76/+134 em `models.py`, ~+257 em `event_manager.py`). Mas os dois
+> últimos são perigosos: quem editar "no ponto indicado" da B3.9/B3.10 mexe no
+> **handler de folha de pagamento**. E o "PERIGO REAL" da B3.9 se apoia numa
+> linha que hoje é de `ContaPagar`.
+>
+> ### O que foi conferido e CONFERE
+>
+> B3.1, B3.2, B3.4, B3.6 e B3.7 batem integralmente, incluindo o ponto de inserção
+> da B3.5 (`handlers/propostas_handlers.py:385`, dentro do corpo existente) e a
+> armadilha do decorador (`:281` `return` → `:282-283` em branco → `:284`
+> `@event_handler` colado no `def` de `:285`; o único lugar seguro para helper
+> module-level é `:282-283`). **Nenhuma rota do B3 está sombreada.** E **E05
+> segue aberto**: nenhum escritor de produção de `Lead.proposta_id`.
+>
+> **Lacuna de plano:** `tests/test_cadeia_crm_proposta_obra_lead.py` — o "teste do
+> bloco" da §6.1 — não existe, e nenhuma das Tasks B3.1-B3.5 o lista em *Files*.
+> Só B3.8 e B3.10 têm `Create`.
 
 ## 6. B3 — Fechar os elos que morrem a um passo
 
@@ -4212,6 +4377,16 @@ instanciação" **não prova morte**. Nos dois casos derrubados (E03, E11) o con
 em template ou em serviço novo, e nos dois a busca por `Classe(` devolveria vazio. Foi
 essa mesma armadilha que E10 quase repetiu (ver a nota de homonímia no B4).
 
+### 8.3 Itens ABERTOS que esta execução descobriu
+
+Não são cortes nem adiamentos: são **fatos novos** que apareceram executando, e
+que não cabiam no recorte onde foram achados. Cada um precisa de decisão própria.
+
+| Item | O fato | Por que não entrou no recorte |
+|---|---|---|
+| **`rdo_crud.listar_rdos` e as rotas irmãs estão SOMBREADAS** (05/08, achado da B2.12) | `views/rdo.py:rdos()` registra `/rdos`, `/rdo`, `/rdo/` **e** `/rdo/lista` no `main_bp`. As três do prefixo `/rdo` resolvem para ela; `rdo_crud.listar_rdos` existe no `url_map` e **nunca recebe requisição**. A §5.2 classificava a variante D como "alimenta a segunda lista" — a segunda lista não é alcançável por URL | Aposentar rota é a mesma classe de decisão da B1.14 (função sem chamador vivo), e merece a mesma disciplina: conferir o parque antes, e decidir sobre o **blueprint inteiro**, não sobre uma função. A B2.12 corrigiu a fórmula assim mesmo — seis linhas — para que o dia em que alguém desregistrar uma das quatro rotas não acorde a função **com o defeito dentro** |
+| **`views/rdo.py:1111-1113` responde 302 a RDO de outro tenant** (registrado no recorte da B2.12) | Usa `flash` + `redirect` em vez de 404. Contraria a regra da casa que a B1.15 acabou de aplicar no almoxarifado | É anterior a este item e não é da família V1. O teste de convergência registra o comportamento vigente; a correção vira item separado |
+
 ### 8.2 Adiados — voltam quando a trava sair
 
 | Item | Trava | Quando volta |
@@ -4810,6 +4985,45 @@ pacotes abaixo seguem existindo e valendo.**
 ---
 
 ## Histórico
+
+- **2026-08-05, noite** — **O A19 FECHOU (B2.7 a B2.12), e a T6 junto (B2.14 a
+  B2.16).** O bloco B2 vai a 15/20, e **a execução passou de 37 Tasks entregues
+  de 61**.
+
+  **Sete geradores de progresso V1 viraram um.** Onde o usuário vê:
+
+  | Onde | Antes | Depois |
+  |---|---|---|
+  | Detalhe do RDO (obra V1) | dividia pelo catálogo mestre; podia passar de 100% | acumulado sobre as chaves apontadas |
+  | PDF do RDO | fundia homônimos: **80,0%** | **60,0%**, igual à tela |
+  | Lista de RDOs | toda linha com o número de hoje | o acumulado da data de cada linha |
+  | Consolidada | V2 no feliz, V1 no fallback | mesmo ramo nos dois |
+  | `listar_rdos` | 0% para obra a 60% em dia sem apontamento | 60% |
+  | `calcular_progresso_real_servico` | número calculado e descartado | **removido** |
+
+  1. **O predicado estrito já existia**, e ninguém o usava.
+     `TarefaCronograma.do_cronograma_interno` foi criado em 27/07 exatamente para
+     que "esquecer o escopo passasse a exigir sair do caminho padrão" — e os
+     **quatro** predicados V2 vivos saíam do caminho padrão. A convergência
+     custou menos do que o recorte previa por causa disso.
+  2. **Duas remoções grandes levaram um vizinho inocente cada.** O `logger.info`
+     órfão da B2.8 e o `total_horas_trabalhadas` da B2.9 — este último pego por
+     `test_rdo_ciclo_completo`. **Em bloco longo, o que morre no meio não é só o
+     que se quer matar**, e a lição prática é rodar os testes do arquivo antes de
+     olhar o diff.
+  3. **A sabotagem pegou um instrumento vacuoso meu no minuto em que nasceu**
+     (B2.7): o cenário de tenant não exercitava o `admin_id`, porque
+     `RDO.obra_id` já isolava sozinho. Os oito anteriores desta rodada só
+     apareceram sessões depois.
+  4. **Escrever o teste achou o que ler não achou** (B2.12): `listar_rdos` está
+     **sombreada** — o GET voltou com o HTML de outra função. Virou a **§8.3**,
+     seção nova para fatos que a execução descobre e que não cabem no recorte
+     onde aparecem.
+  5. **Primeiro paralelismo da execução.** T6 e T5 andaram juntas, com conjuntos
+     de arquivos disjuntos (§11.2). O ganho é de relógio, não de esforço: a
+     regressão de uma rodava enquanto a outra era escrita. **Nenhuma das duas
+     compartilhou módulo com a outra em nenhum momento** — foi essa a regra que
+     tornou o paralelismo seguro, e é ela que o limita.
 
 - **2026-08-05, fim da tarde** — **O A13 FECHOU: B2.1 a B2.6, seis Tasks, um
   commit cada** (a B2.4 saiu junto da B2.3, por serem par). O bloco B2 vai a 6/20.

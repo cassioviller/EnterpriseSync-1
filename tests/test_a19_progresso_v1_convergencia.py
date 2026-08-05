@@ -158,6 +158,111 @@ def test_a_correcao_para_baixo_nao_derruba_o_numero_do_pdf():
             f'correção de 60 para 40 derrubou o progresso da obra')
 
 
+# ---------------------------------------------------------------------------
+# B2.11 — a lista de RDOs
+# ---------------------------------------------------------------------------
+
+def test_cada_linha_da_lista_mostra_o_acumulado_da_propria_data():
+    """O cache era por `obra_id`, sem teto de data.
+
+    Consequência: **toda linha da lista de RDOs da mesma obra exibia o mesmo
+    número** — o de hoje. Um RDO de 10/06 mostrava o progresso de 12/06, o que
+    torna a lista inútil justamente para o que ela serve: ver a evolução.
+
+    Pior, a consulta pegava "o mais recente por nome" em vez do máximo, então a
+    correção de 60 para 40 no dia 12 derrubava o número de **todas** as linhas
+    de uma vez, inclusive as de dias anteriores, onde 40 nunca foi verdade.
+
+    As três datas da semente têm acumulados distintos, e é isso que se afirma:
+
+    * até 10/06 — (S1,'Prep')=30 e (S2,'Prep')=20 → **25.0**
+    * até 11/06 — mais (S1,'Corte')=100, e 'Prep' de S1 sobe a 60 → **60.0**
+    * até 12/06 — o 40 não derruba o 60 → **60.0**
+    """
+    from utils.cronograma_engine import progresso_v1_acumulado
+
+    with app.app_context():
+        t, _rdos = _semear('a19lista')
+
+        ate_10 = progresso_v1_acumulado(t.obra_id, t.admin_id, D10)
+        ate_11 = progresso_v1_acumulado(t.obra_id, t.admin_id, D11)
+        ate_12 = progresso_v1_acumulado(t.obra_id, t.admin_id, D12)
+
+        assert ate_10 == pytest.approx(25.0), (
+            f'até 10/06 deu {ate_10} — as três datas têm de ser distinguíveis, '
+            f'senão o teto de data não está sendo respeitado')
+        assert ate_11 == pytest.approx(ESPERADO_ATE_11)
+        assert ate_12 == pytest.approx(ESPERADO_ATE_11), (
+            f'até 12/06 deu {ate_12} — o 40 do dia 12 derrubou o 60 do dia 11')
+
+        # A lista responde, e responde com o número da data mais recente
+        # visível — a asserção fina por linha exige parsear a tabela inteira;
+        # o que trava a regressão de cache é a distinção acima.
+        r = cliente_de(t.admin_id).get('/rdo/lista')
+        assert r.status_code == 200, f'a lista respondeu {r.status_code}'
+
+
+# ---------------------------------------------------------------------------
+# B2.12 — o sétimo call-site, e a convergência das quatro pontas
+# ---------------------------------------------------------------------------
+
+def test_rdo_de_dia_sem_subatividade_nao_exibe_zero_numa_obra_avancada():
+    """O defeito da variante D, e o que o `elif subatividades:` causava.
+
+    `crud_rdo_completo.listar_rdos` fazia `sum(...)/len(...)` sobre as
+    subatividades **daquele RDO**: não acumulava nada. Uma obra V1 a 60% cujo
+    RDO do dia não teve subatividade nenhuma aparecia com **0** na lista.
+
+    🔴 **`listar_rdos` está SOMBREADA, e isso foi descoberto escrevendo este
+    teste.** `views/rdo.py:rdos()` registra `/rdos`, `/rdo`, `/rdo/` **e**
+    `/rdo/lista` no `main_bp`, e as três URLs do prefixo resolvem para ela —
+    `rdo_crud.listar_rdos` existe no `url_map` e nunca recebe requisição. Ver o
+    Status da B2.12 no plano.
+
+    Por isso o teste chama a função **dentro de um request context**, em vez de
+    fingir que um GET a alcança: fingir seria o instrumento medindo o vazio de
+    novo, e mais insidioso, porque passaria.
+    """
+    import re
+
+    from flask_login import login_user
+
+    from crud_rdo_completo import listar_rdos
+    from models import Usuario
+    from utils.cronograma_engine import progresso_v1_acumulado
+
+    with app.app_context():
+        t, _rdos = _semear('a19vazio')
+
+        d13 = date(2026, 6, 13)
+        vazio = RDO(numero_rdo=f'RDO-{uuid.uuid4().hex[:8]}', obra_id=t.obra_id,
+                    data_relatorio=d13, admin_id=t.admin_id,
+                    criado_por_id=t.admin_id)
+        db.session.add(vazio)
+        db.session.commit()
+
+        assert RDOServicoSubatividade.query.filter_by(rdo_id=vazio.id).count() == 0, (
+            'cenário quebrado — o RDO do dia 13 tem de estar sem subatividade')
+        assert progresso_v1_acumulado(
+            t.obra_id, t.admin_id, d13) == pytest.approx(ESPERADO_ATE_11), (
+            'o acumulado da obra até 13/06 não é o esperado — cenário quebrado')
+
+        admin = db.session.get(Usuario, t.admin_id)
+        with app.test_request_context('/rdo/'):
+            login_user(admin)
+            corpo = listar_rdos()
+
+        percentuais = {float(p) for p in
+                       re.findall(r'<strong>([\d.]+)%</strong>', corpo)}
+        assert percentuais, 'nenhum percentual foi renderizado pela listar_rdos'
+        assert 0.0 not in percentuais, (
+            f'apareceu 0.0% ({sorted(percentuais)}) — é o RDO sem subatividade '
+            f'mostrando o progresso DO DIA numa obra que está a '
+            f'{ESPERADO_ATE_11}%')
+        assert 'Progresso do dia' not in corpo, (
+            'o rótulo ainda diz "do dia", descrevendo o cálculo antigo')
+
+
 def test_a_tela_do_rdo_nao_grava_nada():
     """Item 100% de LEITURA — e a asserção é a negativa.
 

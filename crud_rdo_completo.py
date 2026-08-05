@@ -92,10 +92,12 @@ def listar_rdos():
         
         # Task #61 — MESMA lógica do detalhe: progresso V2 acumulado +
         # normalização de horas (utils/rdo_horas).
-        from models import TarefaCronograma as _TC
-        from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+        from utils.cronograma_engine import (calcular_progresso_geral_obra_v2,
+                                             obra_em_modo_v2,
+                                             progresso_v1_acumulado)
         from utils.rdo_horas import normalizar_horas_funcionario as _norm
-        _cprog: dict = {}
+        _cprog: dict = {}          # V2 por (obra_id, data_relatorio)
+        _cprog_v1: dict = {}       # V1 por (obra_id, data_relatorio) — A19/B2.12
         _cobra: dict = {}
 
         rdos_processados = []
@@ -106,12 +108,9 @@ def listar_rdos():
             # por func×subatividade; contar bruto inflava p/ "30").
             total_funcionarios = len({mo.funcionario_id for mo in mao_obra if mo.funcionario_id})
 
+            # A19/B2.12 — predicado único (com `ativa` e `is_cliente`).
             if rdo.obra_id not in _cobra:
-                _cobra[rdo.obra_id] = (
-                    db.session.query(_TC).filter_by(
-                        obra_id=rdo.obra_id, admin_id=admin_id
-                    ).first() is not None
-                )
+                _cobra[rdo.obra_id] = obra_em_modo_v2(rdo.obra_id, admin_id)
             obra_v2 = _cobra[rdo.obra_id]
             aps_count = (
                 RDOApontamentoCronograma.query.filter_by(rdo_id=rdo.id).count()
@@ -129,12 +128,20 @@ def listar_rdos():
                         logger.warning(f"[Task#61] V2 falhou RDO {rdo.id}: {_e}")
                         _cprog[ck] = {'progresso_geral_pct': 0}
                 progresso_medio = round(_cprog[ck].get('progresso_geral_pct', 0) or 0, 1)
-            elif subatividades:
-                progresso_medio = round(
-                    sum(s.percentual_conclusao or 0 for s in subatividades) / len(subatividades), 1
-                )
             else:
-                progresso_medio = 0
+                # A19/B2.12 — o sétimo e último call-site da família V1.
+                #
+                # Era `sum(...)/len(...)` sobre as subatividades DESTE RDO: não
+                # acumulava nada. Obra V1 a 80% cujo RDO do dia não teve
+                # subatividade nenhuma exibia **0** — e o `elif subatividades:`
+                # era o que fazia isso acontecer, então ele saiu. Manter a
+                # guarda anularia metade da correção; `progresso_v1_acumulado`
+                # já devolve 0.0 quando não há chave em obra nenhuma.
+                ck_v1 = (rdo.obra_id, rdo.data_relatorio)
+                if ck_v1 not in _cprog_v1:
+                    _cprog_v1[ck_v1] = progresso_v1_acumulado(
+                        rdo.obra_id, admin_id, rdo.data_relatorio)
+                progresso_medio = round(_cprog_v1[ck_v1], 1)
 
             entradas = []
             for mo in mao_obra:
@@ -153,7 +160,11 @@ def listar_rdos():
                 'total_funcionarios': total_funcionarios,
                 'total_horas_trabalhadas': total_horas,
                 'progresso_medio': progresso_medio,
-                'progresso_label': 'Progresso geral' if obra_v2 else 'Progresso do dia',
+                # A19/B2.12 — o rótulo era 'Progresso do dia' no ramo V1
+                # porque o número ERA do dia. Agora os dois ramos entregam
+                # acumulado da obra, e um rótulo que dissesse "do dia" estaria
+                # descrevendo o cálculo antigo.
+                'progresso_label': 'Progresso geral',
                 'is_v2_progresso': obra_v2,
                 'status_cor': {
                     'Rascunho': 'warning',
