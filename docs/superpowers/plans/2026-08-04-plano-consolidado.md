@@ -114,10 +114,10 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **9** | **11** | G |
+| B2 — o que o sistema informa errado | 20 | **10** | **10** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **31** | **30** | |
+| **Total** | **61** *(62 − 1 cortada)* | **32** | **29** | |
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -2854,10 +2854,37 @@ aritmética que reconstrói o valor. **Texto de arquivo não sabe multiplicar.**
    lê o dict chave a chave por nome e quebraria se `'fgts'` ou `'encargos_patronais'`
    mudassem. Conferido: não há iteração sobre `.items()`.
 
-- [ ] **Step 1:** escrever o TESTE A e vê-lo VERMELHO em `588.00`
-- [ ] **Step 2:** variável única após `:1130` + os dois ramos + a chave em `:1091`
-- [ ] **Step 3:** teste verde nos três passos
-- [ ] **Step 4:** commit — `fix(folha): INSS patronal gravado por subtração, não por fator 0.7`
+- [x] **Step 1:** TESTE A VERMELHO em `588.00`, exatamente como previsto
+- [x] **Step 2:** variável única + os dois ramos + a chave `inss_patronal`
+- [x] **Step 3:** teste verde nos três passos
+- [x] **Step 4:** commit
+
+**Status: ✅ entregue em 05/08, em PARALELO com a T5** — arquivos disjuntos
+(§11.2), e foi a primeira vez nesta execução que duas trilhas andaram juntas. O
+ganho é de relógio, não de esforço: a regressão da T6 rodou enquanto a B2.10
+estava sendo escrita.
+
+**O vermelho de partida bateu no centavo:** `588.00` gravado onde o certo são
+`600.00`, e a linha violando o próprio invariante — `240 + 588 = 828` com
+`custo_total − salario_bruto = 840`, **dentro da mesma linha**.
+
+**O terceiro passo é o que dá valor ao teste**, e a sabotagem confirmou: trocando
+a subtração por um fator `20/28`, ele acusa **610,71** com FGTS a 8,5%. É a
+diferença entre "consertaram a aritmética" e "trocaram um número mágico por
+outro" — e nenhum fator fixo sobrevive a uma alíquota configurável por tenant.
+
+**A fonte do defeito desapareceu, não só o sintoma.** `processar_folha_funcionario`
+já calculava `inss_patronal` (`:987`) e o jogava fora ao montar o dict; sem a
+chave, o consumidor não tinha escolha senão reconstituir a parcela por aritmética
+inversa — que foi exatamente o que produziu o `* 0.7`. A chave entrou como
+**acréscimo**, com teste afirmando que `fgts` e `encargos_patronais` continuam
+existindo com o mesmo nome (`folha_pagamento_views.py:172-189` lê chave a chave).
+
+**Nota de método que vale além desta Task:** um guarda textual no molde dos
+pacotes — `assert "Decimal('0.20')" in open('services/folha_service.py').read()` —
+**passa VERDE hoje**. A constante certa está mesmo em `:981`; o erro nascia 160
+linhas abaixo, na aritmética que reconstruía o valor. **Texto de arquivo não sabe
+multiplicar.**
 
 ---
 

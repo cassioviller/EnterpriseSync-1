@@ -1089,6 +1089,13 @@ def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int, pa
             'total_descontos': descontos['total'] + float(desconto_faltas) + float(desconto_atrasos),
             'salario_liquido': float(salario_liquido),
             'fgts': encargos['fgts'],
+            # A24a/B2.14 — a parcela patronal já é calculada em `:987` e era
+            # jogada fora aqui. Sem ela, o consumidor não tinha escolha senão
+            # reconstituí-la por aritmética inversa sobre o total — que foi
+            # exatamente o que produziu o `* 0.7` de `salvar_folha_processada`.
+            # ACRÉSCIMO, nunca renomeação: folha_pagamento_views.py:172-189 lê
+            # este dict chave a chave por nome.
+            'inss_patronal': encargos['inss_patronal'],
             'encargos_patronais': encargos['total'],
             'custo_total_empresa': float(salario_bruto) + encargos['total']
         }
@@ -1128,7 +1135,32 @@ def salvar_folha_processada(funcionario_id: int, obra_id: Optional[int], ano: in
             ano=ano,
             mes=mes
         ).first()
-        
+
+        # ── A24a/B2.14 — INSS patronal por SUBTRAÇÃO, não por fator ──
+        #
+        # Os dois ramos abaixo gravavam `encargos_patronais * Decimal('0.7')`.
+        # O fator só seria exato se o FGTS valesse 8% — e a alíquota é
+        # configurável por tenant. Mesmo a 8%, `0.20/0.28 = 0.714285…`, não
+        # 0.7: R$ 588,00 gravados onde o certo são R$ 600,00, e a linha passava
+        # a violar o próprio invariante DENTRO dela mesma —
+        # `fgts + inss_patronal` dava 828 com `custo_total − salario_bruto` em
+        # 840.
+        #
+        # Preferimos a chave direta quando ela existe (o produtor agora a
+        # expõe) e a subtração quando não existe — `salvar_folha_processada` é
+        # pública e recebe dict arbitrário. **Nenhum fator novo**: só a
+        # subtração é exata para qualquer alíquota.
+        #
+        # `Decimal(str(...))` porque o dict vem com float, e `Decimal(float)`
+        # traz cauda binária.
+        if dados_folha.get('inss_patronal') is not None:
+            _inss_patronal = Decimal(str(dados_folha.get('inss_patronal', 0)))
+        else:
+            _inss_patronal = (
+                Decimal(str(dados_folha.get('encargos_patronais', 0)))
+                - Decimal(str(dados_folha.get('fgts', 0)))
+            )
+
         if folha_existente:
             folha_existente.salario_base = Decimal(str(dados_folha.get('salario_base', 0)))
             folha_existente.salario_bruto = Decimal(str(dados_folha.get('salario_bruto', 0)))
@@ -1139,7 +1171,7 @@ def salvar_folha_processada(funcionario_id: int, obra_id: Optional[int], ano: in
             folha_existente.valor_he_100 = Decimal(str(dados_folha.get('valor_he_100', 0)))
             folha_existente.valor_dsr = Decimal(str(dados_folha.get('valor_dsr', 0)))
             folha_existente.encargos_fgts = Decimal(str(dados_folha.get('fgts', 0)))
-            folha_existente.encargos_inss_patronal = Decimal(str(dados_folha.get('encargos_patronais', 0))) * Decimal('0.7')
+            folha_existente.encargos_inss_patronal = _inss_patronal
             folha_existente.custo_total_empresa = Decimal(str(dados_folha.get('custo_total_empresa', 0)))
             folha_existente.inss_funcionario = Decimal(str(dados_folha.get('inss', 0)))
             folha_existente.irrf = Decimal(str(dados_folha.get('irrf', 0)))
@@ -1168,7 +1200,7 @@ def salvar_folha_processada(funcionario_id: int, obra_id: Optional[int], ano: in
                 valor_he_100=Decimal(str(dados_folha.get('valor_he_100', 0))),
                 valor_dsr=Decimal(str(dados_folha.get('valor_dsr', 0))),
                 encargos_fgts=Decimal(str(dados_folha.get('fgts', 0))),
-                encargos_inss_patronal=Decimal(str(dados_folha.get('encargos_patronais', 0))) * Decimal('0.7'),
+                encargos_inss_patronal=_inss_patronal,
                 custo_total_empresa=Decimal(str(dados_folha.get('custo_total_empresa', 0))),
                 inss_funcionario=Decimal(str(dados_folha.get('inss', 0))),
                 irrf=Decimal(str(dados_folha.get('irrf', 0))),
