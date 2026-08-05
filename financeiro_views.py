@@ -635,7 +635,36 @@ def receber_conta(conta_id):
     admin_id = get_admin_id()
     
     conta = ContaReceber.query.filter_by(id=conta_id, admin_id=admin_id).first_or_404()
-    
+
+    # A02/B3.7 — conta já liquidada não aceita nova baixa.
+    #
+    # Sem esta guarda, baixar de novo SOMA: `baixar_recebimento` faz
+    # `conta.valor_recebido += valor`, então uma conta de R$ 1.000 já recebida vai
+    # a R$ 2.000. E o caminho não exige distração do operador — o import de
+    # extrato (`services/importacao_excel.py`) **cria a conta já `RECEBIDO`**.
+    #
+    # Os DOIS status importam: `baixar_recebimento` grava `RECEBIDO`, e quem quita
+    # a CR de medição (`services/medicao_service.py`) grava `QUITADA`. Uma guarda
+    # que olhasse só um deixaria metade do parque desprotegida.
+    #
+    # ⚠️ Vem ANTES da escrita do FluxoCaixa (B3.8), e essa ordem é a mitigação
+    # principal da dupla contagem: sem ela, a escrita nova transformaria um
+    # defeito de status em dinheiro contado duas vezes também no fluxo de caixa.
+    #
+    # `saldo` pode ser NULL em registro legado — tratado como `valor_original`,
+    # mesmo fallback que `financeiro_service` já usa.
+    _saldo = conta.saldo if conta.saldo is not None else (conta.valor_original or 0)
+    _liquidada = (conta.status in ('RECEBIDO', 'QUITADA', 'CANCELADO')
+                  or _saldo <= 0)
+    if _liquidada and request.method == 'POST':
+        logger.warning(
+            "⚠️ [A02] nova baixa RECUSADA — ContaReceber %s já está %s "
+            "(saldo=%s, recebido=%s)",
+            conta.id, conta.status, _saldo, conta.valor_recebido)
+        flash(f'Esta conta já está {conta.status.lower()} e não aceita nova '
+              f'baixa.', 'warning')
+        return redirect(url_for('financeiro.listar_contas_receber'))
+
     if request.method == 'POST':
         try:
             valor_recebido = Decimal(request.form.get('valor_recebido'))

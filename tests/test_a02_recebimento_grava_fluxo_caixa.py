@@ -115,3 +115,35 @@ def test_cr_sem_conta_contabil_deixa_rastro_no_log(caplog):
         assert any('partida dobrada' in m.lower() for m in caplog.messages), (
             f'a baixa de uma CR sem conta_contabil_codigo passou calada; '
             f'mensagens: {caplog.messages}')
+
+
+# ---------------------------------------------------------------------------
+# B3.7 — guarda de re-baixa
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize('status', ['RECEBIDO', 'QUITADA'])
+def test_conta_ja_liquidada_nao_aceita_nova_baixa(status):
+    """Os DOIS status importam, e é por isso que o teste é parametrizado.
+
+    `baixar_recebimento` grava **`RECEBIDO`**; quem quita a CR de medição é
+    `services/medicao_service.py`, que grava **`QUITADA`**. Uma guarda que só
+    olhasse um dos dois deixaria metade do parque desprotegido.
+
+    O caminho mais plausível não é distração do operador: o import de extrato
+    **cria a conta já `RECEBIDO`** (`services/importacao_excel.py:2478`), e
+    baixá-la à mão soma de novo.
+    """
+    with app.app_context():
+        t = um_tenant(f'a02rb{status[:3].lower()}', data_ref=DIA, com_fatos=False)
+        cr = _conta(t, status=status, recebido=1000.00)
+
+        _post_baixa(t, cr)
+
+        db.session.expire_all()
+        cr_db = db.session.get(ContaReceber, cr.id)
+        assert Decimal(cr_db.valor_recebido) == Decimal('1000.00'), (
+            f'a conta {status} aceitou nova baixa e o recebido foi para '
+            f'{cr_db.valor_recebido} — é dinheiro contado duas vezes')
+        assert len(_fluxos(t)) == 0, (
+            'a re-baixa recusada ainda assim gravou FluxoCaixa')
+
