@@ -4064,6 +4064,62 @@ armadilha do decorador nem a de emitir sem `obra_id`) e só afirma
 
 ---
 
+> ## 🔴 RECONFERÊNCIA DE 05/08 — NÃO CORTE POR NÚMERO DE LINHA NESTE BLOCO
+>
+> Reconhecimento contra `27a823f0`. **Os símbolos existem; quase nenhuma âncora
+> está no lugar.** Num bloco de REMOÇÕES isso não é inconveniência — é o modo de
+> falha. Duas Tasks, seguidas ao pé da letra, cortam o pedaço errado:
+>
+> | Task | O plano manda cortar | O alvo real está em | O que o corte cego faz |
+> |---|---|---|---|
+> | **B4.6** | `views/obras.py:3133-3140` | **`:3166-3172`** | `3133-3140` é hoje o **docstring** de `gerar_cronograma_cliente`. O corte apaga a limpeza CORRETA (`TarefaCronograma…delete()`) e **preserva a legada** — exatamente invertido |
+> | **B4.5** | `views/obras.py:3200-3250` | **`:3233-3284`** | Termina no meio do corpo de `editar_cronograma_cliente` e começa dentro de `gerar_cronograma_cliente`: sobra `try:` decapitado e `def` pela metade. **SyntaxError no melhor caso** |
+>
+> **Demais âncoras corrigidas:** B4.3 `:599-610`/`:887-901` → **`:663-674`/`:951-965`**;
+> B4.4 `models.py:2818` → **`:2894`**; B4.7 `models.py:6988-7010` → **`:7119-7141`**;
+> B4.8 `views/rdo.py:565` → **`:541`** (o plano aponta 24 linhas ABAIXO do alvo),
+> `crud_rdo_completo.py:530` → **`:545`**, `models.py:3057-3094` → **`:3137-3170`**.
+> **B4.2 é a única cujas linhas não se moveram** (`event_manager.py:87-125`).
+>
+> ### O que o plano NÃO lista, e que morde
+>
+> 1. **B4.4 — o homônimo em `models.py`.** `adiantamentos` aparece em **`:2894`**
+>    (a coluna a remover) **e em `:2979`** — `backref='adiantamentos'` da classe
+>    `Adiantamento`, viva, servindo `/folha/adiantamentos`. Um grep desatento
+>    devolve as duas e elas são coisas diferentes. **Não tocar a `:2979`.**
+> 2. **B4.8 — dois backrefs somem junto com o modelo:** `notificacoes_obra` em
+>    `Obra` e `notificacoes` em `RDO` (`models.py:3165-3166`). Grep confirma zero
+>    leitores, então é seguro — mas o comentário de `views/rdo.py:513` cita
+>    justamente esses relationships como a razão de o SQLAlchemy anular a FK
+>    sozinho.
+> 3. **B4.9 — DOIS requisitos que o plano não prevê.**
+>    * `views/obras.py:1229` tem `'notificacao_cliente'` em
+>      `TABELAS_DEPENDENTES_OBRA`, e **`tests/test_excluir_obra.py:121`
+>      (`test_lista_nao_tem_tabela_fantasma`) fica VERMELHO** depois do DROP: ele
+>      afirma que todo nome da lista existe em `information_schema.tables`. Tem de
+>      sair no mesmo commit.
+>    * **Ordem contra o `create_all`:** o boot roda `db.create_all()`
+>      (`app.py:562`, `pre_start.py:29`). Se a 279 dropar a tabela **enquanto o
+>      modelo ainda existir**, o próximo boot **recria `notificacao_cliente`
+>      vazia** — e a migração fica marcada `success` sobre uma tabela que voltou.
+>      **B4.8 tem de estar em PRODUÇÃO antes de a 279 rodar.**
+>
+> ### Veredito
+>
+> **SEGURAS hoje, sem produção: B4.1 a B4.7** — as sete, com as âncoras acima e
+> respeitando a ordem **B4.5 → B4.6 → B4.7** (as duas primeiras removem os únicos
+> dois leitores de `CronogramaCliente`; só depois o modelo pode sair).
+>
+> **BLOQUEADAS: B4.8 e B4.9** — dependem de `SELECT count(*) FROM
+> notificacao_cliente` em **produção** (D11). A consulta é executável como
+> escrita.
+>
+> **A armadilha que o plano acerta e é fácil de estragar:** em **B4.2**, cortar
+> `88-125` em vez de `87-125` deixa o decorador de `:87` vivo, e ele **adota
+> `criar_conta_pagar_entrada_material`** (`:129`) — entrada de material passaria a
+> duplicar `GestaoCustoPai`. Só a asserção de que
+> `_handlers['material_entrada']` tem **um** elemento enxerga isso.
+
 ## 7. B4 — Aposentadorias
 
 **Por que existe, e por último.** As cinco foram reabertas no código vivo e as cinco
