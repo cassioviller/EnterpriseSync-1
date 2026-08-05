@@ -113,11 +113,11 @@ A ordem completa:
 | Bloco | Tasks | Entregues | Abertas | Esforço agregado |
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
-| B1 — parar de perder dado | 17 *(era 16)* | **15** | **2** | G |
+| B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **15** | **1** | G |
 | B2 — o que o sistema informa errado | 20 | 0 | **20** | G |
 | B3 — os elos que morrem a um passo | 10 | 0 | **10** | M |
 | B4 — aposentadorias | 9 | 0 | **9** | M |
-| **Total** | **62** | **21** | **41** | |
+| **Total** | **61** *(62 − 1 cortada)* | **21** | **40** | |
 
 **Estado ao fim de 04/08: A05, A10, A16-a e A09 FECHADOS.** B0 inteiro (6/6), a
 trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e três das cinco da T3
@@ -145,13 +145,13 @@ que está fechado.
 Dos oito xfail que o B0 plantou, sete foram cobrados e removidos pelo próprio
 mecanismo que corrigiram.
 
-**O que resta do bloco B1 são duas Tasks, e nenhuma é trabalho de fôlego:**
+**O que resta do bloco B1 é UMA Task, e não é trabalho de fôlego:**
 
 * **B1.15** — 🟡 aberta e sem impedimento: 403 → 404 na entrada múltipla. Ficou
   fora por ordem de trabalho, não por dúvida.
-* **B1.14** — ⛔ **recomendação de corte**, por mexer em função sem chamador vivo
-  onde a correção isolada troca uma mensagem errada por um 500. Precisa de
-  decisão para virar corte formal na §8.1.
+* **B1.14** — ⛔ **CORTADA em 05/08** (decisão do Cássio: seguir a recomendação).
+  Mexia em função sem chamador vivo onde a correção isolada troca uma mensagem
+  errada por um 500. Ver §8.1.
 
 Depois disso o B1 fecha e começa o **B2** — o maior bloco, 20 Tasks, e onde o
 assunto muda: sai *"o sistema está perdendo dado"* e entra *"o número exibido
@@ -1713,8 +1713,10 @@ outro tenant.
 - [ ] ~~**Step 2:** teste de unidade das duas mensagens~~
 - [ ] ~~**Step 3:** commit~~
 
-**Status: ⛔ NÃO EXECUTADA — recomendação de CORTE, confirmada por leitura.
-Precisa da sua decisão para virar corte formal.**
+**Status: ⛔ CORTADA em 05/08 — a recomendação abaixo virou decisão do Cássio, e a
+Task está na §8.1.** O texto do recorte fica aqui inteiro, porque o dia em que
+`processar_xml_nfe` ganhar chamador ele volta a valer — mas só junto com a decisão
+sobre o UNIQUE global. **Nada abaixo desta linha é trabalho pendente.**
 
 A Task inteira mexe em `almoxarifado_utils.py:250-330` (`processar_xml_nfe`), e o
 próprio §4.4 já registra que a função **está morta**: `grep processar_xml_nfe`
@@ -1729,7 +1731,8 @@ trocando uma mensagem amigável errada por um **500**. Escrever isso em código 
 chamador é pagar risco por zero benefício.
 
 **O que fazer com ela, em ordem de preferência:**
-1. **Cortar** e mover para a §8.1, com a razão acima. É a recomendação.
+1. **Cortar** e mover para a §8.1, com a razão acima. Era a recomendação, e foi
+   **o que se fez em 05/08**.
 2. Se um dia `processar_xml_nfe` ganhar chamador, a Task volta — **e aí junto com
    a decisão sobre o UNIQUE global**, que é o defeito de verdade e é decisão de
    negócio (§12 já registra que trocá-lo por `UNIQUE (admin_id, chave_acesso)`
@@ -3819,6 +3822,7 @@ são diferentes em natureza: **cortado** significa "não voltamos a isto sem fat
 | **A23** — aviso interno de comprovante e decisão de compra do portal | **Não existe canal interno para plugar.** `NotificacaoOrcamento` (`models.py:7438`) é específica de estouro por `ObraServicoCusto`, e `NotificacaoCliente` (`models.py:3061`) está na própria lista de mortas (E02, ver B4). Construir um canal é **feature**, não automação — e a decisão de qual canal (Decisão 7 do `PLANO-NUCLEO.md`) **nem foi tomada** |
 | **Fase 7 / folga livre no scheduler** | Último resíduo de fase declarada obsoleta em `PLANO-NUCLEO.md:106` e §8. O sistema **já tem** folga total e caminho crítico (`services/cronograma_scheduler.py:307-457`). **Corte com efeito colateral útil: libera a faixa de migração 280-283** (ver §12) |
 | **E03** — `ObraSignatarioCliente.email` | **Sai da lista de estruturas mortas: não está morta.** Exibição existe e é visível ao usuário — `templates/obras/_signatarios_cliente.html:74` renderiza `{% if s.email %} · {{ s.email }}{% endif %}`, incluído por `templates/obra_form.html:550`, alimentado por `views/obras.py:1137-1141`. E o leitor é de `1fbc97c0` (29/07), **dois dias antes** do documento que a declarou morta: a linha estava errada quando foi escrita. Nada a aposentar |
+| **B1.14** — dedup de XML por tenant + guarda de `chave_acesso` (cortada em **05/08**) | **Primeira Task deste plano a ser cortada, e a razão é que consertá-la piora.** A função inteira que ela toca — `almoxarifado_utils.py:250` `processar_xml_nfe` — **não tem chamador vivo**: `grep` fora de `archive/` devolve a definição de `:250` e mais nada (reconferido em 05/08; o único outro acerto é um docstring de teste que registra justamente a morte). Impacto em produção hoje: **zero**. E a metade mecânica da Task — pôr `admin_id` no `filter_by` de `:257` — **troca uma mensagem amigável errada por um 500**: com o `xml_hash` escopado, o fluxo passa a alcançar o `db.session.add` de `:328` + `flush()` de `:329` e estoura `IntegrityError` contra o UNIQUE **global** de `NotaFiscal.chave_acesso` (`models.py:2626`, `unique=True` na coluna). O defeito de verdade é esse UNIQUE, e trocá-lo por `UNIQUE (admin_id, chave_acesso)` **não é decisão de execução** (§12). **Volta se, e só se, `processar_xml_nfe` ganhar chamador — e aí junto com a decisão sobre o UNIQUE**, nunca antes |
 | **E11** — `subatividade_mestre_id` como ponte | **Sai da lista: não está morta.** O p8 (`ecf7f3a9`) entregou o leitor — `services/progresso_subatividade.py:41` e `:66` —, com consumidor real em `services/medicao_service.py:279-284`. Não é aposentadoria, é o oposto; o resto do p8 segue aberto como A18 (adiado) |
 
 **Consequência de método, que vale para a próxima lista de estruturas mortas:** "grep por
@@ -4275,21 +4279,23 @@ colisão entre B1 e B2 — e é entre trilhas que, sem ela, seriam paralelas.
 | B3.5 | B3.4 | Sem escritor de `proposta_id`, o filtro de `:263` devolve lista vazia e a chamada nova é tão inerte quanto a antiga |
 | B3.8 | B3.7 | A guarda de re-baixa é o freio; escrever no fluxo de caixa antes dela é criar dupla contagem |
 | B3.10 | B3.9, B3.6 | O teste só existe depois da atribuição, e a asserção do tenant sem plano depende do warning |
-| B1.14 (as duas edições) | — | **Mesmo commit.** A `:257` sozinha troca recusa amigável por IntegrityError 500 |
+| ~~B1.14 (as duas edições)~~ | — | ~~**Mesmo commit.** A `:257` sozinha troca recusa amigável por IntegrityError 500~~ — **Task CORTADA em 05/08 (§8.1).** O par continua verdadeiro e é parte da razão do corte: não havia como entregar metade |
 | B4.3 | B4.2 | Rodar o teste do registro de handlers antes de tocar nos emissores isola a armadilha do decorador |
 | B4.7 | B4.5, B4.6 | Rota → bloco legado → modelo: nessa ordem, se algo quebrar o passo culpado é óbvio |
 | B4.9 | B4.8, D11 | Gate de produção primeiro |
 
 ### 11.4 Ordem recomendada de entrega
 
-**Onde a entrega está, em 04/08:** passo 1 fechado e o passo 2 quase — falta só a
-T3. **O próximo trabalho é B1.12-B1.16, e ele não espera nada.**
+**Onde a entrega está, em 05/08:** passo 1 fechado e o passo 2 a **uma Task** do
+fim. Da T3 saíram B1.12, B1.13 e B1.16; a B1.14 foi **cortada** (§8.1). **O que
+resta do B1 inteiro é a B1.15, e ela não espera nada.**
 
 1. ~~**B0**~~ ✅ (a D3 foi respondida pelos fatos: entrou sozinho, com xfail strict —
    o default recomendado, e os oito xfail funcionaram como checklist até o fim:
    sete caíram cobrados pelo próprio mecanismo que corrigiram).
 2. ~~**B1.1-B1.5b (T1)**~~ ✅ **A05 fechado.** ~~**B1.6-B1.11 (T2)**~~ ✅ **A10 e
-   A16-a fechados.** Falta **B1.12-B1.16** (T3). A serialização do guard inverso
+   A16-a fechados.** Da T3 falta só a **B1.15** — B1.12, B1.13 e B1.16 entregues,
+   B1.14 cortada (§8.1). A serialização do guard inverso
    foi consumida pela T1 (a B1.2 mudou `:379-390`) e a T2 nunca precisou esperar —
    foi o principal efeito prático de A05 ter fechado primeiro.
    *Fica aberto de T2 só o que depende de gente: rodar a `q7` em PRODUÇÃO (B1.8
@@ -4362,6 +4368,20 @@ pacotes abaixo seguem existindo e valendo.**
 ---
 
 ## Histórico
+
+- **2026-08-05** — **B1.14 CORTADA**, por decisão do Cássio sobre a recomendação
+  que a sessão anterior deixou pendurada. É o **primeiro corte de uma Task deste
+  plano** (a §8.1 até aqui só tinha itens `A`/`E` e uma fase inteira), e a razão
+  merece ficar: não é "não vale a pena", é **"consertar piora"**. A função está
+  morta (`processar_xml_nfe`, zero chamadores fora de `archive/` — reconferido
+  hoje), então a Task tinha impacto zero em produção; e a metade mecânica dela
+  transformaria uma mensagem amigável errada em `IntegrityError` 500, porque o
+  UNIQUE de `NotaFiscal.chave_acesso` é **global** (`models.py:2626`) e escopar o
+  `xml_hash` só faz o fluxo chegar mais fundo antes de estourar. O defeito de
+  verdade é o UNIQUE, e ele é decisão de negócio.
+
+  **Contagem depois do corte: 61 Tasks, 21 entregues, 40 abertas.** O B1 fica com
+  16 e uma única aberta.
 
 - **2026-08-04, fecho da sessão** — **A09 fechado e a T3 quase**: B1.12, B1.13 e
   B1.16 entregues; B1.15 aberta sem impedimento; B1.14 com recomendação de corte.
