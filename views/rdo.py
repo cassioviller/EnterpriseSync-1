@@ -1,7 +1,7 @@
 from flask import render_template, request, redirect, url_for, flash, jsonify, make_response, session, abort
 from werkzeug.exceptions import HTTPException
 from flask_login import login_required, current_user
-from models import db, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, NotificacaoCliente
+from models import db, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre
 from auth import admin_required, funcionario_required
 from utils.database_diagnostics import capture_db_errors
 from views.helpers import get_admin_id_robusta, get_admin_id_dinamico
@@ -504,30 +504,29 @@ def excluir_rdo(rdo_id):
         except Exception as _e:
             logger.warning(f"[custo-dia] remover_custo_diario_rdo falhou: {_e}")
 
-        # As QUATRO FKs que apontam para `rdo` sem ON DELETE (confirmadas em
-        # pg_constraint, `confdeltype='a'`): custo_obra, movimentacao_estoque,
-        # alocacao_equipe e notificacao_cliente — as outras 12 são CASCADE ou
-        # SET NULL e se resolvem sozinhas. Na prática só `custo_obra` chega a
-        # estourar: as outras três têm relationship para RDO
-        # (`MovimentacaoEstoque.rdo`, `AlocacaoEquipe.rdo_gerado_rel`,
-        # `NotificacaoCliente`) e o SQLAlchemy anula a FK dos filhos
+        # As TRÊS FKs que apontam para `rdo` sem ON DELETE (confirmadas em
+        # pg_constraint, `confdeltype='a'`): custo_obra, movimentacao_estoque e
+        # alocacao_equipe — as outras 12 são CASCADE ou SET NULL e se resolvem
+        # sozinhas. Na prática só `custo_obra` chega a estourar: as outras duas
+        # têm relationship para RDO (`MovimentacaoEstoque.rdo`,
+        # `AlocacaoEquipe.rdo_gerado_rel`) e o SQLAlchemy anula a FK dos filhos
         # carregados antes de deletar o pai; `custo_obra` não tem nenhuma.
-        # O tratamento explícito fica para as quatro assim mesmo: é um UPDATE
+        # O tratamento explícito fica para as três assim mesmo: é um UPDATE
         # em bloco em vez de carregar a coleção inteira na memória, e não
         # depende de um backref que qualquer refactor pode remover.
-        # A rota tratava só a última — e como o percentual das tarefas era
+        # A rota tratava só uma delas — e como o percentual das tarefas era
         # commitado antes (ver abaixo), o RDO ficava OCO: filhos apagados em
         # definitivo, linha do RDO viva, e o retry falhando igual.
         # Dois tratamentos, conforme o dado sobreviva ou não ao RDO:
-        #   somem junto  — custo_obra (custo derivado do RDO) e
-        #                  notificacao_cliente (aviso de um RDO que não existe
-        #                  mais não tem o que preservar; delete na linha abaixo)
+        #   some junto     — custo_obra, que é custo derivado do RDO
         #   soltam o ponteiro — movimentacao_estoque e alocacao_equipe, que são
         #                  histórico próprio e valem sem o RDO
+        #
+        # E02/B4.8 — eram QUATRO: `notificacao_cliente` saiu da lista junto com o
+        # modelo. A tabela continua parada no banco, sem escritor e sem modelo.
         # Espelha `_materializar_rdos`
-        # (services/importacao_fisico_financeiro.py:366-373), com uma
-        # divergência deliberada: lá a notificação é anulada porque o RDO é
-        # RECRIADO em seguida; aqui ele acaba, e o aviso vai junto.
+        # (services/importacao_fisico_financeiro.py), que também deixou de
+        # anular a FK da notificação.
         from models import AlocacaoEquipe, CustoObra, MovimentacaoEstoque
         db.session.query(CustoObra).filter(
             CustoObra.rdo_id == rdo_id).delete(synchronize_session=False)
@@ -538,7 +537,6 @@ def excluir_rdo(rdo_id):
             AlocacaoEquipe.rdo_gerado_id == rdo_id).update(
                 {AlocacaoEquipe.rdo_gerado_id: None}, synchronize_session=False)
 
-        db.session.query(NotificacaoCliente).filter(NotificacaoCliente.rdo_id == rdo_id).delete()
         db.session.query(RDOFoto).filter(RDOFoto.rdo_id == rdo_id).delete()
         db.session.query(RDOEquipamento).filter(RDOEquipamento.rdo_id == rdo_id).delete()
         db.session.query(RDOMaoObra).filter(RDOMaoObra.rdo_id == rdo_id).delete()

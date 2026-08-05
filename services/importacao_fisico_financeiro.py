@@ -343,7 +343,7 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db, avisos=None):
     avisos = avisos if avisos is not None else []
     from app import db
     from models import (RDO, RDOMaoObra, RDOApontamentoCronograma, Funcionario,
-                        CustoObra, NotificacaoCliente, MovimentacaoEstoque,
+                        CustoObra, MovimentacaoEstoque,
                         AlocacaoEquipe, TarefaCronograma)
     from services.rdo_ciclo_vida import PREENCHIDO
     from utils.cronograma_engine import calcular_progresso_rdo
@@ -355,8 +355,10 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db, avisos=None):
     # CASCADE (mão de obra, apontamentos, fotos…) somem junto; as que referenciam
     # o RDO SEM cascade precisam ser tratadas antes, senão o DELETE viola FK:
     #   - custo_obra: custo derivado do RDO (ex.: mão de obra) → removido junto;
-    #   - notificacao_cliente / movimentacao_estoque / alocacao_equipe → desvincula
+    #   - movimentacao_estoque / alocacao_equipe → desvincula
     #     (preserva o histórico, só solta o ponteiro para o RDO que vai sumir).
+    # E02/B4.8 — `notificacao_cliente` saiu desta lista junto com o modelo: a
+    # tabela não tem escritor e fica parada no banco.
     antigos = RDO.query.filter_by(obra_id=obra.id, admin_id=admin_id).all()
     # Preserva as fotos já importadas (base64) por data, para não perdê-las quando
     # a pasta `fotos_rdos/<data>/` estiver vazia neste reimport (ver loop abaixo).
@@ -365,8 +367,6 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db, avisos=None):
     if old_ids:
         CustoObra.query.filter(CustoObra.rdo_id.in_(old_ids)).delete(
             synchronize_session=False)
-        NotificacaoCliente.query.filter(NotificacaoCliente.rdo_id.in_(old_ids)).update(
-            {NotificacaoCliente.rdo_id: None}, synchronize_session=False)
         MovimentacaoEstoque.query.filter(MovimentacaoEstoque.rdo_id.in_(old_ids)).update(
             {MovimentacaoEstoque.rdo_id: None}, synchronize_session=False)
         AlocacaoEquipe.query.filter(AlocacaoEquipe.rdo_gerado_id.in_(old_ids)).update(

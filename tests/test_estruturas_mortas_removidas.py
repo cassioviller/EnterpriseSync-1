@@ -53,6 +53,92 @@ def _config():
 
 
 # ---------------------------------------------------------------------------
+# Cenário 1 — a exclusão de RDO (B4.8)
+# ---------------------------------------------------------------------------
+
+def _rdo_com_filhos(t, marca):
+    """Um RDO da obra do tenant, com os três filhos que a tabela do plano pede.
+
+    `CustoObra` é o que importa mais: das quatro FKs `NO ACTION` que apontam para
+    `rdo`, é a única SEM `relationship` para o RDO — as outras três o SQLAlchemy
+    resolve sozinho anulando a FK dos filhos carregados. Se a exclusão estourar,
+    estoura por ela.
+    """
+    from models import RDO, CustoObra, RDOMaoObra, RDOServicoSubatividade
+
+    # `numero_rdo` é varchar(20) e a marca do tenant já é longa — o corte é para
+    # caber, e a marca sozinha basta para ser único entre os dois tenants.
+    rdo = RDO(numero_rdo=f'R-{marca}'[:20], data_relatorio=DIA,
+              obra_id=t.obra_id, admin_id=t.admin_id,
+              comentario_geral='Cenário 1', clima_geral='Nublado')
+    db.session.add(rdo)
+    db.session.flush()
+
+    db.session.add(RDOMaoObra(
+        admin_id=t.admin_id, rdo_id=rdo.id, funcionario_id=t.funcionario_id,
+        funcao_exercida='Pedreiro', horas_trabalhadas=8.0))
+    db.session.add(RDOServicoSubatividade(
+        rdo_id=rdo.id, nome_subatividade='Preparação',
+        percentual_conclusao=30.0, admin_id=t.admin_id))
+    db.session.add(CustoObra(
+        obra_id=t.obra_id, admin_id=t.admin_id, rdo_id=rdo.id,
+        tipo='mao_obra', descricao=f'Custo do RDO {marca}',
+        valor=100.0, data=DIA))
+    db.session.commit()
+    return rdo.id
+
+
+def _contagens(rdo_id):
+    from models import CustoObra, RDOMaoObra, RDOServicoSubatividade
+
+    db.session.expire_all()
+    return (RDOMaoObra.query.filter_by(rdo_id=rdo_id).count(),
+            RDOServicoSubatividade.query.filter_by(rdo_id=rdo_id).count(),
+            CustoObra.query.filter_by(rdo_id=rdo_id).count())
+
+
+def test_exclusao_de_rdo_leva_os_filhos_e_nao_estoura_fk():
+    """🔬 **A resposta 200/302 sozinha não vale como prova, e é o ponto do teste.**
+
+    As quatro FKs de `notificacao_cliente` são `NO ACTION`, e a rota de exclusão
+    **captura a exceção, faz rollback e redireciona com flash** — então o status
+    sai idêntico no sucesso e no fracasso. Um teste que afirmasse `302` ficaria
+    verde com o RDO intacto no banco.
+
+    Por isso a asserção é sobre o BANCO: o RDO some e as três contagens filhas
+    zeram. É este teste que roda entre cada um dos três pontos da B4.8, e é ele
+    que denuncia se remover uma limpeza deixou a exclusão estourando FK.
+    """
+    from models import RDO
+
+    with app.app_context():
+        a, b = dois_tenants('mortas1', data_ref=DIA, com_fatos=False)
+        rdo_a = _rdo_com_filhos(a, a.marca)
+        rdo_b = _rdo_com_filhos(b, b.marca)
+        assert _contagens(rdo_a) == (1, 1, 1), 'a semeadura do cenário 1 falhou'
+
+        r = cliente_de(a.admin_id).post(f'/rdo/excluir/{rdo_a}',
+                                        follow_redirects=True)
+        assert r.status_code == 200, f'a rota respondeu {r.status_code}'
+
+        db.session.expire_all()
+        assert db.session.get(RDO, rdo_a) is None, (
+            'o RDO continua no banco — a exclusão estourou FK e a rota engoliu a '
+            'exceção; o 302/200 não denuncia isso')
+        assert _contagens(rdo_a) == (0, 0, 0), (
+            f'filhos sobreviveram ao pai: {_contagens(rdo_a)} '
+            f'(mao_obra, subatividade, custo_obra)')
+
+        # O tenant B não foi tocado — nem o RDO, nem os filhos.
+        assert db.session.get(RDO, rdo_b) is not None, (
+            'a exclusão do tenant A levou o RDO do tenant B junto')
+        assert _contagens(rdo_b) == (1, 1, 1), (
+            f'os filhos do tenant B mudaram: {_contagens(rdo_b)}')
+        assert b.marca not in r.get_data(as_text=True), (
+            'a resposta do tenant A cita a marca do tenant B')
+
+
+# ---------------------------------------------------------------------------
 # Cenário 4 — o registro de eventos (B4.1 e B4.2)
 # ---------------------------------------------------------------------------
 

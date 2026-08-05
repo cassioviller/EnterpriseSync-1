@@ -3141,40 +3141,17 @@ class RdoAtividade(db.Model):
 # NOTIFICAÇÕES CLIENTE - MÓDULO 2
 # ================================
 
-class NotificacaoCliente(db.Model):
-    """Notificações automáticas para clientes via portal"""
-    __tablename__ = 'notificacao_cliente'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
-    
-    # Tipo e conteúdo
-    tipo = db.Column(db.String(30), nullable=False)  # 'novo_rdo', 'marco_atingido', 'atraso', 'conclusao_atividade'
-    titulo = db.Column(db.String(100), nullable=False)
-    mensagem = db.Column(db.Text, nullable=False)
-    
-    # Dados relacionados
-    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
-    atividade_id = db.Column(db.Integer, db.ForeignKey('rdo_atividade.id'))
-    
-    # Status
-    visualizada = db.Column(db.Boolean, default=False)
-    data_visualizacao = db.Column(db.DateTime)
-    
-    # Prioridade
-    prioridade = db.Column(db.String(10), default='normal')  # 'baixa', 'normal', 'alta', 'urgente'
-    
-    # Controle
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relacionamentos
-    obra = db.relationship('Obra', backref='notificacoes_obra')
-    rdo = db.relationship('RDO', backref='notificacoes')
-    # Removido: relacionamento com RDOAtividade obsoleto
-    
-    def __repr__(self):
-        return f'<NotificacaoCliente {self.titulo}>'
+# E02/B4.8 — `NotificacaoCliente` foi aposentado em 05/08.
+#
+# A tabela `notificacao_cliente` FICA no banco (a migração 279 a dropa em
+# separado, e só quando a contagem provar que está vazia). O que sai aqui é o
+# modelo: não havia escritor nenhum, e os dois backrefs que ele criava —
+# `Obra.notificacoes_obra` e `RDO.notificacoes` — sumiram junto, conferidos sem
+# leitor em código vivo ou template.
+#
+# As três rotas que limpavam a FK antes de excluir um RDO
+# (`views/rdo.py`, `crud_rdo_completo.py`, `services/importacao_fisico_financeiro.py`)
+# deixaram de tratá-la no mesmo commit.
 
 # ===============================================================
 # == MÓDULO 7: SISTEMA CONTÁBIL COMPLETO

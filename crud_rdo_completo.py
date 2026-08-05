@@ -3,7 +3,7 @@
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from models import db, RDO, Obra, Funcionario, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, SubatividadeMestre, NotificacaoCliente, RDOFoto, RDOApontamentoCronograma, CustoObra, AlocacaoEquipe, MovimentacaoEstoque
+from models import db, RDO, Obra, Funcionario, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, SubatividadeMestre, RDOFoto, RDOApontamentoCronograma, CustoObra, AlocacaoEquipe, MovimentacaoEstoque
 from datetime import datetime
 import json
 import logging
@@ -541,8 +541,11 @@ def excluir_rdo(rdo_id):
         
         numero_rdo = rdo.numero_rdo
         
-        # Excluir TODOS os dados relacionados (incluindo notificacoes e fotos!)
-        NotificacaoCliente.query.filter_by(rdo_id=rdo.id).delete()
+        # Excluir TODOS os dados relacionados (fotos, apontamentos e filhos do RDO)
+        #
+        # E02/B4.8 — a limpeza de `notificacao_cliente` saiu daqui: a tabela não
+        # tem escritor nenhum e o modelo foi aposentado. As outras três FKs sem
+        # ON DELETE continuam tratadas abaixo.
         RDOFoto.query.filter_by(rdo_id=rdo.id).delete()
         RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).delete()
         RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
