@@ -6057,6 +6057,62 @@ def _migration_278_baseline_bac():
         raise
 
 
+def _migration_279_drop_notificacao_cliente():
+    """E02 — dropa `notificacao_cliente`, e só quando ela provar estar vazia.
+
+    A tabela não tem escritor: o modelo `NotificacaoCliente` foi aposentado na
+    B4.8 e o único código que criava linhas está em `archive/`, fora do boot.
+
+    **A contagem ANTES do drop é o que torna esta migração segura por
+    construção**, e não uma formalidade:
+
+    * `run_migration_safe` grava status `'failed'` e faz rollback quando a
+      migração levanta (`:186-194`), **sem propagar a exceção** (`:199`) — o boot
+      não cai;
+    * `is_migration_executed` só aceita `'success'` (`:83-85`), então uma 279 que
+      falhou **não fica marcada como aplicada**: ela retenta no boot seguinte.
+
+    Ou seja: ela nunca destrói aviso de cliente, e só passa quando a tabela está
+    provadamente vazia. Se ficar `'failed'`, o E02 volta para decisão humana — e
+    volta **ruidosamente**, porque cada boot repete o erro no log.
+
+    ⚠️ **Se esta migração falhar, a B4.8 precisa ser revertida.** Sem o modelo,
+    nada mais anula a FK `NO ACTION` de `notificacao_cliente.rdo_id`, e excluir um
+    RDO que tenha notificação passa a falhar em silêncio (a rota captura, faz
+    rollback e responde 200 igual). Medido, não suposto.
+
+    `DROP TABLE IF EXISTS` sem `CASCADE`: se alguma dependência inesperada existir,
+    é melhor falhar e mostrar do que arrastá-la junto.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            existe = conn.execute(sa_text(
+                "SELECT to_regclass('public.notificacao_cliente')")).scalar()
+            if existe is None:
+                logger.info("[Migration 279] notificacao_cliente já não existe — "
+                            "nada a fazer.")
+                return
+
+            n = conn.execute(sa_text(
+                "SELECT count(*) FROM notificacao_cliente")).scalar() or 0
+            if n > 0:
+                raise RuntimeError(
+                    f"notificacao_cliente tem {n} linha(s) — DROP ABORTADO. "
+                    f"O E02 pressupõe a tabela vazia; com dado dentro, a decisão "
+                    f"de descartar ou preservar aviso de cliente é humana. "
+                    f"ATENÇÃO: a B4.8 já removeu o modelo, então a exclusão de "
+                    f"RDO com notificação está falhando em silêncio — reverta a "
+                    f"B4.8 ou trate estas linhas.")
+
+            conn.execute(sa_text("DROP TABLE IF EXISTS notificacao_cliente"))
+        logger.info("[Migration 279] notificacao_cliente dropada (estava vazia; "
+                    "modelo aposentado na B4.8).")
+    except Exception as e:
+        logger.error(f"[Migration 279] Falha: {e}", exc_info=True)
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -6341,6 +6397,7 @@ def executar_migracoes():
             (269, "Fase 9a — remove uq_rdo_assinatura_papel também quando é ÍNDICE (a 268 só tratava constraint)", _migration_269_remover_indice_unico_antigo_de_assinatura),
             (277, "Editor de cronograma v2 em todo o parque — linha de base primeiro, flag ligada em todos os tenants, default da coluna vira TRUE", _migration_277_editor_v2_em_todo_o_parque),
             (278, "p10 — cronograma_baseline.bac (orçamento congelado junto com o prazo; NULL = baseline anterior)", _migration_278_baseline_bac),
+            (279, "E02 — drop de notificacao_cliente, auto-guardado pela contagem (falha e retenta se houver linha)", _migration_279_drop_notificacao_cliente),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
