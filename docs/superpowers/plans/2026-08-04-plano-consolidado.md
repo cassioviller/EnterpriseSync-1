@@ -3397,27 +3397,65 @@ ser acionado pela UI e um dado velho fica sem conserto.
 > Três coisas mudaram de estado desde 04/08, e uma delas **faria a B3.8 nascer
 > inerte**.
 >
-> ### 🔴 1. A B3.8 edita duas páginas que a UI NUNCA renderiza
+> ### 🔴 1. A B3.8 edita duas páginas que a UI NUNCA renderiza — e falta uma TERCEIRA edição
 >
-> O Step 3 manda pôr o checkbox `criar_fluxo_caixa` em
-> `templates/financeiro/receber_conta.html`, copiando o "padrão já estabelecido"
-> de `pagar_conta.html`. **As duas premissas são falsas:**
+> **Reconferido em detalhe em 05/08, à noite.** O modal vivo é
+> `templates/financeiro/contas_receber.html:242-286` (`formBaixaRecebimento`,
+> `action` montada em JS na `:296`, string crua e não `url_for`). Ele manda
+> **cinco campos**: `conta_id`, `valor_recebido`, `data_recebimento`,
+> `forma_recebimento`, `banco_id`. **Zero ocorrências de `criar_fluxo_caixa`**
+> (grep confirmado). Logo `request.form.get('criar_fluxo_caixa') == '1'` é sempre
+> `False` e **nenhum `FluxoCaixa` nasceria**.
 >
-> * `grep -rn receber_conta templates/` devolve **ZERO** — nada no app linka para
->   o GET. O POST vivo sai do **modal** `formBaixaRecebimento`
->   (`templates/financeiro/contas_receber.html:242-283`), com a `action` montada
->   em JS (`:296`);
-> * esse modal **não manda `criar_fluxo_caixa`** (grep: ausente). Logo
->   `criar_fc` é sempre `False` e o `FluxoCaixa` ENTRADA **nunca nasceria**;
-> * o "padrão do lado pagar" é letra morta pelo mesmo motivo: `contas_pagar.html`
->   posta pelo modal de `:402`/`:466`, também sem o checkbox. O `FluxoCaixa`
->   SAIDA de hoje provavelmente só nasce por URL digitada à mão.
+> `templates/financeiro/receber_conta.html` existe e é renderizado pelo GET, mas
+> **nenhum template do app aponta para ele** — só chegável por URL digitada.
 >
-> **Consequência:** sem tocar o MODAL, a B3.8 entrega código que não executa — e
-> as três camadas de defesa contra dupla contagem viram uma só (a guarda da
-> B3.7). É exatamente a falha silenciosa que o Risco 4 da própria Task descreve,
-> vinda pelo lado que ela não olhou. **A Task precisa ser reescrita para editar
-> `contas_receber.html:242-296`, não `receber_conta.html`.**
+> **O lado PAGAR é o mesmo defeito, e é pior do que "não serve de padrão": ele
+> próprio nunca executa.** `contas_pagar.html:402-443` posta pelo modal, também
+> sem `criar_fluxo_caixa`; o checkbox de `pagar_conta.html:94` está numa página
+> igualmente órfã. **O `FluxoCaixa` SAIDA da rota só nasce por URL digitada à
+> mão.** Copiar esse padrão é copiar código morto.
+>
+> **A SEGUNDA edição escondida, que Task nenhuma menciona:** o `<select>` de
+> categoria precisa de dados, e quem renderiza o modal é a **listagem**
+> (`listar_contas_receber`), não o `receber_conta`. É lá que `categorias_fc` tem
+> de ser carregada (filtrando `tipo == 'ENTRADA'`, como `importacao_views.py:485`
+> já faz).
+>
+> **`obra_id=conta.obra_id` é obrigatório** no `FluxoCaixa` novo:
+> `financeiro_service.py:695-696` filtra por ele no `rr_query`, e sem isso o
+> recebimento some do fluxo por obra. O lado pagar **não** o preenche.
+>
+> **A B3.8 precisa ser reescrita assim**, e o passo 5 é o que teria pego a
+> inércia:
+>
+> 1. teste vermelho: POST no modal com `criar_fluxo_caixa=1` → zero linhas;
+> 2. `listar_contas_receber` passa `categorias_fc`;
+> 3. o **modal** ganha o checkbox (`checked`, com "desmarque se já foi registrado
+>    por outro meio") e o `<select>`;
+> 4. o POST grava `FluxoCaixa` ENTRADA com `obra_id`, em try próprio — sem
+>    `abort()`, porque o `except` de `financeiro_views.py:661-663` engole
+>    `HTTPException` e devolve 200;
+> 5. **um teste que renderiza `GET /financeiro/contas-receber` e afirma que o HTML
+>    contém `name="criar_fluxo_caixa"` DENTRO do form `formBaixaRecebimento`** —
+>    sem ele, a Task pode voltar a ficar inerte em silêncio;
+> 6. os casos verdes; remover o checkbox **ou** o `obra_id` deixa vermelho.
+>
+> **Risco a acrescentar:** paridade real com o lado pagar exige o mesmo checkbox
+> em `contas_pagar.html`, e isso é **item próprio**.
+>
+> ### 🔴 1b. A B3.7 tem QUATRO escritores de status, não três
+>
+> | # | Onde | O que faz |
+> |---|---|---|
+> | 1 | `financeiro_service.py:315` | `'RECEBIDO'` quando `saldo <= 0` |
+> | 2 | `services/medicao_service.py:400` | `'QUITADA'` no ramo de **update** |
+> | 3 | `services/medicao_service.py:379` | nasce `'QUITADA'` quando `valor_medido == 0` |
+> | 4 | **`services/importacao_excel.py:2478`** | **cria a CR já `'RECEBIDO'`** a partir do extrato |
+>
+> O quarto é citado no corpo da B3.7 como "o caminho mais plausível", mas **não
+> está entre os riscos que mandam testar** — e é escritor de status tanto quanto
+> os outros. A guarda de re-baixa precisa cobri-lo.
 >
 > ### 🔴 2. Um `xfail(strict=True)` vira FAILED no commit da B3.5
 >
