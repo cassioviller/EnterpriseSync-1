@@ -185,13 +185,10 @@ def rdos():
                         RDOMaoObra.rdo_id == rdo.id
                     ).all()
 
-                    # Detectar V2 (obra com TarefaCronograma)
+                    # A19 — predicado único (com `ativa` e `is_cliente`).
                     if rdo.obra_id not in _cache_obra_v2:
-                        _cache_obra_v2[rdo.obra_id] = (
-                            session.query(_TC).filter_by(
-                                obra_id=rdo.obra_id, admin_id=admin_id
-                            ).first() is not None
-                        )
+                        _cache_obra_v2[rdo.obra_id] = obra_em_modo_v2(
+                            rdo.obra_id, admin_id)
                     obra_em_v2 = _cache_obra_v2[rdo.obra_id]
 
                     aps_count = (
@@ -215,26 +212,17 @@ def rdos():
                                 _cache_prog_v2[ck] = {'progresso_geral_pct': 0}
                         progresso_real = _cache_prog_v2[ck].get('progresso_geral_pct', 0) or 0
                     else:
-                        # Cumulative progress: latest known % for each distinct
-                        # subatividade across ALL RDOs of this obra, then averaged.
-                        if rdo.obra_id not in _cache_prog_v1:
-                            rows_v1 = session.query(
-                                RDOServicoSubatividade.nome_subatividade,
-                                RDOServicoSubatividade.percentual_conclusao,
-                                RDO.data_relatorio
-                            ).join(RDO, RDOServicoSubatividade.rdo_id == RDO.id).filter(
-                                RDO.obra_id == rdo.obra_id,
-                                RDO.admin_id == admin_id
-                            ).all()
-                            latest_v1: dict = {}
-                            for nome, pct, data_rdo in rows_v1:
-                                if nome not in latest_v1 or (data_rdo and data_rdo > latest_v1[nome][1]):
-                                    latest_v1[nome] = (pct or 0, data_rdo)
-                            _cache_prog_v1[rdo.obra_id] = (
-                                sum(v[0] for v in latest_v1.values()) / len(latest_v1)
-                                if latest_v1 else 0
-                            )
-                        progresso_real = _cache_prog_v1[rdo.obra_id]
+                        # A19/B2.11 — acumulado ATÉ A DATA DESTA LINHA.
+                        # O cache era por `obra_id` sem teto de data, então
+                        # TODA linha da lista mostrava o mesmo número, o de
+                        # hoje. E a consulta pegava "o mais recente por nome",
+                        # que não é monotônico: correção para baixo no último
+                        # RDO derrubava o número de todas as linhas de uma vez.
+                        ck_v1 = (rdo.obra_id, rdo.data_relatorio)
+                        if ck_v1 not in _cache_prog_v1:
+                            _cache_prog_v1[ck_v1] = progresso_v1_acumulado(
+                                rdo.obra_id, admin_id, rdo.data_relatorio)
+                        progresso_real = _cache_prog_v1[ck_v1]
 
                     # Horas: aplica normalização on-the-fly por (sub_id) p/
                     # consistência com o detalhe — RDOs antigos podem ter
@@ -341,8 +329,10 @@ def rdos():
             rdos = MockPagination(rdos_basicos)
             
             # Task #61 — fallback usa MESMA lógica V2 + normalização horas
-            from models import RDOApontamentoCronograma as _RAC2, TarefaCronograma as _TC2
-            from utils.cronograma_engine import calcular_progresso_geral_obra_v2 as _calc_v2
+            from models import RDOApontamentoCronograma as _RAC2
+            from utils.cronograma_engine import (
+                calcular_progresso_geral_obra_v2 as _calc_v2,
+                obra_em_modo_v2, progresso_v1_acumulado)
             from utils.rdo_horas import normalizar_horas_funcionario as _norm
             _cprog: dict = {}
             _cobra: dict = {}
@@ -357,11 +347,8 @@ def rdos():
                     ).all()
 
                     if rdo.obra_id not in _cobra:
-                        _cobra[rdo.obra_id] = (
-                            db.session.query(_TC2).filter_by(
-                                obra_id=rdo.obra_id, admin_id=admin_id
-                            ).first() is not None
-                        )
+                        # A19 — predicado único (com `ativa` e `is_cliente`).
+                        _cobra[rdo.obra_id] = obra_em_modo_v2(rdo.obra_id, admin_id)
                     obra_v2 = _cobra[rdo.obra_id]
                     aps_count = (
                         db.session.query(_RAC2).filter_by(rdo_id=rdo.id).count()
@@ -378,26 +365,14 @@ def rdos():
                                 _cprog[ck] = {'progresso_geral_pct': 0}
                         rdo.progresso_total = round(_cprog[ck].get('progresso_geral_pct', 0) or 0, 1)
                     else:
-                        # Cumulative progress: latest known % for each distinct
-                        # subatividade across ALL RDOs of this obra, then averaged.
-                        if rdo.obra_id not in _cprog_v1:
-                            rows_v1 = db.session.query(
-                                RDOServicoSubatividade.nome_subatividade,
-                                RDOServicoSubatividade.percentual_conclusao,
-                                RDO.data_relatorio
-                            ).join(RDO, RDOServicoSubatividade.rdo_id == RDO.id).filter(
-                                RDO.obra_id == rdo.obra_id,
-                                RDO.admin_id == admin_id
-                            ).all()
-                            latest_v1: dict = {}
-                            for nome, pct, data_rdo in rows_v1:
-                                if nome not in latest_v1 or (data_rdo and data_rdo > latest_v1[nome][1]):
-                                    latest_v1[nome] = (pct or 0, data_rdo)
-                            _cprog_v1[rdo.obra_id] = (
-                                sum(v[0] for v in latest_v1.values()) / len(latest_v1)
-                                if latest_v1 else 0
-                            )
-                        rdo.progresso_total = round(_cprog_v1[rdo.obra_id], 1)
+                        # A19/B2.11 — a cópia gêmea da de `:204`, mesma correção.
+                        # Trocar uma e não a outra reintroduziria a divergência
+                        # dentro de uma única rota.
+                        ck_v1 = (rdo.obra_id, rdo.data_relatorio)
+                        if ck_v1 not in _cprog_v1:
+                            _cprog_v1[ck_v1] = progresso_v1_acumulado(
+                                rdo.obra_id, admin_id, rdo.data_relatorio)
+                        rdo.progresso_total = round(_cprog_v1[ck_v1], 1)
 
                     entradas = []
                     for mo in mao_obra:
