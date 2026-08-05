@@ -95,16 +95,30 @@ def _filhos_de_mao_de_obra(t):
 # Step D
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason='A05 — com a asserção apertada para '
-                                       '== 1, o defeito aparece: dá ZERO')
+@pytest.mark.xfail(strict=True, reason='A16 2ª metade (D6) — ponto sem custo '
+                                       'faz o RDO abster-se em favor de um '
+                                       'lançamento que nunca chega')
 def test_dia_com_ponto_e_rdo_nao_gera_dois_custos_de_obra(_par):
     """O caso do mundo real: bate ponto durante o dia, RDO fechado à noite.
 
-    🔬 **04/08 — a asserção era ``<= 1``, que é verdadeira para zero.** Apertada
-    para ``== 1``, revela que o dia não gera custo NENHUM: `existe_ponto_no_dia`
-    (`event_manager.py:722-726`) faz o RDO abster-se porque **existe registro de
-    ponto**, não porque existe custo do ponto. Com o custo do ponto ausente, os
-    dois lados se abstêm citando o outro.
+    🔬 **04/08, manhã — a asserção era ``<= 1``, verdadeira para zero.** Apertada
+    para ``== 1``, revelou que o dia não gerava custo NENHUM.
+
+    🔬 **04/08, fecho — a marca estava com o ITEM ERRADO, e vale corrigir para
+    não mandar ninguém procurar no lugar errado.** Dizia A05, e **A05 está
+    fechado**: depois da B1.3 o guard exige ponto PRODUTIVO e cobre apenas
+    `CustoObra`, então o RDO se abster aqui é o comportamento correto — existe
+    um `RegistroPonto` de 8h com obra, e o ponto é o fato medido.
+
+    O que sobra é a outra ponta: **o custo do ponto nunca chega.** Neste teste
+    porque o cenário emite só `rdo_finalizado`; em PRODUÇÃO porque ponto nascido
+    do plano não emite `ponto_registrado` — nada em `models.py` emite esse evento
+    (`grep EventManager models.py`: vazio). É a **segunda metade do A16**, travada
+    pela **D6** (o plano consolidado, §10): se turno previsto sem batida deve
+    gerar custo é pergunta de negócio.
+
+    Enquanto a D6 não for respondida, o dia fica sem custo em lugar nenhum — e
+    este xfail é o marcador disso, agora apontando para o item certo.
     """
     a, _b = _par
     _limpar_custos(a)

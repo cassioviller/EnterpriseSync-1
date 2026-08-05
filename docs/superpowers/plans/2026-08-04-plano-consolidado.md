@@ -124,10 +124,26 @@ trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e três das cinco da T3
 (B1.12, B1.13, B1.16). A contagem subiu de 61 para 62 porque o B0 achou um
 defeito que nenhum recorte tinha visto (B1.5b).
 
-**Sobra UM `xfail` no repositório inteiro**, e não é dívida: é
-`test_o_ponto_criado_pelo_sync_gera_custo`, a segunda metade do A16, travada pela
-**D6** (§10) — pergunta de negócio, não de código. Dos oito que o B0 plantou,
-sete foram cobrados e removidos pelo próprio mecanismo que corrigiram.
+**Sobram TRÊS `xfail` no repositório inteiro, e nenhum é dívida técnica** —
+todos esperam decisão ou Task futura:
+
+| Onde | Item | Espera |
+|---|---|---|
+| `test_arreio_presenca_rotas.py:391` | A16, 2ª metade | **D6** |
+| `test_p1_dedup_cross_origem.py:98` | A16, 2ª metade | **D6** |
+| `test_arreio_aprovacao_proposta_rotas.py:166` | A14 | Task **B3.5** |
+
+⚠️ **O segundo estava rotulado como `A05` e o rótulo era falso** — corrigido no
+fecho da sessão. Depois da B1.3 o guard exige ponto **produtivo** e cobre só
+`CustoObra`, então o RDO abster-se ali é o comportamento CERTO: existe
+`RegistroPonto` de 8h com obra, e o ponto é o fato medido. O que falta é a outra
+ponta — **o custo do ponto nunca chega**, porque nada em `models.py` emite
+`ponto_registrado` (`grep EventManager models.py`: vazio). Mesmo buraco do
+primeiro, mesma trava. Quem lesse o rótulo antigo iria procurar defeito em A05,
+que está fechado.
+
+Dos oito xfail que o B0 plantou, sete foram cobrados e removidos pelo próprio
+mecanismo que corrigiram.
 
 **O que resta do bloco B1 são duas Tasks, e nenhuma é trabalho de fôlego:**
 
@@ -4350,11 +4366,15 @@ pacotes abaixo seguem existindo e valendo.**
 - **2026-08-04, fecho da sessão** — **A09 fechado e a T3 quase**: B1.12, B1.13 e
   B1.16 entregues; B1.15 aberta sem impedimento; B1.14 com recomendação de corte.
 
-  ⚠️ **LEIA ISTO ANTES DE CONTINUAR: o gate completo desta última leva NÃO foi
-  confirmado.** A sessão fechou com ele em execução. O que existe de verificação:
-  o arreio da T3 e o `test_cronograma_engine_unificado` verdes (17 passed, zero
-  xfail), e nada mais. **O primeiro passo de quem retomar é `bash run_tests.sh
-  --gate`.** Está anotado aqui e não no commit porque commit ninguém relê.
+  ✅ **GATE CONFIRMADO VERDE, depois do commit:** `1864 passed, 6 skipped,
+  3 xfailed`, zero falhas, em 25m52s. O commit `bbe74f00` foi feito com o gate
+  ainda em execução e diz isso no corpo — **aquela ressalva está superada**, e
+  fica registrada aqui porque commit ninguém reescreve. Contra o gate anterior:
+  +5 testes (o arreio novo da T3) e o mesmo número de xfail.
+
+  Nenhum arquivo `.py` mudou entre o início do gate e o commit, então o resultado
+  vale para a árvore commitada — a única exceção é a correção do *rótulo* de um
+  xfail, feita depois e que não altera resultado de teste (só a `reason`).
 
   As três premissas do §4.4 foram todas reconferidas no código, e **a terceira
   estava errada, sendo do próprio plano**: o `Servico` alheio sai da consulta mas
