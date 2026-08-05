@@ -117,7 +117,21 @@ class FinanceiroService:
             
             db.session.commit()
             
-            # ✅ NOVO: Criar lançamento contábil se conta tem vinculação contábil
+            # A03/B3.6 — o gate contábil deixou de ser MUDO em 05/08.
+            #
+            # Ele sempre pulou a partida dobrada quando a CR não tem conta
+            # contábil, e isso está certo — não há para onde lançar. O defeito era
+            # ninguém ficar sabendo: não havia como responder "quantas CRs estão
+            # fora da contabilidade", e essa resposta é o diagnóstico de que as
+            # etapas seguintes do A03 dependem.
+            if not conta.conta_contabil_codigo:
+                logger.warning(
+                    "⚠️ [A03] partida dobrada PULADA — ContaReceber %s sem "
+                    "conta_contabil_codigo (origem=%s doc=%s valor=%s obra=%s). "
+                    "O recebimento foi baixado; o lançamento contábil não existe.",
+                    conta.id, getattr(conta, 'origem_tipo', None),
+                    conta.numero_documento, valor_recebido, conta.obra_id)
+
             if conta.conta_contabil_codigo:
                 try:
                     # Gerar numero sequencial
@@ -328,7 +342,21 @@ class FinanceiroService:
             
             db.session.commit()
             
-            # ✅ NOVO: Criar lançamento contábil se conta tem vinculação contábil
+            # A03/B3.6 — o gate contábil deixou de ser MUDO em 05/08.
+            #
+            # Ele sempre pulou a partida dobrada quando a CR não tem conta
+            # contábil, e isso está certo — não há para onde lançar. O defeito era
+            # ninguém ficar sabendo: não havia como responder "quantas CRs estão
+            # fora da contabilidade", e essa resposta é o diagnóstico de que as
+            # etapas seguintes do A03 dependem.
+            if not conta.conta_contabil_codigo:
+                logger.warning(
+                    "⚠️ [A03] partida dobrada PULADA — ContaReceber %s sem "
+                    "conta_contabil_codigo (origem=%s doc=%s valor=%s obra=%s). "
+                    "O recebimento foi baixado; o lançamento contábil não existe.",
+                    conta.id, getattr(conta, 'origem_tipo', None),
+                    conta.numero_documento, valor_recebido, conta.obra_id)
+
             if conta.conta_contabil_codigo:
                 try:
                     # Gerar numero sequencial
