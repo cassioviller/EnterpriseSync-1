@@ -15,6 +15,14 @@ Notas de ambiente confirmadas no spike:
 - Cronograma da obra: GET /cronograma/obra/<obra_id>.
 - O processo de teste compartilha o MESMO banco Postgres do servidor (dados criados via browser
   são visíveis nas consultas _db()).
+
+⚠️ ESTE ARQUIVO SÓ RODA INTEIRO — NUNCA FILTRAR COM -k.
+O `CTX` de módulo (linha ~69) é estado mutável compartilhado: escrito pelos testes
+01/02/04/05 e lido por 14 dos 19. Selecionar um teste isolado falha por dado ausente,
+não por defeito. Isso é DESENHO de cenário sequencial, não dívida — decisão D-B5.2 da
+rodada B5 (docs/superpowers/plans/2026-08-06-rodada-b5-varredura.md, §9), default
+"documentar". A decisão INVERTE se a paralelização do gate (pytest-xdist/randomly)
+entrar na mesa — aí este arquivo precisa ser reescrito com fixtures encadeados.
 """
 import os
 import sys
