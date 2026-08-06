@@ -525,6 +525,25 @@ class FinanceiroService:
             dt_fim = datetime.combine(data_fim, datetime.max.time())
             from sqlalchemy import or_ as sql_or
             STATUSES_ABERTOS = ['PENDENTE', 'SOLICITADO', 'AUTORIZADO', 'PARCIAL']
+
+            # B5.7 — exclusão de gêmeos, a MESMA de `listar_contas_pagar`
+            # (financeiro_views.py:190-217), que faltava aqui: GCP de pedido
+            # de compra tem gêmea ContaPagar da mesma obrigação, e pagar a
+            # gêmea debita `banco.saldo_atual` (= o saldo_inicial deste
+            # fluxo) MANTENDO a prevista do GCP para sempre — a mesma despesa
+            # subtraída duas vezes do saldo projetado. ⚠️ dev 06/08: 580
+            # gêmeos, R$ 490.950, 24% do valor aberto.
+            #
+            # Restrita por escrito à família `pedido_compra` (as famílias 2 e
+            # 3 do apenso têm regra própria — a 3 fecha no guard de
+            # `migrar_contas_pagar`). O `admin_id` na subquery NÃO é
+            # opcional: sem ele, filho de outro tenant com `pai_id` colidindo
+            # exclui GCP alheio por misjoin — o erro que a medição do WF-2
+            # cometeu duas vezes (41 falsos gêmeos).
+            _gemeos_compra = db.session.query(GestaoCustoFilho.pai_id).filter(
+                GestaoCustoFilho.admin_id == admin_id,
+                GestaoCustoFilho.origem_tabela == 'pedido_compra',
+            ).distinct().subquery()
             # joinedload da categoria: o rótulo do fluxo lê custo.categoria_fluxo_caixa;
             # eager-load resolve a categoria no MESMO SELECT do Pai (snapshot já visível),
             # evitando o lazy-load por linha que ficava stale na 1ª leitura após a escrita.
@@ -534,6 +553,9 @@ class FinanceiroService:
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
                     GestaoCustoPai.status.in_(STATUSES_ABERTOS),
+                    # B5.7 — os gêmeos ficam fora das previstas E, por
+                    # derivação, dos `detalhes` e dos buckets mensais.
+                    ~GestaoCustoPai.id.in_(_gemeos_compra),
                     sql_or(
                         # Com data_vencimento: filtrar pelo período consultado
                         and_(
@@ -585,6 +607,13 @@ class FinanceiroService:
                     GestaoCustoPai.status == 'PAGO',
                     GestaoCustoPai.data_pagamento >= data_inicio,
                     GestaoCustoPai.data_pagamento <= data_fim,
+                    # B5.7 / D-B5.7(2) — compras ficam fora do fluxo também
+                    # neste fallback (PAGO sem FC): o realizado de compra
+                    # legítimo entra pelo pr_query (FluxoCaixa), nunca por
+                    # aqui. O buraco declarado da decisão (compra paga pela
+                    # tela de contas a pagar não gera realizado no fluxo)
+                    # está documentado no apenso, não escondido.
+                    ~GestaoCustoPai.id.in_(_gemeos_compra),
                 )
             )
             if obra_id:

@@ -1350,6 +1350,22 @@ def migrar_contas_pagar():
                 ignorados += 1
                 continue
 
+            # B5.7 — o guard acima só via clones DESTA rota. A CP de COMPRA
+            # tem a obrigação já viva num GCP com filho 'pedido_compra'
+            # (compras_views cria os dois juntos): cloná-la criava a SEGUNDA
+            # GCP por parcela — fora da exclusão da tela e do fluxo — e o
+            # botão promete "ação segura e pode ser repetida". A gêmea é
+            # reconhecida e a CP fica onde está (não decide fonte: D-B5.1).
+            if (conta.origem_tipo or '').upper() == 'COMPRA' and conta.origem_id:
+                gemea = GestaoCustoFilho.query.filter_by(
+                    admin_id=admin_id,
+                    origem_tabela='pedido_compra',
+                    origem_id=conta.origem_id,
+                ).first()
+                if gemea:
+                    ignorados += 1
+                    continue
+
             try:
                 from models import Fornecedor as _Forn
                 forn_nome = conta.descricao or f"Conta #{conta.id}"
