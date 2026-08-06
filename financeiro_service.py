@@ -348,7 +348,31 @@ class FinanceiroService:
             conta = ContaReceber.query.filter_by(id=conta_id, admin_id=admin_id).first()
             if not conta:
                 raise ValueError(f"Conta a receber {conta_id} não encontrada ou sem permissão")
-            
+
+            # B6.1 (cinto da coluna única, espelho de `:96-107`) — `banco_id` é
+            # UM e o estorno debita `valor_recebido` inteiro dele, então toda
+            # CR já parcialmente recebida tem de seguir o caminho bancário da
+            # primeira baixa. Gatilho por VALOR, não por status: a CR legada
+            # meio-recebida fica em PENDENTE e escaparia da guarda por status
+            # (lição (ii) da WF-3).
+            #
+            # ⚠️ ESCOPADO fora de OBRA_MEDICAO, e isto NÃO é detalhe: a CR de
+            # medição é um acumulador com UPSERT que `recalcular_medicao_obra`
+            # reescreve, e "o banco do crédito" em coluna única é mal-definido
+            # ali. Com o estorno recusado por origem (D-B6.1), o cinto não
+            # teria válvula de escape: a primeira obra que trocasse de banco
+            # entre medições veria a baixa falhar com ValueError engolido em
+            # flash genérico (`financeiro_views.py:837-839`). A CR de medição
+            # segue como sempre foi — credita e descarta.
+            _e_medicao = (getattr(conta, 'origem_tipo', None) == 'OBRA_MEDICAO')
+            if (not _e_medicao
+                    and (conta.valor_recebido or 0) > 0
+                    and (banco_id or None) != (getattr(conta, 'banco_id', None) or None)):
+                raise ValueError(
+                    f"Conta a receber {conta_id} tem recebimento anterior por "
+                    f"outro caminho bancário (banco_id={conta.banco_id}); "
+                    f"complete pelo mesmo banco ou estorne primeiro")
+
             # Atualizar valores
             conta.valor_recebido += valor_recebido
             conta.saldo = conta.valor_original - conta.valor_recebido
@@ -368,6 +392,12 @@ class FinanceiroService:
                 banco = BancoEmpresa.query.filter_by(id=banco_id, admin_id=admin_id).first()
                 if banco:
                     banco.saldo_atual += valor_recebido
+                    # B6.1 (migração 281) — persistir QUAL banco foi creditado
+                    # é o que torna o estorno capaz de debitar de volta. Só
+                    # grava quando o crédito de fato aconteceu, e NUNCA para a
+                    # CR de medição (mesmo motivo do cinto, acima).
+                    if not _e_medicao:
+                        conta.banco_id = banco_id
                 else:
                     logger.warning(f"⚠️ Banco {banco_id} não encontrado ou sem permissão para admin {admin_id}")
             

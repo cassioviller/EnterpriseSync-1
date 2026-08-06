@@ -770,8 +770,17 @@ def receber_conta(conta_id):
             conta.id, conta.status, _saldo, conta.valor_recebido)
         # WF-1 (B5.1): mesmo NULL-safe do lado pagar — status NULL com saldo
         # zerado chegava aqui e estourava `.lower()` sobre None.
-        flash(f'Esta conta já está {(conta.status or "liquidada").lower()} e '
-              f'não aceita nova baixa.', 'warning')
+        _msg = (f'Esta conta já está {(conta.status or "liquidada").lower()} e '
+                f'não aceita nova baixa.')
+        # B6.1 — a frase do estorno só entra onde o estorno DE FATO cumpre
+        # (padrão da B5.1, `pagar_conta` acima). Três populações chegam aqui e
+        # NÃO são estornáveis: a CR de medição (recusada por origem, D-B6.1),
+        # as QUITADA legadas e as PENDENTE com saldo zerado — prometer estorno
+        # a elas manda o operador para um botão que só devolve outro aviso.
+        if (conta.status == 'RECEBIDO'
+                and getattr(conta, 'origem_tipo', None) != 'OBRA_MEDICAO'):
+            _msg += ' Para refazer o recebimento, estorne-o primeiro.'
+        flash(_msg, 'warning')
         return redirect(url_for('financeiro.listar_contas_receber'))
 
     if request.method == 'POST':
@@ -783,7 +792,23 @@ def receber_conta(conta_id):
             ).date()
             forma_recebimento = request.form.get('forma_recebimento')
             banco_id = request.form.get('banco_id', type=int) or None
-            
+
+            # B6.1 — o cinto da coluna única, camada amigável (espelho de
+            # `pagar_conta` acima). A mesma invariante existe como raise no
+            # service; sem ESTA camada o ValueError cairia no `except` genérico
+            # abaixo e o operador leria só "Erro ao registrar recebimento",
+            # sem saber que o caminho é completar pelo mesmo banco ou estornar.
+            # Gatilho por VALOR (lição (ii) da WF-3) e ESCOPADO fora de
+            # OBRA_MEDICAO — a CR de medição acumula baixas de medições que
+            # podem legitimamente vir de bancos diferentes.
+            if (getattr(conta, 'origem_tipo', None) != 'OBRA_MEDICAO'
+                    and (conta.valor_recebido or 0) > 0
+                    and (banco_id or None) != (conta.banco_id or None)):
+                flash('Esta conta tem recebimento anterior por outro caminho '
+                      'bancário. Complete pelo mesmo banco da primeira baixa '
+                      'ou estorne-a primeiro.', 'warning')
+                return redirect(url_for('financeiro.listar_contas_receber'))
+
             FinanceiroService.baixar_recebimento(
                 conta_id=conta_id,
                 admin_id=admin_id,
@@ -846,6 +871,110 @@ def receber_conta(conta_id):
         conta=conta,
         bancos=bancos
     )
+
+
+@financeiro_bp.route('/contas-receber/<int:conta_id>/estornar', methods=['POST'])
+@login_required
+def estornar_recebimento(conta_id):
+    """Estorna um recebimento já baixado, revertendo status para PENDENTE.
+
+    B6.1 — o espelho de `estornar_conta` FUNDIDO com o passo-FC de
+    `estornar_gcp`, porque o receber tem o que o pagar não tinha: o FluxoCaixa
+    ENTRADA é VIVO (escritor no checkbox do modal, `receber_conta` acima;
+    leitor `rr_query` no fluxo realizado, `financeiro_service.py:774-796`).
+    Estorno sem delete de FC deixa **entrada fantasma** no realizado e dobra a
+    entrada nos buckets na re-baixa.
+    """
+    admin_id = get_admin_id()
+    conta = ContaReceber.query.filter_by(
+        id=conta_id, admin_id=admin_id).first_or_404()
+
+    if conta.status not in ('RECEBIDO', 'PARCIAL'):
+        flash('Apenas contas recebidas ou parcialmente recebidas podem ser '
+              'estornadas.', 'warning')
+        return redirect(url_for('financeiro.listar_contas_receber'))
+
+    # D-B6.1 — a CR de medição NÃO se estorna por aqui. Ela é um acumulador com
+    # UPSERT que `recalcular_medicao_obra` reescreve (`medicao_service.py`), e
+    # é exibida no portal do cliente (`portal_obras_views.py:276`): zerá-la por
+    # fora deixaria recalc e portal fora de sincronia. Estornar medição é
+    # recorte próprio (zerar + rechamar o recalc + decidir a exibição) e está
+    # registrado na D-B6.1 como trabalho futuro.
+    if getattr(conta, 'origem_tipo', None) == 'OBRA_MEDICAO':
+        flash('Esta conta vem de uma medição de obra e não pode ser estornada '
+              'por aqui — o valor é recalculado pela medição.', 'warning')
+        return redirect(url_for('financeiro.listar_contas_receber'))
+
+    try:
+        # B6.1 — capturar ANTES de zerar: é este valor que sai do banco.
+        _valor_estornado = Decimal(str(conta.valor_recebido or 0))
+        _banco_id = conta.banco_id
+
+        conta.valor_recebido = 0
+        conta.saldo = conta.valor_original
+        conta.data_recebimento = None
+        conta.forma_recebimento = None
+        conta.status = 'PENDENTE'
+
+        # B6.1 — DEBITAR de volta E limpar o campo, no mesmo movimento. É o
+        # único débito novo do sistema (o par invertido de
+        # `financeiro_service.py:127`), e a limpeza é o que impede a catraca
+        # invertida: re-baixa sem banco + 2º estorno debitaria banco não
+        # creditado. `banco_id` NULL = baixa sem banco, CR pré-migração-281 ou
+        # a forma do import (`importacao_excel.py:2469-2503`, que cria a CR já
+        # RECEBIDO sem nunca ter creditado `saldo_atual`): debita ZERO e AVISA
+        # — nunca inventar débito, simétrico ao "nunca inventar crédito" da
+        # B5.6.
+        if _banco_id:
+            banco = BancoEmpresa.query.filter_by(
+                id=_banco_id, admin_id=admin_id).first()
+            if banco:
+                banco.saldo_atual -= _valor_estornado
+            else:
+                logger.warning(
+                    "⚠️ [B6.1] estorno da ContaReceber %s: banco %s não "
+                    "encontrado — débito NÃO aplicado.", conta_id, _banco_id)
+                flash('O banco do recebimento original não foi encontrado — o '
+                      'saldo bancário não foi ajustado.', 'warning')
+        elif _valor_estornado > 0:
+            flash('Este recebimento não tinha banco vinculado (baixa sem banco '
+                  'ou anterior à migração 281) — a conta voltou a PENDENTE, '
+                  'mas nenhum saldo bancário foi debitado.', 'warning')
+        conta.banco_id = None
+
+        # O FluxoCaixa ENTRADA sai — sem isto a entrada vira fantasma no
+        # realizado. Nenhum FK aponta para FC 'conta_receber' (🔬 o único FK
+        # para `fluxo_caixa` é `GestaoCustoPai.fluxo_caixa_id`), então não há
+        # ponteiro a limpar antes — ao contrário de `estornar_gcp`.
+        for fc in FluxoCaixa.query.filter_by(
+                admin_id=admin_id,
+                referencia_tabela='conta_receber',
+                referencia_id=conta_id).all():
+            db.session.delete(fc)
+
+        # Os LancamentoContabil da baixa saem — atômico com o commit abaixo.
+        # Aqui o delete casa de primeira: o LC do recebimento já nasce
+        # carimbado 'FINANCEIRO_RECEBER'/origem_id=conta_id
+        # (`financeiro_service.py:405-406`), sem a armadilha de origem dupla
+        # que a B5.6 teve de corrigir no lado pagar. Partidas caem por cascade.
+        from models import LancamentoContabil
+        lcs = LancamentoContabil.query.filter_by(
+            admin_id=admin_id,
+            origem='FINANCEIRO_RECEBER',
+            origem_id=conta_id
+        ).all()
+        for lc in lcs:
+            db.session.delete(lc)
+
+        db.session.commit()
+        flash('Recebimento estornado com sucesso. A conta voltou para '
+              'PENDENTE.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao estornar recebimento {conta_id}: {e}")
+        flash('Erro ao estornar recebimento. Tente novamente.', 'danger')
+
+    return redirect(url_for('financeiro.listar_contas_receber'))
 
 
 # ==================== FLUXO DE CAIXA ====================

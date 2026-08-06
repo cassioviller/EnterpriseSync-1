@@ -6145,6 +6145,33 @@ def _migration_280_conta_pagar_banco_id():
                 "estorno passa a saber qual banco creditar).")
 
 
+def _migration_281_conta_receber_banco_id():
+    """B6.1 / D-B6.1 — `conta_receber.banco_id`, o banco CREDITADO na baixa.
+
+    Espelho da 280, direção invertida: `baixar_recebimento` credita
+    `banco.saldo_atual` e descartava qual banco foi — o estorno de recebimento
+    (que nasce na B6.1; antes não existia) precisa saber de onde DEBITAR de
+    volta. O FC ENTRADA não serve de fonte: só nasce por checkbox (⚠️ dev
+    06/08: 21 de 239 liquidadas têm FC, zero com banco_id no parque).
+
+    Nullable: baixa sem banco é legítima, o histórico pré-migração não se
+    reconstitui (o estorno dessas avisa e debita ZERO — nunca inventar
+    débito), e ⚠️ a coluna NÃO é gravada para `origem_tipo='OBRA_MEDICAO'`:
+    a CR de medição é um acumulador com UPSERT que o recalc reescreve, e
+    prendê-la a um caminho bancário travaria a baixa de medição (fluxo vivo).
+
+    Alocação: 281, feita por escrito na rodada B6 (§3, Task B6.1). Livres:
+    282-283; 271-276 reservadas da Fase 6.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE conta_receber ADD COLUMN IF NOT EXISTS banco_id "
+            "INTEGER REFERENCES banco_empresa(id)"))
+    logger.info("[Migration 281] conta_receber.banco_id criada (B6.1 — o "
+                "estorno de recebimento passa a saber de onde debitar).")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -6431,6 +6458,7 @@ def executar_migracoes():
             (278, "p10 — cronograma_baseline.bac (orçamento congelado junto com o prazo; NULL = baseline anterior)", _migration_278_baseline_bac),
             (279, "E02 — drop de notificacao_cliente, auto-guardado pela contagem (falha e retenta se houver linha)", _migration_279_drop_notificacao_cliente),
             (280, "B5.6 / D-B5.6(A) — conta_pagar.banco_id: o banco debitado na baixa, para o estorno creditar de volta (NULL = sem banco ou pré-migração)", _migration_280_conta_pagar_banco_id),
+            (281, "B6.1 / D-B6.1 — conta_receber.banco_id: o banco creditado na baixa, para o estorno de recebimento debitar de volta (NULL = sem banco, pré-migração ou OBRA_MEDICAO)", _migration_281_conta_receber_banco_id),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

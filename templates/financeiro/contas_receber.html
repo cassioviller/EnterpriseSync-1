@@ -146,9 +146,20 @@
                             </td>
                             <td>
                                 {% if conta.status != 'RECEBIDO' %}
-                                <button class="btn btn-sm btn-success" 
+                                <button class="btn btn-sm btn-success"
                                         onclick="abrirModalBaixa({{ conta.id }}, '{{ conta.descricao }}', {{ conta.saldo }})">
                                     <i class="fas fa-dollar-sign"></i> Baixar
+                                </button>
+                                {% endif %}
+                                {# B6.1 — o botão só aparece onde o estorno cumpre:
+                                   status RECEBIDO/PARCIAL e origem != OBRA_MEDICAO
+                                   (a CR de medição é recalculada pela medição,
+                                   D-B6.1). Mesmas condições da guarda da rota. #}
+                                {% if conta.status in ('RECEBIDO', 'PARCIAL')
+                                      and conta.origem_tipo != 'OBRA_MEDICAO' %}
+                                <button class="btn btn-sm btn-warning"
+                                        onclick="abrirModalEstornoRecebimento({{ conta.id }}, '{{ conta.descricao|e }}')">
+                                    <i class="fas fa-undo"></i> Estornar
                                 </button>
                                 {% endif %}
                                 <button class="btn btn-sm btn-info" onclick="verDetalhes({{ conta.id }})">
@@ -308,7 +319,52 @@
     </div>
 </div>
 
+<!-- Modal Estornar Recebimento -->
+{# B6.1 — form PRÓPRIO, e de propósito: `contas_pagar.html` tem um único
+   `formEstorno` compartilhado entre duas rotas (conta e GCP), com o action
+   reescrito por JS. É a armadilha registrada na hipótese B da B5.6 — um
+   estorno postando na rota do outro. Aqui o form é só desta rota. #}
+<div class="modal fade" id="modalEstornoRecebimento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Estornar Recebimento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning mb-2">
+                    <strong>Atenção:</strong> esta ação reverte o recebimento para
+                    <strong>PENDENTE</strong>, zerando valor e data recebidos.
+                </div>
+                <p class="mb-1 small text-muted">
+                    O valor sai do saldo do banco creditado na baixa, e o lançamento
+                    no fluxo de caixa e na contabilidade é removido. Se a baixa foi
+                    feita sem banco, nenhum saldo bancário é alterado.
+                </p>
+                <p class="mb-0"><strong>Conta:</strong> <span id="estorno_receb_descricao"></span></p>
+            </div>
+            <form method="post" id="formEstornoRecebimento">
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-undo me-1"></i>Confirmar Estorno
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
+var _urlEstornarRecebimento = {{ url_for('financeiro.estornar_recebimento', conta_id=0) | tojson }};
+
+function abrirModalEstornoRecebimento(contaId, descricao) {
+    document.getElementById('estorno_receb_descricao').textContent = descricao;
+    document.getElementById('formEstornoRecebimento').action =
+        _urlEstornarRecebimento.replace('/0/', '/' + contaId + '/');
+    new bootstrap.Modal(document.getElementById('modalEstornoRecebimento')).show();
+}
+
 function abrirModalBaixa(contaId, descricao, saldo) {
     document.getElementById('baixa_conta_id').value = contaId;
     document.getElementById('baixa_descricao').textContent = descricao;

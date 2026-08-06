@@ -2494,7 +2494,15 @@ class ContaReceber(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+    # B6.1 / D-B6.1, migração 281 — o banco CREDITADO na baixa (espelho da
+    # `ContaPagar.banco_id` da 280, direção invertida). O estorno de
+    # recebimento debita de volta e LIMPA por este campo. NULL = baixa sem
+    # banco, conta pré-migração OU `origem_tipo='OBRA_MEDICAO'` (a CR de
+    # medição é acumulador com UPSERT do recalc — não se prende a caminho
+    # bancário; ver a Task B6.1 da rodada B6). Estorno com NULL avisa e
+    # debita ZERO — nunca inventar débito.
+    banco_id = db.Column(db.Integer, db.ForeignKey('banco_empresa.id'), nullable=True)
+
     obra = db.relationship('Obra', backref='contas_receber')
     conta_contabil = db.relationship('PlanoContas', backref='contas_receber_rel')
     admin = db.relationship('Usuario', backref='contas_receber_admin')
