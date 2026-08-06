@@ -114,10 +114,17 @@ A ordem completa:
 |---|---|---|---|---|
 | B0 — o arreio | 6 | **6** ✅ | 0 | M |
 | B1 — parar de perder dado | 16 *(era 16, subiu a 17, e a B1.14 foi cortada)* | **16** ✅ | 0 | G |
-| B2 — o que o sistema informa errado | 20 | **18** | **2** | G |
-| B3 — os elos que morrem a um passo | 10 | **3** | **7** | M |
-| B4 — aposentadorias | 9 | **7** | **2** | M |
-| **Total** | **61** *(62 − 1 cortada)* | **53** | **8** | |
+| B2 — o que o sistema informa errado | 20 | **19** | **1** | G |
+| B3 — os elos que morrem a um passo | 10 | **10** ✅ | 0 | M |
+| B4 — aposentadorias | 9 | **9** ✅ | 0 | M |
+| **Total** | **61** *(62 − 1 cortada)* | **60** | **1** | |
+
+**Estado em 06/08: só a B2.13 está aberta**, e ela não é código — é a consulta do
+invariante da folha em produção (consulta [2] do `CONSULTAS-PRODUCAO-2026-08-06.md`).
+A tabela acima ficou defasada durante a sessão de 05/08 (dizia B3 3/10 e B4 7/9 com
+todos os Status já fechados) e foi corrigida em 06/08 contra os `**Status:**` de cada
+Task — a conferência é a da rodada B5. O trabalho corrente é a **rodada B5**
+(`docs/superpowers/plans/2026-08-06-rodada-b5-varredura.md`).
 
 **Estado em 05/08: os blocos B0 e B1 estão FECHADOS.** A05, A10, A16-a e A09
 fechados; B0 inteiro (6/6), a trilha T1 (B1.1-B1.5b), a T2 inteira (B1.6-B1.11) e
@@ -125,7 +132,7 @@ a T3 (B1.12, B1.13, B1.15, B1.16 — com a **B1.14 cortada**, §8.1). A contagem
 subiu de 61 para 62 porque o B0 achou um defeito que nenhum recorte tinha visto
 (B1.5b), e voltou a 61 com o corte.
 
-**O próximo trabalho é o B2**, e ele não espera nada.
+~~**O próximo trabalho é o B2**, e ele não espera nada.~~ *(cumprido em 05/08)*
 
 **Sobram TRÊS `xfail` no repositório inteiro, e nenhum é dívida técnica** —
 todos esperam decisão ou Task futura:
@@ -5166,6 +5173,10 @@ merge silencioso com número repetido — e `is_migration_executed` **PULA EM SI
 número já registrado (`:68-86`). Ver §12.
 
 **Ponto de serialização nº 3 — `views/obras.py:727-770`.**
+⚠️ **DEIXOU DE EXISTIR em 05/08** (registrado em 06/08, achado da rodada B5, item novo
+nº10): a serialização foi cumprida na ordem certa e 🔬 `calcular_progresso_real_servico`
+foi removida em `db85ba04` — a âncora `views/obras.py:727-770` aponta hoje para outro
+código. O texto abaixo fica como registro histórico do motivo da ordem.
 **B1.13 (acrescenta `admin_id` a `calcular_progresso_real_servico`) precisa vir ANTES de
 B2.8 (apaga a função inteira).** O filtro entra, é validado pelo T4 do arreio de
 almoxarifado, e depois a função sai. Fazer B2.8 primeiro invalida o T4. É a única
