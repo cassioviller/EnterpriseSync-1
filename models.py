@@ -2177,7 +2177,8 @@ class AlocacaoEquipe(db.Model):
     autoria do próprio RDO.
 
     O que ainda a referencia, e por quê (⚠️ registro corrigido em 06/08 pela
-    B5.4 — a versão anterior listava TRÊS pontos vivos, e um deles não roda):
+    B5.4 — a versão anterior deste docstring contava o ponto SOMBREADO como
+    vivo e omitia o da rota viva; o plano consolidado chegou a listar três):
 
     * `views/rdo.py:536-538` — anula `rdo_gerado_id` ao excluir RDO pela rota
       VIVA (`main.excluir_rdo`). É este o ponto que protege bases onde a FK

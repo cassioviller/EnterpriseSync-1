@@ -406,8 +406,16 @@ def pagar_conta(conta_id):
             "⚠️ [B5.1] nova baixa RECUSADA — ContaPagar %s já está %s "
             "(saldo=%s, pago=%s)",
             conta.id, conta.status, _saldo, conta.valor_pago)
-        flash(f'Esta conta já está {conta.status.lower()} e não aceita nova '
-              f'baixa. Para refazer o pagamento, estorne-o primeiro.', 'warning')
+        # WF-1 (revisão da B5.1): `status` também pode ser NULL em legado (a
+        # coluna não é NOT NULL) — o ramo `_saldo <= 0` chega aqui sem status.
+        # E o estorno só aceita PAGO/PARCIAL (`estornar_conta`, acima): a
+        # frase do estorno só entra onde ele cumpre.
+        _msg = (f'Esta conta já está '
+                f'{(conta.status or "liquidada").lower()} e não aceita nova '
+                f'baixa.')
+        if conta.status == 'PAGO':
+            _msg += ' Para refazer o pagamento, estorne-o primeiro.'
+        flash(_msg, 'warning')
         return redirect(url_for('financeiro.listar_contas_pagar'))
 
     if request.method == 'POST':
@@ -704,8 +712,10 @@ def receber_conta(conta_id):
             "⚠️ [A02] nova baixa RECUSADA — ContaReceber %s já está %s "
             "(saldo=%s, recebido=%s)",
             conta.id, conta.status, _saldo, conta.valor_recebido)
-        flash(f'Esta conta já está {conta.status.lower()} e não aceita nova '
-              f'baixa.', 'warning')
+        # WF-1 (B5.1): mesmo NULL-safe do lado pagar — status NULL com saldo
+        # zerado chegava aqui e estourava `.lower()` sobre None.
+        flash(f'Esta conta já está {(conta.status or "liquidada").lower()} e '
+              f'não aceita nova baixa.', 'warning')
         return redirect(url_for('financeiro.listar_contas_receber'))
 
     if request.method == 'POST':

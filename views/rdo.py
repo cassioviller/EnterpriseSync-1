@@ -473,7 +473,11 @@ def excluir_rdo(rdo_id):
         abort(404)
 
     try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        # WF-1 (revisão da B5.3): derivado do RDO resolvido pelo helper (o
+        # padrão de `finalizar_rdo`) — os efeitos colaterais (cancelar custos,
+        # recomputar cadeia) recebem o tenant do RDO, não o recálculo do
+        # usuário, que divergia para SUPER_ADMIN.
+        admin_id = rdo.admin_id or rdo.obra.admin_id
 
         # Fase 5 — RDO assinado/aprovado/retificado não se apaga. A guarda
         # `before_flush` (services/rdo_ciclo_vida) barraria o delete de
@@ -1092,10 +1096,23 @@ def visualizar_rdo(id):
         logger.info("[DOC] TEMPLATE: rdo/visualizar_rdo_moderno.html (MODERNO)")
         logger.info(f"[USER] USUÁRIO: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
 
-        # Consumidores V2 lá embaixo (`obra_em_modo_v2`, contagens) continuam
-        # lendo `admin_id_atual` — a resolução do RDO subiu para o helper, a
-        # variável fica.
-        admin_id_atual = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        # Consumidores V2 lá embaixo (`obra_em_modo_v2`, contagens) leem
+        # `admin_id_atual`. WF-1 (revisão da B5.3): derivar do RDO resolvido —
+        # o padrão de `finalizar_rdo` — em vez de recalcular do usuário; o
+        # recálculo divergia do helper para SUPER_ADMIN (helper resolve por
+        # `current_user.id`, o recálculo dava `admin_id=None`).
+        admin_id_atual = rdo.admin_id or rdo.obra.admin_id
+
+        # WF-1 — repõe o eager-loading que a query antiga tinha (a resolução
+        # subiu para o helper na B5.3; sem isto o render lazy-carrega as
+        # coleções uma a uma).
+        rdo = RDO.query.options(
+            db.joinedload(RDO.obra),
+            db.joinedload(RDO.criado_por),
+            db.selectinload(RDO.fotos),
+            db.selectinload(RDO.equipamentos),
+            db.selectinload(RDO.ocorrencias_rdo),
+        ).filter(RDO.id == rdo.id).first()
 
         # Buscar subatividades do RDO (sem relacionamentos problemáticos)
         subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
@@ -1555,6 +1572,12 @@ def exportar_rdo_pdf(rdo_id):
     if not pode_ver_obra(rdo.obra_id):
         abort(404)
 
+    # WF-1 — repõe o eager que a query antiga tinha (obra + criado_por).
+    rdo = RDO.query.options(
+        db.joinedload(RDO.obra),
+        db.joinedload(RDO.criado_por),
+    ).filter(RDO.id == rdo.id).first()
+
     try:
         from services.rdo_pdf_service import gerar_pdf_rdo
         pdf_bytes = gerar_pdf_rdo(rdo)
@@ -1666,8 +1689,8 @@ def finalizar_rdo(id):
         return redirect(url_for('main.visualizar_rdo', id=id))
         
     except HTTPException:
-        # B5.3 — `_rdo_do_tenant_ou_404` é chamado DENTRO deste try (`:1587`)
-        # e o abort dele era engolido aqui: RDO alheio respondia 302 com
+        # B5.3 — `_rdo_do_tenant_ou_404` é chamado DENTRO deste try (logo no
+        # topo dele) e o abort era engolido aqui: RDO alheio respondia 302 com
         # "Erro ao finalizar RDO" — o 404 escrito e nunca entregue. Antes do
         # rollback (sem abort pós-escrita neste corpo; teardown remove a
         # sessão).
