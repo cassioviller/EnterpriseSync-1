@@ -846,21 +846,13 @@ def excluir_ponto_preview(registro_id):
                 'pai_sera_excluido': pai is not None and len(pai.itens) == 1
             })
 
-        fluxos = FluxoCaixa.query.filter_by(
-            referencia_tabela='registro_ponto',
-            referencia_id=registro_id,
-            admin_id=admin_id
-        ).all()
-
-        fluxo_items = [
-            {
-                'id': fc.id,
-                'descricao': fc.descricao,
-                'valor': float(fc.valor),
-                'data': fc.data_movimento.strftime('%d/%m/%Y') if fc.data_movimento else ''
-            }
-            for fc in fluxos
-        ]
+        # B5.7 — o leitor de FluxoCaixa 'registro_ponto' saiu: NENHUM escritor
+        # de produção grava esse referencia_tabela (varredura por cinco
+        # lentes, homonímia com GestaoCustoFilho.origem_tabela checada;
+        # ⚠️ dev 0 linhas). A chave fica como lista vazia — os consumidores
+        # JS (controle_ponto.html:543-545, funcionario_perfil.html) toleram
+        # lista vazia, não chave ausente.
+        fluxo_items = []
 
         return jsonify({
             'success': True,
@@ -928,16 +920,9 @@ def excluir_registro_ponto_post(registro_id):
             if filhos:
                 modulos_excluidos.append(f'Gestão de Custos ({len(filhos)} lançamento(s))')
 
-            # --- Fluxo de Caixa
-            fluxos = FluxoCaixa.query.filter_by(
-                referencia_tabela='registro_ponto',
-                referencia_id=registro_id,
-                admin_id=admin_id
-            ).all()
-            for fc in fluxos:
-                db.session.delete(fc)
-            if fluxos:
-                modulos_excluidos.append(f'Fluxo de Caixa ({len(fluxos)} registro(s))')
+            # --- Fluxo de Caixa: bloco removido na B5.7 — não existe escritor
+            # de FC 'registro_ponto' em produção (⚠️ dev 0 linhas); o delete
+            # nunca apagou nada. Ver o apenso da rodada B5, item nº4.
 
         db.session.delete(registro)
         db.session.commit()

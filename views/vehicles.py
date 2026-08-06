@@ -822,127 +822,20 @@ def novo_custo_veiculo_lista():
 
 
 
-# 5. ROTA REGISTRO CUSTO - /veiculos/<id>/custo (GET/POST)
-@main_bp.route('/veiculos/<int:id>/custo', methods=['GET', 'POST'])
-@admin_required
-def novo_custo_veiculo(id):
-    from forms import CustoVeiculoForm
-    from models import Veiculo, CustoVeiculo, FluxoCaixa
-    
-    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-    veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
-    
-    form = CustoVeiculoForm()
-    form.veiculo_id.data = veiculo.id
-    from services.dropdown_service import populate_form_choices
-    populate_form_choices(form, admin_id)
-    
-    if form.validate_on_submit():
-        try:
-            # CRÍTICO: Validar valor positivo
-            if form.valor.data is None or form.valor.data <= 0:
-                flash('Erro: O valor do custo deve ser maior que zero.', 'error')
-                return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
-            
-            # CRÍTICO: Validação de odômetro - km não pode diminuir
-            if form.km_atual.data and veiculo.km_atual:
-                if form.km_atual.data < veiculo.km_atual:
-                    flash(f'Erro: Quilometragem não pode diminuir. Atual: {veiculo.km_atual}km, Tentativa: {form.km_atual.data}km', 'error')
-                    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
-            
-            # Normalizar tipo_custo: converte labels do catálogo → código canônico
-            _TIPO_CUSTO_NORM = {
-                'combustível': 'combustivel', 'combustivel': 'combustivel',
-                'manutenção': 'manutencao',  'manutencao': 'manutencao',
-                'seguro': 'seguro',
-                'multa': 'multa',
-                'lavagem': 'lavagem',
-                'ipva': 'ipva',
-                'licenciamento': 'licenciamento',
-                'pneus': 'pneus',
-                'outros': 'outros',
-            }
-            tipo_custo_raw = (form.tipo_custo.data or '').strip()
-            tipo_custo = _TIPO_CUSTO_NORM.get(tipo_custo_raw.lower(), tipo_custo_raw.lower())
-
-            # Validar tipo de custo
-            tipos_validos = list(_TIPO_CUSTO_NORM.values())
-            if tipo_custo not in tipos_validos:
-                flash(f'Tipo de custo inválido: {tipo_custo_raw}', 'error')
-                return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
-            
-            # Validações específicas para combustível
-            if tipo_custo == 'combustivel':
-                if not form.litros_combustivel.data or form.litros_combustivel.data <= 0:
-                    flash('Litros de combustível é obrigatório para abastecimentos.', 'error')
-                    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
-                
-                if not form.preco_por_litro.data or form.preco_por_litro.data <= 0:
-                    flash('Preço por litro é obrigatório para abastecimentos.', 'error')
-                    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
-            
-            # Criar registro de custo com novos campos
-            custo = CustoVeiculo(
-                veiculo_id=veiculo.id,
-                obra_id=form.obra_id.data if form.obra_id.data else None,
-                data_custo=form.data_custo.data,
-                valor=form.valor.data,
-                tipo_custo=tipo_custo,
-                descricao=form.descricao.data,
-                km_atual=form.km_atual.data or veiculo.km_atual,
-                fornecedor=form.fornecedor.data,
-                # Campos específicos para combustível
-                litros_combustivel=form.litros_combustivel.data if tipo_custo == 'combustivel' else None,
-                preco_por_litro=form.preco_por_litro.data if tipo_custo == 'combustivel' else None,
-                posto_combustivel=form.posto_combustivel.data if tipo_custo == 'combustivel' else None,
-                tipo_combustivel=form.tipo_combustivel.data if tipo_custo == 'combustivel' else None,
-                tanque_cheio=form.tanque_cheio.data if tipo_custo == 'combustivel' else False,
-                # Campos para manutenção
-                numero_nota_fiscal=form.numero_nota_fiscal.data if tipo_custo == 'manutencao' else None,
-                categoria_manutencao=form.categoria_manutencao.data if tipo_custo == 'manutencao' else None,
-                proxima_manutencao_km=form.proxima_manutencao_km.data if tipo_custo == 'manutencao' else None,
-                proxima_manutencao_data=form.proxima_manutencao_data.data if tipo_custo == 'manutencao' else None,
-                # Controle financeiro
-                centro_custo=form.centro_custo.data,
-                admin_id=admin_id
-            )
-            
-            # Calcular próxima manutenção automaticamente se for manutenção
-            if tipo_custo == 'manutencao':
-                custo.calcular_proxima_manutencao()
-            
-            db.session.add(custo)
-            
-            # Atualizar KM atual do veículo se informado (já validado acima)
-            if form.km_atual.data and form.km_atual.data > veiculo.km_atual:
-                veiculo.km_atual = form.km_atual.data
-            
-            # Integrar com fluxo de caixa (se tabela existir)
-            try:
-                fluxo = FluxoCaixa(
-                    data_movimento=form.data_custo.data,
-                    tipo_movimento='SAIDA',
-                    categoria='custo_veiculo',
-                    valor=form.valor.data,
-                    descricao=f'{tipo_custo.title()} - {veiculo.placa} - {form.descricao.data}',
-                    referencia_id=custo.id,
-                    referencia_tabela='custo_veiculo'
-                )
-                db.session.add(fluxo)
-            except Exception as fluxo_error:
-                logger.error(f"AVISO: Não foi possível integrar com fluxo de caixa: {fluxo_error}")
-            
-            db.session.commit()
-            
-            flash(f'Custo de {form.tipo_custo.data} registrado com sucesso!', 'success')
-            return redirect(url_for('main.detalhes_veiculo', id=veiculo.id))
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"ERRO AO REGISTRAR CUSTO DE VEÍCULO: {str(e)}")
-            flash('Erro ao registrar custo do veículo. Tente novamente.', 'error')
-    
-    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
+# 5. (B5.7) A rota de registro de custo — main.novo_custo_veiculo,
+#    /veiculos/<id>/custo — saiu INTEIRA em 06/08. Era morta tripla:
+#    o FluxoCaixa de dentro não passava admin_id (NOT NULL) e o commit
+#    estourava IntegrityError engolido pelo except (o CustoVeiculo e o
+#    km_atual caíam juntos no rollback — NUNCA persistiu nada);
+#    o template veiculos/novo_custo.html não existe (nem o diretório) —
+#    o GET morria em TemplateNotFound; e não havia referência em template,
+#    static ou teste. Cortar só o bloco FC seria PIOR que não fazer:
+#    destravaria um escritor de CustoVeiculo que nunca persistiu —
+#    comportamento novo sem decisão. Recorte na Task B5.7 do apenso da
+#    rodada B5; a ausência da rota é afirmada em
+#    tests/test_b5_fluxo_gemeos_e_orfaos.py (caso 6).
+#    As rotas irmãs mortas /veiculos/custo e novo_custo_veiculo_form ficam
+#    para limpeza própria (risco 3 do recorte).
 
 
 # ===== NOVAS ROTAS AVANÇADAS PARA SISTEMA DE VEÍCULOS =====
