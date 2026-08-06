@@ -79,8 +79,14 @@
   <div class="alert alert-warning d-flex align-items-center mb-4" style="border-radius:10px;">
     <i data-feather="credit-card" class="me-2" style="width:18px;height:18px;flex-shrink:0;"></i>
     <div>
+      {# B6.2 / D-B6.2 — o texto prometia uma Conta a Pagar que este modo NÃO
+         cria: `services/importacao_excel.py:2327-2346` grava SÓ o lançamento
+         de Fluxo de Caixa, com referência nula, e é assim que ele evita a
+         duplicação (o custo já existe em outro lugar). O modo está certo; a
+         frase é que mentia. #}
       <strong>{{ resultado.n_apenas_pagamento }} registro(s) tratado(s) como "apenas pagamento"</strong> —
-      apenas Fluxo de Caixa e Conta a Pagar foram criados; nenhum custo (Gestão de Custos) foi duplicado.
+      apenas o lançamento no Fluxo de Caixa foi criado; nenhum custo (Gestão de Custos)
+      nem Conta a Pagar foi duplicado.
     </div>
   </div>
   {% endif %}
