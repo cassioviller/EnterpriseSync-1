@@ -131,6 +131,31 @@ def ctx():
         }
 
 
+@pytest.fixture(scope='module')
+def operacional(ctx):
+    """B5.2 — garante o `ObraOrcamentoOperacional` para os testes que o LEEM.
+
+    Antes, quem o criava era o efeito colateral do GET de
+    `test_get_index_clona_lazy_e_renderiza` — e dois testes deste módulo
+    falhavam quando selecionados com `-k` (dependência de ordem, §8.3 do plano
+    consolidado / Task B5.2 da rodada B5).
+
+    Fixture INTERMEDIÁRIO de propósito: criar o objeto dentro do `ctx` deixaria
+    o teste do GET lazy verde sem exercitar o caminho lazy (`garantir_operacional`
+    devolve o existente no primeiro `if`) — verde e oco. Por isso:
+    - `test_get_index_clona_lazy_e_renderiza` continua pedindo SÓ `ctx` e segue
+      sendo a única prova do fio rota → serviço. NÃO adicionar `operacional` à
+      assinatura dele "por simetria".
+    - Nenhum dos dois consumidores usa o valor de retorno (ambos re-consultam
+      por `obra_id`); o fixture entra pelo efeito colateral, e isso é
+      intencional — não "limpar" o return, nem passar a lê-lo.
+    """
+    with app.app_context():
+        from services.orcamento_operacional import garantir_operacional
+        op = garantir_operacional(ctx['obra_id'], criado_por_id=ctx['admin_id'])
+        return op.id
+
+
 def _client_logado(user_id: int):
     c = app.test_client()
     with c.session_transaction() as sess:
@@ -168,7 +193,7 @@ def test_get_index_clona_lazy_e_renderiza(ctx):
         assert versoes[0].modo_aplicacao == 'clonagem_inicial'
 
 
-def test_post_salvar_item_cria_nova_versao_a_partir_de_hoje(ctx):
+def test_post_salvar_item_cria_nova_versao_a_partir_de_hoje(ctx, operacional):
     """POST salvar com modo='a_partir_de_hoje' fecha vigente + abre nova versão."""
     with app.app_context():
         op = ObraOrcamentoOperacional.query.filter_by(obra_id=ctx['obra_id']).first()
@@ -219,7 +244,7 @@ def test_post_salvar_item_cria_nova_versao_a_partir_de_hoje(ctx):
         assert vigentes[0].motivo == 'Reajuste de preço do cimento'
 
 
-def test_post_atualizar_do_original_sem_diff_flash_info(ctx):
+def test_post_atualizar_do_original_sem_diff_flash_info(ctx, operacional):
     """Após sincronizar, propagar do original sem diferenças deve devolver flash 'info'."""
     with app.app_context():
         # Re-alinhar: aplica retroativo com os MESMOS valores do original para zerar diffs
