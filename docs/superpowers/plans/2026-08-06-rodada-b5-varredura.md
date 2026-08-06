@@ -672,7 +672,15 @@ invisível a grep pelo símbolo: 📖 `templates/rdo/editar_rdo.html:1286` (`fet
 
 ### Task B5.5: curva de baseline — terceira série derivada de `CronogramaBaselineItem`
 
-🔴 **BLOQUEADA no Step 1: medição em PRODUÇÃO.** Mesma trava da B2.13.
+**Status: ⛔ CORTADA em 06/08 — decisão do Cássio, e o mecanismo foi o previsto no
+próprio Step 1 ("a Task pode morrer nele").** O Cássio decidiu não rodar as consultas
+de produção; sem a medição, decide a evidência disponível: 🔬⚠️ dev, **uma** obra no
+banco inteiro onde a série seria calculável e diferente, com Δ máx **1,1 p.p. na
+direção contrária** à do risco 6, e 🔬 o SPI/SV não é exibido a ninguém. Volta se, e
+só se, vier fato novo (uma medição, ou usuário reclamando de curva que não mostra
+atraso). O recorte abaixo fica como está — é o COMO, se o SE um dia mudar.
+
+🔴 ~~**BLOQUEADA no Step 1: medição em PRODUÇÃO.** Mesma trava da B2.13.~~
 
 **Files:** Modify `utils/cronograma_engine.py` — função nova irmã de
 `calcular_progresso_geral_obra_v2`; Modify `views/obras.py:2818-2896` — terceira chave no
@@ -972,6 +980,10 @@ Só as que **mudam o recorte**. Cada uma diz o que trava e qual é o default se 
 não vier.
 
 **D-B5.1 — Qual camada é a fonte da SAÍDA de caixa: `ContaPagar` ou `GestaoCustoPai`?**
+✅ **DECIDIDA em 06/08 pelo Cássio: (a), o default** — junto com a D-B5.6(A) e o corte
+da B5.5, na mesma decisão que descartou as consultas de produção ("sigo sem elas,
+confio no que fez"). Registrada aqui como decisão, não como default assumido — é o
+formato do precedente E02 de 05/08. A B5.7 executa sobre ela.
 Trava: o `FluxoCaixa` do lado pagar (a dívida como o fecho a enunciou).
 Não é pergunta nova — 📖 `compras_views.py:250-255` diz por escrito que **ContaPagar** é a
 camada do fluxo de caixa, e 📖 `gestao_custos_views.py:1315-1317` (rota com botão vivo em
@@ -1077,9 +1089,21 @@ B5.1 passaram pela rota viva e `fluxo_caixa` `'conta_pagar'` segue com **0 linha
 
 ### Task B5.6: o estorno devolve o débito bancário — a catraca de `banco.saldo_atual`
 
-🔴 **BLOQUEADA no Step 0: decisão D-B5.6.** É o caso F2.3 do plano de execução — a solução
+**Status: ✅ entregue em `08f2ee88`, sob a D-B5.6=(A) decidida em 06/08.** Migração 280
+gasta. Red-first (casos 1/3/4/5/6/7 vermelhos; o 2 já passava — nada a inventar) e três
+mutações cirúrgicas: crédito desligado derruba só 1/4, carimbo removido derruba só o 5,
+delete de FC removido derruba só o 6. Um desvio a mais, para menos: o caso 6 descobriu
+que **o pagamento de GCP nunca gerou LC** — os dois caminhos passam `'DESPESA_GERAL'`,
+que não existe no `MAPEAMENTO_CONTABIL` (`contabilidade_utils.py:1536-1543`), então o
+"delete no-op" do estorno era **duplamente** no-op. Mapear é escolher conta contábil =
+decisão de contador (lição do A03) — NÃO mapeado; o carimbo de origem deixa o caminho
+pronto e o teste vigia a premissa (se alguém mapear, o caso 6 avisa). **Item novo para
+a fila do contador: mapear `DESPESA_GERAL`, ou trocar o `tipo_operacao` dos dois
+caminhos de GCP por um mapeado.**
+
+~~🔴 **BLOQUEADA no Step 0: decisão D-B5.6.** É o caso F2.3 do plano de execução — a solução
 exige migração (A) ou redesenho (C), e as duas são decisão do Cássio. A Task está escrita
-**sob o default (A)**; se a resposta for (C), ela reabre como redesenho G.
+**sob o default (A)**; se a resposta for (C), ela reabre como redesenho G.~~
 
 **Files** (sob o default A): Modify `migrations.py` — **uma** migração, número alocado no
 Step 1 (faixa 280-283; ver risco 4); Modify `models.py` — `ContaPagar` (`:2412-2463`)
@@ -1146,6 +1170,10 @@ acrescentou ao recorte:
 
 **D-B5.6 — O estorno de conta a pagar passa a devolver o débito bancário por qual
 mecanismo?** (formato da §9; **continuação da fila de decisões**)
+✅ **DECIDIDA em 06/08 pelo Cássio: (A), o default** — na mesma decisão da D-B5.1 (ver
+lá). A migração **280 foi alocada e GASTA** (`08f2ee88`); a corrida de três se resolveu
+por desistência dos concorrentes, que dependiam das consultas descartadas. Entregue —
+ver o Status da Task B5.6.
 Trava: os Steps 1-8 desta Task.
 **(A)** `ContaPagar` ganha `banco_id` persistido na baixa e o estorno credita e limpa pelo
 campo — **uma migração** (número da faixa 280-283, alocado por escrito), custo M, com a
@@ -1217,15 +1245,15 @@ armadilha de origem dupla de LC do lado pagar (`FINANCEIRO_RECEBER` +
 `gerar_lancamento_contabil_automatico`). (ii) A hipótese C — fica escrita como destino
 possível, não é iniciada. (iii) A dupla contagem do fluxo — é a B5.7.
 
-- [ ] **Step 0:** 🔴 **decisão D-B5.6** (acima, com default A) + consultas de produção no pacote F0.1. Se (C), a Task reabre como redesenho G e **para aqui**
-- [ ] **Step 1:** alocar o número da migração **por escrito** (faixa 280-283; corrida de três — risco 4)
-- [ ] **Step 2:** escrever o teste e ver vermelhos os casos 1 (saldo não volta), 4, 5 (LC dobra) e 6 (FC vaza; delete no-op)
-- [ ] **Step 3:** migração + coluna `banco_id` em `ContaPagar`
-- [ ] **Step 4:** `baixar_pagamento` grava `conta.banco_id`; regra da parcial (caso 7)
-- [ ] **Step 5:** `estornar_conta` credita **e limpa**; aviso no caso NULL
-- [ ] **Step 6:** origem rastreável dos LC V2 (`:1556` do prior art) + deletes que casam nos dois estornos + FC do GCP removido e ponteiros limpos
-- [ ] **Step 7:** sete casos verdes; mutação: desfazer o Step 5 derruba só 1/4; desfazer o Step 6 derruba só 5/6
-- [ ] **Step 8:** commit — `fix(financeiro): estorno devolve o debito bancario e apaga o que a baixa criou`
+- [x] **Step 0:** 🔴 **decisão D-B5.6** (acima, com default A) + consultas de produção no pacote F0.1. Se (C), a Task reabre como redesenho G e **para aqui**
+- [x] **Step 1:** alocar o número da migração **por escrito** (faixa 280-283; corrida de três — risco 4)
+- [x] **Step 2:** escrever o teste e ver vermelhos os casos 1 (saldo não volta), 4, 5 (LC dobra) e 6 (FC vaza; delete no-op)
+- [x] **Step 3:** migração + coluna `banco_id` em `ContaPagar`
+- [x] **Step 4:** `baixar_pagamento` grava `conta.banco_id`; regra da parcial (caso 7)
+- [x] **Step 5:** `estornar_conta` credita **e limpa**; aviso no caso NULL
+- [x] **Step 6:** origem rastreável dos LC V2 (`:1556` do prior art) + deletes que casam nos dois estornos + FC do GCP removido e ponteiros limpos
+- [x] **Step 7:** sete casos verdes; mutação: desfazer o Step 5 derruba só 1/4; desfazer o Step 6 derruba só 5/6
+- [x] **Step 8:** commit — `fix(financeiro): estorno devolve o debito bancario e apaga o que a baixa criou`
 
 **Esforço: M** (sob A; sob C é G e reabre). **Migração: SIM — uma**, número alocado no
 Step 1 (280-283; a 279 segue a última registrada).
