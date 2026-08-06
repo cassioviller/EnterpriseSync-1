@@ -375,9 +375,41 @@ def estornar_gcp(gcp_id):
 def pagar_conta(conta_id):
     """Registrar pagamento de conta"""
     admin_id = get_admin_id()
-    
+
     conta = ContaPagar.query.filter_by(id=conta_id, admin_id=admin_id).first_or_404()
-    
+
+    # B5.1 — conta já liquidada não aceita nova baixa (espelho da guarda
+    # A02/B3.7 do lado receber, `receber_conta` acima).
+    #
+    # Sem esta guarda, baixar de novo SOMA: `baixar_pagamento` faz
+    # `conta.valor_pago += valor_pago` (`financeiro_service.py:97`), então uma
+    # conta de R$ 1.000 já paga vai a R$ 2.000. E o vetor não exige distração
+    # do operador — `services/importacao_excel.py:2414-2430` cria a ContaPagar
+    # já com `status='PAGO'`, `valor_pago` cheio e `saldo=0`.
+    #
+    # Os status são os do lado PAGAR: quem grava é `financeiro_service.py:104`
+    # ('PAGO') e o import acima; 'PARCIAL' fica FORA da lista de propósito —
+    # baixa parcial legítima não pode ser barrada (caso 4 do teste da B5.1).
+    #
+    # ⚠️ A guarda fica ANTES do `if POST` e FORA do try do POST: `abort()`
+    # dentro daquele try seria engolido pelo `except Exception` e viraria 200
+    # (risco 1 do recorte). E o flash aponta para o estorno SEM prometer o que
+    # ele não cumpre — o estorno hoje não devolve `banco.saldo_atual` (item
+    # nº1 da §4 da rodada B5; Task separada).
+    #
+    # `saldo` pode ser NULL em registro legado — fallback para
+    # `valor_original`, o mesmo de `receber_conta`.
+    _saldo = conta.saldo if conta.saldo is not None else (conta.valor_original or 0)
+    _liquidada = (conta.status in ('PAGO', 'CANCELADO') or _saldo <= 0)
+    if _liquidada and request.method == 'POST':
+        logger.warning(
+            "⚠️ [B5.1] nova baixa RECUSADA — ContaPagar %s já está %s "
+            "(saldo=%s, pago=%s)",
+            conta.id, conta.status, _saldo, conta.valor_pago)
+        flash(f'Esta conta já está {conta.status.lower()} e não aceita nova '
+              f'baixa. Para refazer o pagamento, estorne-o primeiro.', 'warning')
+        return redirect(url_for('financeiro.listar_contas_pagar'))
+
     if request.method == 'POST':
         try:
             valor_pago = Decimal(request.form.get('valor_pago'))

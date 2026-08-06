@@ -119,18 +119,24 @@ class FinanceiroService:
             
             # A03/B3.6 — o gate contábil deixou de ser MUDO em 05/08.
             #
-            # Ele sempre pulou a partida dobrada quando a CR não tem conta
+            # Ele sempre pulou a partida dobrada quando a conta não tem conta
             # contábil, e isso está certo — não há para onde lançar. O defeito era
-            # ninguém ficar sabendo: não havia como responder "quantas CRs estão
+            # ninguém ficar sabendo: não havia como responder "quantas contas estão
             # fora da contabilidade", e essa resposta é o diagnóstico de que as
             # etapas seguintes do A03 dependem.
+            # B5.1 — este bloco era cópia verbatim do lado receber (B3.6,
+            # `01883756`) e citava `valor_recebido`, que não existe neste
+            # escopo: o parâmetro aqui é `valor_pago`. Como (⚠️ dev) nenhuma
+            # ContaPagar tem `conta_contabil_codigo`, o NameError disparava em
+            # TODA baixa — depois do commit acima, com o pagamento já
+            # persistido e a rota respondendo 200 com flash de erro.
             if not conta.conta_contabil_codigo:
                 logger.warning(
-                    "⚠️ [A03] partida dobrada PULADA — ContaReceber %s sem "
+                    "⚠️ [A03] partida dobrada PULADA — ContaPagar %s sem "
                     "conta_contabil_codigo (origem=%s doc=%s valor=%s obra=%s). "
-                    "O recebimento foi baixado; o lançamento contábil não existe.",
+                    "O pagamento foi baixado; o lançamento contábil não existe.",
                     conta.id, getattr(conta, 'origem_tipo', None),
-                    conta.numero_documento, valor_recebido, conta.obra_id)
+                    conta.numero_documento, valor_pago, conta.obra_id)
 
             if conta.conta_contabil_codigo:
                 try:
@@ -139,7 +145,7 @@ class FinanceiroService:
                         admin_id=admin_id
                     ).scalar() or 0
                     proximo_numero = ultimo_numero + 1
-                    
+
                     # Criar lançamento principal
                     lancamento = LancamentoContabil(
                         admin_id=admin_id,
