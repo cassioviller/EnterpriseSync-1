@@ -1672,6 +1672,8 @@ def gerar_lancamento_contabil_automatico(
     data: date,
     descricao: str,
     centro_custo_id: int = None,
+    origem: str = 'V2_AUTO',
+    origem_id: int = None,
 ) -> bool:
     """
     Gera lançamento contábil automático (partidas dobradas) para operações V2.
@@ -1679,6 +1681,14 @@ def gerar_lancamento_contabil_automatico(
     - Seed do plano de contas feito automaticamente na primeira chamada.
     - Usa a função existente criar_lancamento_automatico para consistência.
     - NUNCA propaga exceções: erros são apenas logados.
+
+    B5.6 — `origem`/`origem_id` viram parâmetros (a correção proposta em
+    `docs/estudo-fluxo/analises-2026-07-30.json:1556` e esquecida uma vez):
+    um LC gravado como 'V2_AUTO'/None é INESTORNÁVEL — os deletes de
+    `estornar_conta`/`estornar_gcp` buscam pela origem real e nunca o acham,
+    então estornar+re-pagar dobrava a contabilidade. Quem gera LC a partir de
+    um documento estornável DEVE carimbar a origem dele; o default 'V2_AUTO'
+    fica para os chamadores sem documento.
 
     Retorna True se criado com sucesso, False caso contrário.
     """
@@ -1718,8 +1728,8 @@ def gerar_lancamento_contabil_automatico(
             data=data,
             historico=historico,
             valor=valor_dec,
-            origem='V2_AUTO',
-            origem_id=None,
+            origem=origem,
+            origem_id=origem_id,
             admin_id=admin_id,
             partidas=partidas,
         )

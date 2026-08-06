@@ -305,13 +305,44 @@ def estornar_conta(conta_id):
         return redirect(url_for('financeiro.listar_contas_pagar'))
 
     try:
+        # B5.6 — capturar ANTES de zerar: é este valor que volta ao banco.
+        _valor_estornado = Decimal(str(conta.valor_pago or 0))
+        _banco_id = conta.banco_id
+
         conta.valor_pago = 0
         conta.saldo = conta.valor_original
         conta.data_pagamento = None
         conta.forma_pagamento = None
         conta.status = 'PENDENTE'
 
-        # Estornar todos os LancamentoContabil vinculados — atômico com o commit abaixo
+        # B5.6 — devolve o débito bancário E limpa o campo, no mesmo
+        # movimento (risco 1: crédito sem limpeza é catraca invertida — a
+        # re-baixa sem banco + 2º estorno creditaria banco não debitado).
+        # `banco_id` NULL = baixa sem banco OU conta pré-migração-280
+        # (a forma do import, `importacao_excel.py:2414-2430`): credita ZERO
+        # e AVISA — nunca inventar crédito é o que descartou a hipótese B.
+        if _banco_id:
+            banco = BancoEmpresa.query.filter_by(
+                id=_banco_id, admin_id=admin_id).first()
+            if banco:
+                banco.saldo_atual += _valor_estornado
+            else:
+                logger.warning(
+                    "⚠️ [B5.6] estorno da ContaPagar %s: banco %s não "
+                    "encontrado — crédito NÃO aplicado.", conta_id, _banco_id)
+                flash('O banco do pagamento original não foi encontrado — o '
+                      'saldo bancário não foi ajustado.', 'warning')
+        elif _valor_estornado > 0:
+            flash('Este pagamento não tinha banco vinculado (baixa sem banco '
+                  'ou anterior à migração 280) — a conta voltou a PENDENTE, '
+                  'mas nenhum saldo bancário foi creditado.', 'warning')
+        conta.banco_id = None
+
+        # Estornar todos os LancamentoContabil vinculados — atômico com o
+        # commit abaixo. B5.6: depois do carimbo de origem (Step 6), este
+        # delete apanha TAMBÉM o LC V2 da baixa — antes ele nascia
+        # 'V2_AUTO'/origem_id=None e sobrava, dobrando a contabilidade no
+        # re-pagamento.
         from models import LancamentoContabil
         lcs = LancamentoContabil.query.filter_by(
             admin_id=admin_id,
@@ -349,8 +380,27 @@ def estornar_gcp(gcp_id):
         gcp.forma_pagamento = None
         gcp.status = 'PENDENTE'
 
-        # Estornar todos os LancamentoContabil vinculados — atômico com o commit abaixo.
-        # GCP payments usam origem='GESTAO_CUSTO_PAI' (distinto de 'FINANCEIRO_PAGAR').
+        # B5.6 — o estorno desfaz TUDO que o pagamento criou, não só o
+        # documento. `saldo_atual` fica intocado de propósito: pagar GCP
+        # nunca debita banco (item nº2 da §4 da rodada B5).
+        #
+        # 1) O FluxoCaixa SAIDA sai — sem isto, re-pagar criava um segundo FC
+        #    e a saída dobrava nos buckets de `agregar_fluxo_mensal`. O
+        #    ponteiro `pai.fluxo_caixa_id` é limpo ANTES do delete (FK).
+        gcp.fluxo_caixa_id = None
+        gcp.conta_bancaria = None
+        db.session.flush()
+        for fc in FluxoCaixa.query.filter_by(
+                admin_id=admin_id,
+                referencia_tabela='gestao_custo_pai',
+                referencia_id=gcp_id).all():
+            db.session.delete(fc)
+
+        # 2) Estornar todos os LancamentoContabil vinculados — atômico com o
+        #    commit abaixo. Este delete era NO-OP por construção (o escritor
+        #    gravava 'V2_AUTO'/origem_id=None — analises-2026-07-30.json:1529);
+        #    com o carimbo de origem da B5.6 nos dois caminhos de pagamento,
+        #    ele passa a casar.
         from models import LancamentoContabil
         lcs = LancamentoContabil.query.filter_by(
             admin_id=admin_id,
@@ -429,6 +479,19 @@ def pagar_conta(conta_id):
             banco_id = request.form.get('banco_id', type=int) or None
             categoria_fc_id = request.form.get('categoria_fluxo_caixa_id', type=int) or None
             criar_fc = request.form.get('criar_fluxo_caixa') == '1'
+
+            # B5.6 risco 3 — a coluna `banco_id` é ÚNICA e o estorno é
+            # tudo-ou-nada (zera `valor_pago` inteiro): baixa complementar em
+            # conta PARCIAL tem de seguir o MESMO caminho bancário da primeira
+            # — trocar de banco (A→B, e também None→A ou A→None) faria o
+            # estorno creditar o total num banco que não recebeu esse débito.
+            # `return` simples dentro do try — não é abort, nada o engole.
+            if (conta.status == 'PARCIAL'
+                    and (banco_id or None) != (conta.banco_id or None)):
+                flash('Esta conta tem pagamento parcial por outro caminho '
+                      'bancário. Complete pelo mesmo banco da primeira baixa '
+                      'ou estorne-a primeiro.', 'warning')
+                return redirect(url_for('financeiro.listar_contas_pagar'))
 
             FinanceiroService.baixar_pagamento(
                 conta_id=conta_id,

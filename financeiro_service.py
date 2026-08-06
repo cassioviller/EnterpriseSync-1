@@ -112,6 +112,10 @@ class FinanceiroService:
                 banco = BancoEmpresa.query.filter_by(id=banco_id, admin_id=admin_id).first()
                 if banco:
                     banco.saldo_atual -= valor_pago
+                    # B5.6 (migração 280) — persistir QUAL banco foi debitado
+                    # é o que torna o estorno capaz de creditar de volta. Só
+                    # grava quando o débito de fato aconteceu.
+                    conta.banco_id = banco_id
                 else:
                     logger.warning(f"⚠️ Banco {banco_id} não encontrado ou sem permissão para admin {admin_id}")
             
@@ -205,12 +209,20 @@ class FinanceiroService:
                     else:
                         op = None
                     if op:
+                        # B5.6 — carimbo de origem real: é o que permite ao
+                        # delete de `estornar_conta` (que busca
+                        # FINANCEIRO_PAGAR/conta_id) apanhar ESTE lançamento.
+                        # Antes ele nascia 'V2_AUTO'/None e sobrava — no
+                        # parque real (627/627 COMPRA) era o ÚNICO LC da
+                        # baixa, e o único que o estorno não apagava.
                         gerar_lancamento_contabil_automatico(
                             admin_id=admin_id,
                             tipo_operacao=op,
                             valor=float(valor_pago),
                             data=data_pagamento,
                             descricao=f"Pagamento - {conta.descricao[:100] if conta.descricao else 'Conta a pagar'}",
+                            origem='FINANCEIRO_PAGAR',
+                            origem_id=conta_id,
                         )
             except Exception as _e:
                 logger.warning(f"[WARN] Lancamento contabil pagamento nao gerado: {_e}")

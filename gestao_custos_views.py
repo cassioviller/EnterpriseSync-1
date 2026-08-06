@@ -836,12 +836,17 @@ def autorizar(pai_id):
         # Lançamento contábil (não crítico)
         try:
             from contabilidade_utils import gerar_lancamento_contabil_automatico
+            # B5.6 — origem real: sem o carimbo, o delete de `estornar_gcp`
+            # (GESTAO_CUSTO_PAI/gcp_id) era no-op por construção
+            # (analises-2026-07-30.json:1529; correção proposta em :1556).
             gerar_lancamento_contabil_automatico(
                 admin_id=admin_id,
                 tipo_operacao='DESPESA_GERAL',
                 valor=float(valor_autorizado),
                 data=data_pgto,
                 descricao=f'{label} — {pai.entidade_nome}',
+                origem='GESTAO_CUSTO_PAI',
+                origem_id=pai.id,
             )
         except Exception as e_cont:
             logger.warning(f"[WARN] Lançamento contábil falhou (não crítico): {e_cont}")
@@ -984,12 +989,16 @@ def pagar(pai_id):
         # Lançamento contábil (opcional, V2)
         try:
             from contabilidade_utils import gerar_lancamento_contabil_automatico
+            # B5.6 — mesmo carimbo do caminho aprovar-e-pagar (acima): é o
+            # que torna o LC estornável.
             gerar_lancamento_contabil_automatico(
                 admin_id=admin_id,
                 tipo_operacao='DESPESA_GERAL',
                 valor=float(valor_pago_agora),
                 data=data_pgto,
                 descricao=f'{label} — {pai.entidade_nome}',
+                origem='GESTAO_CUSTO_PAI',
+                origem_id=pai.id,
             )
         except Exception as e_cont:
             logger.warning(f"[WARN] Lançamento contábil falhou (não crítico): {e_cont}")

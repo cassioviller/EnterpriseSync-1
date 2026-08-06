@@ -2441,7 +2441,13 @@ class ContaPagar(db.Model):
     parcela_total = db.Column(db.Integer, nullable=True)
     pedido_compra_id = db.Column(db.Integer, db.ForeignKey('pedido_compra.id', use_alter=True, name='fk_cp_pedido_compra'), nullable=True)
     fechamento_id = db.Column(db.Integer, db.ForeignKey('fechamento_pagamento.id', use_alter=True, name='fk_cp_fechamento'), nullable=True)
-    
+    # B5.6 / D-B5.6(A), migração 280 — o banco DEBITADO na baixa. Antes disto
+    # o débito de `banco.saldo_atual` era irrecuperável (nada persistia qual
+    # banco foi) e o estorno virava catraca: devolvia a conta e engolia o
+    # débito. NULL = baixa sem banco OU conta anterior à migração — o estorno
+    # avisa e credita zero nesses casos, nunca inventa crédito.
+    banco_id = db.Column(db.Integer, db.ForeignKey('banco_empresa.id'), nullable=True)
+
     fornecedor = db.relationship('Fornecedor', backref='contas_pagar')
     obra = db.relationship('Obra', backref='contas_pagar')
     conta_contabil = db.relationship('PlanoContas', backref='contas_pagar_rel')

@@ -6113,6 +6113,38 @@ def _migration_279_drop_notificacao_cliente():
         raise
 
 
+def _migration_280_conta_pagar_banco_id():
+    """B5.6 / D-B5.6(A) — `conta_pagar.banco_id`, o banco DEBITADO na baixa.
+
+    Sem esta coluna o débito de `banco.saldo_atual` era irrecuperável: a baixa
+    persistia só `forma_pagamento` (string), nenhuma tabela guardava qual banco
+    saiu o dinheiro, e `estornar_conta` devolvia a conta ENGOLINDO o débito —
+    a "catraca" do item nº1 da §4 da rodada B5. E `sum(banco.saldo_atual)` é
+    literalmente o `saldo_inicial` do fluxo de caixa.
+
+    Nullable de propósito: baixa sem banco é o caminho padrão do modal, e o
+    histórico pré-migração não tem como ser reconstituído — o estorno dessas
+    contas AVISA e credita zero, nunca inventa crédito.
+
+    Alocação do número: a faixa 280-283 foi liberada pelo corte da Fase 7
+    (plano consolidado §12). Os outros dois pretendentes condicionais ao 280
+    (índice único de RegistroPonto pós-q7; A24a pós-B2.13) dependiam de
+    consultas de produção que a decisão de 06/08 descartou — a corrida se
+    resolveu por desistência dos concorrentes, registrada no apenso da rodada.
+
+    Idempotente (`IF NOT EXISTS`); FK para `banco_empresa` sem cascade — banco
+    não se apaga com conta pendurada, e é melhor falhar mostrando do que
+    perder o rastro do débito.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE conta_pagar ADD COLUMN IF NOT EXISTS banco_id "
+            "INTEGER REFERENCES banco_empresa(id)"))
+    logger.info("[Migration 280] conta_pagar.banco_id criada (B5.6 — o "
+                "estorno passa a saber qual banco creditar).")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -6398,6 +6430,7 @@ def executar_migracoes():
             (277, "Editor de cronograma v2 em todo o parque — linha de base primeiro, flag ligada em todos os tenants, default da coluna vira TRUE", _migration_277_editor_v2_em_todo_o_parque),
             (278, "p10 — cronograma_baseline.bac (orçamento congelado junto com o prazo; NULL = baseline anterior)", _migration_278_baseline_bac),
             (279, "E02 — drop de notificacao_cliente, auto-guardado pela contagem (falha e retenta se houver linha)", _migration_279_drop_notificacao_cliente),
+            (280, "B5.6 / D-B5.6(A) — conta_pagar.banco_id: o banco debitado na baixa, para o estorno creditar de volta (NULL = sem banco ou pré-migração)", _migration_280_conta_pagar_banco_id),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
