@@ -134,6 +134,15 @@ fica visível na nota ao final da Task.
 
 ### Task B5.1: a baixa de conta a pagar volta a funcionar — `NameError` + guarda de re-baixa
 
+**Status: ✅ entregue em `0bc62449`, com dois apertos da revisão WF-1 no commit de
+revisão.** Red-first (casos 1-3 vermelhos) e matriz de mutação medida como o Step 4
+pede — e reconferida analiticamente pelo revisor. Desvio de forma declarado: login por
+`cliente_de()` em vez de POST /login. A revisão achou dois findings baixos, os dois
+aplicados: `status` NULL em legado estourava `.lower()` na própria guarda (nos DOIS
+lados — o espelho do receber tinha o mesmo latente), e o flash prometia estorno em
+ramos (`CANCELADO`, saldo≤0) onde `estornar_conta` recusa — a frase do estorno agora
+só entra quando `status == 'PAGO'`.
+
 **Files:** Modify `financeiro_service.py` — `baixar_pagamento`, bloco de log `:127-133`;
 Modify `financeiro_views.py` — `pagar_conta`, entre o `first_or_404()` de `:379` e o
 `if request.method == 'POST'` de `:381`;
@@ -256,11 +265,11 @@ saidas_previstas`, só previstas. O que dobra é a lista `detalhes` e os buckets
 `agregar_fluxo_mensal` (`:768-780`), e a despesa prevista **nunca sai**. O sintoma a
 procurar é esse, não um KPI errado.
 
-- [ ] **Step 1:** escrever o teste e vê-lo **vermelho** no caso 1 (200 + "Erro ao registrar pagamento" com a conta já PAGO) e no caso 3 (soma dobrada)
-- [ ] **Step 2:** `financeiro_service.py:129-133` — `valor_recebido` → `valor_pago`, `ContaReceber` → `ContaPagar` no texto
-- [ ] **Step 3:** guarda de re-baixa em `pagar_conta`, entre `:379` e `:381`, espelhando `financeiro_views.py:650-677` com os status do lado pagar
-- [ ] **Step 4:** os cinco casos verdes; verificar que **desfazer o Step 2** derruba só os casos 1 e 2, e **desfazer o Step 3** derruba só o caso 3
-- [ ] **Step 5:** commit único — `fix(financeiro): baixa de conta a pagar para de estourar NameError e recusa re-baixa`
+- [x] **Step 1:** escrever o teste e vê-lo **vermelho** no caso 1 (200 + "Erro ao registrar pagamento" com a conta já PAGO) e no caso 3 (soma dobrada)
+- [x] **Step 2:** `financeiro_service.py:129-133` — `valor_recebido` → `valor_pago`, `ContaReceber` → `ContaPagar` no texto
+- [x] **Step 3:** guarda de re-baixa em `pagar_conta`, entre `:379` e `:381`, espelhando `financeiro_views.py:650-677` com os status do lado pagar
+- [x] **Step 4:** os cinco casos verdes; verificar que **desfazer o Step 2** derruba só os casos 1 e 2, e **desfazer o Step 3** derruba só o caso 3
+- [x] **Step 5:** commit único — `fix(financeiro): baixa de conta a pagar para de estourar NameError e recusa re-baixa`
 
 **Esforço: P.** **Migração: não.**
 
@@ -276,6 +285,10 @@ procurar é esse, não um KPI errado.
 ---
 
 ### Task B5.2: fixture `operacional` — tirar a dependência de ordem do módulo
+
+**Status: ✅ entregue em `41ffe37e`.** Sem desvio; a revisão WF-1 não achou finding
+nenhum (e conferiu byte a byte que `test_get_index_clona_lazy_e_renderiza` ficou
+intocado — o risco 2 não se materializou).
 
 **Files:** Modify `tests/test_e2e_orcamento_operacional_e_metricas_views.py` — acrescentar
 fixture após `:131`; assinaturas de `:171` e `:222`
@@ -343,11 +356,11 @@ provas — não porque a alternativa seria catastrófica.
    `UniqueConstraint('codigo','admin_id')` (`models.py:337`) e pelo admin novo a cada run.
    Não é dívida hoje; é a classe de falha vizinha, e quem mexer no fixture precisa saber.
 
-- [ ] **Step 1:** rodar as duas invocações isoladas e **ver os dois vermelhos** (`:175` e `:228`)
-- [ ] **Step 2:** acrescentar o fixture `operacional(ctx)` depois de `:131`
-- [ ] **Step 3:** trocar as assinaturas de `:171` e `:222`; **não** tocar em `:146`
-- [ ] **Step 4:** rodar os três testes **separadamente** (três passes) e o arquivo inteiro (7/7)
-- [ ] **Step 5:** commit — `test(orcamento-operacional): fixture proprio tira a dependencia de ordem do modulo`
+- [x] **Step 1:** rodar as duas invocações isoladas e **ver os dois vermelhos** (`:175` e `:228`)
+- [x] **Step 2:** acrescentar o fixture `operacional(ctx)` depois de `:131`
+- [x] **Step 3:** trocar as assinaturas de `:171` e `:222`; **não** tocar em `:146`
+- [x] **Step 4:** rodar os três testes **separadamente** (três passes) e o arquivo inteiro (7/7)
+- [x] **Step 5:** commit — `test(orcamento-operacional): fixture proprio tira a dependencia de ordem do modulo`
 
 **Esforço: P.** **Migração: não.**
 
@@ -363,6 +376,18 @@ provas — não porque a alternativa seria catastrófica.
 ---
 
 ### Task B5.3: RDO de outro tenant — e de outra obra — responde 404
+
+**Status: ✅ entregue em `f4857b20`, com três apertos da revisão WF-1 no commit de
+revisão.** Sete casos vermelhos antes; três mutações medidas, cada uma derrubando só o
+seu caso. Dois desvios de forma: (i) fixture próprio `dois_tenants_com_rdo` em vez do
+helper `dois_tenants` — o caso 6 precisa de APONTADOR + `UsuarioObra` + flag, que o
+helper não monta (⚠️ não declarado na mensagem do commit; registrado aqui pela
+revisão); (ii) quase-erro no meio da Task, pego pelo teste de convergência do A19:
+a resolução nova removeu `admin_id_atual` e o `NameError` engolido virava 302 —
+reposto antes do commit. A revisão achou e o commit seguinte aplicou: `admin_id`
+derivado do RDO resolvido (padrão de `finalizar_rdo`) em `visualizar`/`excluir`, no
+lugar do recálculo que divergia para SUPER_ADMIN; e o eager-loading das queries
+antigas reposto em `visualizar`/`pdf`.
 
 **Files:** Modify `views/rdo.py` — `visualizar_rdo` (`:1063-1088`), `exportar_rdo_pdf`
 (`:1532-1552`), `excluir_rdo` (`:449-476`), e os `except Exception` de `:590`, `:1526`,
@@ -501,13 +526,13 @@ candidatas estáticas de "404 escrito e engolido por `except` largo" —
 `tests/test_fase1_escopo_obra.py:412`. **A família inteira é Task própria, com arreio
 próprio** — incluí-la aqui vira G.
 
-- [ ] **Step 1:** escrever o teste e ver os sete casos vermelhos (302 nos casos 1-5, mensagem distinta no 7)
-- [ ] **Step 2:** `except HTTPException: raise` nos seis handlers, **antes** do `rollback`
-- [ ] **Step 3:** `_rdo_do_tenant_ou_404` antes do `try` nas três rotas, com a nota de mudança para SUPER_ADMIN no commit
-- [ ] **Step 4:** `pode_ver_obra` com 404 e mensagem idêntica, copiando `cronograma_views.py:2700-2704`
-- [ ] **Step 5:** mensagem única em `:719-727` e `:2720-2727`; a segunda query sem tenant **sai**
-- [ ] **Step 6:** apertar `tests/test_fase5_rdo_ciclo_vida.py:637` e `:693` para `== 404`
-- [ ] **Step 7:** commit — `fix(rdo): RDO de outro tenant e de outra obra responde 404`
+- [x] **Step 1:** escrever o teste e ver os sete casos vermelhos (302 nos casos 1-5, mensagem distinta no 7)
+- [x] **Step 2:** `except HTTPException: raise` nos seis handlers, **antes** do `rollback`
+- [x] **Step 3:** `_rdo_do_tenant_ou_404` antes do `try` nas três rotas, com a nota de mudança para SUPER_ADMIN no commit
+- [x] **Step 4:** `pode_ver_obra` com 404 e mensagem idêntica, copiando `cronograma_views.py:2700-2704`
+- [x] **Step 5:** mensagem única em `:719-727` e `:2720-2727`; a segunda query sem tenant **sai**
+- [x] **Step 6:** apertar `tests/test_fase5_rdo_ciclo_vida.py:637` e `:693` para `== 404`
+- [x] **Step 7:** commit — `fix(rdo): RDO de outro tenant e de outra obra responde 404`
 
 **Esforço: M.** **Migração: não.**
 
@@ -525,6 +550,13 @@ próprio** — incluí-la aqui vira G.
 ---
 
 ### Task B5.4: `rdo_crud` — aposentadoria PARCIAL e correção do registro do E04
+
+**Status: ✅ entregue em `e3ca534c`.** Caracterização verde antes do corte; a medição
+corrigiu um chute do recorte (o endpoint sombreado de `/rdo/editar/<id>` é
+`rdo_editar.editar_rdo_form`). A revisão WF-1 achou dois findings baixos de TEXTO,
+aplicados no commit de revisão: a nota de proveniência do docstring de `models.py`
+descrevia errado o que estava errado onde, e "sem decorador como `salvar_rdo`" era
+inexato (o `@login_required` permanece — sem decorador de ROTA).
 
 **Files:** Modify `crud_rdo_completo.py` — decoradores de `:653` e `:681`;
 Modify `models.py:2179-2183`, `docs/superpowers/plans/2026-08-04-plano-consolidado.md:4732`
@@ -614,10 +646,10 @@ invisível a grep pelo símbolo: 📖 `templates/rdo/editar_rdo.html:1286` (`fet
    `{% elif foto.arquivo_otimizado %}` — mesmo numa base 100% `'banco'`, qualquer foto com
    `thumbnail` ou `arquivo_otimizado` cai em `url_for('rdo_crud.servir_foto')`.
 
-- [ ] **Step 1:** escrever `tests/test_b5_rdo_crud_url_map.py` congelando o placar 4/9/1 e vê-lo **verde** (é caracterização, não correção)
-- [ ] **Step 2:** cortar os decoradores de `:653` e `:681`; rodar o teste do Step 1 e ver as duas regras sumirem do map
-- [ ] **Step 3:** corrigir `models.py:2179-2183`, plano `:4732` e `ESTADO-ATUAL.md:939` — dois pontos vivos, números de linha atuais, e a nota de que a rota sombreada **não** protege base nenhuma
-- [ ] **Step 4:** commit — `chore(rdo): corta as duas rotas de API mortas do rdo_crud e corrige o registro do E04`
+- [x] **Step 1:** escrever `tests/test_b5_rdo_crud_url_map.py` congelando o placar 4/9/1 e vê-lo **verde** (é caracterização, não correção)
+- [x] **Step 2:** cortar os decoradores de `:653` e `:681`; rodar o teste do Step 1 e ver as duas regras sumirem do map
+- [x] **Step 3:** corrigir `models.py:2179-2183`, plano `:4732` e `ESTADO-ATUAL.md:939` — dois pontos vivos, números de linha atuais, e a nota de que a rota sombreada **não** protege base nenhuma
+- [x] **Step 4:** commit — `chore(rdo): corta as duas rotas de API mortas do rdo_crud e corrige o registro do E04`
 
 **Esforço: P** para o recorte acima. **Migração: não.**
 
@@ -1007,6 +1039,430 @@ aí o item novo nº8 (o `Timer` do listener de RDO) é mais urgente que este.
 
 ---
 
+## 10. Apenso de 2026-08-06 — recortes B5.6 e B5.7 (os dois itens de dinheiro)
+
+Este apenso é o produto do **WF-2 `varredura-b5-dinheiro`** (§5 do plano de execução):
+dois levantamentos com as cinco lentes e dois adversários, um par por item, sobre os
+**itens novos nº1 a nº5 da §4** — a catraca de `banco.saldo_atual` (nº1), a discordância
+entre os dois caminhos de pagamento (nº2), o escritor morto de `views/vehicles.py` (nº3),
+os leitores órfãos de `'registro_ponto'` (nº4) e a exclusão de gêmeos que existe na tela e
+não no fluxo (nº5). Mesmo método da rodada, mesmo formato de recorte. **Escrito contra a
+árvore com a Fase 1 já COMMITADA** (B5.1 `0bc62449` … B5.4 `e3ca534c`) — as âncoras abaixo
+são da árvore atual, e onde divergem das da §4 a divergência está anotada. **Toda medida
+⚠️ dev deste apenso é de 2026-08-06** e envelhece: a própria suíte da B5.1 moveu o banco
+de dev no meio da varredura (ver abaixo).
+
+**A má notícia primeiro — o que os adversários derrubaram ou corrigiram.** Os dois itens
+sobreviveram (`confirmado_com_correcoes` nos dois), mas o placar contra o levantamento é
+pesado:
+
+| O que caiu | Onde estava | O que ficou no lugar |
+|---|---|---|
+| **As medidas ⚠️ dev centrais da B5.6 ficaram irreprodutíveis no mesmo dia.** "0 ContaPagar PAGO, 42 bancos com drift zero" | levantamento B5.6 | 🔬⚠️ dev (refutação, 06/08): a suíte da B5.1 rodou contra o banco único e deixou resíduo — **25 ContaPagar PAGO** e **5 bancos em drift** (`'Banco B5'`, 5000→4000, casando com `tests/test_b5_baixa_conta_pagar.py:187-201`). Ironia útil: **o resíduo é a catraca demonstrada ao vivo** — 5×R$ 1.000 debitados por teste e jamais devolvidos. A substância ("nenhuma operação real moveu saldo em dev") sobrevive; os números escritos sem data, não |
+| **"Achado novo: o delete de LC em `estornar_gcp` é no-op"** | levantamento B5.6 | Correto e **não é novo**: 📖 `docs/estudo-fluxo/analises-2026-07-30.json:1529` já o registrava verbatim, e `:1556` já propunha a correção exata (gravar os LC V2 com `origem='GESTAO_CUSTO_PAI'`/`origem_id=gcp.id`). O levantamento citou `:1532` e `:1559` do mesmo arquivo e não viu `:1529`, três linhas acima. **Proposta por escrito desde 30/07 e esquecida uma vez** — este apenso a põe em Step para não esquecer duas |
+| **"`estornar_conta` casa com o escritor"** — apresentado como o lado são | levantamento B5.6 | Meia-verdade: 📖 `baixar_pagamento` cria **dois** LC potenciais — o `FINANCEIRO_PAGAR` (gated por `conta_contabil_codigo`, ⚠️ dev **0 de 652** contas o têm) e o `V2_AUTO` de `financeiro_service.py:196-217`, gravado com `origem_id=None`. `estornar_conta` apaga **só o primeiro**. No parque real (627/627 COMPRA), o único LC que uma baixa de fato gera é **exatamente o que o estorno não apaga**: estornar+re-pagar **dobra a contabilidade** |
+| **Duas medidas centrais da B5.7 vieram de join SEM guard de tenant** | levantamento B5.7 | 🔬⚠️ dev (refutação): "621 gêmeos / R$ 503.250" são **580 / R$ 490.950** com `cp.admin_id = p.admin_id` — 41 "gêmeos" casavam com ContaPagar de **outro** tenant. E o "GCP 999 com 168 FC realizados sob pai PENDENTE" **não existe**: as 168 linhas pertencem a **76 admin_ids diferentes** e são órfãs (nenhum desses tenants tem GCP 999). A armadilha é a da própria pergunta aberta do levantamento — a chave canônica do gêmeo |
+| **A âncora da hipótese C "os campos já existem"** | levantamento B5.6 | Existem no esquema e **não no dado**: 🔬⚠️ dev `data_saldo_inicial` é NULL em **47 de 47** `banco_empresa`. A borda "(5) banco sem data" não é exceção — é o **caso universal**. O G da hipótese C está subestimado até no G |
+| **O inventário de gêmeos tinha DUAS famílias** | levantamento B5.7 | São **três**, e a terceira está a um clique: 📖 `migrar_contas_pagar` (`gestao_custos_views.py:1311-1420`, botão vivo em `templates/custos/gestao.html:21-26`, cujo `confirm` promete "Esta ação é segura e pode ser repetida") clona toda CP PENDENTE/PARCIAL num GCP com filho `origem_tabela='conta_pagar'` — e o guard de idempotência (`:1335-1341`) **não vê a gêmea `'pedido_compra'`**: um clique num tenant com as 627 CPs de compra cria a **segunda** GCP por parcela |
+| **Âncoras pré-B5.1 na B5.7** | levantamento B5.7 | O commit `0bc62449` empurrou `financeiro_views.py` ~32 linhas abaixo de `:379`. Posições atuais (📖 conferidas nesta redação): checkbox `:423`, escritor FC `'conta_pagar'` `:434-452` (`FluxoCaixa(` `:439`, `referencia_tabela` `:448`), ENTRADA `:746`, lançamento manual `:886` |
+
+O que os adversários **tentaram e falhou** também fica registrado: ressuscitar a página
+órfã `pagar_conta.html` por link (zero href/fetch — só URL digitada); achar um restaurador
+de `saldo_atual` (não há); achar um escritor de FC `'registro_ponto'` por homonímia (as
+ocorrências de `event_manager.py:327/:396` são `GestaoCustoFilho.origem_tabela`, outra
+tabela); e derrubar a hipótese D — que ficou **mais** morta: os 25 POSTs reais da suíte
+B5.1 passaram pela rota viva e `fluxo_caixa` `'conta_pagar'` segue com **0 linhas**.
+
+---
+
+### Task B5.6: o estorno devolve o débito bancário — a catraca de `banco.saldo_atual`
+
+🔴 **BLOQUEADA no Step 0: decisão D-B5.6.** É o caso F2.3 do plano de execução — a solução
+exige migração (A) ou redesenho (C), e as duas são decisão do Cássio. A Task está escrita
+**sob o default (A)**; se a resposta for (C), ela reabre como redesenho G.
+
+**Files** (sob o default A): Modify `migrations.py` — **uma** migração, número alocado no
+Step 1 (faixa 280-283; ver risco 4); Modify `models.py` — `ContaPagar` (`:2412-2463`)
+ganha `banco_id` nullable; Modify `financeiro_service.py` — `baixar_pagamento` grava
+`conta.banco_id`; Modify `financeiro_views.py` — `estornar_conta` (`:296-331`) e
+`estornar_gcp` (`:334-370`); Modify `contabilidade_utils.py` — origem dos LC V2
+(`:1721-1722`); Create `tests/test_b5_estorno_devolve_banco.py`
+
+**A pergunta central, e a resposta é NÃO.** Quando uma `ContaPagar` é baixada com
+`banco_id`, esse banco **não fica persistido em nenhum lugar recuperável**. 📖 Conferido
+nesta redação: `ContaPagar` (`models.py:2412-2463`) e `ContaReceber` (`:2464-2508`) não
+têm coluna `banco_id` — a baixa persiste só `forma_pagamento` (string,
+`financeiro_service.py:100`); 🔬⚠️ dev `information_schema.columns`: `conta_pagar` e
+`conta_receber` sem `banco_id`, `lancamento_contabil`/`partida_contabil` sem coluna de
+banco — só `fluxo_caixa` tem. As três vias teóricas de recuperação estão mortas: (1) o FC
+`'conta_pagar'` com `banco_id` só nasce pelo escritor de `financeiro_views.py:434-452`,
+gated por checkbox que **o modal vivo não envia** (📖
+`templates/financeiro/contas_pagar.html:402-443` — banco opcional, primeira opção "Sem
+vínculo bancário", sem `criar_fluxo_caixa`), alcançável apenas pela página órfã
+`pagar_conta.html:94` — ⚠️ dev **0 linhas**, e o default D-B5.1 **remove** esse escritor;
+(2) o LC `FINANCEIRO_PAGAR` não tem coluna de banco e ⚠️ dev tem 0 linhas dessa origem;
+(3) `baixar_pagamento` não loga o banco no sucesso. **Consequência: estorno automático do
+débito é impossível sem mudança de esquema (A) ou de fonte (C)** — para o histórico e para
+o futuro.
+
+**A catraca.** 📖 Conferido nesta redação: `banco.saldo_atual -= valor_pago`
+(`financeiro_service.py:114`, sob `if banco_id:`/`if banco:`) é o único débito do sistema;
+`+= valor_recebido` (`:345`) o único crédito; criação de banco espelha `saldo_inicial`
+(`financeiro_service.py:945`, `financeiro_views.py:992`) e **não existe rota de edição que
+reescreva saldo**. `estornar_conta` (`financeiro_views.py:296-331`) devolve
+`valor_pago`/saldo/status e apaga LC — **não toca `saldo_atual`**; `estornar_gcp`
+(`:334-370`) idem (correto ali: pagar GCP nunca debita — é o item nº2). E `saldo_inicial`
+do fluxo de caixa é literalmente `sum(banco.saldo_atual)` dos ativos
+(`financeiro_service.py:491`; segundo leitor: KPI `:881`; terceiro: `listar_bancos`
+`financeiro_views.py:952`). O flash da guarda B5.1, já commitado, **manda o operador ao
+estorno** — o caminho sancionado de refazer carrega este defeito dentro.
+
+**O estorno está mais quebrado do que o item nº1 enuncia** — e é o que o adversário
+acrescentou ao recorte:
+1. **O delete de LC em `estornar_gcp` é no-op por construção**: busca
+   `origem='GESTAO_CUSTO_PAI'` e o escritor real grava `origem='V2_AUTO'`,
+   `origem_id=None` (📖 `contabilidade_utils.py:1721-1722`; 🔬⚠️ dev: 0 LC
+   `GESTAO_CUSTO_PAI`, 548 `V2_AUTO` todos com `origem_id` NULL). Prior art:
+   `analises-2026-07-30.json:1529` e a correção em `:1556`.
+2. **`estornar_conta` tem o vazamento simétrico**: não apaga o LC `V2_AUTO` que a baixa de
+   uma conta COMPRA gera (`financeiro_service.py:196-217`) — no parque real é o **único**
+   LC gerado, e estornar+re-pagar dobra o `pagamento_fornecedor` na contabilidade.
+3. **`estornar_gcp` vaza o FluxoCaixa SAIDA** (não apaga; re-pagar cria segundo FC =
+   saída dobrada nos buckets) e não limpa `pai.fluxo_caixa_id`/`conta_bancaria`.
+4. **Não existe estorno de recebimento** (🔬 grep `estorn` fora de archive/tests: só
+   `estornar_conta`, `estornar_gcp` e `contabilidade.estornar_lancamento`): a catraca é
+   assimétrica nos dois sentidos — pagar tem estorno que vaza o débito; receber não tem
+   estorno nenhum (⚠️ dev 06/08: 194 CRs liquidadas sem reversão pela UI). E 🔬 **zero
+   testes citam `estornar`**.
+
+**As quatro hipóteses, atacadas uma a uma:**
+
+| Hipótese | Veredito | O essencial |
+|---|---|---|
+| **(A)** persistir `banco_id` na `ContaPagar`; estorno credita pelo campo | **Sobrevive — é a menor correção correta.** Custo M | Borda real: baixas **parciais** em bancos diferentes (coluna única lembra o último; estorno é tudo-ou-nada). Histórico pré-migração fica NULL — estorno dessas avisa e não credita (não pior que hoje). O par obrigatório que o adversário acrescentou: o estorno credita **e LIMPA** o campo, senão um segundo ciclo credita banco que não foi debitado |
+| **(B)** operador informa o banco no estorno | **Descartada com razão escrita** | Inventa crédito sem rastro (conta paga SEM banco estornada COM banco infla o fluxo); não há contra o que validar — nada foi persistido; e o modal de estorno é **compartilhado** conta/GCP (`contas_pagar.html:449-465`, um só `formEstorno`) — no ramo GCP creditaria débito que nunca houve |
+| **(C)** `saldo_atual` vira **derivado** (`saldo_inicial` + Σ FluxoCaixa por banco) | **Sobrevive como destino, não como conserto.** Custo G, **subestimado** | Mata catraca e discordância (nº1+nº2) por construção, e tem prior art (`:1559`). Mas: a âncora (`data_saldo_inicial`, `models.py:2520`) é NULL em **47/47** bancos — exige backfill/convenção universal; o modal vivo de pagar não gera FC e o import de CR gera FC **sem** `banco_id` (`importacao_excel.py:2487-2501`) — o derivado nasceria furado; os estornos teriam de reverter FC (hoje vazam); e 📖 `editar_fluxo_caixa` (`financeiro_views.py:911-940`, âncora pré-B5.1 `:911` ≈ atual `:943`) edita **qualquer** FC inline — sob C, uma edição reescreve o saldo do banco em silêncio |
+| **(D)** FluxoCaixa como fonte da reversão (como está) | **Morta por quatro vias** | ⚠️ dev 0 linhas `'conta_pagar'` (re-medido 06/08, **depois** dos 25 POSTs reais da suíte B5.1 — demonstração empírica); escritor só alcançável pela página órfã; D-B5.1 o remove; e mesmo no lado receber, onde o FC existe, `banco_id` é NULL em 100% das linhas de `conta_receber` |
+
+**D-B5.6 — O estorno de conta a pagar passa a devolver o débito bancário por qual
+mecanismo?** (formato da §9; **continuação da fila de decisões**)
+Trava: os Steps 1-8 desta Task.
+**(A)** `ContaPagar` ganha `banco_id` persistido na baixa e o estorno credita e limpa pelo
+campo — **uma migração** (número da faixa 280-283, alocado por escrito), custo M, com a
+borda das parciais multi-banco documentada. **(C)** `banco.saldo_atual` deixa de ser
+contador mutável e vira derivado de `saldo_inicial` + Σ FluxoCaixa por banco — redesenho G
+que também mata o item nº2, já proposto em 30/07, mas que muda o número exibido em todos
+os leitores e exige antes: backfill de `data_saldo_inicial` (NULL em 47/47), FC em toda
+baixa com banco, estornos que revertem FC e imutabilidade do FC referenciado na edição
+inline. (B) e (D) estão descartadas acima, com razão escrita.
+**Default se não vier: (A).** Razão: é a menor correção correta; a âncora do derivado de C
+**não existe em nenhum banco do parque**; e A não fecha a porta para C — a coluna nova
+vira insumo do derivado se C vier depois. **A consulta de produção que dimensiona o dano**
+(se produção ≈ dev — 0 PAGO real, drift zero —, a B5.6 é prevenção pré-deploy, não
+incidente): `SELECT status, count(*) FROM conta_pagar GROUP BY 1;` ·
+`SELECT count(*), count(banco_id) FROM fluxo_caixa WHERE referencia_tabela='conta_pagar';`
+· `SELECT count(*), count(*) FILTER (WHERE saldo_atual IS DISTINCT FROM saldo_inicial)
+FROM banco_empresa;` — entram no pacote F0.1.
+
+**Comportamento novo (sob o default A).**
+1. Migração: coluna `banco_id` nullable em `conta_pagar` (histórico fica NULL — e o
+   estorno **avisa** quando `valor_pago > 0` e `banco_id` NULL, em vez de creditar).
+2. `baixar_pagamento` grava `conta.banco_id` quando debita; em baixa **parcial**, grava no
+   primeiro pagamento e **recusa troca de banco** em conta PARCIAL (a mitigação honesta da
+   borda multi-banco — a alternativa, aproximar pelo último banco, só por decisão escrita).
+3. `estornar_conta` credita `banco.saldo_atual += valor_pago` pelo campo **e limpa
+   `conta.banco_id`** no mesmo movimento.
+4. Os LC V2 do pagamento passam a nascer rastreáveis (`origem`/`origem_id` reais — a
+   correção de `analises-2026-07-30.json:1556`), e os dois estornos apagam o que a baixa
+   criou: `estornar_conta` apaga também o LC do pagamento; `estornar_gcp` passa a ter
+   delete que **casa**, apaga/compensa o FC SAIDA vinculado e limpa
+   `pai.fluxo_caixa_id`/`conta_bancaria`.
+
+**Teste que prova.** Tenant próprio com `BancoEmpresa` de saldo conhecido; padrão de login
+da B5.1 (`tests/test_b5_baixa_conta_pagar.py`).
+
+| # | Ação | Asserção |
+|---|---|---|
+| 1 | baixa de R$ 1.000 com `banco_id` → estorno | `saldo_atual` volta ao valor inicial; `conta.banco_id` limpo; status PENDENTE |
+| 2 | baixa **sem** banco → estorno | nenhum crédito inventado; saldo dos bancos intacto |
+| 3 | conta legada PAGO com `banco_id` NULL (forma do import, `importacao_excel.py:2414-2430`) → estorno | crédito **zero** + aviso explícito — é o caso que um teste só-caminho-feliz deixaria verde e oco |
+| 4 | estorno → re-baixa com **outro** banco → 2º estorno | o 2º estorno credita o banco da 2ª rodada (prova da limpeza do campo) |
+| 5 | baixa de conta COMPRA (admin V2) → estorno → re-baixa | `LancamentoContabil` **não dobra** — o LC do pagamento foi apagado no estorno |
+| 6 | pagar GCP com FC → `estornar_gcp` | FC SAIDA removido/compensado; `pai.fluxo_caixa_id` e `conta_bancaria` limpos; LC do GCP apagado (delete agora casa); `saldo_atual` **intocado** (GCP nunca debitou) |
+| 7 | baixa parcial de 400 no banco A → tentativa de parcial de 600 no banco B | recusa com flash; mesma conta, parcial de 600 no banco A, completa PAGO |
+
+**Riscos → mitigação.**
+1. **Crédito sem limpeza é catraca invertida.** Se `banco_id` sobrevive ao estorno e a
+   re-baixa vem sem banco, um segundo estorno credita banco não debitado. → caso 4 é o cão
+   de guarda; crédito e limpeza no mesmo Step.
+2. **O verde-e-oco espreita no caso NULL.** Teste que só cubra baixa-com-banco→estorno
+   fica verde sem provar o aviso da conta legada/importada. → caso 3 obrigatório.
+3. **Parciais multi-banco.** O estorno é tudo-ou-nada (zera `valor_pago` inteiro); coluna
+   única + troca de banco em parcial = crédito total no banco errado. → recusa de troca
+   (caso 7); aceitar a aproximação exige decisão escrita na D-B5.6.
+4. **A migração é recurso disputado e o 280 é corrida de TRÊS.** §12 do plano consolidado
+   já promete o 280 a dois pretendentes condicionais (índice único de `RegistroPonto` pós-q7;
+   A24a pós-B2.13). → alocar o número **por escrito no Step 1**, antes de tocar
+   `migrations.py` (§11.3 nº2) — "primeira da faixa liberada" é verdade, "estante vazia" não.
+5. **O modal de estorno é compartilhado conta/GCP** (`contas_pagar.html:449-465`).
+   Qualquer texto/campo novo tem de existir só no ramo conta — o GCP nunca debitou.
+6. **As medidas ⚠️ dev envelhecem a cada rodada de teste** contra o banco único — a B5.1
+   moveu 627→652 CPs no mesmo dia. → toda medida deste apenso carrega data; recorte futuro
+   que cite "drift zero" sem data afirma coisa falsa.
+
+**O que esta Task NÃO faz.** (i) **Estorno de recebimento** — não existe hoje e não nasce
+aqui; ⚠️ dev 06/08: 194 CRs liquidadas sem reversão pela UI. Item próprio; se vier e a
+resposta for A, `ContaReceber` ganha `banco_id` junto — quem o criar herda a mesma
+armadilha de origem dupla de LC do lado pagar (`FINANCEIRO_RECEBER` +
+`gerar_lancamento_contabil_automatico`). (ii) A hipótese C — fica escrita como destino
+possível, não é iniciada. (iii) A dupla contagem do fluxo — é a B5.7.
+
+- [ ] **Step 0:** 🔴 **decisão D-B5.6** (acima, com default A) + consultas de produção no pacote F0.1. Se (C), a Task reabre como redesenho G e **para aqui**
+- [ ] **Step 1:** alocar o número da migração **por escrito** (faixa 280-283; corrida de três — risco 4)
+- [ ] **Step 2:** escrever o teste e ver vermelhos os casos 1 (saldo não volta), 4, 5 (LC dobra) e 6 (FC vaza; delete no-op)
+- [ ] **Step 3:** migração + coluna `banco_id` em `ContaPagar`
+- [ ] **Step 4:** `baixar_pagamento` grava `conta.banco_id`; regra da parcial (caso 7)
+- [ ] **Step 5:** `estornar_conta` credita **e limpa**; aviso no caso NULL
+- [ ] **Step 6:** origem rastreável dos LC V2 (`:1556` do prior art) + deletes que casam nos dois estornos + FC do GCP removido e ponteiros limpos
+- [ ] **Step 7:** sete casos verdes; mutação: desfazer o Step 5 derruba só 1/4; desfazer o Step 6 derruba só 5/6
+- [ ] **Step 8:** commit — `fix(financeiro): estorno devolve o debito bancario e apaga o que a baixa criou`
+
+**Esforço: M** (sob A; sob C é G e reabre). **Migração: SIM — uma**, número alocado no
+Step 1 (280-283; a 279 segue a última registrada).
+
+> **Nota — o que o adversário corrigiu neste levantamento.** (a) As medidas ⚠️ dev centrais
+> ficaram irreprodutíveis no mesmo dia (25 PAGO e 5 bancos em drift por resíduo da suíte
+> B5.1 — que é a catraca demonstrada ao vivo). (b) O "achado novo" do LC no-op já estava
+> registrado verbatim em 30/07 (`analises-2026-07-30.json:1529`), com a correção proposta
+> em `:1556` — lida e não vista pelo levantamento, três linhas acima do que ele citou.
+> (c) `estornar_conta` não é o lado são: vaza o LC `V2_AUTO` — no parque real, o único LC
+> que a baixa gera. (d) A hipótese C está mais cara que o G da letra: `data_saldo_inicial`
+> NULL em 47/47 e a edição inline de FC reescreveria saldo em silêncio. (e) Na hipótese A
+> faltava o par crédito+limpeza do campo. (f) A migração 280 tem três pretendentes, não
+> estante vazia. (g) Pergunta aberta 7 do levantamento **fechada**: o flash commitado da
+> guarda B5.1 (📖 `financeiro_views.py:396-398`, `:409-410`) não promete devolução do
+> banco — o texto está correto.
+
+---
+
+### Task B5.7: a exclusão de gêmeos chega ao fluxo de caixa; os escritores/leitores mortos saem
+
+**Esta Task está escrita SOB o default (a) da D-B5.1** — `GestaoCustoPai` é a única fonte
+da SAÍDA e o escritor de FC `'conta_pagar'` (`financeiro_views.py:434-452`, âncora da §4
+`:407-418` **pré-B5.1**) **sai** em vez de ser completado. Se a resposta for **(b)**, esta
+Task reabre como o recorte da F2 inteiro (hipótese H3, custo G): previstas de compra
+passam a vir de `ContaPagar`, o escritor ganha os campos que faltam (a começar por
+`obra_id`) e o serviço passa a ler três fontes de saída.
+
+**Files:** Modify `financeiro_service.py` — `calcular_fluxo_caixa` (`:471-758`: previstas
+`:519-545`, fallback PAGO `:569-580` e os detalhes previstos que alimentam
+`agregar_fluxo_mensal` `:764-786`); Modify `gestao_custos_views.py` — guard de
+idempotência de `migrar_contas_pagar` (`:1335-1341`); Modify `views/vehicles.py` — remoção
+da rota `main.novo_custo_veiculo` **inteira** (`:826-946`); Modify `ponto_views.py` —
+blocos `:849-863` e `:932-940`; Create `tests/test_b5_fluxo_gemeos_e_orfaos.py`
+
+**O mecanismo, corrigido contra o enunciado da §4.** O caminho **vivo** de pagamento de
+GCP não é o `pagar` de `:872+` (legado por comentário próprio, 📖
+`gestao_custos_views.py:865-871`, zero referências em template/JS) e sim **`autorizar`**
+(`:732-870`, alcançado por path literal `` `/gestao-custos/${paiId}/autorizar` `` em
+`templates/custos/gestao.html:647` — lente TEMPLATE): grava FC SAIDA `'gestao_custo_pai'`
+com `banco_id` (📖 `:812-825`, banco obrigatório só se `criar_fc`, `:805-808`) e **nunca
+toca `banco.saldo_atual`** (🔬 grep no arquivo: zero). `baixar_pagamento` faz o oposto:
+debita `saldo_atual` quando há banco (`financeiro_service.py:114`) e não grava FC. E as
+linhas FC `'conta_pagar'` são **invisíveis** a `calcular_fluxo_caixa` (`pr_query` filtra
+`'gestao_custo_pai'`, `fd_query` filtra `referencia_tabela IS NULL` — um escritor sem
+nenhum leitor, em lugar nenhum). **Os dois caminhos erram em direções opostas e o sinal
+depende da tela**: pagar a gêmea CP com banco debita o `saldo_inicial` do fluxo E mantém a
+prevista do GCP para sempre (dupla subtração de `saldo_final :594`); pagar via GCP tira a
+prevista e mostra realizado sem nunca debitar o banco.
+
+**A exclusão de gêmeos existe numa tela e não no fluxo** (item nº5, confirmado intacto):
+📖 `financeiro_views.py:190-217` — subquery dos filhos `origem_tabela='pedido_compra'`
+aplicada em `:207` e `:216`, **só em `listar_contas_pagar`**. `calcular_fluxo_caixa` não
+tem equivalente em nenhuma das pontas. Tamanho, com a medida **corrigida pelo adversário**
+(join com guard de tenant): ⚠️ dev 06/08 — **580 GCPs de compra abertos com gêmea CP no
+mesmo tenant, R$ 490.950** entrando em `saidas_previstas` (sem o guard, 621/R$ 503.250 —
+os 41 extras casavam com CP de outro tenant); na janela default do fluxo (mês corrente):
+**341 GCPs, R$ 59.625** (reproduzida exata pela refutação); universo das previstas: 5.081
+abertos / R$ 2.046.609 — os gêmeos são **24%** do valor, e 4.202 têm `saldo` NULL (o
+fallback é parte obrigatória de qualquer exclusão).
+
+**As três famílias de gêmeos** (o inventário que o levantamento entregou com duas):
+1. **`pedido_compra`** — 📖 `compras_views.py:206-276` cria GCP + GCF + ContaPagar para o
+   mesmo pedido; ⚠️ dev 627 CPs COMPRA. É a família da exclusão desta Task.
+2. **Reembolso do import** — 📖 `importacao_excel.py:2413-2431` cria CP gêmea com
+   `origem_tipo='gestao_custo_pai'`, fora do filtro da tela. Registrada; sem regra ainda.
+3. **Clones de `migrar_contas_pagar`** — a mais perigosa, a um clique (achado do
+   adversário): o guard de idempotência (`:1335-1341`) só olha `origem_tabela='conta_pagar'`
+   e **não vê a gêmea `'pedido_compra'`** — um clique cria a segunda GCP por parcela, que
+   escapa da exclusão da tela E de qualquer espelho em `calcular_fluxo_caixa`. Qualquer
+   recorte que não feche isso **fica errado no dia seguinte ao deploy**. ⚠️ dev: 0 filhos
+   `'conta_pagar'` hoje — o botão ainda não foi clicado; a forma está armada.
+   (Quarta forma menor: 44 filhos `'compra'` minúsculo, legado de seed, nenhum com gêmea.)
+
+**Vehicles (item nº3): a morte é tripla e o recorte é a rota inteira.** 📖 Conferido nesta
+redação (`views/vehicles.py:826-946`): o `FluxoCaixa` de `:922-930` não passa `admin_id`
+(`nullable=False`, 📖 `models.py:1130`; 🔬 `is_nullable='NO'` na coluna real) —
+`IntegrityError` garantido no commit; o template `veiculos/novo_custo.html` **não existe**
+(🔬 nem o diretório `templates/veiculos/`) — GET morre em `TemplateNotFound`; zero
+referências à rota em templates, static e tests (nenhum `BuildError` ao remover). O
+`except` externo (`:940-943`) faz rollback que derruba o `CustoVeiculo` e o `km_atual`
+juntos. **Remover só o bloco FC seria pior que não fazer**: destrava o commit e ressuscita
+um escritor de `CustoVeiculo` que nunca persistiu — comportamento novo sem decisão.
+
+**Ponto (item nº4): remoção sem mudança observável.** Nenhum escritor de FC
+`'registro_ponto'` em nenhuma lente (homonímia com `GestaoCustoFilho.origem_tabela`
+checada); ⚠️ dev 0 linhas; os consumidores JS toleram chave ausente/vazia
+(`controle_ponto.html:543-545`, `funcionario_perfil.html:2565+`). Mantém-se a chave
+`fluxo_caixa: []` no JSON do preview.
+
+**D-B5.7 — sob o default (a) da D-B5.1: quando a ContaPagar de uma compra é paga, quem
+registra a SAÍDA REALIZADA no fluxo de caixa?** (a afiada da D-B5.1 — o default sozinho
+não a resolve)
+Trava: nada desta Task — ela executa o default abaixo; a resposta pode reabrir um Step.
+**(1)** a baixa passa a gravar FC `'gestao_custo_pai'` no GCP gêmeo (ou flipa o status
+dele) — acoplamento novo entre camadas, com matching frágil: a chave exige
+`admin_id + (pedido_compra_id, parcela_numero) × (filho.origem_id, pai.numero_parcela)` —
+`filho.origem_id` é o **mesmo** para todas as parcelas do pedido, e o próprio WF errou o
+join duas vezes; e o escritor teria de vir do bloco Fase 4 do legado
+(`gestao_custos_views.py:940-957`, o único que atribui `obra_id`/`centro_custo_id`), não
+do vivo `autorizar` (`:812-825`, que não atribui — realizados invisíveis ao filtro por
+obra e à limpeza de `excluir_obra`). **(2)** compras ficam **fora do realizado do fluxo**
+por decisão documentada — revogando por escrito o comentário Task #11
+(`compras_views.py:247-255`, "ContaPagar = camada do fluxo de caixa") — e o buraco fica
+declarado: ~24% do valor aberto do parque sem realizado no fluxo quando pago pela tela de
+contas a pagar.
+**Default se não vier: (2).** Razão: (1) cria acoplamento com chave que já se provou fácil
+de errar e herdaria o defeito do escritor vivo; um acoplamento novo entre camadas não deve
+nascer por default — nasce por resposta. O buraco de (2) é visível e reversível; o
+matching errado de (1) é silencioso.
+
+**Comportamento novo.**
+1. `calcular_fluxo_caixa` ganha a exclusão de gêmeos — **restrita por escrito à família
+   `pedido_compra`**, com a subquery carregando `admin_id` — nas **três** pontas: previstas
+   (`:519-545`), fallback PAGO (`:569-580`) e os detalhes previstos que alimentam os
+   buckets de `agregar_fluxo_mensal`.
+2. O guard de idempotência de `migrar_contas_pagar` passa a reconhecer também a gêmea
+   `'pedido_compra'` (CP de compra **não** é clonada — fecha o amplificador de um clique
+   sem decidir a fonte).
+3. `views/vehicles.py:826-946` — a rota `main.novo_custo_veiculo` sai **inteira**.
+4. `ponto_views.py:849-863` e `:932-940` saem; a chave `fluxo_caixa: []` fica no JSON.
+5. Sob a D-B5.7 default (2): nenhum realizado novo é escrito; o comentário Task #11 ganha
+   a anotação de revogação com ponteiro para este apenso.
+
+**Teste que prova.**
+
+| # | Ação | Asserção |
+|---|---|---|
+| 1 | GCP-compra aberto com gêmea CP no mesmo tenant | fora de `saidas_previstas` e dos buckets mensais |
+| 2 | GCP-compra cujo "gêmeo" só existe em CP de **outro** tenant (colisão de id) | **continua** nas previstas — o guard de tenant na subquery (o erro que a medição cometeu duas vezes) |
+| 3 | GCP aberto sem gêmea (origem manual) | continua nas previstas |
+| 4 | GCP-compra com `saldo` NULL (4.202/5.081 em dev) | excluído também pelo fallback |
+| 5 | `POST /gestao-custos/migrar-contas-pagar` duas vezes, com CPs de compra pendentes | **zero** GCP novo criado nas duas (guard reconhece a gêmea `pedido_compra`) |
+| 6 | url_map após o corte de vehicles | `/veiculos/<id>/custo` sem regra; nenhum `url_for` quebra (zero referências) |
+| 7 | `GET /ponto/excluir-preview/<id>` e o delete | JSON mantém `fluxo_caixa: []`; comportamento idêntico ao atual |
+
+**Riscos → mitigação.**
+1. **Subquery sem `admin_id` = misjoin** — provado: 41 falsos gêmeos em dev. → caso 2 é o
+   cão de guarda.
+2. **Exclusão só nas previstas deixa os buckets dobrados** — a lista `detalhes` e
+   `agregar_fluxo_mensal` são o sintoma real (correção do adversário já adotada na B5.1:
+   não é o `saldo_final` que dobra sozinho). → as três pontas no mesmo Step.
+3. **Cortar só o bloco FC de vehicles ressuscita um escritor de `CustoVeiculo`** que nunca
+   persistiu. → rota inteira (H4). A família tem **três** rotas mortas —
+   `/veiculos/custo` (`:766-816`) e `novo_custo_veiculo_form` (`:1899+`) ficam citadas
+   como limpeza separada, fora desta Task.
+4. **As famílias 2 e 3 de gêmeos escapam do espelho por construção.** O guard do item 2 do
+   comportamento fecha a 3; a 2 (reembolso do import) fica **registrada sem regra** — entra
+   na resposta da D-B5.1/D-B5.7, não aqui em silêncio.
+5. **Se a D-B5.7 devolver (1)**: o escritor de FC vem do bloco Fase 4 do legado, **não**
+   de `autorizar` — senão nascem realizados sem `obra_id`, invisíveis ao filtro por obra
+   (`pr_query :566-567`) e fora de `excluir_obra` (`views/obras.py:1215`).
+6. **As linhas órfãs de dev** (168 FC `referencia_id=999` espalhadas por 76 tenants, 1-3
+   cada) aparecem no `pr_query` desses tenants **sem pai nenhum** — é dado de seed/teste,
+   não forma de estorno (o misjoin do levantamento está desfeito); limpeza é decisão de
+   dado, não código desta Task.
+
+**O que esta Task NÃO faz.** O buraco do **estorno de GCP** (FC retido sob pai reaberto,
+delete de LC no-op) é matéria da **B5.6** — provado por leitura de
+`financeiro_views.py:334-370`, **sem exemplar em dev** (o "GCP 999" caiu). O escritor vivo
+`autorizar` sem `obra_id` fica registrado (⚠️ dev: 0 das 210 linhas FC `'gestao_custo_pai'`
+sem obra — nenhuma veio de `autorizar` ainda; prova de forma, não de volume) — consertá-lo
+é da resposta (1) da D-B5.7 ou de item próprio. E o import `'apenas_pagamento'`
+(`importacao_excel.py:2329-2346`, SAIDA com referência NULL que vira "Lançamento Direto"
+**editável** na tela do fluxo) fica como pergunta aberta de produto.
+
+- [ ] **Step 0:** registrar a **D-B5.7** na fila do Cássio (com a D-B5.1, de que ela é a afiada); a Task executa o default (2) sem esperar
+- [ ] **Step 1:** escrever o teste e ver vermelhos os casos 1, 4 e 5 (2, 3 e 7 nascem como guardas verdes; 6 nasce vermelho junto do Step 4)
+- [ ] **Step 2:** exclusão nas três pontas de `calcular_fluxo_caixa`, subquery com `admin_id`, restrita a `pedido_compra`
+- [ ] **Step 3:** guard de idempotência de `migrar_contas_pagar` reconhece a gêmea `pedido_compra`
+- [ ] **Step 4:** rota de vehicles sai inteira (`:826-946`)
+- [ ] **Step 5:** blocos de ponto saem; chave `fluxo_caixa: []` mantida
+- [ ] **Step 6:** sete casos verdes; mutação: restaurar a exclusão de uma ponta derruba só o caso 1/4; tirar o `admin_id` da subquery derruba só o 2; restaurar o guard antigo derruba só o 5
+- [ ] **Step 7:** dois commits — `fix(fluxo-caixa): gemeos de compra saem das previstas do fluxo` e `chore(financeiro): remove o escritor morto de vehicles e os leitores orfaos de ponto`
+
+**Esforço: M.** **Migração: não** (🔬 conferido: `migrations.py` sobre `fluxo_caixa` só
+tem o UPDATE de backfill de `admin_id` — nenhum INSERT; a 279 segue a última).
+
+> **Nota — o que o adversário corrigiu neste levantamento.** (a) Âncoras de
+> `financeiro_views.py` pré-B5.1 — corrigidas para a árvore atual (`:423`, `:434-452`,
+> `:746`, `:886`); o levantamento era internamente inconsistente (metade medida antes do
+> commit, metade depois). (b) "621 gêmeos / R$ 503.250" → **580 / R$ 490.950** com guard
+> de tenant. (c) O "GCP 999 com 168 realizadas sob pai aberto" **não existe** — misjoin;
+> as linhas são órfãs em 76 tenants; a pergunta aberta "seed ou estorno?" morreu com ele.
+> (d) A **terceira família** de gêmeos (clones de `migrar_contas_pagar` + guard furado) —
+> o levantamento citou a rota zero vezes; a lente STRING dele não pegou
+> `origem_tabela='conta_pagar'` em `:1337/:1400`. (e) O escritor vivo `autorizar` **não é
+> equivalente** ao legado: perde `obra_id`/`centro_custo_id` — a correção da Fase 4 virou
+> código morto no caminho que a UI usa. (f) "627 CPs TOTAIS" → 652 (resíduo da B5.1).
+> (g) A família de vehicles tem três rotas mortas, não duas.
+
+---
+
+### 10.1 Contradições registradas (formato da §8; numeração continua a de lá)
+
+**6 — O que é "consertar o estorno" (B5.6).**
+O levantamento recorta a catraca bancária e deixa os vazamentos de LC/FC dos estornos como
+pergunta aberta ("entram na B5.6 ou na B5.7?"). O adversário sustenta que recortar só a
+catraca entrega um estorno "consertado" que ainda mente — mesmo com (A), estornar+re-pagar
+uma conta COMPRA dobra o LC `V2_AUTO` que ninguém apaga, e o flash da B5.1 empurra o
+operador para lá; agrava que a correção da origem dos LC está proposta por escrito desde
+30/07 e já foi esquecida uma vez.
+**Adotado: os vazamentos dos DOIS estornos entram na B5.6** (Step 6, casos 5-6), e a
+B5.7-H6 do levantamento (que os empurrava para cá) confirma o destino. Registrado porque a
+inclusão é escolha desta síntese sobre uma pergunta que o levantamento deixou aberta — e
+porque ela sobe o custo dentro do próprio M.
+
+**7 — (A) × (C) na B5.6.**
+O levantamento entrega o recorte "pronto nos dois sentidos" e trata A e C como
+equivalentes na maturidade. O adversário rebaixa C duas vezes: a âncora do derivado
+(`data_saldo_inicial`) é NULL em 47/47 bancos — a borda "(5)" do levantamento é o caso
+universal —, e a edição inline de FC reescreveria saldo em silêncio sob C.
+**Não resolvida — é a D-B5.6**, com default (A) e a razão escrita. A discordância
+registrada é sobre a **simetria** das opções, não sobre a lista: se o Cássio escolher (C),
+o recorte de C precisa ser revarrido — o que está pronto nos dois sentidos é a pergunta,
+não a implementação.
+
+**8 — O realizado das compras sob o default (a) da D-B5.1 (B5.7).**
+O levantamento formula a escolha (1) FC no GCP gêmeo × (2) compras fora do fluxo e não
+recomenda lado. O adversário acrescenta que (1), como o levantamento a descreveu, herdaria
+dois defeitos (matching sem guard de tenant; escritor vivo sem `obra_id`) — sem se opor a
+(1) corrigida.
+**Não resolvida — é a D-B5.7**, com default (2) e a razão escrita (o erro de (1) é
+silencioso; o buraco de (2) é declarado). A Task executa o default; a resposta pode
+reabrir um Step, não a Task.
+
+**9 — As medidas com join sem guard de tenant (B5.7).**
+Levantamento: 621 gêmeos/R$ 503.250; "GCP 999 com 168 realizadas sob pai PENDENTE".
+Adversário: reproduziu os dois números **e** os refez com `admin_id` — 580/R$ 490.950; e
+o GCP 999 é misjoin (168 linhas órfãs em 76 tenants).
+**Resolvida a favor do adversário**, e registrada porque vira regra da casa desta rodada:
+**todo join de gêmeos CP↔GCP carrega `admin_id`** (caso 2 do teste da B5.7 congela isso), e
+**toda medida ⚠️ dev citada em documento carrega a data da medição** — o banco único de dev
+é movido pela própria suíte (627→652 CPs no mesmo dia, medido).
+
+---
+
 ## Histórico
 
 - **2026-08-06** — Rodada B5 aberta. Cinco dívidas sem Task varridas com cinco lentes cada
@@ -1016,3 +1472,11 @@ aí o item novo nº8 (o `Timer` do listener de RDO) é mais urgente que este.
   (a catraca de `banco.saldo_atual` e a discordância entre os dois caminhos de pagamento) e
   dois são risco de instrumento (`Timer` em thread de fundo no listener de RDO; ordem de
   coleta determinística sustentando o gate).
+- **2026-08-06, tarde** — **Apenso §10: os dois itens de dinheiro viraram as Tasks B5.6 e
+  B5.7** (WF-2, levantar/refutar). A pergunta central da B5.6 tem resposta **NÃO** (o banco
+  debitado não é recuperável em lugar nenhum) e nasce a **D-B5.6** (default: coluna
+  `banco_id` + migração da faixa 280-283) e a **D-B5.7** (a afiada da D-B5.1, default:
+  compras fora do realizado do fluxo, documentado). Os adversários derrubaram quatro
+  medidas do levantamento (resíduo da suíte B5.1 no banco de dev; dois joins de gêmeos sem
+  guard de tenant) e acharam a terceira família de gêmeos (`migrar_contas_pagar`) e o
+  vazamento de LC `V2_AUTO` nos dois estornos. Contradições 6-9 registradas na §10.1.

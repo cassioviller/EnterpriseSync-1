@@ -29,7 +29,7 @@ silêncio.
 |---|---|---|
 | **D-B5.3** | 404 em todas as rotas, inclusive na tela HTML | O Step 4 da B5.3 ganha um ramo: tela mantém flash+redirect, programáticas dão 404. O teste muda nos casos 1-2 |
 | **D-B5.4** | (B) manter os dois `finalizar_rdo` | (A) reabre a B5.4 como **G**, serializa com a B5.3 e reescreve o arreio de custo — não fazer sem sessão dedicada |
-| **D-B5.1** | (a) `GestaoCustoPai` é a única fonte da SAÍDA; o escritor de `financeiro_views.py:407-418` **sai** em vez de ser completado | (b) reabre o recorte da F2 inteiro: a exclusão de gêmeos vira pré-requisito de qualquer escrita |
+| **D-B5.1** | (a) `GestaoCustoPai` é a única fonte da SAÍDA; o escritor de FC `'conta_pagar'` — hoje em `financeiro_views.py:434-452` (⚠️ a âncora original `:407-418` ficou EM CIMA da guarda da B5.1 depois do commit `0bc62449`; corrigida pela revisão WF-1 — executar o corte pela âncora velha apagaria a guarda) — **sai** em vez de ser completado | (b) reabre o recorte da F2 inteiro: a exclusão de gêmeos vira pré-requisito de qualquer escrita |
 | **D-B5.5a/b/c** | peso vivo · só a Curva S · borda por exclusão com rótulo | Afeta só a B5.5, que está bloqueada de qualquer jeito |
 | **D-B5.2** | documentar a jornada (comentário no topo), não reescrever | Se a paralelização do gate entrar na mesa, inverte — e o item nº8 (Timer) passa na frente |
 
