@@ -46,8 +46,8 @@ from models import (BancoEmpresa, ContaReceber, FluxoCaixa, LancamentoContabil,
 
 from helpers_tenant import cliente_de, um_tenant
 
-# ⚠️ Cão de guarda do verde-e-oco (risco 3): o oráculo do caso 3 é `rr_query`
-# (`financeiro_service.py:774-796`), que filtra por `data_movimento` DENTRO da
+# ⚠️ Cão de guarda do verde-e-oco (risco 3): o oráculo do caso 3 é `rr_query`,
+# em `calcular_fluxo_caixa`, que filtra por `data_movimento` DENTRO da
 # janela e por `obra_id`. Data da baixa e janela consultada são fixadas juntas
 # aqui — um FC fora da janela sumiria do oráculo por filtro, não por delete, e
 # o caso ficaria verde sobre nada.
@@ -56,9 +56,10 @@ DATA_D = date(2026, 8, 6)
 JANELA = (date(2026, 8, 1), date(2026, 8, 31))
 
 CONTA_RECEITA = '3.1.01.001'
-# A partida de DÉBITO da baixa é fixa em Caixa/Bancos
-# (`financeiro_service.py:416`), e `partida_contabil` tem FK composta para
-# `plano_contas` — sem semear as DUAS contas o LC do caso 4 nem nasce.
+# A partida de DÉBITO da baixa é fixa em Caixa/Bancos (bloco
+# `# PARTIDA 1: DÉBITO - Caixa/Bancos` de `baixar_recebimento`), e
+# `partida_contabil` tem FK composta para `plano_contas` — sem semear as DUAS
+# contas o LC do caso 4 nem nasce.
 CONTA_CAIXA = '1.1.01.001'
 
 
@@ -143,7 +144,8 @@ def _flashes(cli):
 def test_caso1_estorno_debita_o_banco_e_limpa_o_campo(tenant):
     """Baixa de R$ 1.000 com banco → estorno: `saldo_atual` volta ao inicial,
     `conta.banco_id` limpo, status PENDENTE, saldo = valor_original. É o único
-    DÉBITO novo do sistema — o par invertido de `financeiro_service.py:127`."""
+    DÉBITO novo do sistema — o par invertido do `banco.saldo_atual -=
+    valor_pago` de `baixar_pagamento`."""
     cli = cliente_de(tenant.admin_id)
     banco_id = _banco(tenant.admin_id, 5000)
     conta_id = _conta(tenant.admin_id)
@@ -219,7 +221,8 @@ def test_caso3_estorno_apaga_o_fluxo_caixa_entrada(tenant):
 
 def test_caso4_estornar_e_rebaixar_nao_dobra_a_contabilidade(tenant):
     """CR com conta contábil: a baixa gera o LC `FINANCEIRO_RECEBER` (já nasce
-    carimbado, `financeiro_service.py:405-406` — sem Step de carimbo, ao
+    carimbado (`origem='FINANCEIRO_RECEBER'`, em `baixar_recebimento`) — sem
+    Step de carimbo, ao
     contrário da B5.6). O estorno tem de apagá-lo (partidas por cascade), e a
     re-baixa não pode dobrar."""
     cli = cliente_de(tenant.admin_id)
@@ -324,7 +327,8 @@ def test_caso7_cr_de_medicao_aceita_segunda_baixa_em_outro_banco(tenant):
     A CR de medição acumula baixas ao longo das medições da obra. Se o cinto de
     banco único valesse para ela, a primeira obra que trocasse de banco entre
     medições veria a baixa falhar com ValueError engolido em flash genérico
-    (`financeiro_views.py:837-839`). Cinto e gravação NÃO se aplicam a
+    (o `flash('Erro ao registrar recebimento')` de `receber_conta`). Cinto e
+    gravação NÃO se aplicam a
     OBRA_MEDICAO: a 2ª baixa em OUTRO banco PASSA, e credita o banco novo."""
     cli = cliente_de(tenant.admin_id)
     banco_a = _banco(tenant.admin_id, 5000)

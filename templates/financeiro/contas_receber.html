@@ -158,7 +158,14 @@
                                 {% if conta.status in ('RECEBIDO', 'PARCIAL')
                                       and conta.origem_tipo != 'OBRA_MEDICAO' %}
                                 <button class="btn btn-sm btn-warning"
-                                        onclick="abrirModalEstornoRecebimento({{ conta.id }}, '{{ conta.descricao|e }}')">
+                                {# WF-4/E1 — `|e` aqui deixava o botão INERTE: o autoescape
+                                   vira a aspa simples em `&#39;`, o parser HTML a decodifica
+                                   ANTES de o JS compilar, e a string fecha no meio
+                                   (SyntaxError, clique sem efeito e sem erro visível — e o
+                                   modal é a única via de estorno da tela). O `|replace` do
+                                   gêmeo em contas_pagar.html:225 funciona porque a barra
+                                   sobrevive ao autoescape: `\&#39;` decodifica para `\'`. #}
+                                        onclick="abrirModalEstornoRecebimento({{ conta.id }}, '{{ conta.descricao|replace("'", "\\'") }}')">
                                     <i class="fas fa-undo"></i> Estornar
                                 </button>
                                 {% endif %}

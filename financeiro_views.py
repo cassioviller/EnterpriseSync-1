@@ -901,7 +901,7 @@ def estornar_recebimento(conta_id):
     B6.1 — o espelho de `estornar_conta` FUNDIDO com o passo-FC de
     `estornar_gcp`, porque o receber tem o que o pagar não tinha: o FluxoCaixa
     ENTRADA é VIVO (escritor no checkbox do modal, `receber_conta` acima;
-    leitor `rr_query` no fluxo realizado, `financeiro_service.py:774-796`).
+    leitor `rr_query` em `calcular_fluxo_caixa`).
     Estorno sem delete de FC deixa **entrada fantasma** no realizado e dobra a
     entrada nos buckets na re-baixa.
     """
@@ -938,7 +938,8 @@ def estornar_recebimento(conta_id):
 
         # B6.1 — DEBITAR de volta E limpar o campo, no mesmo movimento. É o
         # único débito novo do sistema (o par invertido de
-        # `financeiro_service.py:127`), e a limpeza é o que impede a catraca
+        # o `banco.saldo_atual -= valor_pago` de `baixar_pagamento`), e a
+        # limpeza é o que impede a catraca
         # invertida: re-baixa sem banco + 2º estorno debitaria banco não
         # creditado. `banco_id` NULL = baixa sem banco, CR pré-migração-281 ou
         # a forma do import (`importacao_excel.py:2469-2503`, que cria a CR já
@@ -975,7 +976,8 @@ def estornar_recebimento(conta_id):
         # Os LancamentoContabil da baixa saem — atômico com o commit abaixo.
         # Aqui o delete casa de primeira: o LC do recebimento já nasce
         # carimbado 'FINANCEIRO_RECEBER'/origem_id=conta_id
-        # (`financeiro_service.py:405-406`), sem a armadilha de origem dupla
+        # (o bloco `origem='FINANCEIRO_RECEBER'` de `baixar_recebimento`),
+        # sem a armadilha de origem dupla
         # que a B5.6 teve de corrigir no lado pagar. Partidas caem por cascade.
         from models import LancamentoContabil
         lcs = LancamentoContabil.query.filter_by(

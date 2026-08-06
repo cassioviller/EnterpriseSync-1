@@ -362,7 +362,8 @@ class FinanceiroService:
             # ali. Com o estorno recusado por origem (D-B6.1), o cinto não
             # teria válvula de escape: a primeira obra que trocasse de banco
             # entre medições veria a baixa falhar com ValueError engolido em
-            # flash genérico (`financeiro_views.py:837-839`). A CR de medição
+            # flash genérico (o `flash('Erro ao registrar recebimento')` de
+            # `receber_conta`). A CR de medição
             # segue como sempre foi — credita e descarta.
             _e_medicao = (getattr(conta, 'origem_tipo', None) == 'OBRA_MEDICAO')
             if (not _e_medicao

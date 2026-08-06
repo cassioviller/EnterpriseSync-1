@@ -9,11 +9,26 @@ gravação do import de fluxo com checkbox de reembolso nunca rodou lá. **Este
 arquivo É o exemplar** — a forma é montada por ORM exatamente como
 `services/importacao_excel.py:2400-2431` a grava.
 
-**A forma.** GCP + GCF **sem `origem_tabela`** (invisível a toda exclusão por
-GCF, que é como a B5.7 excluiu a família 1) + CP gêmea com
-`origem_tipo='gestao_custo_pai'` **minúsculo** e `origem_id=gcp.id` — chave
-DIRETA, mais forte que a da família 1. Por isso a exclusão desta família é uma
-subquery sobre `conta_pagar`, não sobre `gestao_custo_filho`.
+**A forma.** GCP (`importacao_excel.py:2353-2363`) + GCF **sem `origem_tabela`**
+(`:2368-2376` — invisível a toda exclusão por GCF, que é como a B5.7 excluiu a
+família 1) + CP gêmea (`:2400-2431`) com `origem_tipo='gestao_custo_pai'`
+**minúsculo** e `origem_id=gcp.id` — chave DIRETA, mais forte que a da família
+1. Por isso a exclusão desta família é uma subquery sobre `conta_pagar`, não
+sobre `gestao_custo_filho`.
+
+⚠️ **DIVERGÊNCIA DECLARADA (achado E5 da revisão WF-4), e ela importa porque
+este arquivo é a única descrição da forma que existe no repo.** O `_familia2`
+abaixo preenche `data_vencimento`, `saldo` e `obra_id` no GCP; o import **não
+grava nenhum dos três** — em produção os três nascem NULL. A divergência FICA,
+de propósito: com `data_vencimento` NULL os casos cairiam no 3º ramo do
+`sql_or` de `calcular_fluxo_caixa` (`data_criacao` dentro da janela), e como
+`HOJE` é fixo em 2026-08-06, a partir de 2026-09-06 os casos virariam vermelhos
+pelo relógio — trocar a forma instalaria bomba-relógio. O certo é manter o
+arreio e **dizer** que ele diverge. ⚠️ Quem for escrever regra para a família 2
+(ou para a família 4, ALIMENTACAO, do §7): **não recorte por `data_vencimento`,
+por `saldo` nem por `gestao_custo_pai.obra_id`** — em produção os três são NULL
+e a regra erraria 100% dos casos em silêncio. É a mecânica exata da "morte
+afirmada" da B5.7, no eixo da forma.
 
 **A dupla contagem, na mesma tela.** `listar_contas_pagar` só exclui GCP com
 filho `'pedido_compra'`; o GCF do import tem origem NULL, então a GCP entra em
@@ -27,9 +42,14 @@ idempotência só vê clones da própria rota, do 2º clique em diante) e o clon
 escapa de todas as exclusões → tripla contagem. E o botão promete "ação segura
 e pode ser repetida".
 
-**Matriz de mutação (Step 5).** Restaurar o guard antigo do migrar derruba só o
-1; tirar o `admin_id` da subquery derruba só o 5; restaurar uma ponta da
-exclusão derruba só o caso daquela ponta (2 = tela, 3 = fluxo).
+**Matriz de mutação (Step 5), medida.** Restaurar o guard antigo do migrar
+derruba só o 1; tirar o `admin_id` das subqueries derruba só o 5; restaurar a
+ponta da tela derruba só o 2; restaurar a ponta do fluxo derruba só o 3;
+**tirar o predicado `upper(origem_tipo)='GESTAO_CUSTO_PAI'` das subqueries
+derruba só o 7** — esta quinta nasceu do achado E4 da revisão WF-4: antes do
+caso 7 ela sobrevivia à suíte inteira, porque o caso 4 (a guarda contra
+exclusão larga) montava o tenant SEM nenhuma `ContaPagar`. O eixo do tenant
+tinha cão de guarda; o eixo do `origem_tipo` não tinha.
 """
 import os
 import sys
@@ -65,7 +85,8 @@ def tenant():
 
 
 def _familia2(admin_id, obra_id, valor=1000, batch_id=None, com_cp=True,
-              cp_admin_id=None, cp_origem_id='pai'):
+              cp_admin_id=None, cp_origem_id='pai',
+              cp_origem_tipo='gestao_custo_pai'):
     """A forma EXATA do import de fluxo em modo reembolso.
 
     `com_cp=False` monta o GCP manual (sem gêmea) do caso 4. `cp_admin_id`
@@ -73,6 +94,11 @@ def _familia2(admin_id, obra_id, valor=1000, batch_id=None, com_cp=True,
     na subquery.
     """
     with app.app_context():
+        # ⚠️ `data_vencimento`, `saldo` e `obra_id` são do ARREIO, não do
+        # import: o construtor real (`importacao_excel.py:2353-2363`) tem só
+        # tipo_categoria, entidade_nome, entidade_id, valor_total, status —
+        # em produção os três nascem NULL. Ver a divergência declarada no
+        # topo do arquivo antes de derivar qualquer regra desta montagem.
         g = GestaoCustoPai(
             tipo_categoria='MATERIAL',
             entidade_nome=f'REEMB-{uuid.uuid4().hex[:6]}',
@@ -97,8 +123,9 @@ def _familia2(admin_id, obra_id, valor=1000, batch_id=None, com_cp=True,
                 valor_original=Decimal(valor), valor_pago=Decimal('0'),
                 saldo=Decimal(valor), data_emissao=HOJE,
                 data_vencimento=HOJE + timedelta(days=10), status='PENDENTE',
-                # minúsculo, como o import grava (`:2427`)
-                origem_tipo='gestao_custo_pai',
+                # minúsculo, como o import grava (`:2427`). O caso 7 troca por
+                # 'COMPRA' — é o cão de guarda do predicado.
+                origem_tipo=cp_origem_tipo,
                 origem_id=(g.id if cp_origem_id == 'pai' else cp_origem_id),
                 obra_id=obra_id, admin_id=(cp_admin_id or admin_id),
                 import_batch_id=batch_id)
@@ -252,6 +279,47 @@ def test_caso5_cp_gemea_de_outro_tenant_nao_exclui(tenant):
     assert _nas_previstas(fluxo, entidade), (
         'GCP excluído do fluxo por CP de OUTRO tenant — misjoin')
     assert fluxo['saidas_previstas'] == 500.0
+
+
+def test_caso7_cp_de_outro_origem_tipo_no_MESMO_tenant_nao_exclui(tenant):
+    """⚠️ Cão de guarda do PREDICADO — o eixo que o caso 4 não guarda.
+
+    Achado da revisão WF-4 (E4): o caso 4 monta o tenant SEM nenhuma
+    `ContaPagar`, então apagar `func.upper(origem_tipo)=='GESTAO_CUSTO_PAI'`
+    das duas subqueries deixava os seis casos VERDES. O eixo do tenant tinha
+    guarda (caso 5); o eixo do `origem_tipo` não tinha.
+
+    Sem o predicado, num tenant real qualquer CP com `origem_id` preenchido
+    excluiria o GCP de mesmo id: a CP de COMPRA (`compras_views.py`, com
+    `origem_id=pedido.id`) e a de ALIMENTACAO (`event_manager.py`) são os dois
+    escritores vivos, e id de pedido colidindo com id de GCP é o caso COMUM,
+    não a exceção — mesmo modo de falha do misjoin, no outro eixo.
+
+    ⚠️ NÃO asserir `resumo['pendentes']` aqui: a CP plantada é uma ContaPagar
+    PENDENTE de verdade e entra na soma legitimamente. O oráculo é a presença
+    do GCP, não o total."""
+    gcp_id, entidade, _ = _familia2(tenant.admin_id, tenant.obra_id, valor=400,
+                                    com_cp=False)
+    with app.app_context():
+        # MESMO tenant (o caso 5 já cobre o outro), origem_id colidindo com o
+        # id do GCP, mas origem_tipo de outra família: não é gêmea de reembolso.
+        db.session.add(ContaPagar(
+            descricao='CP de compra, nao gemea', valor_original=Decimal('400'),
+            valor_pago=Decimal('0'), saldo=Decimal('400'), data_emissao=HOJE,
+            data_vencimento=HOJE + timedelta(days=10), status='PENDENTE',
+            origem_tipo='COMPRA', origem_id=gcp_id,
+            obra_id=tenant.obra_id, admin_id=tenant.admin_id))
+        db.session.commit()
+
+    ctx = _contexto_contas_pagar(tenant.admin_id)
+    assert entidade in [c.entidade_nome for c in (ctx.get('custos_v2') or [])], (
+        'GCP excluído da tela por uma CP que NÃO é gêmea de reembolso — o '
+        'predicado origem_tipo sumiu da subquery e a exclusão pegou geral')
+
+    fluxo = _fluxo(tenant.admin_id)
+    assert _nas_previstas(fluxo, entidade), (
+        'GCP excluído do fluxo por CP de outra família — predicado ausente')
+    assert fluxo['saidas_previstas'] == 400.0
 
 
 def test_caso6_rollback_do_batch_apaga_as_quatro_tabelas_juntas(tenant):

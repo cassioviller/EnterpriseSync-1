@@ -790,10 +790,21 @@ def deletar_custo_veiculo(custo_id):
 #    B5.7 plantou: a frota grava FrotaDespesa direto + V2
 #    (frota_views.py:609-653).
 #
-#    ⚠️ PENDÊNCIA registrada: CustoVeiculoService.criar_custo_veiculo
-#    (veiculos_services.py:388) ficou ÓRFÃO com este corte — a rota removida
-#    era o único caller do repo. Símbolo presente que mente é o padrão que já
-#    enganou o grep uma vez; está no §7 da rodada B6, não em limbo.
+#    ⚠️ PENDÊNCIA registrada: DOIS métodos ficaram ÓRFÃOS com este corte — as
+#    rotas removidas eram os únicos callers do repo:
+#      - CustoVeiculoService.criar_custo_veiculo (veiculos_services.py:388),
+#        órfão pela remoção de novo_custo_veiculo_form;
+#      - VeiculoService.criar_veiculo (veiculos_services.py:96), órfão pela
+#        remoção de novo_veiculo_OLD — achado E6 da revisão WF-4, que a
+#        primeira versão deste registro tinha deixado de fora.
+#    Símbolo presente que mente é o padrão que já enganou o grep uma vez, e o
+#    segundo é PIOR de enxergar: VeiculoService continua vivo pela classe
+#    (o import de :1544 e VeiculoService.atualizar_veiculo em :1735 estão em
+#    uso), então a lente bate na classe e dá o método por vivo. Quem remover
+#    `criar_veiculo` derruba junto os dois stubs-espelho de `except
+#    ImportError` (views/vehicles.py:1554 e frota_views.py:24) e deixa o
+#    escritor de Veiculo (veiculos_services.py:128-129) sem dono. Está no §7
+#    da rodada B6, não em limbo.
 
 
 # ===== NOVAS ROTAS AVANÇADAS PARA SISTEMA DE VEÍCULOS =====

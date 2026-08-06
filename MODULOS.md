@@ -146,7 +146,7 @@ listar aqui com a evidência antes de remover.
 > **Gerado por `python scripts/rastreio_modulos.py`** (análise estática:
 > AST de `models.py` + regex de `@bp.route` + varredura de uso de modelos
 > por arquivo de view). Não edite esta seção à mão — rode o script.
-> Números desta geração: **186 modelos**, **760 rotas**.
+> Números desta geração: **184 modelos**, **754 rotas**.
 > "Modelos próprios" = referenciados por até 2 módulos; o resto aparece em
 > "compartilhados" — onde mora a integração, e o risco na conferência.
 > A marca `Conferência:` de cada módulo é manual e **sobrevive à regeração**.
@@ -170,7 +170,7 @@ FK indicada com `→tabela`.
 **CustoObra** (`custo_obra`, 18 colunas, usada por 6 módulos):
 `id`, `obra_id→obra`, `centro_custo_id→centro_custo`, `tipo`, `descricao`, `valor`, `data`, `created_at`, `funcionario_id→funcionario`, `item_almoxarifado_id→almoxarifado_item`, `veiculo_id→frota_veiculo`, `admin_id→usuario`, `quantidade`, `valor_unitario`, `horas_trabalhadas`, `horas_extras`, `rdo_id→rdo`, `categoria`
 
-**TarefaCronograma** (`tarefa_cronograma`, 30 colunas, usada por 11 módulos):
+**TarefaCronograma** (`tarefa_cronograma`, 30 colunas, usada por 10 módulos):
 `id`, `obra_id→obra`, `tarefa_pai_id→tarefa_cronograma`, `predecessora_id→tarefa_cronograma`, `ordem`, `nome_tarefa`, `duracao_dias`, `data_inicio`, `data_fim`, `quantidade_total`, `unidade_medida`, `modo_apontamento`, `subatividade_mestre_id→subatividade_mestre`, `servico_id→servico`, `percentual_concluido`, `responsavel`, `data_entrega_real`, `admin_id→usuario`, `is_cliente`, `gerada_por_proposta_item_id→proposta_itens`, `mpp_uid`, `wbs_codigo`, `fingerprint`, `is_marco`, `ativa`, `arquivada_em`, `versao_criacao_id→cronograma_versao`, `is_critica`, `folga_dias`, `created_at`
 
 **Servico** (`servico`, 18 colunas, usada por 10 módulos):
@@ -192,7 +192,7 @@ FK indicada com `→tabela`.
 Arquivos: `views/__init__.py`, `views/auth.py`, `views/dashboard.py`, `views/users.py`, `views/employees.py`, `views/obras.py`, `views/vehicles.py`, `views/rdo.py`, `views/api.py`, `views/admin.py`
 Conferência: ☐ pendente
 
-**Funcionalidades (129 rotas):**
+**Funcionalidades (124 rotas):**
 
 | Rota | Métodos | Função |
 |---|---|---|
@@ -234,7 +234,6 @@ Conferência: ☐ pendente
 | `/obras/<int:obra_id>/mapa-concorrencia/novo` | POST | `nova_mapa_concorrencia` |
 | `/obras/<int:obra_id>/mapa-concorrencia/<int:mapa_id>/deletar` | POST | `deletar_mapa_concorrencia` |
 | `/obras/<int:obra_id>/cronograma-cliente/gerar` | POST | `gerar_cronograma_cliente` |
-| `/obras/<int:obra_id>/cronograma-cliente/<int:item_id>/editar` | POST | `editar_cronograma_cliente` |
 | `/obras/<int:obra_id>/mapa-v2/criar` | POST | `criar_mapa_v2` |
 | `/obras/<int:obra_id>/mapa-v2/<int:mapa_id>/editar` | GET,POST | `editar_mapa_v2` |
 | `/obras/<int:obra_id>/mapa-v2/<int:mapa_id>/relatorio/<int:rel_id>/baixar` | GET | `baixar_relatorio_mapa_v2` |
@@ -322,19 +321,17 @@ Conferência: ☐ pendente
 | `/admin/webhooks/<int:entrega_id>/reenviar` | POST | `admin_webhooks_reenviar` |
 | `/admin/database-diagnostics/check-table` | POST | `check_table_structure` |
 
-**Modelos próprios (24):**
+**Modelos próprios (22):**
 
 - **AlocacaoEquipe** (`alocacao_equipe`, 17 col) — também usado por RDO — CRUD completo: `id`, `funcionario_id→funcionario`, `obra_id→obra`, `data_alocacao`, `tipo_local`, `turno`, `criado_por_id→usuario`, `rdo_gerado_id→rdo`, `rdo_gerado`, `status`, `prioridade`, `validacao_conflito`, `motivo_cancelamento`, `observacoes`, `admin_id→usuario`, `created_at`, `updated_at`
 - **CategoriaEscritorio** (`categoria_escritorio`, 6 col) — também usado por Custos de escritório: `id`, `nome`, `cor`, `ativo`, `admin_id→usuario`, `created_at`
 - **CategoriaReembolso** (`categoria_reembolso`, 6 col) — também usado por Catálogos (views): `id`, `nome`, `descricao`, `ativo`, `admin_id→usuario`, `created_at`
-- **CronogramaCliente** (`cronograma_cliente`, 10 col): `id`, `obra_id→obra`, `admin_id→usuario`, `nome_tarefa`, `data_inicio_apresentacao`, `data_fim_apresentacao`, `percentual_apresentacao`, `ordem`, `created_at`, `updated_at`
 - **HorarioDia** (`horario_dia`, 8 col) — também usado por Configurações: `id`, `horario_id→horario_trabalho`, `dia_semana`, `entrada`, `saida`, `pausa_horas`, `trabalha`, `admin_id→usuario`
 - **MapaConcorrencia** (`mapa_concorrencia`, 6 col) — também usado por Portal do cliente: `id`, `obra_id→obra`, `admin_id→usuario`, `descricao_item`, `status`, `created_at`
 - **MapaCotacao** (`mapa_cotacao`, 8 col): `id`, `mapa_id→mapa_concorrencia_v2`, `item_id→mapa_item_cotacao`, `fornecedor_id→mapa_fornecedor`, `admin_id→usuario`, `valor_unitario`, `prazo`, `selecionado`
 - **MapaFornecedor** (`mapa_fornecedor`, 8 col) — também usado por Portal do cliente: `id`, `mapa_id→mapa_concorrencia_v2`, `admin_id→usuario`, `nome`, `ordem`, `prazo_entrega`, `observacao`, `condicoes_pagamento`
 - **MapaItemCotacao** (`mapa_item_cotacao`, 8 col) — também usado por Portal do cliente: `id`, `mapa_id→mapa_concorrencia_v2`, `admin_id→usuario`, `descricao`, `unidade`, `quantidade`, `ordem`, `fornecedor_escolhido_id→mapa_fornecedor`
 - **MovimentacaoEstoque** (`movimentacao_estoque`, 17 col) — também usado por RDO — CRUD completo: `id`, `produto_id→produto`, `tipo_movimentacao`, `quantidade`, `quantidade_anterior`, `quantidade_posterior`, `valor_unitario`, `valor_total`, `data_movimentacao`, `nota_fiscal_id→nota_fiscal`, `rdo_id→rdo`, `funcionario_id→funcionario`, `obra_id→obra`, `usuario_id→usuario`, `observacoes`, `ip_address`, `admin_id→usuario`
-- **NotificacaoCliente** (`notificacao_cliente`, 12 col) — também usado por RDO — CRUD completo: `id`, `admin_id→usuario`, `obra_id→obra`, `tipo`, `titulo`, `mensagem`, `rdo_id→rdo`, `atividade_id→rdo_atividade`, `visualizada`, `data_visualizacao`, `prioridade`, `created_at`
 - **ObraServicoCustoItem** (`obra_servico_custo_item`, 9 col): `id`, `obra_servico_custo_id→obra_servico_custo`, `admin_id→usuario`, `descricao`, `valor`, `fonte`, `ordem`, `data_inicio`, `data_fim`
 - **ObraSignatarioCliente** (`obra_signatario_cliente`, 14 col) — também usado por Portal do cliente: `id`, `obra_id→obra`, `admin_id→usuario`, `nome`, `email`, `cargo`, `password_hash`, `senha_temporaria`, `senha_expira_em`, `ativo`, `falhas_login`, `ultimo_acesso_em`, `recuperacao_pedida_em`, `criado_em`
 - **ObraTransicaoEstado** (`obra_transicao_estado`, 9 col): `id`, `obra_id→obra`, `admin_id→usuario`, `estado_de`, `estado_para`, `motivo`, `detalhes`, `usuario_id→usuario`, `criado_em`
@@ -349,7 +346,7 @@ Conferência: ☐ pendente
 - **VehicleExpense** (`frota_despesa`, 16 col): `id`, `veiculo_id→frota_veiculo`, `obra_id→obra`, `data_custo`, `tipo_custo`, `valor`, `descricao`, `fornecedor`, `numero_nota_fiscal`, `data_vencimento`, `status_pagamento`, `forma_pagamento`, `km_veiculo`, `observacoes`, `admin_id→usuario`, `created_at`
 - **WebhookEntrega** (`webhook_entrega`, 10 col): `id`, `event`, `payload`, `status`, `tentativas`, `ultimo_erro`, `proxima_tentativa_em`, `admin_id→usuario`, `created_at`, `sent_at`
 
-**Modelos compartilhados que este módulo toca (48):** `AlimentacaoLancamento`, `AlmoxarifadoEstoque`, `AlmoxarifadoItem`, `AlmoxarifadoMovimento`, `CategoriaFluxoCaixa`, `CategoriaFornecedor`, `Cliente`, `ConfiguracaoEmpresa`, `CronogramaTemplate`, `CustoObra`, `CustoVeiculo`, `Departamento`, `FluxoCaixa`, `Fornecedor`, `Funcao`, `Funcionario`, `GestaoCustoFilho`, `GestaoCustoPai`, `HorarioTrabalho`, `LancamentoTransporte`, `MapaConcorrenciaV2`, `MedicaoObra`, `Obra`, `ObraOrcamentoOperacional`, `ObraServicoCusto`, `PedidoCompra`, `Proposta`, `PropostaHistorico`, `PropostaTemplate`, `RDO`, `RDOApontamentoCronograma`, `RDOEquipamento`, `RDOFoto`, `RDOMaoObra`, `RDOOcorrencia`, `RDOServicoSubatividade`, `RDOSubempreitadaApontamento`, `RegistroAlimentacao`, `RegistroPonto`, `Restaurante`, `Servico`, `ServicoObraReal`, `SubatividadeMestre`, `Subempreiteiro`, `TarefaCronograma`, `UsoVeiculo`, `Usuario`, `Veiculo`
+**Modelos compartilhados que este módulo toca (49):** `AlimentacaoLancamento`, `AlmoxarifadoEstoque`, `AlmoxarifadoItem`, `AlmoxarifadoMovimento`, `CategoriaFluxoCaixa`, `CategoriaFornecedor`, `Cliente`, `ConfiguracaoEmpresa`, `CronogramaTemplate`, `CustoObra`, `CustoVeiculo`, `Departamento`, `FluxoCaixa`, `Fornecedor`, `Funcao`, `Funcionario`, `GestaoCustoFilho`, `GestaoCustoPai`, `HorarioTrabalho`, `LancamentoTransporte`, `Lead`, `MapaConcorrenciaV2`, `MedicaoObra`, `Obra`, `ObraOrcamentoOperacional`, `ObraServicoCusto`, `PedidoCompra`, `Proposta`, `PropostaHistorico`, `PropostaTemplate`, `RDO`, `RDOApontamentoCronograma`, `RDOEquipamento`, `RDOFoto`, `RDOMaoObra`, `RDOOcorrencia`, `RDOServicoSubatividade`, `RDOSubempreitadaApontamento`, `RegistroAlimentacao`, `RegistroPonto`, `Restaurante`, `Servico`, `ServicoObraReal`, `SubatividadeMestre`, `Subempreiteiro`, `TarefaCronograma`, `UsoVeiculo`, `Usuario`, `Veiculo`
 
 ### RDO — edição
 
@@ -375,7 +372,7 @@ Conferência: ☐ pendente
 Arquivos: `crud_rdo_completo.py`
 Conferência: ☐ pendente
 
-**Funcionalidades (15 rotas):**
+**Funcionalidades (13 rotas):**
 
 | Rota | Métodos | Função |
 |---|---|---|
@@ -387,21 +384,18 @@ Conferência: ☐ pendente
 | `/rdo/salvar` | GET | `excluir_rdo` |
 | `/excluir/<int:rdo_id>` | POST | `excluir_rdo` |
 | `/finalizar/<int:rdo_id>` | POST | `finalizar_rdo` |
-| `/api/subatividades/<int:servico_id>` | GET | `api_subatividades_por_servico` |
-| `/api/funcionarios` | GET | `api_funcionarios` |
 | `/<int:rdo_id>/fotos/upload` | POST | `upload_foto_rdo` |
 | `/foto/<int:foto_id>/<tipo>` | GET | `servir_foto` |
 | `/<int:rdo_id>/fotos` | GET | `listar_fotos_rdo` |
 | `/foto/<int:foto_id>/editar` | POST | `editar_descricao_foto` |
 | `/foto/<int:foto_id>/deletar` | POST | `deletar_foto` |
 
-**Modelos próprios (3):**
+**Modelos próprios (2):**
 
 - **AlocacaoEquipe** (`alocacao_equipe`, 17 col) — também usado por Obras/Dashboard/base (main): `id`, `funcionario_id→funcionario`, `obra_id→obra`, `data_alocacao`, `tipo_local`, `turno`, `criado_por_id→usuario`, `rdo_gerado_id→rdo`, `rdo_gerado`, `status`, `prioridade`, `validacao_conflito`, `motivo_cancelamento`, `observacoes`, `admin_id→usuario`, `created_at`, `updated_at`
 - **MovimentacaoEstoque** (`movimentacao_estoque`, 17 col) — também usado por Obras/Dashboard/base (main): `id`, `produto_id→produto`, `tipo_movimentacao`, `quantidade`, `quantidade_anterior`, `quantidade_posterior`, `valor_unitario`, `valor_total`, `data_movimentacao`, `nota_fiscal_id→nota_fiscal`, `rdo_id→rdo`, `funcionario_id→funcionario`, `obra_id→obra`, `usuario_id→usuario`, `observacoes`, `ip_address`, `admin_id→usuario`
-- **NotificacaoCliente** (`notificacao_cliente`, 12 col) — também usado por Obras/Dashboard/base (main): `id`, `admin_id→usuario`, `obra_id→obra`, `tipo`, `titulo`, `mensagem`, `rdo_id→rdo`, `atividade_id→rdo_atividade`, `visualizada`, `data_visualizacao`, `prioridade`, `created_at`
 
-**Modelos compartilhados que este módulo toca (13):** `ContaPagar`, `CustoObra`, `Funcionario`, `Obra`, `RDO`, `RDOApontamentoCronograma`, `RDOEquipamento`, `RDOFoto`, `RDOMaoObra`, `RDOOcorrencia`, `RDOServicoSubatividade`, `SubatividadeMestre`, `TarefaCronograma`
+**Modelos compartilhados que este módulo toca (12):** `ContaPagar`, `CustoObra`, `Funcionario`, `Obra`, `RDO`, `RDOApontamentoCronograma`, `RDOEquipamento`, `RDOFoto`, `RDOMaoObra`, `RDOOcorrencia`, `RDOServicoSubatividade`, `SubatividadeMestre`
 
 ### Cronograma
 
@@ -462,7 +456,7 @@ Conferência: ☐ pendente
 **Modelos próprios (6):**
 
 - **ComposicaoServico** (`composicao_servico`, 8 col) — também usado por Catálogo de serviços: `id`, `admin_id→usuario`, `servico_id→servico`, `insumo_id→insumo`, `coeficiente`, `unidade`, `observacao`, `created_at`
-- **CronogramaBaseline** (`cronograma_baseline`, 8 col): `id`, `obra_id→obra`, `admin_id→usuario`, `nome`, `criada_em`, `criada_por→usuario`, `ativa`, `is_cliente`
+- **CronogramaBaseline** (`cronograma_baseline`, 9 col): `id`, `obra_id→obra`, `admin_id→usuario`, `nome`, `criada_em`, `criada_por→usuario`, `ativa`, `is_cliente`, `bac`
 - **CronogramaBaselineItem** (`cronograma_baseline_item`, 7 col): `id`, `baseline_id→cronograma_baseline`, `tarefa_id→tarefa_cronograma`, `admin_id→usuario`, `data_inicio`, `data_fim`, `duracao_dias`
 - **CronogramaTemplateItem** (`cronograma_template_item`, 11 col): `id`, `template_id→cronograma_template`, `subatividade_mestre_id→subatividade_mestre`, `parent_item_id→cronograma_template_item`, `nome_tarefa`, `ordem`, `duracao_dias`, `quantidade_prevista`, `responsavel`, `admin_id`, `created_at`
 - **SubatividadeMaoObra** (`subatividade_mao_obra`, 5 col): `id`, `admin_id→usuario`, `subatividade_mestre_id→subatividade_mestre`, `composicao_servico_id→composicao_servico`, `created_at`
@@ -718,7 +712,7 @@ Conferência: ☐ pendente
 
 - **ConfiguracaoHorario** (`configuracao_horario`, 13 col): `id`, `obra_id→obra`, `funcionario_id→funcionario`, `entrada_padrao`, `saida_padrao`, `almoco_inicio`, `almoco_fim`, `tolerancia_atraso`, `carga_horaria_diaria`, `admin_id→usuario`, `ativo`, `created_at`, `updated_at`
 - **FotoFacialFuncionario** (`foto_facial_funcionario`, 8 col): `id`, `funcionario_id→funcionario`, `foto_base64`, `descricao`, `ordem`, `ativa`, `created_at`, `admin_id→usuario`
-- **FuncionarioObrasPonto** (`funcionario_obras_ponto`, 6 col): `id`, `funcionario_id→funcionario`, `obra_id→obra`, `admin_id→usuario`, `ativo`, `created_at`
+- **FuncionarioObrasPonto** (`funcionario_obras_ponto`, 6 col) — também usado por Relatórios: `id`, `funcionario_id→funcionario`, `obra_id→obra`, `admin_id→usuario`, `ativo`, `created_at`
 
 **Modelos compartilhados que este módulo toca (6):** `FluxoCaixa`, `Funcionario`, `GestaoCustoFilho`, `GestaoCustoPai`, `Obra`, `RegistroPonto`
 
@@ -754,7 +748,7 @@ Conferência: ☐ pendente
 
 - **Adiantamento** (`adiantamento`, 15 col): `id`, `funcionario_id→funcionario`, `valor_total`, `data_solicitacao`, `data_aprovacao`, `aprovado_por→usuario`, `parcelas`, `valor_parcela`, `parcelas_pagas`, `status`, `motivo`, `observacoes`, `admin_id→usuario`, `created_at`, `updated_at`
 - **BeneficioFuncionario** (`beneficio_funcionario`, 13 col): `id`, `funcionario_id→funcionario`, `tipo_beneficio`, `valor`, `percentual_desconto`, `dias_por_mes`, `ativo`, `data_inicio`, `data_fim`, `observacoes`, `admin_id→usuario`, `created_at`, `updated_at`
-- **FolhaPagamento** (`folha_pagamento`, 32 col): `id`, `funcionario_id→funcionario`, `mes_referencia`, `salario_base`, `horas_extras`, `adicional_noturno`, `dsr`, `comissoes`, `bonus`, `outros_proventos`, `total_proventos`, `inss`, `irrf`, `fgts`, `vale_refeicao`, `vale_transporte`, `plano_saude`, `seguro_vida`, `faltas`, `atrasos`, `adiantamentos`, `emprestimos`, `outros_descontos`, `total_descontos`, `salario_liquido`, `status`, `calculado_em`, `aprovado_em`, `aprovado_por→usuario`, `pago_em`, `observacoes`, `admin_id→usuario`
+- **FolhaPagamento** (`folha_pagamento`, 31 col): `id`, `funcionario_id→funcionario`, `mes_referencia`, `salario_base`, `horas_extras`, `adicional_noturno`, `dsr`, `comissoes`, `bonus`, `outros_proventos`, `total_proventos`, `inss`, `irrf`, `fgts`, `vale_refeicao`, `vale_transporte`, `plano_saude`, `seguro_vida`, `faltas`, `atrasos`, `emprestimos`, `outros_descontos`, `total_descontos`, `salario_liquido`, `status`, `calculado_em`, `aprovado_em`, `aprovado_por→usuario`, `pago_em`, `observacoes`, `admin_id→usuario`
 - **ParametrosLegais** (`parametros_legais`, 35 col): `id`, `admin_id→usuario`, `ano_vigencia`, `inss_faixa1_limite`, `inss_faixa1_percentual`, `inss_faixa2_limite`, `inss_faixa2_percentual`, `inss_faixa3_limite`, `inss_faixa3_percentual`, `inss_faixa4_limite`, `inss_faixa4_percentual`, `inss_teto`, `irrf_isencao`, `irrf_faixa1_limite`, `irrf_faixa1_percentual`, `irrf_faixa1_deducao`, `irrf_faixa2_limite`, `irrf_faixa2_percentual`, `irrf_faixa2_deducao`, `irrf_faixa3_limite`, `irrf_faixa3_percentual`, `irrf_faixa3_deducao`, `irrf_faixa4_percentual`, `irrf_faixa4_deducao`, `irrf_dependente_valor`, `fgts_percentual`, `salario_minimo`, `vale_transporte_percentual`, `adicional_noturno_percentual`, `hora_extra_50_percentual`, `hora_extra_100_percentual`, `tolerancia_minutos`, `ativo`, `created_at`, `updated_at`
 
 **Modelos compartilhados que este módulo toca (5):** `ConfiguracaoEmpresa`, `Departamento`, `Funcionario`, `GestaoCustoFilho`, `GestaoCustoPai`
@@ -833,7 +827,7 @@ Conferência: ☐ pendente
 Arquivos: `financeiro_views.py`
 Conferência: ☐ pendente
 
-**Funcionalidades (23 rotas):**
+**Funcionalidades (24 rotas):**
 
 | Rota | Métodos | Função |
 |---|---|---|
@@ -848,6 +842,7 @@ Conferência: ☐ pendente
 | `/contas-receber/criar` | POST | `criar_conta_receber` |
 | `/contas-receber/nova` | GET,POST | `nova_conta_receber` |
 | `/contas-receber/<int:conta_id>/receber` | GET,POST | `receber_conta` |
+| `/contas-receber/<int:conta_id>/estornar` | POST | `estornar_recebimento` |
 | `/fluxo-caixa` | GET | `fluxo_caixa` |
 | `/fluxo-caixa/novo` | POST | `novo_fluxo_caixa` |
 | `/fluxo-caixa/<int:fc_id>/editar` | POST | `editar_fluxo_caixa` |
@@ -1066,7 +1061,7 @@ Conferência: ☐ pendente
 | `/clientes/<int:cliente_id>` | GET | `detalhe_cliente` |
 | `/clientes/<int:cliente_id>/observacao` | POST | `adicionar_observacao_cliente` |
 
-**Modelos próprios (10):**
+**Modelos próprios (9):**
 
 - **ClienteObservacao** (`cliente_observacao`, 6 col): `id`, `cliente_id→cliente`, `admin_id→usuario`, `usuario_id→usuario`, `texto`, `created_at`
 - **CrmCadencia** (`crm_cadencia`, 5 col): `id`, `admin_id→usuario`, `nome`, `ativo`, `created_at`
@@ -1076,10 +1071,9 @@ Conferência: ☐ pendente
 - **CrmSituacao** (`crm_situacao`, 5 col): `id`, `admin_id→usuario`, `nome`, `ativo`, `created_at`
 - **CrmTipoMaterial** (`crm_tipo_material`, 5 col): `id`, `admin_id→usuario`, `nome`, `ativo`, `created_at`
 - **CrmTipoObra** (`crm_tipo_obra`, 5 col): `id`, `admin_id→usuario`, `nome`, `ativo`, `created_at`
-- **Lead** (`lead`, 37 col): `id`, `admin_id→usuario`, `data_chegada`, `data_envio`, `nome`, `contato`, `email`, `responsavel_id→crm_responsavel`, `vendedor_id→crm_responsavel`, `orcamentista_id→crm_responsavel`, `origem_id→crm_origem`, `cadencia_id→crm_cadencia`, `situacao_id→crm_situacao`, `tipo_material_id→crm_tipo_material`, `tipo_obra_id→crm_tipo_obra`, `motivo_perda_id→crm_motivo_perda`, `localizacao`, `detalhes_localizacao`, `demanda`, `pasta`, `valor_proposta`, `status`, `observacao`, `prioridade`, `data_retomada`, `prazo`, `cliente_id→cliente`, `proposta_id→propostas_comerciais`, `obra_id→obra`, `criado_por_id→usuario`, `created_at`, `updated_at`, `status_changed_at`, `validacao_aprovada`, `validado_por_id→usuario`, `validado_em`, `comentario_revisao`
 - **LeadHistorico** (`lead_historico`, 9 col): `id`, `lead_id→lead`, `admin_id→usuario`, `campo`, `valor_antes`, `valor_depois`, `descricao`, `usuario_id→usuario`, `created_at`
 
-**Modelos compartilhados que este módulo toca (4):** `Cliente`, `Obra`, `Proposta`, `Usuario`
+**Modelos compartilhados que este módulo toca (5):** `Cliente`, `Lead`, `Obra`, `Proposta`, `Usuario`
 
 ### Clientes
 
@@ -1154,7 +1148,7 @@ Conferência: ☐ pendente
 - **PropostaClausula** (`proposta_clausula`, 9 col) — também usado por Orçamentos: `id`, `proposta_id→propostas_comerciais`, `admin_id→usuario`, `titulo`, `texto`, `ordem`, `criado_em`, `atualizado_em`, `revisado_em`
 - **PropostaTemplateClausula** (`proposta_template_clausula`, 8 col) — também usado por Orçamentos: `id`, `proposta_template_id→proposta_templates`, `admin_id→usuario`, `titulo`, `texto`, `ordem`, `criado_em`, `atualizado_em`
 
-**Modelos compartilhados que este módulo toca (13):** `Cliente`, `ConfiguracaoEmpresa`, `ContaReceber`, `ItemMedicaoComercial`, `LancamentoContabil`, `Obra`, `Proposta`, `PropostaHistorico`, `PropostaItem`, `PropostaTemplate`, `Servico`, `TarefaCronograma`, `Usuario`
+**Modelos compartilhados que este módulo toca (14):** `Cliente`, `ConfiguracaoEmpresa`, `ContaReceber`, `ItemMedicaoComercial`, `LancamentoContabil`, `Lead`, `Obra`, `Proposta`, `PropostaHistorico`, `PropostaItem`, `PropostaTemplate`, `Servico`, `TarefaCronograma`, `Usuario`
 
 ### Orçamentos
 
@@ -1369,9 +1363,10 @@ Conferência: ☐ pendente
 | `/movimentacoes/deletar/<int:id>` | POST | `movimentacoes_deletar` |
 | `/relatorios` | GET | `relatorios` |
 
-**Modelos próprios (1):**
+**Modelos próprios (2):**
 
 - **AlmoxarifadoCategoria** (`almoxarifado_categoria`, 7 col): `id`, `nome`, `tipo_controle_padrao`, `permite_devolucao_padrao`, `admin_id→usuario`, `created_at`, `updated_at`
+- **NotaFiscal** (`nota_fiscal`, 20 col): `id`, `numero`, `serie`, `chave_acesso`, `fornecedor_id→fornecedor`, `data_emissao`, `data_entrada`, `valor_produtos`, `valor_frete`, `valor_desconto`, `valor_total`, `xml_content`, `xml_hash`, `status`, `observacoes`, `processada_por_id→usuario`, `data_processamento`, `admin_id→usuario`, `created_at`, `updated_at`
 
 **Modelos compartilhados que este módulo toca (7):** `AlmoxarifadoEstoque`, `AlmoxarifadoItem`, `AlmoxarifadoMovimento`, `CategoriaFornecedor`, `Fornecedor`, `Funcionario`, `Obra`
 
@@ -1477,8 +1472,9 @@ Conferência: ☐ pendente
 | `/gerar/<tipo>` | POST | `gerar_relatorio` |
 | `/exportar/<formato>` | POST | `exportar_relatorio` |
 
-**Modelos próprios (1):**
+**Modelos próprios (2):**
 
+- **FuncionarioObrasPonto** (`funcionario_obras_ponto`, 6 col) — também usado por Ponto: `id`, `funcionario_id→funcionario`, `obra_id→obra`, `admin_id→usuario`, `ativo`, `created_at`
 - **Receita** (`receita`, 14 col) — também usado por Métricas: `id`, `admin_id→usuario`, `numero_receita`, `obra_id→obra`, `centro_custo_id→centro_custo`, `origem`, `descricao`, `valor`, `data_receita`, `data_recebimento`, `status`, `forma_recebimento`, `observacoes`, `created_at`
 
 **Modelos compartilhados que este módulo toca (8):** `CustoObra`, `Departamento`, `Funcionario`, `Obra`, `RegistroAlimentacao`, `RegistroPonto`, `Restaurante`, `Veiculo`
@@ -1785,37 +1781,37 @@ conferir (mudança num módulo pode quebrar os outros).
 |---|---|---|
 | `Obra` | 36 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Cronograma — importação .mpp, Portal do cliente, Medição, Importação, Equipe, Ponto, Alimentação, Reembolso, Subempreiteiros, Financeiro, Relatórios financeiros avançados, Contabilidade, Custos de obra, Gestão de custos, Planejamento de custos, CRM, Clientes, Propostas, Orçamentos, Orçamento operacional, Catálogo de serviços, Serviço da obra (real), Cadastrar serviço na obra, Almoxarifado, Compras, Frota, Transporte, Relatórios, Dashboards específicos, Métricas, Auditoria de vínculos, Produção |
 | `Funcionario` | 22 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Importação, Equipe, Funcionários (API), Ponto, Folha de pagamento, Alimentação, Reembolso, Planejamento de custos, Serviço da obra (real), Almoxarifado, Compras, Frota, Transporte, Relatórios, Métricas, Configurações, Auditoria de vínculos, Produção |
-| `TarefaCronograma` | 11 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Cronograma — importação .mpp, Portal do cliente, Medição, Subempreiteiros, Propostas, Orçamentos, Auditoria de vínculos |
 | `GestaoCustoPai` | 11 | Obras/Dashboard/base (main), Portal do cliente, Importação, Ponto, Folha de pagamento, Reembolso, Subempreiteiros, Financeiro, Gestão de custos, Compras, Transporte |
 | `RDO` | 10 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Portal do cliente, Funcionários (API), Subempreiteiros, Gestão de custos, Métricas, Auditoria de vínculos |
+| `TarefaCronograma` | 10 | Obras/Dashboard/base (main), RDO — edição, Cronograma, Cronograma — importação .mpp, Portal do cliente, Medição, Subempreiteiros, Propostas, Orçamentos, Auditoria de vínculos |
 | `Servico` | 10 | Obras/Dashboard/base (main), Cronograma, Medição, Propostas, Orçamentos, Catálogo de serviços, Serviço da obra (real), Serviços da obra (API), Cadastrar serviço na obra, Métricas |
 | `Fornecedor` | 9 | Obras/Dashboard/base (main), Portal do cliente, Importação, Financeiro, Gestão de custos, Planejamento de custos, Almoxarifado, Compras, Quick-create |
+| `Cliente` | 8 | Obras/Dashboard/base (main), Portal do cliente, CRM, Clientes, Propostas, Orçamentos, Compras, Quick-create |
 | `FluxoCaixa` | 8 | Obras/Dashboard/base (main), Portal do cliente, Importação, Ponto, Financeiro, Gestão de custos, Compras, Catálogos (views) |
 | `ConfiguracaoEmpresa` | 8 | Obras/Dashboard/base (main), Cronograma, Portal do cliente, Medição, Folha de pagamento, Propostas, Orçamentos, Configurações |
+| `GestaoCustoFilho` | 8 | Obras/Dashboard/base (main), RDO — edição, Ponto, Folha de pagamento, Financeiro, Gestão de custos, Compras, Transporte |
 | `ObraServicoCusto` | 8 | Obras/Dashboard/base (main), Medição, Alimentação, Gestão de custos, Planejamento de custos, Catálogo de serviços, Compras, Transporte |
 | `Usuario` | 8 | Obras/Dashboard/base (main), Cronograma — importação .mpp, Importação, Financeiro, CRM, Propostas, Serviços da obra (API), Compras |
-| `GestaoCustoFilho` | 8 | Obras/Dashboard/base (main), RDO — edição, Ponto, Folha de pagamento, Financeiro, Gestão de custos, Compras, Transporte |
-| `Cliente` | 8 | Obras/Dashboard/base (main), Portal do cliente, CRM, Clientes, Propostas, Orçamentos, Compras, Quick-create |
 | `RDOMaoObra` | 7 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Portal do cliente, Gestão de custos, Auditoria de vínculos |
 | `Veiculo` | 7 | Obras/Dashboard/base (main), Relatórios financeiros avançados, Frota, Relatórios, Exportação de relatórios, Dashboards específicos, Produção |
-| `SubatividadeMestre` | 6 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Quick-create, Auditoria de vínculos |
-| `Proposta` | 6 | Obras/Dashboard/base (main), CRM, Clientes, Propostas, Orçamentos, API organizer |
-| `CustoObra` | 6 | Obras/Dashboard/base (main), RDO — CRUD completo, Alimentação, Custos de obra, Transporte, Relatórios |
 | `Departamento` | 6 | Obras/Dashboard/base (main), RDO — edição, Folha de pagamento, Relatórios, Configurações, Produção |
+| `CustoObra` | 6 | Obras/Dashboard/base (main), RDO — CRUD completo, Alimentação, Custos de obra, Transporte, Relatórios |
+| `Proposta` | 6 | Obras/Dashboard/base (main), CRM, Clientes, Propostas, Orçamentos, API organizer |
+| `SubatividadeMestre` | 6 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Quick-create, Auditoria de vínculos |
 | `ContaPagar` | 6 | RDO — CRUD completo, Importação, Financeiro, Gestão de custos, Custos de escritório, Compras |
 | `CustoVeiculo` | 5 | Obras/Dashboard/base (main), Relatórios financeiros avançados, Frota, Exportação de relatórios, Dashboards específicos |
 | `UsoVeiculo` | 5 | Obras/Dashboard/base (main), Relatórios financeiros avançados, Frota, Exportação de relatórios, Dashboards específicos |
-| `RDOServicoSubatividade` | 5 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Portal do cliente |
 | `Funcao` | 5 | Obras/Dashboard/base (main), Métricas, Configurações, Auditoria de vínculos, Produção |
 | `RDOApontamentoCronograma` | 5 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Portal do cliente |
+| `RDOServicoSubatividade` | 5 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Portal do cliente |
 | `ContaReceber` | 5 | Portal do cliente, Medição, Importação, Financeiro, Propostas |
-| `PropostaTemplate` | 4 | Obras/Dashboard/base (main), Propostas, Orçamentos, API organizer |
-| `Restaurante` | 4 | Obras/Dashboard/base (main), Importação, Alimentação, Relatórios |
-| `Subempreiteiro` | 4 | Obras/Dashboard/base (main), Cronograma, Subempreiteiros, Gestão de custos |
-| `CronogramaTemplate` | 4 | Obras/Dashboard/base (main), Cronograma, Orçamentos, Catálogo de serviços |
-| `RegistroAlimentacao` | 4 | Obras/Dashboard/base (main), Alimentação, Relatórios, Produção |
-| `ServicoObraReal` | 4 | Obras/Dashboard/base (main), RDO — edição, Serviço da obra (real), Serviços da obra (API) |
 | `RegistroPonto` | 4 | Obras/Dashboard/base (main), Ponto, Gestão de custos, Relatórios |
+| `Subempreiteiro` | 4 | Obras/Dashboard/base (main), Cronograma, Subempreiteiros, Gestão de custos |
+| `RegistroAlimentacao` | 4 | Obras/Dashboard/base (main), Alimentação, Relatórios, Produção |
+| `Restaurante` | 4 | Obras/Dashboard/base (main), Importação, Alimentação, Relatórios |
+| `CronogramaTemplate` | 4 | Obras/Dashboard/base (main), Cronograma, Orçamentos, Catálogo de serviços |
+| `ServicoObraReal` | 4 | Obras/Dashboard/base (main), RDO — edição, Serviço da obra (real), Serviços da obra (API) |
+| `PropostaTemplate` | 4 | Obras/Dashboard/base (main), Propostas, Orçamentos, API organizer |
 | `CategoriaFluxoCaixa` | 4 | Obras/Dashboard/base (main), Importação, Financeiro, Catálogos (views) |
 | `Insumo` | 4 | Cronograma, Catálogo de serviços, Configurações, Quick-create |
 | `ItemMedicaoComercial` | 4 | Medição, Planejamento de custos, Propostas, Catálogo de serviços |
