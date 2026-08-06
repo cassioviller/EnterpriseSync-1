@@ -1284,8 +1284,10 @@ fechar para o futuro.
 **O que depende deste número:** o índice único em `(funcionario_id, data)` — hoje
 os três índices de `models.py:800-804` são todos NÃO-únicos, e um
 `CREATE UNIQUE INDEX` falharia se produção tiver linhas que o violem. Foi
-`/novo_ponto` que as criou, então provavelmente tem. Se couber, é a **migração
-280** (faixa liberada pelo corte da Fase 7, §12).
+`/novo_ponto` que as criou, então provavelmente tem. ~~Se couber, é a **migração
+280**~~ ⚠️ **corrigido em 06/08: a 280 foi GASTA pela B5.6** (`conta_pagar.banco_id`,
+`08f2ee88`) — se este índice couber um dia, o número é **281+**, conferido no
+registro de `migrations.py` antes de cravar (§12).
 
 ---
 
@@ -5285,10 +5287,13 @@ em `:6342`. **279 está livre.**
   avisa.
 - **A faixa 271-276 é RESERVADA da Fase 6** (`docs/superpowers/plans/2026-07-21-fase-6-*`,
   Tasks 1, 3, 4, 6, 10 e 12). **Não usar.**
-- **A faixa 280-283 está LIBERADA** — era da Fase 7, cortada nesta rodada (§8.1). Quem
-  precisar de número depois do 279 pode usá-la, e é o primeiro efeito prático do corte.
+- ~~**A faixa 280-283 está LIBERADA**~~ ⚠️ **corrigido em 06/08: a 280 foi GASTA pela
+  B5.6** (`conta_pagar.banco_id`, `08f2ee88` — a corrida de três se resolveu por
+  desistência dos concorrentes, ver o apenso da rodada B5). **Livres: 281-283.**
 - **Antes de cravar qualquer número, conferir o registro em `migrations.py`.** Dois PRs
-  concorrentes escolhendo o mesmo número produzem merge silencioso.
+  concorrentes escolhendo o mesmo número produzem merge silencioso — e
+  `is_migration_executed` PULA EM SILÊNCIO um número já registrado: quem gravar uma
+  "280" nova nunca a verá rodar.
 
 ### O que NÃO vira migração, e por quê
 

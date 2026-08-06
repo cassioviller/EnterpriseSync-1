@@ -1089,8 +1089,14 @@ B5.1 passaram pela rota viva e `fluxo_caixa` `'conta_pagar'` segue com **0 linha
 
 ### Task B5.6: o estorno devolve o débito bancário — a catraca de `banco.saldo_atual`
 
-**Status: ✅ entregue em `08f2ee88`, sob a D-B5.6=(A) decidida em 06/08.** Migração 280
-gasta. Red-first (casos 1/3/4/5/6/7 vermelhos; o 2 já passava — nada a inventar) e três
+**Status: ✅ entregue em `08f2ee88`, sob a D-B5.6=(A) decidida em 06/08; apertada em
+`f69cb359` pela revisão WF-3.** Migração 280 gasta. Desvios que a revisão registrou e o
+commit de aperto resolveu: (i) a recusa de troca de caminho bancário estava na VIEW e o
+recorte a mandava para `baixar_pagamento` — agora está nos dois (flash amigável na view,
+raise no service); (ii) o gatilho era `status == 'PARCIAL'` e a janela real do legado
+(conta meio-paga sem banco, status NULL/PENDENTE) passava — virou `valor_pago > 0`, com
+o caso 8 e mutação própria; (iii) a lista **Files** não declarava `pagar_conta` nem
+`gestao_custos_views.py` (os carimbos), tocados pelo commit — registrado aqui. Red-first (casos 1/3/4/5/6/7 vermelhos; o 2 já passava — nada a inventar) e três
 mutações cirúrgicas: crédito desligado derruba só 1/4, carimbo removido derruba só o 5,
 delete de FC removido derruba só o 6. Um desvio a mais, para menos: o caso 6 descobriu
 que **o pagamento de GCP nunca gerou LC** — os dois caminhos passam `'DESPESA_GERAL'`,
@@ -1256,7 +1262,7 @@ possível, não é iniciada. (iii) A dupla contagem do fluxo — é a B5.7.
 - [x] **Step 8:** commit — `fix(financeiro): estorno devolve o debito bancario e apaga o que a baixa criou`
 
 **Esforço: M** (sob A; sob C é G e reabre). **Migração: SIM — uma**, número alocado no
-Step 1 (280-283; a 279 segue a última registrada).
+Step 1 (280-283; gasta: **280**, `08f2ee88`).
 
 > **Nota — o que o adversário corrigiu neste levantamento.** (a) As medidas ⚠️ dev centrais
 > ficaram irreprodutíveis no mesmo dia (25 PAGO e 5 bancos em drift por resíduo da suíte
@@ -1274,6 +1280,26 @@ Step 1 (280-283; a 279 segue a última registrada).
 ---
 
 ### Task B5.7: a exclusão de gêmeos chega ao fluxo de caixa; os escritores/leitores mortos saem
+
+**Status: ✅ entregue em `3288ba84` (fix) + `b5472260` (chore), sob a D-B5.1=(a)
+decidida em 06/08 e a D-B5.7 executada pelo default (2); completada em `f69cb359` pela
+revisão WF-3** — que pegou DOIS itens do recorte prometidos e não entregues pelos
+commits originais: o escritor de FC `'conta_pagar'` (a premissa da D-B5.1(a), "sai em
+vez de ser completado") continuava vivo, e a anotação de revogação do comentário
+Task #11 em `compras_views.py` não existia. Os dois saíram/entraram no aperto; o guard
+do migrar foi simplificado (CP de COMPRA nunca clona, inclusive com `origem_id` NULL) e
+a asserção de buckets do caso 1, que era VÁCUA (chave inexistente), foi consertada.
+
+⚠️ **Âncoras deste apenso**: foram medidas na árvore `a69b7464` e os commits da própria
+execução as deslocaram (o transversal do WF-3 listou o mapa completo; ex.: o escritor
+FC `:434-452` → `:505-523` antes de ser removido). Quem retomar confere contra a árvore
+corrente — os Status carregam os commits que servem de âncora estável. Red-first nos casos 1/4/5/6
+e três mutações medidas, cada uma derrubando só os seus casos. Registro de método que
+vale a pena: o caso 5 nasceu **verde e oco** na primeira forma — a CP de teste não
+tinha `obra_id`, o clone falhava no check da Fase 4 (outro motivo que não o guard) e a
+contagem ficava igual por acidente. Detectado porque o vermelho esperado não veio;
+consertado antes de o teste valer. É a mesma classe de vácuo que a B5.2 fechou, agora
+do lado de quem escreve o teste.
 
 **Esta Task está escrita SOB o default (a) da D-B5.1** — `GestaoCustoPai` é a única fonte
 da SAÍDA e o escritor de FC `'conta_pagar'` (`financeiro_views.py:434-452`, âncora da §4
@@ -1420,17 +1446,17 @@ sem obra — nenhuma veio de `autorizar` ainda; prova de forma, não de volume) 
 (`importacao_excel.py:2329-2346`, SAIDA com referência NULL que vira "Lançamento Direto"
 **editável** na tela do fluxo) fica como pergunta aberta de produto.
 
-- [ ] **Step 0:** registrar a **D-B5.7** na fila do Cássio (com a D-B5.1, de que ela é a afiada); a Task executa o default (2) sem esperar
-- [ ] **Step 1:** escrever o teste e ver vermelhos os casos 1, 4 e 5 (2, 3 e 7 nascem como guardas verdes; 6 nasce vermelho junto do Step 4)
-- [ ] **Step 2:** exclusão nas três pontas de `calcular_fluxo_caixa`, subquery com `admin_id`, restrita a `pedido_compra`
-- [ ] **Step 3:** guard de idempotência de `migrar_contas_pagar` reconhece a gêmea `pedido_compra`
-- [ ] **Step 4:** rota de vehicles sai inteira (`:826-946`)
-- [ ] **Step 5:** blocos de ponto saem; chave `fluxo_caixa: []` mantida
-- [ ] **Step 6:** sete casos verdes; mutação: restaurar a exclusão de uma ponta derruba só o caso 1/4; tirar o `admin_id` da subquery derruba só o 2; restaurar o guard antigo derruba só o 5
-- [ ] **Step 7:** dois commits — `fix(fluxo-caixa): gemeos de compra saem das previstas do fluxo` e `chore(financeiro): remove o escritor morto de vehicles e os leitores orfaos de ponto`
+- [x] **Step 0:** registrar a **D-B5.7** na fila do Cássio (com a D-B5.1, de que ela é a afiada); a Task executa o default (2) sem esperar
+- [x] **Step 1:** escrever o teste e ver vermelhos os casos 1, 4 e 5 (2, 3 e 7 nascem como guardas verdes; 6 nasce vermelho junto do Step 4)
+- [x] **Step 2:** exclusão nas três pontas de `calcular_fluxo_caixa`, subquery com `admin_id`, restrita a `pedido_compra`
+- [x] **Step 3:** guard de idempotência de `migrar_contas_pagar` reconhece a gêmea `pedido_compra`
+- [x] **Step 4:** rota de vehicles sai inteira (`:826-946`)
+- [x] **Step 5:** blocos de ponto saem; chave `fluxo_caixa: []` mantida
+- [x] **Step 6:** sete casos verdes; mutação: restaurar a exclusão de uma ponta derruba só o caso 1/4; tirar o `admin_id` da subquery derruba só o 2; restaurar o guard antigo derruba só o 5
+- [x] **Step 7:** dois commits — `fix(fluxo-caixa): gemeos de compra saem das previstas do fluxo` e `chore(financeiro): remove o escritor morto de vehicles e os leitores orfaos de ponto`
 
 **Esforço: M.** **Migração: não** (🔬 conferido: `migrations.py` sobre `fluxo_caixa` só
-tem o UPDATE de backfill de `admin_id` — nenhum INSERT; a 279 segue a última).
+tem o UPDATE de backfill de `admin_id` — nenhum INSERT; ⚠️ nota de 06/08: a última registrada passou a ser a **280**, gasta pela B5.6).
 
 > **Nota — o que o adversário corrigiu neste levantamento.** (a) Âncoras de
 > `financeiro_views.py` pré-B5.1 — corrigidas para a árvore atual (`:423`, `:434-452`,
@@ -1508,3 +1534,12 @@ o GCP 999 é misjoin (168 linhas órfãs em 76 tenants).
   medidas do levantamento (resíduo da suíte B5.1 no banco de dev; dois joins de gêmeos sem
   guard de tenant) e acharam a terceira família de gêmeos (`migrar_contas_pagar`) e o
   vazamento de LC `V2_AUTO` nos dois estornos. Contradições 6-9 registradas na §10.1.
+- **2026-08-06, noite** — **A rodada B5 FECHA: 6 entregues, 1 cortada.** O Cássio decidiu
+  não rodar as consultas de produção e adotar os defaults (D-B5.1(a), D-B5.6(A); a B5.5
+  caiu pelo próprio mecanismo do Step 1). B5.6 entregue (`08f2ee88`, **migração 280
+  gasta**) e B5.7 entregue (`3288ba84`+`b5472260`). Itens novos que sobraram desta
+  execução, ambos para fila futura: **mapear `DESPESA_GERAL`** (ou trocar o
+  `tipo_operacao` dos pagamentos de GCP) — decisão de contador, achado do caso 6 da
+  B5.6; e o **estorno de recebimento**, que não existe (194 CRs liquidadas sem reversão
+  pela UI, ⚠️ dev). A família flash+redirect (35 rotas) e a limpeza das rotas irmãs de
+  vehicles seguem para a rodada B6.
