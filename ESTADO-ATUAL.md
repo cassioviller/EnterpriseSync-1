@@ -935,10 +935,14 @@ FUNCIONARIO.)*
     de estoque vinda de RDO nascia sem funcionário — desde o primeiro dia, sem
     ninguém notar, porque o campo é opcional. Corrigido em `d5294ce4` (a
     autoria real é a do RDO, via `Usuario.funcionario_id`). O modelo está
-    marcado **EM APOSENTADORIA**, mas **a tabela continua lá** e ainda tem dois
-    leitores (📖 `crud_rdo_completo.py:539`, mantido de propósito, e o import
-    físico-financeiro). Remover exige migração destrutiva e conferência em
-    produção — passo próprio.
+    marcado **EM APOSENTADORIA**, mas **a tabela continua lá**. ⚠️ Corrigido
+    em 06/08 (B5.4): os pontos vivos que a anulam são **dois** —
+    📖 `views/rdo.py:536-538` (exclusão pela rota viva) e
+    📖 `services/importacao_fisico_financeiro.py:372-373`. O
+    `crud_rdo_completo.py:557` (ex-`:539`), antes descrito como "mantido de
+    propósito", está em rota **sombreada** que nunca despacha — não protege
+    nada (🔬 `tests/test_b5_rdo_crud_url_map.py`). Remover exige migração
+    destrutiva e conferência em produção — passo próprio.
 
 18. **Teste vermelho não é regressão até que se prove.** 🔬 03/08: a única
     falha do gate completo era de **calendário** — semeava N dias a partir do

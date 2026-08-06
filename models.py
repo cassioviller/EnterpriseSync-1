@@ -2176,13 +2176,19 @@ class AlocacaoEquipe(db.Model):
     por isso recebia `None` desde sempre; esse leitor foi repontado para a
     autoria do próprio RDO.
 
-    O que ainda a referencia, e por quê:
+    O que ainda a referencia, e por quê (⚠️ registro corrigido em 06/08 pela
+    B5.4 — a versão anterior listava TRÊS pontos vivos, e um deles não roda):
 
-    * `crud_rdo_completo.py:539` — anula `rdo_gerado_id` ao excluir RDO.
-      Mantido de propósito: é barato e protege bases onde a FK porventura
-      tenha valor, o que dev não consegue provar sobre produção;
-    * `services/importacao_fisico_financeiro.py` — import da tabela no
-      cabeçalho.
+    * `views/rdo.py:536-538` — anula `rdo_gerado_id` ao excluir RDO pela rota
+      VIVA (`main.excluir_rdo`). É este o ponto que protege bases onde a FK
+      porventura tenha valor;
+    * `services/importacao_fisico_financeiro.py:372-373` — anula no
+      reimporte;
+    * `crud_rdo_completo.py:557` — o MESMO anulação, mas dentro de
+      `rdo_crud.excluir_rdo`, rota SOMBREADA: `POST /rdo/excluir/<id>`
+      despacha para `main.excluir_rdo` (🔬 url_map congelado em
+      `tests/test_b5_rdo_crud_url_map.py`). Este ponto NÃO protege base
+      nenhuma — não conta como vivo no inventário do E04.
 
     Remover a tabela exige migração destrutiva e conferência em produção — é
     passo próprio, não carona de outro pacote.

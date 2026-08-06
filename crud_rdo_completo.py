@@ -650,7 +650,13 @@ def finalizar_rdo(rdo_id):
         flash(f'Erro ao finalizar RDO: {str(e)}', 'error')
         return redirect(url_for('rdo_crud.visualizar_rdo', rdo_id=rdo_id))
 
-@rdo_crud_bp.route('/api/subatividades/<int:servico_id>')
+# B5.4 — rota cortada em 06/08. `/rdo/api/subatividades/<id>` VENCIA o
+# despacho e tinha zero consumidor: nenhum fetch/url_for/href em templates,
+# static, views, services, docs, tests ou n8n_workflows — nem por URL
+# relativa (testado; os três hits de `api/...` relativos são de outro
+# blueprint). A função fica sem decorador, como `salvar_rdo` (:249-254):
+# devolver a rota é decisão, não acidente. O url_map pós-corte está congelado
+# em tests/test_b5_rdo_crud_url_map.py.
 @login_required
 def api_subatividades_por_servico(servico_id):
     """API para buscar subatividades por serviço (inclui subatividades sem servico_id)"""
@@ -678,7 +684,8 @@ def api_subatividades_por_servico(servico_id):
         logger.error(f"ERRO API SUBATIVIDADES: {str(e)}")
         return jsonify({'erro': str(e)}), 500
 
-@rdo_crud_bp.route('/api/funcionarios')
+# B5.4 — rota cortada em 06/08, mesmo caso da API de subatividades acima:
+# vencia o despacho, zero consumidor por qualquer lente.
 @login_required
 def api_funcionarios():
     """API para buscar funcionários ativos"""
