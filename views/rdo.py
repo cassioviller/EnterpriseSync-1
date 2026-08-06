@@ -462,18 +462,18 @@ def excluir_rdo(rdo_id):
     if request.method != 'POST':
         flash('Operação de exclusão deve ser feita via POST', 'warning')
         return redirect(url_for('main.visualizar_rdo', id=rdo_id))
+
+    # B5.3 — helper antes do try (RDO alheio/inexistente → 404 idêntico) e
+    # escopo de obra: quem não VÊ a obra não apaga o RDO dela. O escopo de
+    # ver é o PISO — a permissão fina de exclusão continua nas guardas de
+    # ciclo de vida logo abaixo.
+    rdo = _rdo_do_tenant_ou_404(rdo_id)
+    from utils.autorizacao import pode_ver_obra
+    if not pode_ver_obra(rdo.obra_id):
+        abort(404)
+
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-        
-        # Buscar RDO
-        rdo = db.session.query(RDO).join(Obra).filter(
-            RDO.id == rdo_id, 
-            Obra.admin_id == admin_id
-        ).first()
-        
-        if not rdo:
-            flash('RDO não encontrado.', 'error')
-            return redirect(url_for('main.rdos'))
 
         # Fase 5 — RDO assinado/aprovado/retificado não se apaga. A guarda
         # `before_flush` (services/rdo_ciclo_vida) barraria o delete de
@@ -587,6 +587,13 @@ def excluir_rdo(rdo_id):
         flash('RDO excluído com sucesso.', 'success')
         return redirect(url_for('main.rdos'))
         
+    except HTTPException:
+        # B5.3 — 404/403 são RESPOSTA, não falha a ser recuperada (o formato
+        # de `rdos()`, p1 Step B). Sem isto o `abort(404)` da guarda de tenant
+        # viraria "Erro ao excluir RDO" + 302. Vem antes do rollback: não há
+        # `abort()` depois de escrita nesta função, e o teardown do
+        # Flask-SQLAlchemy faz `session.remove()`.
+        raise
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao excluir RDO {rdo_id}: {str(e)}")
@@ -718,12 +725,11 @@ def criar_rdo():
         # Buscar obra do admin atual (manter multi-tenant)
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         if not obra:
-            # Verificar se obra existe mas pertence a outro admin
-            obra_existe = Obra.query.filter_by(id=obra_id).first()
-            if obra_existe:
-                flash('Acesso negado: esta obra pertence a outra empresa.', 'error')
-            else:
-                flash('Obra não encontrada.', 'error')
+            # B5.3 — mensagem ÚNICA. A segunda query SEM tenant que morava
+            # aqui existia só para escolher entre "outra empresa" e "não
+            # encontrada": oráculo de enumeração na flash (os dois caminhos
+            # respondiam 302). Quem não pode ver não pode distinguir.
+            flash('Obra não encontrada.', 'error')
             return redirect(url_for('main.novo_rdo'))
         
         # Verificar se já existe RDO para esta obra/data
@@ -1063,30 +1069,34 @@ def _acoes_para_template(rdo):
 @main_bp.route('/rdo/<int:id>')
 @login_required     # triagem 23/07 (Anexo B) — anônimo caía em AttributeError engolido
 def visualizar_rdo(id):
-    """Visualizar RDO específico (escopo por tenant no corpo da query)"""
+    """Visualizar RDO específico (escopo por tenant E por obra — B5.3)"""
+    # B5.3 — resolução ANTES do try, pelo helper: RDO alheio ou inexistente
+    # responde 404 idêntico (não vazar existência — regra da B1.15), em vez do
+    # 302 com flash. Nota de mudança: o helper usa `get_tenant_admin_id()`,
+    # que para SUPER_ADMIN devolve `current_user.id` — antes esta rota usava
+    # `current_user.admin_id` para não-ADMIN (risco 3 do recorte, decidido lá).
+    rdo = _rdo_do_tenant_ou_404(id)
+
+    # LEITURA: escopo de VER, não de apontar (o formato de
+    # `cronograma_views.py:2695-2704`). Com `escopo_obra_ativo` ligado, um
+    # APONTADOR vinculado só à obra X não enxerga o RDO da obra Y — e a
+    # resposta é o MESMO 404 do inexistente.
+    from utils.autorizacao import pode_ver_obra
+    if not pode_ver_obra(rdo.obra_id):
+        abort(404)
+
     try:
         # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
         logger.info("[TARGET] RDO VISUALIZAR VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
         logger.debug(f"[LOC] ROTA USADA: /rdo/{id} (visualizar_rdo)")
         logger.info("[DOC] TEMPLATE: rdo/visualizar_rdo_moderno.html (MODERNO)")
         logger.info(f"[USER] USUÁRIO: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
-        # Buscar RDO diretamente sem verificação de acesso
+
+        # Consumidores V2 lá embaixo (`obra_em_modo_v2`, contagens) continuam
+        # lendo `admin_id_atual` — a resolução do RDO subiu para o helper, a
+        # variável fica.
         admin_id_atual = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-        rdo = RDO.query.options(
-            db.joinedload(RDO.obra),
-            db.joinedload(RDO.criado_por),
-            db.selectinload(RDO.fotos),
-            db.selectinload(RDO.equipamentos),
-            db.selectinload(RDO.ocorrencias_rdo),
-        ).join(Obra).filter(
-            RDO.id == id,
-            Obra.admin_id == admin_id_atual
-        ).first()
-        
-        if not rdo:
-            flash('RDO não encontrado.', 'error')
-            return redirect('/funcionario/rdo/consolidado')
-        
+
         # Buscar subatividades do RDO (sem relacionamentos problemáticos)
         subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
         
@@ -1523,6 +1533,10 @@ def visualizar_rdo(id):
                              # acionável para cobrar o cliente.
                              ciencia_cliente=_ciencia_para_template(rdo))
         
+    except HTTPException:
+        # B5.3 — o formato de `rdos()` (p1 Step B): o 404 da resolução de
+        # tenant é resposta, não falha.
+        raise
     except Exception as e:
         logger.error(f"ERRO VISUALIZAR RDO: {str(e)}")
         flash('Erro ao carregar RDO.', 'error')
@@ -1533,24 +1547,15 @@ def visualizar_rdo(id):
 @login_required
 def exportar_rdo_pdf(rdo_id):
     """Exporta o RDO em PDF (server-side, sem depender do print do browser)."""
+    # B5.3 — mesma resolução da tela: helper antes do try + escopo de VER.
+    # Nota de mudança (risco 3 do recorte): esta rota usava
+    # `admin_id or current_user.id`; o helper usa `get_tenant_admin_id()`.
+    rdo = _rdo_do_tenant_ou_404(rdo_id)
+    from utils.autorizacao import pode_ver_obra
+    if not pode_ver_obra(rdo.obra_id):
+        abort(404)
+
     try:
-        if current_user.tipo_usuario == TipoUsuario.ADMIN:
-            admin_id_atual = current_user.id
-        else:
-            admin_id_atual = getattr(current_user, 'admin_id', None) or current_user.id
-
-        rdo = RDO.query.options(
-            db.joinedload(RDO.obra),
-            db.joinedload(RDO.criado_por),
-        ).join(Obra).filter(
-            RDO.id == rdo_id,
-            Obra.admin_id == admin_id_atual,
-        ).first()
-
-        if not rdo:
-            flash('RDO não encontrado.', 'error')
-            return redirect('/funcionario/rdo/consolidado')
-
         from services.rdo_pdf_service import gerar_pdf_rdo
         pdf_bytes = gerar_pdf_rdo(rdo)
         if not pdf_bytes:
@@ -1562,6 +1567,9 @@ def exportar_rdo_pdf(rdo_id):
         response.headers['Content-Type'] = 'application/pdf'
         response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
+    except HTTPException:
+        # B5.3 — idem `rdos()`: 404 é resposta.
+        raise
     except Exception as e:
         logger.error(f"ERRO EXPORTAR RDO PDF: {str(e)}")
         flash('Erro ao gerar PDF do RDO.', 'error')
@@ -1657,6 +1665,13 @@ def finalizar_rdo(id):
         flash(f'RDO {rdo.numero_rdo} finalizado com sucesso!', 'success')
         return redirect(url_for('main.visualizar_rdo', id=id))
         
+    except HTTPException:
+        # B5.3 — `_rdo_do_tenant_ou_404` é chamado DENTRO deste try (`:1587`)
+        # e o abort dele era engolido aqui: RDO alheio respondia 302 com
+        # "Erro ao finalizar RDO" — o 404 escrito e nunca entregue. Antes do
+        # rollback (sem abort pós-escrita neste corpo; teardown remove a
+        # sessão).
+        raise
     except Exception as e:
         db.session.rollback()
         logger.error(f"ERRO FINALIZAR RDO: {str(e)}")
@@ -2066,6 +2081,11 @@ def atualizar_rdo(id):
 
         return redirect(url_for('main.visualizar_rdo', id=id))
         
+    except HTTPException:
+        # B5.3 — o `first_or_404()` de cima era engolido aqui: RDO alheio
+        # respondia 302 para a tela de edição. Antes do rollback, como nos
+        # irmãos.
+        raise
     except Exception as e:
         db.session.rollback()
         logger.error(f"ERRO ATUALIZAR RDO: {str(e)}")
@@ -2147,6 +2167,9 @@ def editar_rdo(id):
             opcoes_rdo_status_equipamento=get_opcoes_valores('rdo_status_equipamento', admin_id),
         )
 
+    except HTTPException:
+        # B5.3 — o `first_or_404()` de cima era engolido aqui.
+        raise
     except Exception as e:
         logger.error(f"ERRO EDITAR RDO: {str(e)}")
         flash('Erro ao carregar RDO para edição.', 'error')
@@ -2719,12 +2742,9 @@ def rdo_salvar_unificado():
             # Buscar obra do admin atual (manter multi-tenant)
             obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id_correto).first()
             if not obra:
-                # Verificar se obra existe mas pertence a outro admin
-                obra_existe = Obra.query.filter_by(id=obra_id).first()
-                if obra_existe:
-                    flash('Acesso negado: esta obra pertence a outra empresa.', 'error')
-                else:
-                    flash('Obra não encontrada.', 'error')
+                # B5.3 — mensagem ÚNICA (gêmeo de `criar_rdo`; ver o
+                # comentário lá). A segunda query sem tenant SAI.
+                flash('Obra não encontrada.', 'error')
                 return redirect(url_for('main.funcionario_rdo_novo'))
             
             # Verificar se já existe RDO para esta obra/data

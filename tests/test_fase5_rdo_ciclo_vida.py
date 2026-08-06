@@ -634,7 +634,9 @@ def test_duplicar_rdo_de_outro_tenant_devolve_404():
 
     resposta = _cliente_de(aid).post(f'/rdo/{rid}/duplicar',
                                      follow_redirects=False)
-    assert resposta.status_code in (302, 404)
+    # B5.3 — era `in (302, 404)`, medindo os dois lados; agora a família
+    # inteira responde 404.
+    assert resposta.status_code == 404
 
     with app.app_context():
         assert RDO.query.filter_by(obra_id=obid).count() == 1
@@ -690,7 +692,8 @@ def test_visualizar_rdo_de_outro_tenant_devolve_404():
         rid, aid = rdo_b.id, admin_a.id
 
     resposta = _cliente_de(aid).get(f'/rdo/{rid}', follow_redirects=False)
-    assert resposta.status_code in (302, 404), (
+    # B5.3 — era `in (302, 404)`; o nome do teste finalmente diz a verdade.
+    assert resposta.status_code == 404, (
         f'RDO de outro tenant devolveu {resposta.status_code}')
 
 
