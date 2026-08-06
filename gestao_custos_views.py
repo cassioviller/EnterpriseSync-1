@@ -1360,7 +1360,18 @@ def migrar_contas_pagar():
             # que exigia o id para conferir a gêmea): sem id não há como
             # provar que NÃO tem gêmea, e o lado seguro é não clonar. A CP
             # fica onde está (não decide fonte: D-B5.1).
-            if (conta.origem_tipo or '').upper() == 'COMPRA':
+            #
+            # B6.2 — a família 2 entra pela MESMA porta. A CP que o import de
+            # fluxo cria em modo reembolso (`importacao_excel.py:2400-2431`)
+            # nasce com `origem_tipo='gestao_custo_pai'` MINÚSCULO e
+            # `origem_id=gcp.id`: a obrigação já vive num GCP, e cloná-la cria
+            # a terceira cópia — o guard de idempotência acima só vê clones
+            # desta rota, então ela passava no 1º clique e o clone escapava de
+            # toda exclusão. O `.upper()` normaliza o literal minúsculo do
+            # import; o skip é incondicional pelo mesmo motivo da COMPRA (sem
+            # id não há como provar que NÃO tem gêmea, e o lado seguro é não
+            # clonar).
+            if (conta.origem_tipo or '').upper() in ('COMPRA', 'GESTAO_CUSTO_PAI'):
                 ignorados += 1
                 continue
 

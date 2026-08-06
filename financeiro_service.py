@@ -587,6 +587,23 @@ class FinanceiroService:
                 GestaoCustoFilho.admin_id == admin_id,
                 GestaoCustoFilho.origem_tabela == 'pedido_compra',
             ).distinct().subquery()
+
+            # B6.2 — a família 2, que a B5.7 remeteu por escrito a "regra
+            # própria". A CP do import em modo reembolso
+            # (`services/importacao_excel.py:2400-2431`) aponta para o GCP por
+            # chave DIRETA (`origem_tipo='gestao_custo_pai'` minúsculo,
+            # `origem_id=gcp.id`), e o GCF que o import grava vem SEM
+            # `origem_tabela` — invisível à exclusão por filho acima. A
+            # assimetria morde ao contrário da tela: no fluxo é a GCP que entra
+            # nas previstas e a CP gêmea que é invisível, então pagar a CP
+            # debita `banco.saldo_atual` (= o saldo_inicial daqui) e deixa a
+            # prevista ETERNA. `admin_id` na subquery não é opcional (misjoin
+            # do WF-2). Espelho literal de `financeiro_views.py:207-219`.
+            _gemeos_reembolso = db.session.query(ContaPagar.origem_id).filter(
+                ContaPagar.admin_id == admin_id,
+                func.upper(ContaPagar.origem_tipo) == 'GESTAO_CUSTO_PAI',
+                ContaPagar.origem_id.isnot(None),
+            ).distinct().subquery()
             # joinedload da categoria: o rótulo do fluxo lê custo.categoria_fluxo_caixa;
             # eager-load resolve a categoria no MESMO SELECT do Pai (snapshot já visível),
             # evitando o lazy-load por linha que ficava stale na 1ª leitura após a escrita.
@@ -599,6 +616,8 @@ class FinanceiroService:
                     # B5.7 — os gêmeos ficam fora das previstas E, por
                     # derivação, dos `detalhes` e dos buckets mensais.
                     ~GestaoCustoPai.id.in_(_gemeos_compra),
+                    # B6.2 — idem para a família 2 (reembolso do import).
+                    ~GestaoCustoPai.id.in_(_gemeos_reembolso),
                     sql_or(
                         # Com data_vencimento: filtrar pelo período consultado
                         and_(
@@ -657,6 +676,13 @@ class FinanceiroService:
                     # tela de contas a pagar não gera realizado no fluxo)
                     # está documentado no apenso, não escondido.
                     ~GestaoCustoPai.id.in_(_gemeos_compra),
+                    # B6.2 — a família 2 entra aqui por SIMETRIA, e o recorte
+                    # diz por quê: para ela esta ponta é quase redundante (GCP
+                    # PAGO do import sempre tem FC, e o dedup `ids_gc_no_fluxo`
+                    # abaixo já o pega). Fica para que as duas famílias tenham
+                    # a mesma forma nas mesmas pontas — divergência entre elas
+                    # é o que faz a próxima leitura errar.
+                    ~GestaoCustoPai.id.in_(_gemeos_reembolso),
                 )
             )
             if obra_id:

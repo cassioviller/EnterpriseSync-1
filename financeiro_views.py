@@ -12,6 +12,7 @@ from models import (
     PlanoContas, Obra, CentroCusto, GestaoCustoPai, GestaoCustoFilho, FluxoCaixa,
     CategoriaFluxoCaixa, DiaPagamentoConfig, FechamentoPagamento, Usuario, TipoUsuario
 )
+from sqlalchemy import func
 from utils.tenant import is_v2_active
 from financeiro_service import FinanceiroService
 from multitenant_helper import get_admin_id
@@ -198,6 +199,23 @@ def listar_contas_pagar():
         GestaoCustoFilho.origem_tabela == 'pedido_compra',
     ).distinct().subquery()
 
+    # B6.2 — a família 2 (rodada B6, §3): a CP que o import de fluxo cria em
+    # modo reembolso (`services/importacao_excel.py:2400-2431`) aponta para o
+    # GCP por chave DIRETA — `origem_tipo='gestao_custo_pai'` minúsculo,
+    # `origem_id=gcp.id`. A exclusão acima não a alcança: o GCF que o import
+    # grava vem SEM `origem_tabela`, invisível a toda exclusão por filho. Sem
+    # esta subquery, GCP e CP gêmea aparecem juntas na tabela e o KPI soma as
+    # duas — a mesma obrigação contada duas vezes na mesma tela.
+    #
+    # `admin_id` NÃO é opcional (regra da casa desde a contradição 9 da B5):
+    # sem ele, CP de outro tenant com `origem_id` colidindo exclui GCP alheio
+    # por misjoin — o erro que a medição do WF-2 cometeu duas vezes.
+    _reembolso_gcp_ids = db.session.query(ContaPagar.origem_id).filter(
+        ContaPagar.admin_id == admin_id,
+        func.upper(ContaPagar.origem_tipo) == 'GESTAO_CUSTO_PAI',
+        ContaPagar.origem_id.isnot(None),
+    ).distinct().subquery()
+
     # custos_v2: lista para exibição na tabela (inclui PAGO/PARCIAL para acesso ao estorno)
     custos_v2 = []
     if v2:
@@ -205,6 +223,7 @@ def listar_contas_pagar():
             GestaoCustoPai.admin_id == admin_id,
             GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO', 'PENDENTE', 'PARCIAL', 'PAGO']),
             ~GestaoCustoPai.id.in_(_compra_gcp_ids),
+            ~GestaoCustoPai.id.in_(_reembolso_gcp_ids),
         ).order_by(GestaoCustoPai.data_criacao.desc()).all()
 
     # KPI V2: query separada — apenas status abertos, sem limite de 200, para precisão dos cards
@@ -214,6 +233,7 @@ def listar_contas_pagar():
             GestaoCustoPai.admin_id == admin_id,
             GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO', 'PENDENTE', 'PARCIAL']),
             ~GestaoCustoPai.id.in_(_compra_gcp_ids),
+            ~GestaoCustoPai.id.in_(_reembolso_gcp_ids),
         ).all()
 
     # Incorporar custos V2 nos KPI cards usando regra canônica (valor_solicitado tem prioridade)
