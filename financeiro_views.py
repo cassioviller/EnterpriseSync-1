@@ -477,18 +477,20 @@ def pagar_conta(conta_id):
             ).date()
             forma_pagamento = request.form.get('forma_pagamento')
             banco_id = request.form.get('banco_id', type=int) or None
-            categoria_fc_id = request.form.get('categoria_fluxo_caixa_id', type=int) or None
-            criar_fc = request.form.get('criar_fluxo_caixa') == '1'
 
-            # B5.6 risco 3 — a coluna `banco_id` é ÚNICA e o estorno é
-            # tudo-ou-nada (zera `valor_pago` inteiro): baixa complementar em
-            # conta PARCIAL tem de seguir o MESMO caminho bancário da primeira
-            # — trocar de banco (A→B, e também None→A ou A→None) faria o
-            # estorno creditar o total num banco que não recebeu esse débito.
+            # B5.6 risco 3, apertado pela revisão WF-3 — a coluna `banco_id`
+            # é ÚNICA e o estorno é tudo-ou-nada (zera `valor_pago` inteiro):
+            # baixa complementar tem de seguir o MESMO caminho bancário da
+            # primeira. O gatilho é `valor_pago > 0`, NÃO `status ==
+            # 'PARCIAL'`: conta legada meio-paga com status NULL/PENDENTE
+            # (pré-migração-280) passava pela versão por status, ganhava
+            # banco na complementar e o estorno creditava o TOTAL nesse
+            # banco — crédito inventado (a catraca invertida). A mesma
+            # invariante existe como cinto no service.
             # `return` simples dentro do try — não é abort, nada o engole.
-            if (conta.status == 'PARCIAL'
+            if ((conta.valor_pago or 0) > 0
                     and (banco_id or None) != (conta.banco_id or None)):
-                flash('Esta conta tem pagamento parcial por outro caminho '
+                flash('Esta conta tem pagamento anterior por outro caminho '
                       'bancário. Complete pelo mesmo banco da primeira baixa '
                       'ou estorne-a primeiro.', 'warning')
                 return redirect(url_for('financeiro.listar_contas_pagar'))
@@ -502,25 +504,16 @@ def pagar_conta(conta_id):
                 banco_id=banco_id
             )
 
-            if criar_fc:
-                if categoria_fc_id:
-                    cfc = CategoriaFluxoCaixa.query.filter_by(id=categoria_fc_id, admin_id=admin_id).first()
-                    if not cfc:
-                        categoria_fc_id = None
-                fc = FluxoCaixa(
-                    admin_id=admin_id,
-                    tipo_movimento='SAIDA',
-                    data_movimento=data_pagamento,
-                    valor=valor_pago,
-                    descricao=f'Pagamento: {conta.descricao[:150] if conta.descricao else "Conta a pagar"}',
-                    categoria='OUTROS',
-                    banco_id=banco_id,
-                    categoria_fluxo_caixa_id=categoria_fc_id,
-                    referencia_tabela='conta_pagar',
-                    referencia_id=conta_id,
-                )
-                db.session.add(fc)
-                db.session.commit()
+            # B5.7 / D-B5.1(a), executada pela revisão WF-3 — o escritor de
+            # FluxoCaixa 'conta_pagar' que morava aqui SAIU. Era a premissa
+            # das Tasks B5.6/B5.7 ("o escritor sai em vez de ser completado")
+            # que nenhum commit tinha cumprido: `GestaoCustoPai` é a única
+            # fonte da SAÍDA do fluxo; as linhas 'conta_pagar' eram
+            # invisíveis a `calcular_fluxo_caixa` (pr_query filtra
+            # 'gestao_custo_pai'; fd_query, IS NULL), só nasciam pela página
+            # órfã `pagar_conta.html` (checkbox que o modal vivo não envia;
+            # ⚠️ dev 0 linhas) e o estorno NÃO as apagava — um artefato órfão
+            # com banco_id que ninguém lia e nada limpava.
 
             flash(f'Pagamento de R$ {valor_pago} registrado com sucesso!', 'success')
             return redirect(url_for('financeiro.listar_contas_pagar'))

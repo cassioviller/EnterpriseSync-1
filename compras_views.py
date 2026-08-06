@@ -249,10 +249,19 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
         # Task #11 — Arquitetura de duas camadas (sem dupla contagem):
         #   GCP (acima)  = camada de CUSTO: centro de custo da obra, DRE, relatórios.
         #   ContaPagar   = camada de OBRIGAÇÃO FINANCEIRA (payables): contas a pagar,
-        #                  fluxo de caixa, Fechamento de Pagamentos.
+        #                  ~~fluxo de caixa~~, Fechamento de Pagamentos.
         # A tela de Contas a Pagar exclui GCPs de pedido_compra de custos_v2
         # porque esses já aparecem como ContaPagar na tabela principal.
         # Assim, cada tela consulta apenas sua camada e não há soma duplicada.
+        #
+        # ⚠️ REVOGADO EM PARTE — 06/08, D-B5.1(a) + D-B5.7(2) (apenso §10 de
+        # docs/superpowers/plans/2026-08-06-rodada-b5-varredura.md): a parte
+        # "fluxo de caixa" desta divisão NUNCA valeu no código
+        # (`calcular_fluxo_caixa` não lê ContaPagar em ponta nenhuma) e foi
+        # revogada por decisão: `GestaoCustoPai` é a ÚNICA fonte da SAÍDA do
+        # fluxo — previsto E realizado. Consequência declarada: compra paga
+        # pela tela de Contas a Pagar NÃO gera realizado no fluxo de caixa; o
+        # realizado de compra entra só quando paga pela Gestão de Custos.
         cp = ContaPagar(
             admin_id=admin_id,
             fornecedor_id=pedido.fornecedor_id,

@@ -826,7 +826,7 @@ def excluir_ponto_preview(registro_id):
         if not registro:
             return jsonify({'success': False, 'message': 'Registro não encontrado'}), 404
 
-        from models import GestaoCustoFilho, GestaoCustoPai, FluxoCaixa
+        from models import GestaoCustoFilho, GestaoCustoPai
 
         filhos = GestaoCustoFilho.query.filter_by(
             origem_tabela='registro_ponto',
@@ -871,7 +871,8 @@ def excluir_ponto_preview(registro_id):
 def excluir_registro_ponto_post(registro_id):
     """Exclui um registro de ponto via POST.
     Parâmetro JSON: cascade (bool) — se True, exclui também lançamentos vinculados
-    em Gestão de Custos e Fluxo de Caixa.
+    em Gestão de Custos. (O braço de Fluxo de Caixa saiu na B5.7: não existe
+    escritor de FC 'registro_ponto' — o delete nunca apagou nada.)
     """
     try:
         admin_id = get_tenant_admin_id()
@@ -891,7 +892,7 @@ def excluir_registro_ponto_post(registro_id):
         modulos_excluidos = []
 
         if cascade:
-            from models import GestaoCustoFilho, GestaoCustoPai, FluxoCaixa
+            from models import GestaoCustoFilho, GestaoCustoPai
 
             # --- Gestão de Custos: filhos vinculados
             filhos = GestaoCustoFilho.query.filter_by(

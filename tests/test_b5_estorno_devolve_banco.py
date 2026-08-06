@@ -276,6 +276,29 @@ def test_caso6_estornar_gcp_remove_fc_limpa_ponteiros_e_apaga_lc(tenant):
         'saldo_atual mudou num fluxo de GCP — GCP nunca debita banco (nº2)')
 
 
+def test_caso8_legado_meio_pago_sem_banco_nao_ganha_banco_na_complementar(tenant):
+    """A janela que a revisão WF-3 achou: conta LEGADA meio-paga sem banco
+    (pré-migração-280, status PENDENTE — não PARCIAL). A versão da guarda por
+    `status == 'PARCIAL'` deixava a complementar entrar com banco; o service
+    gravava `banco_id` e o estorno creditava o `valor_pago` INTEIRO nesse
+    banco — crédito inventado da parte antiga. O gatilho certo é
+    `valor_pago > 0`."""
+    cli = cliente_de(tenant.admin_id)
+    banco_b = _banco(tenant.admin_id, 3000)
+    conta_id = _conta(tenant.admin_id, valor=1000,
+                      valor_pago=Decimal('400'), saldo=Decimal('600'),
+                      status='PENDENTE')  # a forma legada: meio-paga, sem banco
+
+    _pagar(cli, conta_id, 600, banco_id=banco_b)
+
+    conta = _cp(conta_id)
+    assert float(conta.valor_pago) == 400.0, (
+        f'valor_pago={conta.valor_pago}: a complementar com banco entrou — '
+        f'a guarda por status deixa o legado passar')
+    assert conta.banco_id is None
+    assert _saldo_banco(banco_b) == 3000.0, 'banco B não podia ser debitado'
+
+
 def test_caso7_parcial_recusa_troca_de_banco_e_completa_no_mesmo(tenant):
     """Parcial de 400 no banco A → parcial de 600 no banco B é RECUSADA
     (coluna única + estorno tudo-ou-nada: trocar de banco em parcial

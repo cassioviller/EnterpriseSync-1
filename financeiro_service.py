@@ -92,7 +92,20 @@ class FinanceiroService:
             conta = ContaPagar.query.filter_by(id=conta_id, admin_id=admin_id).first()
             if not conta:
                 raise ValueError(f"Conta a pagar {conta_id} não encontrada ou sem permissão")
-            
+
+            # B5.6 (cinto da revisão WF-3) — a invariante da coluna única
+            # mora AQUI, não só na view: `banco_id` é um e o estorno credita
+            # `valor_pago` inteiro nele, então toda baixa de conta já
+            # parcialmente paga tem de seguir o caminho bancário da primeira.
+            # A view barra com flash amigável; este raise é a defesa contra
+            # qualquer chamador futuro (API, lote, import) que a contorne.
+            if ((conta.valor_pago or 0) > 0
+                    and (banco_id or None) != (getattr(conta, 'banco_id', None) or None)):
+                raise ValueError(
+                    f"Conta {conta_id} tem pagamento anterior por outro caminho "
+                    f"bancário (banco_id={conta.banco_id}); complete pelo mesmo "
+                    f"banco ou estorne primeiro")
+
             # Atualizar valores
             conta.valor_pago += valor_pago
             conta.saldo = conta.valor_original - conta.valor_pago

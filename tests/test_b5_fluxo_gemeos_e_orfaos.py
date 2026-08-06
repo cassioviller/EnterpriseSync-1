@@ -104,10 +104,13 @@ def test_caso1_gcp_de_compra_com_gemea_sai_das_previstas_e_dos_buckets(tenant):
         f"gêmea CP continua sendo previsto — a dupla subtração do item nº5")
     assert not _nas_previstas(fluxo, entidade), (
         'o gêmeo continua nos detalhes → nos buckets de agregar_fluxo_mensal')
+    # WF-3: a primeira forma desta asserção usava m.get('saidas') — chave que
+    # os buckets NÃO têm (são saidas_real/previsto_liquido) — e era vácua.
     mensal = FinanceiroService.agregar_fluxo_mensal(
         fluxo['detalhes'], fluxo['saldo_inicial'])
-    assert all(m.get('saidas', 0) == 0 for m in mensal.get('meses', [])) or \
-        not any(entidade in str(m) for m in mensal.get('meses', []))
+    for m in (mensal.get('meses') or []):
+        assert m.get('previsto_liquido', 0) == 0 and m.get('saidas_real', 0) == 0, (
+            f'bucket {m.get("mes")} carrega valor do gêmeo: {m}')
 
 
 def test_caso2_colisao_de_id_com_filho_de_outro_tenant_nao_exclui(tenant):
