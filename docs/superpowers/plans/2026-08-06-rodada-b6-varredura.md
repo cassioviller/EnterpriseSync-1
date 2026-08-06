@@ -297,15 +297,29 @@ próprio, §7); a página órfã `receber_conta.html` (candidata ao tratamento q
 deu ao lado pagar, §7); a validação de overpay (`valor_recebido <= saldo` — registrada,
 §7).
 
-- [ ] **Step 0:** decisão **D-B6.1** (§9, default escrito) — a Task executa o default sem esperar
-- [ ] **Step 1:** escrever `_migration_281_conta_receber_banco_id` (espelho da 280: nullable, IF NOT EXISTS, FK `banco_empresa` sem cascade) — a alocação já está feita **aqui**
-- [ ] **Step 2:** `models.py` — `ContaReceber.banco_id` + comentário-molde
-- [ ] **Step 3:** escrever o teste e ver vermelhos os casos 1/3/4 (e 6/7 vermelhos por rota inexistente); 2/5/8/9 nascem com a implementação
-- [ ] **Step 4:** `baixar_recebimento` — cinto escopado + gravação escopada (fora de OBR-MED)
-- [ ] **Step 5:** rota `estornar_recebimento` completa (captura → zera → debita → apaga FC → apaga LC → commit único)
-- [ ] **Step 6:** flash condicional da guarda B3.7 + form próprio no template
-- [ ] **Step 7:** nove casos verdes; as cinco mutações medidas, cada uma derrubando só o seu caso
-- [ ] **Step 8:** commit — `feat(financeiro): estorno de recebimento debita o banco e apaga FC e LC (migracao 281)`
+- [x] **Step 0:** decisão **D-B6.1** (§9, default escrito) — a Task executa o default sem esperar
+- [x] **Step 1:** escrever `_migration_281_conta_receber_banco_id` (espelho da 280: nullable, IF NOT EXISTS, FK `banco_empresa` sem cascade) — a alocação já está feita **aqui**
+- [x] **Step 2:** `models.py` — `ContaReceber.banco_id` + comentário-molde
+- [x] **Step 3:** escrever o teste e ver vermelhos os casos 1/3/4 (e 6/7 vermelhos por rota inexistente); 2/5/8/9 nascem com a implementação
+- [x] **Step 4:** `baixar_recebimento` — cinto escopado + gravação escopada (fora de OBR-MED)
+- [x] **Step 5:** rota `estornar_recebimento` completa (captura → zera → debita → apaga FC → apaga LC → commit único)
+- [x] **Step 6:** flash condicional da guarda B3.7 + form próprio no template
+- [x] **Step 7:** nove casos verdes; as cinco mutações medidas, cada uma derrubando só o seu caso
+- [x] **Step 8:** commit — `feat(financeiro): estorno de recebimento debita o banco e apaga FC e LC (migracao 281)`
+
+**Status: ✅ entregue em `87786a88`, com os apertos da revisão WF-4 em `55d80939`.**
+Migração 281 gasta. Nove casos verdes; cinco mutações medidas. **Dois desvios do
+recorte, ambos deliberados e registrados:** (1) a matriz de mutação não saiu cirúrgica
+em dois pontos — débito desligado derruba 1 **e 8**, delete de FC derruba 3 **e 8**,
+porque o recorte escreveu a matriz antes de o caso 8 existir e o 8 é o ciclo
+integrativo (afirmar "nada dobra" *é* afirmar que o banco voltou e o FC saiu);
+enfraquecer o 8 para limpar a matriz teria trocado cobertura por estética. (2) O cinto
+ganhou a camada da VIEW, que o recorte não pedia: sem ela o `ValueError` do service caía
+no `except` genérico e o operador lia só "Erro ao registrar recebimento" — o
+flash-engolido que o próprio adversário apontou. É o espelho do que a B5.6 fez em
+`pagar_conta`; o caso 5 prova as duas camadas. A WF-4 achou ainda que o botão Estornar
+ficava INERTE para descrição com apóstrofo (`|e` dentro de string JS) — corrigido em
+`55d80939`.
 
 **Esforço: M** (o ajuste do cinto é um if de escopo, não recorte novo — conferido pelo
 adversário). **Migração: SIM — 281, alocada por escrito NESTE documento.**
@@ -427,13 +441,24 @@ D-B5.7(1) — default (2) mantido, buraco declarado); a possível **quarta famí
 ALIMENTACAO (§7); qualquer mudança no comportamento do import; a normalização do
 literal minúsculo no escritor.
 
-- [ ] **Step 0:** registrar a **D-B6.2** (§9); a Task executa o default sem esperar
-- [ ] **Step 1:** escrever o teste (a forma do import montada por ORM) e ver vermelhos 1/2/3; 4/5/6 nascem como guardas
-- [ ] **Step 2:** guard do migrar — skip incondicional `('COMPRA', 'GESTAO_CUSTO_PAI')`
-- [ ] **Step 3:** exclusão da família 2 na tela (custos_v2 + KPIs) e no fluxo (previstas; fallback por simetria; buckets)
-- [ ] **Step 4:** chore de `resultado_fluxo.html:83` (+ rótulo opcional de origem)
-- [ ] **Step 5:** seis casos verdes; três mutações medidas
-- [ ] **Step 6:** dois commits — `fix(financeiro): familia 2 de gemeos sai da tela e do fluxo; migrar nao clona reembolso` e `chore(importacao): o texto do apenas_pagamento para de prometer ContaPagar`
+- [x] **Step 0:** registrar a **D-B6.2** (§9); a Task executa o default sem esperar
+- [x] **Step 1:** escrever o teste (a forma do import montada por ORM) e ver vermelhos 1/2/3; 4/5/6 nascem como guardas
+- [x] **Step 2:** guard do migrar — skip incondicional `('COMPRA', 'GESTAO_CUSTO_PAI')`
+- [x] **Step 3:** exclusão da família 2 na tela (custos_v2 + KPIs) e no fluxo (previstas; fallback por simetria; buckets)
+- [x] **Step 4:** chore de `resultado_fluxo.html:83` (+ rótulo opcional de origem)
+- [x] **Step 5:** seis casos verdes; ~~três~~ **cinco** mutações medidas (a 5ª veio do E4 da WF-4)
+- [x] **Step 6:** dois commits — `fix(financeiro): familia 2 de gemeos sai da tela e do fluxo; migrar nao clona reembolso` e `chore(importacao): o texto do apenas_pagamento para de prometer ContaPagar`
+
+**Status: ✅ entregue em `7c188985` (+ chore `dbe1fdbc`), com os apertos da WF-4 em
+`55d80939`.** Seis casos verdes; quatro mutações cirúrgicas na entrega, mais uma quinta
+que a WF-4 exigiu. **O achado E4 da revisão é a lição desta Task:** o caso 4, vendido
+como guarda contra exclusão larga, montava o tenant SEM nenhuma `ContaPagar` — apagar o
+predicado `upper(origem_tipo)='GESTAO_CUSTO_PAI'` deixava a suíte INTEIRA verde. O eixo
+do tenant tinha cão de guarda (caso 5); o do `origem_tipo` não tinha. Novo caso 7 fecha
+o buraco. Registrado também (E5) que a forma montada no arreio diverge do import em três
+colunas (`data_vencimento`, `saldo`, `obra_id` — NULL em produção): a divergência FICA,
+porque consertá-la instalaria bomba-relógio de calendário, mas está DECLARADA no topo do
+arquivo com o aviso de não recortar a família 2 por nenhuma das três.
 
 **Esforço: M** (teto). **Migração: não** (a 103 já deu `import_batch_id` às 4 tabelas —
 📖 `migrations.py:6279`, `:9410-9433`).
@@ -521,11 +546,22 @@ pendência** no comentário e no §7.
 4. **Não tocar** em `excluir_veiculo`, nos shims, nem em nada do item M — matar rota ≠
    consertar resposta, e o layer tem caminho vivo (§1.2).
 
-- [ ] **Step 0:** **D-B6.3** (§9, default SIM) — a Task executa o default
-- [ ] **Step 1:** estender o caso 6 do teste (4 endpoints ausentes) e vê-lo **vermelho** (as rotas ainda existem)
-- [ ] **Step 2:** deletes dos três ranges; Edit do comentário-registro com o texto corrigido (sem "mesmo service"; pendência do método órfão)
-- [ ] **Step 3:** MODULOS.md — as quatro linhas (258, 259, 270, 273)
-- [ ] **Step 4:** commit — `chore(vehicles): remove as tres rotas mortas provadas e corrige o registro (MODULOS 259 stale)`
+- [x] **Step 0:** **D-B6.3** (§9, default SIM) — a Task executa o default
+- [x] **Step 1:** estender o caso 6 do teste (4 endpoints ausentes) e vê-lo **vermelho** (as rotas ainda existem)
+- [x] **Step 2:** deletes dos três ranges; Edit do comentário-registro com o texto corrigido (sem "mesmo service"; pendência do método órfão)
+- [x] **Step 3:** MODULOS.md — as quatro linhas (⚠️ WF-4/E2: as linhas saíram, mas os CONTADORES ficaram mentindo; fechado em `55d80939` rodando o gerador) (258, 259, 270, 273)
+- [x] **Step 4:** commit — `chore(vehicles): remove as tres rotas mortas provadas e corrige o registro (MODULOS 259 stale)`
+
+**Status: ✅ entregue em `6c744df7`, com os apertos da WF-4 em `55d80939`.** As três
+rotas saíram; caso 6 do arreio da B5.7 estendido para os quatro endpoints, mais o caso
+6b (cão de guarda: `frota.novo_custo` e os templates compartilhados ficam). **Dois
+apertos da revisão:** (E6) a pendência de órfão estava INCOMPLETA — `VeiculoService.criar_veiculo`
+também ficou sem caller com a morte de `novo_veiculo_OLD`, e é pior de enxergar que o
+primeiro, porque a classe segue viva por `atualizar_veiculo` e a lente bate na classe;
+(E2) o commit tirou 4 linhas de `MODULOS.md` e deixou os contadores da região GERADA
+mentindo — regenerado com `python scripts/rastreio_modulos.py`, **não** à mão, e o
+gerador devolveu 124/754 (não os 125/756 do hand-edit), de quebra tirando a linha stale
+`editar_cronograma_cliente`.
 
 **Esforço: P.** **Migração: não.**
 
@@ -762,9 +798,12 @@ rodada.
 | 8 | **Literal minúsculo `'gestao_custo_pai'`** vazaria em DOIS dropdowns; normalizar muda dado gravado | `financeiro_views.py:251-255`, `:1433-1437` | Cosmético; decisão de dado, não desta rodada |
 | 9 | **Dashboard × tela divergem na fonte do "a pagar":** `obter_kpis_financeiros` soma TODOS os GCPs abertos sem exclusão de gêmeos (nem da família 1); `saidas_v2_pagas` (`:645`) agrega sem o dedup do detalhe | `financeiro_service.py:904-980`, `:645` | Pré-existente; a família 1 já vive nessa incoerência — item de inventário do financeiro |
 | 10 | **Link quebrado** `/dashboards/veiculos/executivo` (rota inexistente em qualquer blueprint) | `templates/dashboards/especificos.html:81` | Débito do módulo **dashboards** (endereço corrigido pelo adversário) |
-| 11 | **`CustoVeiculoService.criar_custo_veiculo` órfão** após a B6.3 — símbolo presente que mente | `veiculos_services.py:388` | Registrado na B6.3; remoção é do item M ou de limpeza de services |
+| 11 | **DOIS órfãos** após a B6.3, não um: `CustoVeiculoService.criar_custo_veiculo` **e** `VeiculoService.criar_veiculo` (achado E6 da WF-4). O segundo é PIOR de enxergar — a classe segue viva por `atualizar_veiculo`, então a lente bate na classe e dá o método por vivo | `veiculos_services.py:388` e `:96` | Registrados no comentário de `views/vehicles.py`; quem remover `criar_veiculo` derruba junto os dois stubs de `except ImportError` (`views/vehicles.py:1554`, `frota_views.py:24`) |
 | 12 | **Clone do migrar criado ANTES do fecho** num tenant que depois faz rollback do batch fica órfão | `importacao_views.py:980-1020` | Limpeza é decisão de dado (mesma forma das 168 órfãs da B5.7) |
 | 13 | **`mapear DESPESA_GERAL`** (herdado da B5.6 — decisão de contador) e **`escopo_obra_ativo` em produção** (herdada da B5.3; segue indecidível sem produção, segue fora de qualquer gate) | B5 §Histórico | Herdados; listados para não sumirem |
+| 14 | ⚠️ **`notificacao_cliente` sobreviveu à migração 279**: a tabela existe em dev (0 linhas) com FK NO ACTION para `obra`, mas `3ba7937c` já a tirou de `TABELAS_DEPENDENTES_OBRA` — **hoje, excluir uma obra em dev estoura nessa FK**. A 279 está registrada como `success` em 05/08 | `migrations.py` (279), `views/obras.py` | **Achado do gate da F1 da B6** (é o que deixa `test_excluir_obra::test_lista_cobre_toda_fk_no_action_para_obra` vermelho). Ponta solta da **E02**, não da B6 — não tocada para não alargar escopo. **Decisão do Cássio** |
+| 15 | **`test_custo_diario::test_4_snapshot_imutavel_mudanca_salario` depende de ORDEM**: vermelho no gate completo, verde isolado e verde com o arquivo inteiro | `tests/test_custo_diario.py` | Instabilidade pré-existente, medida no gate da F1 da B6. Poluí o sinal do gate — item de arreio |
+| 16 | **Política de âncoras** (lição da WF-4): comentário que cita `arquivo:linha` apodrece **na origem** — três das nove âncoras podres da F1 já nasceram erradas no commit que as escreveu. Citar **símbolo + literal** | transversal | Aplicado na F1; vale para as próximas rodadas |
 
 ---
 

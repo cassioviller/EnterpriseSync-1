@@ -22,10 +22,10 @@ delegação, no padrão da B5.
 ## Fases
 
 - **F1 — sessão principal, serial** (as delicadas: migração, dinheiro, remoção):
-  - [ ] F1.1 — **B6.1** estorno de recebimento (migração **281**, alocada na rodada §3)
-  - [ ] F1.2 — **B6.2** família 2 + guard do migrar (serializada após B6.1: mesmos arquivos)
-  - [ ] F1.3 — **B6.3** vehicles, remoção provada (P)
-  - [ ] F1.4 — gate completo + revisão adversarial WF (read-only, em paralelo ao gate)
+  - [x] F1.1 — **B6.1** estorno de recebimento (migração **281**) — `87786a88`
+  - [x] F1.2 — **B6.2** família 2 + guard do migrar — `7c188985` + `dbe1fdbc`
+  - [x] F1.3 — **B6.3** vehicles, remoção provada (P) — `6c744df7`
+  - [x] F1.4 — gate completo + revisão adversarial **WF-4** — findings em `55d80939`
 - **F2 — os cinco lotes 404 (B6.4-B6.8), por SUBAGENTES SEQUENCIAIS**:
   - Um agente por lote, um de cada vez (o banco de dev é único — paralelismo de teste
     é não-determinismo, §2 do plano da B5). Cada agente recebe o molde da B5.3 e o
@@ -47,7 +47,91 @@ delegação, no padrão da B5.
 | **D-B6.3** | `novo_veiculo_OLD` sai no lote de vehicles |
 | **D-B6.4** | destino do 404 = `error.html`; rotas fetch ganham JSON 404 (precedente D-B5.3) |
 
+## FECHO DA SESSÃO — 2026-08-06 (a sessão CAIU e foi retomada)
+
+**Onde a rodada está: a F1 fechou inteira; a F2 NÃO COMEÇOU.** Cinco lotes 404
+(B6.4–B6.8) e a F3 seguem abertos. Nada foi deixado pela metade — a F2 nunca abriu.
+
+### O que foi entregue (5 commits + 1 de docs)
+
+| Commit | O quê |
+|---|---|
+| `87786a88` | B6.1 — estorno de recebimento; migração **281 gasta** |
+| `7c188985` | B6.2 — família 2 sai da tela e do fluxo; migrar não clona reembolso |
+| `dbe1fdbc` | chore — texto do `apenas_pagamento` |
+| `6c744df7` | B6.3 — as três rotas mortas de vehicles saem |
+| `55d80939` | os seis findings da revisão adversarial **WF-4** |
+
+### A sessão caiu no meio da F1.1
+
+A queda foi entre o Step 2 e o Step 3 da B6.1: a migração 281 e
+`ContaReceber.banco_id` estavam na árvore **sem commit**, e o arreio não existia.
+A retomada partiu do Step 3 (red-first), como o precedente manda — nada foi
+aproveitado sem ver vermelho antes.
+
+⚠️ **A migração 281 já estava APLICADA no banco de dev** (`migration_history`,
+06/08 17:18) antes do commit existir. Quem retomar uma sessão caída depois de uma
+migração precisa conferir isso: o `IF NOT EXISTS` salvou aqui, mas uma migração sem
+ele teria falhado na primeira execução da árvore recuperada.
+
+### O gate completo: 1981 passed, **2 failed — nenhuma da B6**
+
+Diagnosticadas e provadas alheias (a B6 não tocou `views/obras.py`, nem os dois
+arquivos de teste; o único FK que a 281 cria aponta para `banco_empresa`):
+
+1. `test_custo_diario::test_4_snapshot_imutavel_mudanca_salario` — **passa isolada**
+   (8 passed no arquivo inteiro). Dependência de ordem dentro do gate, pré-existente.
+2. `test_excluir_obra::test_lista_cobre_toda_fk_no_action_para_obra` — aponta
+   `notificacao_cliente`: a tabela **ainda existe** em dev (0 linhas) com FK NO ACTION
+   para `obra`, mas `3ba7937c` já a tirou de `TABELAS_DEPENDENTES_OBRA`. A migração 279
+   está registrada como `success` em 05/08 e a tabela sobreviveu mesmo assim.
+   **É defeito REAL: hoje, em dev, excluir uma obra estoura nessa FK.** É ponta solta da
+   **E02**, não da B6 — não foi tocada para não alargar escopo por conta própria.
+   **Decisão do Cássio.**
+
+### A revisão WF-4 (4 revisores + 1 cético por finding + síntese)
+
+15 findings levantados, **9 sobreviveram** à refutação, consolidados em 6. Veredito
+**confirmado_com_correcoes**. Só um tocava comportamento (E1, o botão Estornar inerte
+com apóstrofo na descrição). As lições que valem para as próximas rodadas:
+
+- **Âncora numérica em comentário é rot na ORIGEM, não por erosão.** Três das nove
+  âncoras podres já nasceram erradas no commit que as escreveu — o autor editou o
+  código e o comentário no mesmo commit e não releu o número. Política adotada:
+  **citar símbolo + literal** (`` `rr_query` em `calcular_fluxo_caixa` ``), imune a
+  inserção de linhas.
+- **Guarda de teste sem o dado que ela guarda é guarda vazia.** O caso 4 da B6.2
+  prometia guardar contra exclusão larga num tenant sem nenhuma `ContaPagar`: a mutação
+  do predicado sobrevivia à suíte inteira.
+- **Contador de região gerada não se edita à mão.** O gerador do `MODULOS.md` devolveu
+  124/754; o hand-edit "óbvio" teria plantado 125/756 — número novo e falso.
+
+### O que falta (F2 e F3)
+
+- **F2 — cinco lotes 404, por subagentes sequenciais** (um por vez; o banco de dev é
+  único): B6.4 propostas · B6.5 miscelânea · B6.6 frota · B6.7 obras · B6.8 cauda.
+  Serialização interna: **B6.5 antes de B6.7** (`views/obras.py` compartilhado).
+  A sessão principal não terceiriza a evidência: re-roda os testes, roda as mutações,
+  revisa o diff e commita. Agente não commita.
+- **Adiantado nesta sessão** (economia real para quem retomar): o **scanner de censo**
+  do Step 0 dos cinco lotes está escrito e medido. Ele reproduz o documento
+  (`propostas_consolidated.py`: 18 TRYs, todos sem o ramo, 24 ocorrências no arquivo,
+  zero `except HTTPException`). ⚠️ Ele é **piso, não veredito**: em `frota_views.py`
+  levanta 25 candidatos `if not ...` e o recorte nomeia **10** — os outros são validação
+  de formulário e guarda de lista, que o critério (i) do molde põe fora de propósito.
+  O scanner não foi versionado (o recorte manda deixá-lo no scratchpad).
+- **F3 — fecho**: gate final + revisão WF dos lotes + Status/checkboxes + push.
+
+### As duas fronteiras: respeitadas
+
+1. **`main` não andou.** Segue em `6cd3f774`; todo o trabalho está em `test/b0-arreio`.
+2. **Nenhuma decisão sem default foi chutada.** D-B6.1 a D-B6.4 executaram pelos
+   defaults escritos. A única decisão nova que apareceu — o que fazer com a ponta solta
+   da E02 no gate — **parou e ficou escrita**, como o precedente B1.14 manda.
+
 ## Histórico
 
 - **2026-08-06, noite** — escrito e disparado em execução autônoma, logo após a
   varredura B6 (9 agentes, 8 Tasks, vereditos 4× confirmado_com_correcoes).
+- **2026-08-06, madrugada** — a sessão caiu no meio da F1.1 e foi retomada. F1 fechada
+  (5 commits), WF-4 aplicada, F2 não iniciada. Fecho acima.
