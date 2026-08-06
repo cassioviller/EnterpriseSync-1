@@ -762,66 +762,6 @@ def deletar_custo_veiculo(custo_id):
         flash(f'Erro ao excluir custo: {str(e)}', 'error')
         return redirect(url_for('main.veiculos'))
 
-# ROTA PARA MODAL DE CUSTO (SEM PARÂMETRO ID NA URL)
-@main_bp.route('/veiculos/custo', methods=['POST'])
-@login_required  # [LOCK] MUDANÇA: Funcionários podem registrar custos de veículos
-def novo_custo_veiculo_lista():
-    from models import Veiculo, CustoVeiculo
-    
-    # Obter veiculo_id do form (hidden field)
-    veiculo_id = request.form.get('veiculo_id')
-    if not veiculo_id:
-        flash('Erro: ID do veículo não fornecido.', 'error')
-        return redirect(url_for('main.veiculos'))
-    
-    # [LOCK] SEGURANÇA MULTITENANT: Usar resolver unificado
-    tenant_admin_id = get_tenant_admin_id()
-    if not tenant_admin_id:
-        flash('Acesso negado. Faça login novamente.', 'error')
-        return redirect(url_for('auth.login'))
-    
-    veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first_or_404()
-    
-    try:
-        # Validações de negócio
-        valor = float(request.form.get('valor', 0))
-        if valor <= 0:
-            flash('Valor deve ser maior que zero.', 'error')
-            return redirect(url_for('main.veiculos'))
-        
-        # Campos opcionais específicos por tipo de custo
-        tipo_custo = request.form.get('tipo_custo')
-        km_custo = request.form.get('km_custo')
-        litros = request.form.get('litros')
-        
-        # Criar registro de custo
-        custo = CustoVeiculo(
-            veiculo_id=veiculo.id,
-            data_custo=datetime.strptime(request.form.get('data_custo'), '%Y-%m-%d').date(),
-            tipo_custo=tipo_custo,
-            valor=valor,
-            descricao=request.form.get('descricao', ''),
-            fornecedor=request.form.get('fornecedor', ''),
-            km_custo=int(km_custo) if km_custo else None,
-            litros=float(litros) if litros else None,
-            admin_id=tenant_admin_id,
-            created_at=datetime.utcnow()
-        )
-        
-        db.session.add(custo)
-        db.session.commit()
-        flash(f'Custo do veículo {veiculo.placa} registrado com sucesso!', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"ERRO AO REGISTRAR CUSTO: {str(e)}")
-        flash('Erro ao registrar custo do veículo. Tente novamente.', 'error')
-    
-    return redirect(url_for('main.veiculos'))
-
-
-
-
 # 5. (B5.7) A rota de registro de custo — main.novo_custo_veiculo,
 #    /veiculos/<id>/custo — saiu INTEIRA em 06/08. Era morta tripla:
 #    o FluxoCaixa de dentro não passava admin_id (NOT NULL) e o commit
@@ -834,8 +774,26 @@ def novo_custo_veiculo_lista():
 #    comportamento novo sem decisão. Recorte na Task B5.7 do apenso da
 #    rodada B5; a ausência da rota é afirmada em
 #    tests/test_b5_fluxo_gemeos_e_orfaos.py (caso 6).
-#    As rotas irmãs mortas /veiculos/custo e novo_custo_veiculo_form ficam
-#    para limpeza própria (risco 3 do recorte).
+#
+#    (B6.3, 06/08) As irmãs saíram nesta rodada, e a diferença importa: a B5.7
+#    as deixou citadas com a morte AFIRMADA; a B6 PROVOU cada uma pelas cinco
+#    lentes antes de cortar. Saíram novo_custo_veiculo_lista (POST-only sem
+#    nenhum form apontando — inalcançável até por URL digitada),
+#    novo_custo_veiculo_form (e 📖 o form do próprio template que ela
+#    renderizava posta para frota.novo_custo — até quem chegasse ao GET
+#    acabaria na frota) e novo_veiculo_OLD. A família main.* de registro de
+#    custo de veículo está EXTINTA.
+#
+#    A rota viva de mesma capacidade é frota.novo_custo (frota_views.py:548).
+#    Ela usa o MESMO template (custo_veiculo_novo.html) — mas NÃO o mesmo
+#    service, e escrever o contrário aqui plantaria a afirmação falsa que a
+#    B5.7 plantou: a frota grava FrotaDespesa direto + V2
+#    (frota_views.py:609-653).
+#
+#    ⚠️ PENDÊNCIA registrada: CustoVeiculoService.criar_custo_veiculo
+#    (veiculos_services.py:388) ficou ÓRFÃO com este corte — a rota removida
+#    era o único caller do repo. Símbolo presente que mente é o padrão que já
+#    enganou o grep uma vez; está no §7 da rodada B6, não em limbo.
 
 
 # ===== NOVAS ROTAS AVANÇADAS PARA SISTEMA DE VEÍCULOS =====
@@ -1623,49 +1581,6 @@ def novo_veiculo():
     logger.info("[ROUTE] [VEICULOS_NOVO_REDIRECT] Redirecionando /veiculos/novo → /frota/novo")
     return redirect(url_for('frota.novo'))
 
-# ===== ROTA ANTIGA DESATIVADA: NOVO VEÍCULO =====
-@main_bp.route('/veiculos/novo_OLD', methods=['GET', 'POST'])
-@login_required
-def novo_veiculo_OLD():
-    """Formulário para cadastrar novo veículo"""
-    try:
-        logger.info(f"[CAR] [NOVO_VEICULO] Iniciando...")
-        
-        # Proteção multi-tenant
-        tenant_admin_id = get_tenant_admin_id()
-        if not tenant_admin_id:
-            flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
-        
-        if request.method == 'GET':
-            return render_template('veiculos_novo.html')
-        
-        # POST - Processar cadastro
-        dados = request.form.to_dict()
-        logger.debug(f"[DEBUG] [NOVO_VEICULO] Dados recebidos: {dados.keys()}")
-        
-        # Validações básicas
-        campos_obrigatorios = ['placa', 'marca', 'modelo', 'ano', 'tipo']
-        for campo in campos_obrigatorios:
-            if not dados.get(campo):
-                flash(f'Campo {campo.title()} é obrigatório.', 'error')
-                return render_template('veiculos_novo.html')
-        
-        # Usar service para criar veículo
-        sucesso, veiculo, mensagem = VeiculoService.criar_veiculo(dados, tenant_admin_id)
-        
-        if sucesso:
-            flash(mensagem, 'success')
-            return redirect(url_for('main.veiculos'))
-        else:
-            flash(mensagem, 'error')
-            return render_template('veiculos_novo.html')
-        
-    except Exception as e:
-        logger.error(f"[ERROR] [NOVO_VEICULO] Erro: {str(e)}")
-        flash('Erro ao cadastrar veículo. Tente novamente.', 'error')
-        return render_template('veiculos_novo.html')
-
 # ===== NOVA ROTA: DETALHES DO VEÍCULO =====
 @main_bp.route('/veiculos/<int:id>')
 @login_required  
@@ -1786,86 +1701,6 @@ def novo_uso_veiculo(veiculo_id):
     except Exception as e:
         logger.error(f"[ERROR] [NOVO_USO] Erro: {str(e)}")
         flash('Erro ao registrar uso do veículo.', 'error')
-        return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
-
-# ===== NOVA ROTA: NOVO CUSTO DE VEÍCULO =====
-@main_bp.route('/veiculos/<int:veiculo_id>/custo/novo', methods=['GET', 'POST'])
-@login_required
-def novo_custo_veiculo_form(veiculo_id):
-    """Formulário para registrar novos custos de veículo"""
-    try:
-        logger.info(f"[MONEY] [NOVO_CUSTO] Iniciando para veículo {veiculo_id}")
-        
-        # Proteção multi-tenant
-        tenant_admin_id = get_tenant_admin_id()
-        if not tenant_admin_id:
-            flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
-        
-        # Buscar veículo
-        from models import Veiculo, Obra, UsoVeiculo
-        veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
-        if not veiculo:
-            flash('Veículo não encontrado.', 'error')
-            return redirect(url_for('main.veiculos'))
-        
-        if request.method == 'GET':
-            # Buscar usos recentes para associação (opcional)
-            usos = UsoVeiculo.query.filter_by(
-                veiculo_id=veiculo_id, 
-                admin_id=tenant_admin_id
-            ).order_by(UsoVeiculo.data_uso.desc()).limit(10).all()
-            
-            # Buscar obras para associação (opcional)
-            obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
-            
-            return render_template('custo_veiculo_novo.html',
-                                 veiculo=veiculo,
-                                 usos=usos,
-                                 obras=obras)
-        
-        # POST - Processar criação do custo
-        dados = request.form.to_dict()
-        dados['veiculo_id'] = veiculo_id
-        
-        logger.debug(f"[DEBUG] [NOVO_CUSTO] Dados recebidos: {dados.keys()}")
-        
-        # Validações básicas
-        campos_obrigatorios = ['data_custo', 'tipo', 'valor']
-        for campo in campos_obrigatorios:
-            if not dados.get(campo):
-                flash(f'Campo {campo.replace("_", " ").title()} é obrigatório.', 'error')
-                usos = UsoVeiculo.query.filter_by(
-                    veiculo_id=veiculo_id, 
-                    admin_id=tenant_admin_id
-                ).order_by(UsoVeiculo.data_uso.desc()).limit(10).all()
-                obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
-                return render_template('custo_veiculo_novo.html',
-                                     veiculo=veiculo,
-                                     usos=usos,
-                                     obras=obras)
-        
-        # Usar service para criar custo
-        sucesso, custo, mensagem = CustoVeiculoService.criar_custo_veiculo(dados, tenant_admin_id)
-        
-        if sucesso:
-            flash(mensagem, 'success')
-            return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
-        else:
-            flash(mensagem, 'error')
-            usos = UsoVeiculo.query.filter_by(
-                veiculo_id=veiculo_id, 
-                admin_id=tenant_admin_id
-            ).order_by(UsoVeiculo.data_uso.desc()).limit(10).all()
-            obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
-            return render_template('custo_veiculo_novo.html',
-                                 veiculo=veiculo,
-                                 usos=usos,
-                                 obras=obras)
-        
-    except Exception as e:
-        logger.error(f"[ERROR] [NOVO_CUSTO] Erro: {str(e)}")
-        flash('Erro ao registrar custo do veículo.', 'error')
         return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
 
 # ===== NOVA ROTA: EDITAR VEÍCULO =====

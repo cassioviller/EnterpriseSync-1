@@ -196,13 +196,41 @@ def test_caso6_rota_de_custo_de_veiculo_saiu_do_url_map():
     (NOT NULL → IntegrityError garantido no commit), template inexistente
     (GET morria em TemplateNotFound) e zero referências. O corte é a rota
     inteira — cortar só o bloco FC ressuscitaria um escritor de CustoVeiculo
-    que nunca persistiu (risco 3)."""
+    que nunca persistiu (risco 3).
+
+    **B6.3 estendeu este caso para a família inteira.** A B5.7 deixou as irmãs
+    CITADAS para limpeza própria — morte AFIRMADA, não provada. A rodada B6
+    provou as três pelas cinco lentes e as cortou; este teste congela a
+    extinção da família `main.*` de registro de custo de veículo. A rota VIVA
+    de mesma capacidade é `frota.novo_custo` — mesmo template, mas NÃO o mesmo
+    service (a frota grava `FrotaDespesa` direto; ver o caso 6b)."""
     from werkzeug.exceptions import NotFound
     adapter = app.url_map.bind('localhost')
     with pytest.raises(NotFound):
         adapter.match('/veiculos/1/custo', method='POST')
-    assert not [r for r in app.url_map.iter_rules()
-                if r.endpoint == 'main.novo_custo_veiculo']
+
+    endpoints = {r.endpoint for r in app.url_map.iter_rules()}
+    extintos = {'main.novo_custo_veiculo', 'main.novo_custo_veiculo_lista',
+                'main.novo_custo_veiculo_form', 'main.novo_veiculo_OLD'}
+    assert not (endpoints & extintos), (
+        f'endpoints da família extinta ainda no url_map: '
+        f'{sorted(endpoints & extintos)}')
+
+
+def test_caso6b_o_caminho_vivo_da_frota_e_os_templates_compartilhados_ficam():
+    """Cão de guarda do corte: a capacidade não morreu junto com as rotas.
+    `frota.novo_custo` segue no map, e os dois templates que as rotas mortas
+    renderizavam são COMPARTILHADOS com a frota viva — cortá-los junto teria
+    quebrado três chamadas de `frota_views.py`."""
+    import os
+    endpoints = {r.endpoint for r in app.url_map.iter_rules()}
+    assert 'frota.novo_custo' in endpoints, (
+        'a rota viva de mesma capacidade sumiu — o corte foi longe demais')
+    raiz = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), 'templates')
+    for nome in ('custo_veiculo_novo.html', 'veiculos_novo.html'):
+        assert any(nome in arqs for _, _, arqs in os.walk(raiz)), (
+            f'{nome} sumiu — ele é compartilhado com a frota viva')
 
 
 def test_caso7_preview_de_exclusao_de_ponto_mantem_a_chave_fluxo_caixa(tenant):
