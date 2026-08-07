@@ -146,7 +146,7 @@ listar aqui com a evidência antes de remover.
 > **Gerado por `python scripts/rastreio_modulos.py`** (análise estática:
 > AST de `models.py` + regex de `@bp.route` + varredura de uso de modelos
 > por arquivo de view). Não edite esta seção à mão — rode o script.
-> Números desta geração: **184 modelos**, **754 rotas**.
+> Números desta geração: **184 modelos**, **755 rotas**.
 > "Modelos próprios" = referenciados por até 2 módulos; o resto aparece em
 > "compartilhados" — onde mora a integração, e o risco na conferência.
 > A marca `Conferência:` de cada módulo é manual e **sobrevive à regeração**.
@@ -1034,7 +1034,7 @@ Conferência: ☐ pendente
 Arquivos: `crm_views.py`
 Conferência: ☐ pendente
 
-**Funcionalidades (22 rotas):**
+**Funcionalidades (23 rotas):**
 
 | Rota | Métodos | Função |
 |---|---|---|
@@ -1057,6 +1057,7 @@ Conferência: ☐ pendente
 | `/cadastros/<slug>/<int:item_id>/excluir` | POST | `cadastros_excluir` |
 | `/cadastros/<slug>/itens` | GET | `cadastros_itens` |
 | `/exportar_modelo` | GET | `exportar_modelo` |
+| `/exportar` | GET | `exportar` |
 | `/importar` | POST | `importar` |
 | `/clientes/<int:cliente_id>` | GET | `detalhe_cliente` |
 | `/clientes/<int:cliente_id>/observacao` | POST | `adicionar_observacao_cliente` |
@@ -1783,36 +1784,36 @@ conferir (mudança num módulo pode quebrar os outros).
 | `Funcionario` | 22 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Importação, Equipe, Funcionários (API), Ponto, Folha de pagamento, Alimentação, Reembolso, Planejamento de custos, Serviço da obra (real), Almoxarifado, Compras, Frota, Transporte, Relatórios, Métricas, Configurações, Auditoria de vínculos, Produção |
 | `GestaoCustoPai` | 11 | Obras/Dashboard/base (main), Portal do cliente, Importação, Ponto, Folha de pagamento, Reembolso, Subempreiteiros, Financeiro, Gestão de custos, Compras, Transporte |
 | `RDO` | 10 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Portal do cliente, Funcionários (API), Subempreiteiros, Gestão de custos, Métricas, Auditoria de vínculos |
-| `TarefaCronograma` | 10 | Obras/Dashboard/base (main), RDO — edição, Cronograma, Cronograma — importação .mpp, Portal do cliente, Medição, Subempreiteiros, Propostas, Orçamentos, Auditoria de vínculos |
 | `Servico` | 10 | Obras/Dashboard/base (main), Cronograma, Medição, Propostas, Orçamentos, Catálogo de serviços, Serviço da obra (real), Serviços da obra (API), Cadastrar serviço na obra, Métricas |
+| `TarefaCronograma` | 10 | Obras/Dashboard/base (main), RDO — edição, Cronograma, Cronograma — importação .mpp, Portal do cliente, Medição, Subempreiteiros, Propostas, Orçamentos, Auditoria de vínculos |
 | `Fornecedor` | 9 | Obras/Dashboard/base (main), Portal do cliente, Importação, Financeiro, Gestão de custos, Planejamento de custos, Almoxarifado, Compras, Quick-create |
-| `Cliente` | 8 | Obras/Dashboard/base (main), Portal do cliente, CRM, Clientes, Propostas, Orçamentos, Compras, Quick-create |
-| `FluxoCaixa` | 8 | Obras/Dashboard/base (main), Portal do cliente, Importação, Ponto, Financeiro, Gestão de custos, Compras, Catálogos (views) |
 | `ConfiguracaoEmpresa` | 8 | Obras/Dashboard/base (main), Cronograma, Portal do cliente, Medição, Folha de pagamento, Propostas, Orçamentos, Configurações |
 | `GestaoCustoFilho` | 8 | Obras/Dashboard/base (main), RDO — edição, Ponto, Folha de pagamento, Financeiro, Gestão de custos, Compras, Transporte |
-| `ObraServicoCusto` | 8 | Obras/Dashboard/base (main), Medição, Alimentação, Gestão de custos, Planejamento de custos, Catálogo de serviços, Compras, Transporte |
+| `Cliente` | 8 | Obras/Dashboard/base (main), Portal do cliente, CRM, Clientes, Propostas, Orçamentos, Compras, Quick-create |
 | `Usuario` | 8 | Obras/Dashboard/base (main), Cronograma — importação .mpp, Importação, Financeiro, CRM, Propostas, Serviços da obra (API), Compras |
-| `RDOMaoObra` | 7 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Portal do cliente, Gestão de custos, Auditoria de vínculos |
+| `ObraServicoCusto` | 8 | Obras/Dashboard/base (main), Medição, Alimentação, Gestão de custos, Planejamento de custos, Catálogo de serviços, Compras, Transporte |
+| `FluxoCaixa` | 8 | Obras/Dashboard/base (main), Portal do cliente, Importação, Ponto, Financeiro, Gestão de custos, Compras, Catálogos (views) |
 | `Veiculo` | 7 | Obras/Dashboard/base (main), Relatórios financeiros avançados, Frota, Relatórios, Exportação de relatórios, Dashboards específicos, Produção |
-| `Departamento` | 6 | Obras/Dashboard/base (main), RDO — edição, Folha de pagamento, Relatórios, Configurações, Produção |
-| `CustoObra` | 6 | Obras/Dashboard/base (main), RDO — CRUD completo, Alimentação, Custos de obra, Transporte, Relatórios |
-| `Proposta` | 6 | Obras/Dashboard/base (main), CRM, Clientes, Propostas, Orçamentos, API organizer |
+| `RDOMaoObra` | 7 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Portal do cliente, Gestão de custos, Auditoria de vínculos |
 | `SubatividadeMestre` | 6 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Quick-create, Auditoria de vínculos |
+| `CustoObra` | 6 | Obras/Dashboard/base (main), RDO — CRUD completo, Alimentação, Custos de obra, Transporte, Relatórios |
+| `Departamento` | 6 | Obras/Dashboard/base (main), RDO — edição, Folha de pagamento, Relatórios, Configurações, Produção |
+| `Proposta` | 6 | Obras/Dashboard/base (main), CRM, Clientes, Propostas, Orçamentos, API organizer |
 | `ContaPagar` | 6 | RDO — CRUD completo, Importação, Financeiro, Gestão de custos, Custos de escritório, Compras |
-| `CustoVeiculo` | 5 | Obras/Dashboard/base (main), Relatórios financeiros avançados, Frota, Exportação de relatórios, Dashboards específicos |
+| `RDOServicoSubatividade` | 5 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Portal do cliente |
 | `UsoVeiculo` | 5 | Obras/Dashboard/base (main), Relatórios financeiros avançados, Frota, Exportação de relatórios, Dashboards específicos |
+| `CustoVeiculo` | 5 | Obras/Dashboard/base (main), Relatórios financeiros avançados, Frota, Exportação de relatórios, Dashboards específicos |
 | `Funcao` | 5 | Obras/Dashboard/base (main), Métricas, Configurações, Auditoria de vínculos, Produção |
 | `RDOApontamentoCronograma` | 5 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Portal do cliente |
-| `RDOServicoSubatividade` | 5 | Obras/Dashboard/base (main), RDO — edição, RDO — CRUD completo, Cronograma, Portal do cliente |
 | `ContaReceber` | 5 | Portal do cliente, Medição, Importação, Financeiro, Propostas |
-| `RegistroPonto` | 4 | Obras/Dashboard/base (main), Ponto, Gestão de custos, Relatórios |
-| `Subempreiteiro` | 4 | Obras/Dashboard/base (main), Cronograma, Subempreiteiros, Gestão de custos |
-| `RegistroAlimentacao` | 4 | Obras/Dashboard/base (main), Alimentação, Relatórios, Produção |
-| `Restaurante` | 4 | Obras/Dashboard/base (main), Importação, Alimentação, Relatórios |
-| `CronogramaTemplate` | 4 | Obras/Dashboard/base (main), Cronograma, Orçamentos, Catálogo de serviços |
 | `ServicoObraReal` | 4 | Obras/Dashboard/base (main), RDO — edição, Serviço da obra (real), Serviços da obra (API) |
+| `Subempreiteiro` | 4 | Obras/Dashboard/base (main), Cronograma, Subempreiteiros, Gestão de custos |
 | `PropostaTemplate` | 4 | Obras/Dashboard/base (main), Propostas, Orçamentos, API organizer |
 | `CategoriaFluxoCaixa` | 4 | Obras/Dashboard/base (main), Importação, Financeiro, Catálogos (views) |
+| `CronogramaTemplate` | 4 | Obras/Dashboard/base (main), Cronograma, Orçamentos, Catálogo de serviços |
+| `RegistroAlimentacao` | 4 | Obras/Dashboard/base (main), Alimentação, Relatórios, Produção |
+| `RegistroPonto` | 4 | Obras/Dashboard/base (main), Ponto, Gestão de custos, Relatórios |
+| `Restaurante` | 4 | Obras/Dashboard/base (main), Importação, Alimentação, Relatórios |
 | `Insumo` | 4 | Cronograma, Catálogo de serviços, Configurações, Quick-create |
 | `ItemMedicaoComercial` | 4 | Medição, Planejamento de custos, Propostas, Catálogo de serviços |
 | `PropostaItem` | 4 | Propostas, Orçamentos, Catálogo de serviços, API organizer |
