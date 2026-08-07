@@ -19,6 +19,28 @@ delegação, no padrão da B5.
 2. **Decisão sem default executável não é chutada** — a Task para, o resto segue, o
    motivo fica escrito (precedente B1.14).
 
+## ⏸️ PAUSADO em 2026-08-07 — a frase que retoma é `RETOMAR ARREIO B6`
+
+O Cássio **pausou a execução sequencial** em 07/08 para fazer ajustes específicos fora
+desta rodada. O plano **não foi abandonado nem cortado**: a F1 está fechada e a F2 nunca
+abriu (estado por extenso no FECHO, no fim deste arquivo).
+
+**Quando ele escrever `RETOMAR ARREIO B6`**, a rodada volta imediatamente, sem
+re-perguntar o que fazer:
+
+1. Ler o **FECHO DA SESSÃO** (fim deste arquivo) e as Tasks **B6.4–B6.8** do recorte,
+   com o **molde comum dos lotes 404** e o §5 de serialização.
+2. **Re-rodar o gate completo antes de abrir a F2.** Os ajustes avulsos da pausa podem
+   ter mexido na linha de base (no momento da pausa: 1981 passed / 2 failed, ambas
+   provadas alheias à B6). Conferir também o `git log` da `test/b0-arreio`.
+3. Retomar na **F2.1 = Task B6.4** (lote 404 de `propostas_consolidated.py`), com as
+   regras da F2 abaixo intactas — um agente por lote, um de cada vez, agente não commita.
+
+As duas fronteiras da autorização continuam valendo durante e depois da pausa, e as duas
+decisões dele que ficaram escritas em vez de chutadas (ponta solta da **E02** no
+`notificacao_cliente`; dependência de ordem do `test_custo_diario`) **seguem em aberto** —
+a pausa não as resolve.
+
 ## Fases
 
 - **F1 — sessão principal, serial** (as delicadas: migração, dinheiro, remoção):
@@ -135,3 +157,7 @@ com apóstrofo na descrição). As lições que valem para as próximas rodadas:
   varredura B6 (9 agentes, 8 Tasks, vereditos 4× confirmado_com_correcoes).
 - **2026-08-06, madrugada** — a sessão caiu no meio da F1.1 e foi retomada. F1 fechada
   (5 commits), WF-4 aplicada, F2 não iniciada. Fecho acima.
+- **2026-08-07** — o Cássio **pausou** a rodada para ajustes específicos fora dela e
+  pediu uma frase-gatilho de retomada: **`RETOMAR ARREIO B6`** (seção no topo). O estado
+  congelado é o mesmo do fecho de 06/08 — F1 fechada, F2 nunca aberta, branch com 7
+  commits e **nada pushado**.
