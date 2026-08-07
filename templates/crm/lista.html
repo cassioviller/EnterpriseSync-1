@@ -142,7 +142,7 @@ body.modal-open .sige-table-card:hover { transform: none !important; box-shadow:
                     <td>{{ lead.vendedor.nome if lead.vendedor else '—' }}</td>
                     <td>
                         {{ status_badge(lead.status) }}
-                        {% if lead.validacao_aprovada %}
+                        {% if pode_exibir_validado(lead) %}
                         <span class="badge bg-success ms-1" title="Orçamento validado pelo supervisor">
                             <i class="fas fa-check-circle me-1" aria-hidden="true"></i>Validado
                         </span>

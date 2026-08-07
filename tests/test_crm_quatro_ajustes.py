@@ -176,3 +176,59 @@ def test_c1_migracao_282_e_idempotente():
         assert _contagens() == antes
 
 
+# ===========================================================================
+# C2 — a tag "Validado" some de Enviado em diante
+# ===========================================================================
+
+def _kanban_do_card(tenant, lead):
+    resp = cliente_de(tenant.admin_id).get('/crm/')
+    corpo = resp.get_data(as_text=True)
+    # Isola o card deste lead: do seu data-lead-id até o do próximo card.
+    ini = corpo.find(f'data-lead-id="{lead.id}"')
+    assert ini != -1, 'o card do lead não está no kanban'
+    fim = corpo.find('data-lead-id="', ini + 1)
+    return corpo[ini:fim if fim != -1 else None]
+
+
+def test_c2_tag_validado_some_no_enviado():
+    """Teste 4: lead validado que já foi para Enviado não exibe mais a tag."""
+    with app.app_context():
+        t = um_tenant('c2a', com_fatos=False)
+        lead = _lead(t, status=LeadStatus.ENVIADO, validacao_aprovada=True,
+                     valor_proposta=1000)
+        card = _kanban_do_card(t, lead)
+        assert 'Validado' not in card
+        assert 'crm-card--validado' not in card
+
+
+def test_c2_tag_validado_continua_na_validacao():
+    """Teste 5 (a guarda contra esconder demais): em Validação a tag TEM que
+    continuar — sem este teste, um conserto que escondesse o badge em todos
+    os status passaria no teste 4."""
+    with app.app_context():
+        t = um_tenant('c2b', com_fatos=False)
+        lead = _lead(t, status=LeadStatus.VALIDACAO, validacao_aprovada=True)
+        card = _kanban_do_card(t, lead)
+        assert 'Validado — pronto para envio' in card
+
+
+def test_c2_lista_segue_a_mesma_regra():
+    """A lista tem o mesmo badge com a mesma falha — mesma regra nas duas."""
+    with app.app_context():
+        t = um_tenant('c2c', com_fatos=False)
+        _lead(t, status=LeadStatus.ENVIADO, validacao_aprovada=True,
+              valor_proposta=1000)
+        corpo = cliente_de(t.admin_id).get('/crm/lista').get_data(as_text=True)
+        assert 'Validado' not in corpo
+
+
+def test_c2_botao_validar_some_do_lead_enviado():
+    """O botão "Marcar como Validado" não faz sentido em lead já enviado."""
+    with app.app_context():
+        t = um_tenant('c2d', com_fatos=False)
+        lead = _lead(t, status=LeadStatus.ENVIADO, validacao_aprovada=False,
+                     valor_proposta=1000)
+        card = _kanban_do_card(t, lead)
+        assert 'btn-validar-lead' not in card
+
+

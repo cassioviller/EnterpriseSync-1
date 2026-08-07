@@ -257,11 +257,11 @@
                     {% else %}
                         {% set urgencia = 'crm-card--fresh' %}
                     {% endif %}
-                    <div class="crm-card {{ urgencia }} status-{{ slug }}{% if lead.prioridade %} crm-card--prioridade{% endif %}{% if lead.validacao_aprovada %} crm-card--validado{% endif %}" data-lead-id="{{ lead.id }}">
+                    <div class="crm-card {{ urgencia }} status-{{ slug }}{% if lead.prioridade %} crm-card--prioridade{% endif %}{% if pode_exibir_validado(lead) %} crm-card--validado{% endif %}" data-lead-id="{{ lead.id }}">
                         {% if lead.prioridade %}
                         <div><span class="crm-prioridade-badge"><i class="fas fa-star" aria-hidden="true"></i> Prioridade</span></div>
                         {% endif %}
-                        {% if lead.validacao_aprovada %}
+                        {% if pode_exibir_validado(lead) %}
                         <div><span class="crm-validado-badge"><i class="fas fa-check-circle" aria-hidden="true"></i> Validado — pronto para envio</span></div>
                         {% endif %}
                         <div class="crm-card__nome">{{ lead.nome }}</div>

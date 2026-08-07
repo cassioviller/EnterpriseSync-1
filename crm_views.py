@@ -283,6 +283,21 @@ def vincular_ou_criar_cliente(lead, admin_id):
 STATUS_VALIDOS = {s.value for s in LeadStatus}
 
 
+# Onde a tag "Validado — pronto para envio" ainda diz alguma coisa: antes do
+# envio. De Enviado em diante ela é ruído — mas `validacao_aprovada`,
+# `validado_por_id` e `validado_em` ficam intactos (trilha de quem liberou).
+STATUS_PRE_ENVIO = {
+    LeadStatus.EM_FILA.value,
+    LeadStatus.EM_ANDAMENTO.value,
+    LeadStatus.VALIDACAO.value,
+}
+
+
+def pode_exibir_validado(lead):
+    """Regra única do badge de validação, para kanban e lista (D-CRM.2)."""
+    return bool(lead.validacao_aprovada) and lead.status in STATUS_PRE_ENVIO
+
+
 def _aplicar_automacoes_status(lead, status_anterior):
     """Chamado APÓS atualizar lead.status. Faz:
     - Status muda para "Enviado" → preenche data_envio (se vazia).
@@ -361,6 +376,7 @@ def kanban():
         listas=listas,
         filtros=filtros,
         is_admin=is_admin_user(),
+        pode_exibir_validado=pode_exibir_validado,
     )
 
 
@@ -385,6 +401,7 @@ def lista():
         filtros=filtros,
         status_enum=LeadStatus,
         is_admin=is_admin_user(),
+        pode_exibir_validado=pode_exibir_validado,
     )
 
 
