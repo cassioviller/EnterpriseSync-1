@@ -55,6 +55,45 @@ e os apontamentos entram por `registrar_apontamento`. Basta um payload com a
 > **Enquanto o cronograma não for atualizado, não assine nem aprove os RDOs de
 > 04/08 em diante.**
 
+### Se a atualização for pelo REIMPORT do JSON canônico (plano do usuário, ~10/08)
+
+O usuário informou em 07/08 que pretende atualizar o cronograma **pela
+importação, como fazia antes** — o reimport do JSON canônico —, provavelmente na
+segunda 10/08. Isso **continua possível**, e muda o roteiro acima para melhor.
+Três coisas verificadas no código em 07/08:
+
+**1. O guard do M09 não bloqueia esta obra.** `_recusar_se_versionada_pelo_fluxo_novo`
+(`services/importacao_fisico_financeiro.py:815`) só recusa obra com
+`CronogramaVersao` de origem `upload_mspdi`/`upload_mpp`. Versão de origem
+`json_canonico` **não** bloqueia — e é a única que a obra tem (conferido em dev:
+1 versão, `json_canonico`). **Confira em produção antes de segunda:** se em
+algum momento o `.mpp` foi importado por lá pela aba Cronograma, o reimport
+passa a ser recusado e o caminho vira obrigatoriamente a aba.
+
+**2. Pelo reimport, cronograma e percentuais viram UMA operação só.** Como o
+import reconstrói tudo a partir do JSON, as tarefas novas do reforço entram em
+`eap`/`cronograma_tarefas` e os apontamentos de 04, 05 e 06/08 entram na seção
+`rdos` do **mesmo arquivo**. Não é preciso passar por `atualizar_rdos_obra.py`
+depois — ele existe para o caminho não-destrutivo, que aqui deixa de ser
+necessário.
+
+**3. O reimport é destrutivo e o JSON precisa ser a verdade inteira.** Ele apaga
+e recria, nesta ordem: propostas e seus itens, orçamentos e seus itens, itens de
+medição, `ObraServicoCusto`, `TarefaCronograma`, `MedicaoContrato` e **todos os
+RDOs da obra** (`importacao_fisico_financeiro.py:153-175` e `:376`). Tudo volta
+do JSON. Logo, **qualquer coisa lançada na UI depois do último sync do JSON se
+perde** — mão de obra editada em RDO, foto anexada à mão, RDO criado pela tela.
+
+> 🔴 **Um único RDO assinado aborta o reimport inteiro.** `_materializar_rdos`
+> apaga os RDOs com `db.session.delete` sem checar estado, e a guarda
+> `before_flush` de `services/rdo_ciclo_vida.py` cobre `session.deleted` — o
+> importador **não** usa `escrita_de_ciclo_de_vida()`. Verificado em dev: com um
+> RDO posto em `assinado`, o delete levanta
+> `RDOImutavel: RDO ... está assinado e não aceita mais alteração`, e a
+> transação inteira cai — não é "pula aquele dia", é o import todo. Hoje os 37
+> RDOs estão em `preenchido`, então o caminho está livre. **Não assine nem
+> aprove nenhum RDO da Baia antes do reimport de segunda.**
+
 ### O custo de deixar como está
 
 Três dos seis dias deste export não produzem um único apontamento — não porque a
