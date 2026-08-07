@@ -5,6 +5,69 @@
 
 ---
 
+## 🔴 PENDENTE — atualizar o cronograma e ENTÃO revisar os percentuais
+
+**Decisão do usuário em 07/08: o cronograma será atualizado com os itens abaixo,
+mas não hoje.** Enquanto isso não acontece, os dias 04, 05 e 06/08 estão no JSON
+com `apontamentos: []` — o texto e as fotos entraram, o físico não. Não é
+esquecimento: é que o serviço executado não tem tarefa onde ser lançado.
+
+### 1º — o que entra no cronograma
+
+| Item | De onde vem |
+|---|---|
+| Brocas de reforço das vigas transversais (A e B) | revisão estrutural entregue em 30/07 |
+| Blocos de coroamento das vigas transversais (B) | idem |
+| Laje de reforço das vigas transversais (B) | idem |
+| Escavação das novas valas de reforço | idem |
+| Perfuração das novas brocas | idem |
+| Caixaria (fôrma) das calçadas | ou tarefa própria, ou desmembrar a **23** em fôrma + concretagem |
+| Precedência: valas de drenagem **antes** das concretagens | reunião na obra em 05/08 — inverte a ordem entre a **19** e a **18/23** |
+
+O caminho é a **aba Cronograma da página da obra (M09)** — importar o `.mpp`
+revisado, decidir os mapeamentos na prévia, aplicar. **Não** é o reimport do
+JSON canônico, que é recusado em obra já versionada por `.mpp` e, se passasse,
+apagaria tarefas, propostas, medições e os RDOs.
+
+### 2º — só depois, revisar os percentuais dos dias que ficaram sem
+
+Com as tarefas novas existindo, os dias **04, 05 e 06/08** (mais os que se
+acumularem até lá) precisam de uma passagem de de-para para lançar o físico que
+hoje está só no texto. O caminho é o mesmo de sempre e **não apaga nada** —
+`services/atualizacao_rdos.py` faz upsert por `(obra_id, data_relatorio)`:
+
+```bash
+SIGE_ENABLE_DEMO_SEED=false python scripts/atualizar_rdos_obra.py \
+    <admin> 10 /tmp/payload_revisao.json --dry-run   # revisa a resolução
+```
+
+Um RDO que já existe é **atualizado**, não recriado: os campos de texto só são
+sobrescritos se vierem no payload (dia sem `comentario` não zera o que está lá),
+e os apontamentos entram por `registrar_apontamento`. Basta um payload com a
+`data` e os `apontamentos` novos.
+
+> ⚠️ **A janela para fazer isso sem retificador tem prazo — e ele não é uma
+> data, é um estado.** Os RDOs nascem por este caminho em `preenchido`, que
+> ainda é corrigível. Assim que um deles for para `assinado` ou `aprovado`, ele
+> entra em `ESTADOS_IMUTAVEIS` (`services/rdo_ciclo_vida.py`) e o atualizador
+> passa a **PULÁ-LO** com o aviso "para corrigir, emita um RDO retificador" —
+> o lançamento retroativo deixa de ser possível por este caminho.
+> **Enquanto o cronograma não for atualizado, não assine nem aprove os RDOs de
+> 04/08 em diante.**
+
+### O custo de deixar como está
+
+Três dos seis dias deste export não produzem um único apontamento — não porque a
+obra parou (teve 8 a 10 pessoas em campo), mas porque o que ela executou não
+existe no cronograma. Até a revisão entrar, **a Curva S mostra a obra parada de
+04/08 em diante enquanto o custo corre**, e os indicadores de avanço físico ×
+financeiro (SPI/CPI) ficam distorcidos no mesmo período. Continua fora do
+cronograma e do financeiro, também, o impacto do período de indefinição
+(proposta enviada em 10/07 com 10 dias de validade; decisão em 27/07; projeto
+revisado em 30/07).
+
+---
+
 ## Rodada 2026-08-07 — RDOs de 30/07 a 06/08, e a virada de escopo da revisão estrutural
 
 Terceira passagem pelo mesmo caminho, sem nenhuma peça nova de código. O export
