@@ -22,7 +22,8 @@ try:
     calcular_custos_salariais_completos = utils_module.calcular_custos_salariais_completos
     calcular_dsr_modo_estrito = utils_module.calcular_dsr_modo_estrito
     calcular_horas_trabalhadas = utils_module.calcular_horas_trabalhadas
-    
+    somar_dias_uteis = utils_module.somar_dias_uteis
+
 except Exception as e:
     print(f"Warning: Could not import functions from utils.py: {e}")
     # Provide dummy fallbacks
@@ -30,3 +31,13 @@ except Exception as e:
         return 0.0
     def calcular_valor_hora_corrigido(funcionario):
         return 0.0
+    # Fallback REAL (não dummy): é matemática pura de data, sem dependência —
+    # um dummy aqui plantaria prazo errado em silêncio no lead do CRM.
+    def somar_dias_uteis(data_base, n):
+        from datetime import timedelta
+        atual, restantes = data_base, n
+        while restantes > 0:
+            atual += timedelta(days=1)
+            if atual.weekday() < 5:
+                restantes -= 1
+        return atual

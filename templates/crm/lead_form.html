@@ -161,7 +161,7 @@
                             <div class="col-md-3">
                                 <label class="form-label small text-muted mb-1">Data de chegada</label>
                                 <input type="date" name="data_chegada" class="form-control"
-                                       value="{% if lead %}{{ lead.data_chegada.isoformat() if lead.data_chegada else '' }}{% endif %}">
+                                       value="{% if lead %}{{ lead.data_chegada.isoformat() if lead.data_chegada else '' }}{% elif default_data_chegada %}{{ default_data_chegada.isoformat() }}{% endif %}">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small text-muted mb-1">Data de envio</label>
@@ -171,8 +171,8 @@
                             <div class="col-md-3">
                                 <label class="form-label small text-muted mb-1">Prazo</label>
                                 <input type="date" name="prazo" class="form-control"
-                                       value="{% if lead and lead.prazo %}{{ lead.prazo.isoformat() }}{% endif %}">
-                                <div class="form-text">Data alvo de fechamento do lead.</div>
+                                       value="{% if lead and lead.prazo %}{{ lead.prazo.isoformat() }}{% elif not lead and default_prazo %}{{ default_prazo.isoformat() }}{% endif %}">
+                                <div class="form-text">Data alvo de fechamento do lead{% if not lead %} — sugerido: 3 dias úteis após a chegada{% endif %}.</div>
                             </div>
                             <div class="col-md-3">
                                 {{ select_lista('vendedor_id', listas.responsavel,

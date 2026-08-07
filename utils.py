@@ -64,6 +64,24 @@ def _obter_horas_diarias_funcionario(funcionario) -> float:
     except Exception:
         return 8.8
 
+def somar_dias_uteis(data_base: date, n: int) -> date:
+    """`data_base` + `n` dias úteis (segunda a sexta, sem feriado — o mesmo
+    critério `weekday() < 5` de todo cálculo deste arquivo; não existe tabela
+    de feriado no projeto).
+
+    Conta a partir do dia SEGUINTE à base: quinta + 3 = sex, seg, TER.
+    Base em fim de semana resolve para dia útil naturalmente (sábado + 3 =
+    seg, ter, QUA). Nasceu para o prazo do lead do CRM (D-CRM.3).
+    """
+    atual = data_base
+    restantes = n
+    while restantes > 0:
+        atual += timedelta(days=1)
+        if atual.weekday() < 5:  # Segunda a sexta
+            restantes -= 1
+    return atual
+
+
 def _particionar_semanas(inicio: date, fim: date, semana_comeca_em: str = "domingo"):
     """Particiona período em semanas (domingo-sábado por padrão)"""
     semanas = []

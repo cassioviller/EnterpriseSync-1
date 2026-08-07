@@ -232,3 +232,66 @@ def test_c2_botao_validar_some_do_lead_enviado():
         assert 'btn-validar-lead' not in card
 
 
+# ===========================================================================
+# C3 — prazo de 3 dias úteis
+# ===========================================================================
+
+def test_c3_lead_novo_sem_prazo_ganha_3_dias_uteis():
+    """Teste 6: POST sem `prazo` → prazo = chegada + 3 úteis (hoje: None)."""
+    with app.app_context():
+        t = um_tenant('c3a', com_fatos=False)
+        resp = cliente_de(t.admin_id).post('/crm/novo', data=_form_minimo(
+            nome=f'Prazo {t.marca}', data_chegada='2026-08-03'))  # segunda
+        assert resp.status_code in (302, 200)
+        lead = Lead.query.filter_by(admin_id=t.admin_id,
+                                    nome=f'Prazo {t.marca}').one()
+        assert lead.prazo == date(2026, 8, 6)  # seg + 3 úteis = quinta
+
+
+def test_c3_quinta_atravessa_o_fim_de_semana():
+    """Teste 7 — o que mata a soma de dias corridos: chegada QUINTA 06/08 →
+    prazo TERÇA 11/08 (sex, seg, ter). Corridos daria domingo 09/08."""
+    with app.app_context():
+        t = um_tenant('c3b', com_fatos=False)
+        cliente_de(t.admin_id).post('/crm/novo', data=_form_minimo(
+            nome=f'Quinta {t.marca}', data_chegada='2026-08-06'))
+        lead = Lead.query.filter_by(admin_id=t.admin_id,
+                                    nome=f'Quinta {t.marca}').one()
+        assert lead.prazo == date(2026, 8, 11)
+
+
+def test_c3_prazo_informado_e_respeitado():
+    """A sugestão não atropela quem preencheu: prazo explícito fica."""
+    with app.app_context():
+        t = um_tenant('c3c', com_fatos=False)
+        cliente_de(t.admin_id).post('/crm/novo', data=_form_minimo(
+            nome=f'Manual {t.marca}', data_chegada='2026-08-03',
+            prazo='2026-09-30'))
+        lead = Lead.query.filter_by(admin_id=t.admin_id,
+                                    nome=f'Manual {t.marca}').one()
+        assert lead.prazo == date(2026, 9, 30)
+
+
+def test_c3_editar_lead_existente_nao_recalcula():
+    """Teste 8 (fronteira D-CRM.4): lead antigo sem prazo segue sem prazo —
+    editar não inventa data de cobrança retroativa."""
+    with app.app_context():
+        t = um_tenant('c3d', com_fatos=False)
+        lead = _lead(t, status=LeadStatus.EM_FILA)
+        assert lead.prazo is None
+        cliente_de(t.admin_id).post(f'/crm/{lead.id}/editar', data=_form_minimo(
+            nome=lead.nome, data_chegada='2026-06-01'))
+        db.session.refresh(lead)
+        assert lead.prazo is None
+
+
+def test_c3_somar_dias_uteis_unitario():
+    """A travessia na unidade: sexta + 1 = segunda; sábado como base também
+    resolve para dia útil."""
+    from utils import somar_dias_uteis
+    assert somar_dias_uteis(date(2026, 8, 7), 1) == date(2026, 8, 10)   # sex → seg
+    assert somar_dias_uteis(date(2026, 8, 3), 3) == date(2026, 8, 6)    # seg → qui
+    assert somar_dias_uteis(date(2026, 8, 6), 3) == date(2026, 8, 11)   # qui → ter
+    assert somar_dias_uteis(date(2026, 8, 8), 3) == date(2026, 8, 12)   # sáb → qua
+
+

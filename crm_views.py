@@ -503,6 +503,11 @@ def novo():
         'email': request.args.get('email', ''),
         'demanda': request.args.get('demanda', ''),
     }
+    # D-CRM.3: o formulário nasce com chegada = hoje e prazo sugerido de
+    # 3 dias úteis, os dois editáveis. `_salvar_lead` garante o mesmo default
+    # no servidor caso o campo volte vazio.
+    from utils import somar_dias_uteis
+    hoje = date.today()
     return render_template(
         'crm/lead_form.html',
         lead=None,
@@ -510,6 +515,8 @@ def novo():
         valores=pre,
         status_enum=LeadStatus,
         is_admin=is_admin_user(),
+        default_data_chegada=hoje,
+        default_prazo=somar_dias_uteis(hoje, 3),
     )
 
 
@@ -612,6 +619,11 @@ def _salvar_lead(lead, listas, admin_id):
 
     # Task #113 — Prazo do lead com registro no histórico
     novo_prazo = _to_date(request.form.get('prazo'))
+    # D-CRM.3: lead NOVO sem prazo ganha chegada + 3 dias úteis. Só no novo —
+    # editar nunca recalcula (D-CRM.4), e prazo explícito é respeitado.
+    if is_new and novo_prazo is None:
+        from utils import somar_dias_uteis
+        novo_prazo = somar_dias_uteis(lead.data_chegada, 3)
     if not is_new and str(lead.prazo or '') != str(novo_prazo or ''):
         _registrar_historico(lead, 'prazo', lead.prazo, novo_prazo)
     lead.prazo = novo_prazo
