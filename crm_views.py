@@ -41,7 +41,7 @@ from models import (
     Lead, LeadHistorico, LeadStatus,
     CrmResponsavel, CrmOrigem, CrmCadencia, CrmSituacao,
     CrmTipoMaterial, CrmTipoObra, CrmMotivoPerda,
-    Cliente, ClienteObservacao, TipoUsuario,
+    Cliente, ClienteObservacao, TipoUsuario, Usuario,
 )
 
 logger = logging.getLogger(__name__)
@@ -1393,6 +1393,161 @@ def exportar_modelo():
     return send_file(
         buf,
         download_name='modelo_leads_crm.xlsx',
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
+# Cores por status na planilha exportada — as MESMAS dos seletores
+# `.status-*` de `templates/crm/kanban.html`, para o funil se ler de relance.
+STATUS_CORES_XLSX = {
+    LeadStatus.EM_FILA.value:      '6C757D',
+    LeadStatus.EM_ANDAMENTO.value: '0DCAF0',
+    LeadStatus.ENVIADO.value:      '0D6EFD',
+    LeadStatus.VALIDACAO.value:    '6F42C1',
+    LeadStatus.APROVADO.value:     '198754',
+    LeadStatus.FEEDBACK.value:     'FD7E14',
+    LeadStatus.CONGELADO.value:    '495057',
+    LeadStatus.PERDIDO.value:      'DC3545',
+}
+
+
+@crm_bp.route('/exportar')
+@login_required
+def exportar():
+    """Exporta TODOS os leads do tenant, todos os campos, num .xlsx
+    apresentável (D-CRM.5): aba `Leads` — deliberadamente ≠ `Lead.2026`,
+    para a planilha não voltar pelo importador por engano (D-CRM.6; o
+    importador só CRIA leads, reimportar duplicaria a base). Os filtros da
+    tela são IGNORADOS de propósito: exportação é do funil inteiro.
+    """
+    import openpyxl
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+    from sqlalchemy.orm import joinedload
+
+    admin_id = get_admin_id()
+    if not admin_id or not is_admin_user():
+        flash('Apenas administradores podem exportar os leads.', 'danger')
+        return redirect(url_for('crm.lista'))
+
+    leads = (
+        _query_leads_visiveis(admin_id)
+        .options(
+            joinedload(Lead.responsavel), joinedload(Lead.vendedor),
+            joinedload(Lead.orcamentista), joinedload(Lead.origem),
+            joinedload(Lead.cadencia), joinedload(Lead.situacao),
+            joinedload(Lead.tipo_material), joinedload(Lead.tipo_obra),
+            joinedload(Lead.motivo_perda), joinedload(Lead.validado_por),
+            joinedload(Lead.cliente), joinedload(Lead.proposta),
+            joinedload(Lead.obra),
+        )
+        .order_by(Lead.data_chegada.desc(), Lead.id.desc())
+        .all()
+    )
+
+    # `criado_por` não tem relationship no modelo — resolve os nomes em lote.
+    criadores_ids = {l.criado_por_id for l in leads if l.criado_por_id}
+    criadores = {}
+    if criadores_ids:
+        criadores = {
+            u.id: u.nome
+            for u in Usuario.query.filter(Usuario.id.in_(criadores_ids)).all()
+        }
+
+    def _n(rel):
+        return rel.nome if rel else ''
+
+    def _sim_nao(v):
+        return 'Sim' if v else 'Não'
+
+    # (cabeçalho, largura, getter, tipo) — tipo dita number_format da célula.
+    COLUNAS = [
+        ('ID',                     8,  lambda l: l.id, 'int'),
+        ('Nome',                   32, lambda l: l.nome, 'str'),
+        ('Status',                 14, lambda l: l.status, 'status'),
+        ('Contato Lead',           16, lambda l: l.contato or '', 'str'),
+        ('E-mail',                 24, lambda l: l.email or '', 'str'),
+        ('Data de Chegada',        12, lambda l: l.data_chegada, 'date'),
+        ('Prazo',                  12, lambda l: l.prazo, 'date'),
+        ('Data de Envio',          12, lambda l: l.data_envio, 'date'),
+        ('Data de Retomada',       12, lambda l: l.data_retomada, 'date'),
+        ('Valor da Proposta',      16, lambda l: l.valor_proposta, 'money'),
+        ('Prioridade',             10, lambda l: _sim_nao(l.prioridade), 'str'),
+        ('Demanda',                45, lambda l: l.demanda or '', 'str'),
+        ('Observação',             45, lambda l: l.observacao or '', 'str'),
+        ('Origem',                 16, lambda l: _n(l.origem), 'str'),
+        ('Cadência',               12, lambda l: _n(l.cadencia), 'str'),
+        ('Situação',               18, lambda l: _n(l.situacao), 'str'),
+        ('Tipo de Material',       16, lambda l: _n(l.tipo_material), 'str'),
+        ('Tipo de obra',           14, lambda l: _n(l.tipo_obra), 'str'),
+        ('Motivo da Perda',        16, lambda l: _n(l.motivo_perda), 'str'),
+        ('Responsável',            16, lambda l: _n(l.responsavel), 'str'),
+        ('Vendedor',               16, lambda l: _n(l.vendedor), 'str'),
+        ('Orçamentista',           16, lambda l: _n(l.orcamentista), 'str'),
+        ('Localização',            20, lambda l: l.localizacao or '', 'str'),
+        ('Detalhes Loc.',          24, lambda l: l.detalhes_localizacao or '', 'str'),
+        ('Pasta',                  20, lambda l: l.pasta or '', 'str'),
+        ('Validado',               10, lambda l: _sim_nao(l.validacao_aprovada), 'str'),
+        ('Validado por',           16, lambda l: l.validado_por.nome if l.validado_por else '', 'str'),
+        ('Validado em',            16, lambda l: l.validado_em, 'datetime'),
+        ('Comentário de revisão',  30, lambda l: l.comentario_revisao or '', 'str'),
+        ('Cliente',                24, lambda l: _n(l.cliente), 'str'),
+        ('Proposta',               14, lambda l: l.proposta.numero if l.proposta else '', 'str'),
+        ('Obra',                   24, lambda l: _n(l.obra), 'str'),
+        ('Criado por',             16, lambda l: criadores.get(l.criado_por_id, ''), 'str'),
+        ('Criado em',              16, lambda l: l.created_at, 'datetime'),
+        ('Atualizado em',          16, lambda l: l.updated_at, 'datetime'),
+        ('Status alterado em',     16, lambda l: l.status_changed_at, 'datetime'),
+        ('Dias parado no status',  12, lambda l: l.dias_parado, 'int'),
+    ]
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Leads'
+
+    header_fill = PatternFill(start_color='1F4E79', end_color='1F4E79', fill_type='solid')
+    header_font = Font(color='FFFFFF', bold=True, size=11)
+    zebra_fill = PatternFill(start_color='F2F6FA', end_color='F2F6FA', fill_type='solid')
+
+    for col_idx, (cab, largura, _getter, _tipo) in enumerate(COLUNAS, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=cab)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', wrap_text=True)
+        ws.column_dimensions[get_column_letter(col_idx)].width = largura
+    ws.row_dimensions[1].height = 30
+
+    for row_idx, lead in enumerate(leads, start=2):
+        zebrar = row_idx % 2 == 0
+        for col_idx, (_cab, _largura, getter, tipo) in enumerate(COLUNAS, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=getter(lead))
+            if tipo == 'date':
+                cell.number_format = 'DD/MM/YYYY'
+            elif tipo == 'datetime':
+                cell.number_format = 'DD/MM/YYYY HH:MM'
+            elif tipo == 'money':
+                cell.number_format = 'R$ #,##0.00'
+            elif tipo == 'status':
+                cor = STATUS_CORES_XLSX.get(lead.status)
+                if cor:
+                    cell.fill = PatternFill(start_color=cor, end_color=cor,
+                                            fill_type='solid')
+                    cell.font = Font(color='FFFFFF', bold=True)
+                continue  # a cor do status vence a zebra
+            if zebrar:
+                cell.fill = zebra_fill
+
+    # AutoFiltro em toda a faixa + cabeçalho e ID/Nome/Status congelados.
+    ws.auto_filter.ref = ws.dimensions
+    ws.freeze_panes = 'D2'
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        download_name=f'leads_crm_{date.today().isoformat()}.xlsx',
         as_attachment=True,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )

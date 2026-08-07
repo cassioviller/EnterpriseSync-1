@@ -295,3 +295,74 @@ def test_c3_somar_dias_uteis_unitario():
     assert somar_dias_uteis(date(2026, 8, 8), 3) == date(2026, 8, 12)   # sáb → qua
 
 
+# ===========================================================================
+# C4 — exportação
+# ===========================================================================
+
+def _abrir_xlsx(resp):
+    import openpyxl
+    assert resp.status_code == 200
+    assert 'spreadsheetml' in resp.headers.get('Content-Type', '')
+    return openpyxl.load_workbook(io.BytesIO(resp.data))
+
+
+def test_c4_exporta_todos_ignorando_filtros():
+    """Teste 9: todos os leads do tenant, aba `Leads`, e a query string de
+    filtro é IGNORADA (D-CRM.5). Vermelho hoje: a rota não existe (404)."""
+    with app.app_context():
+        t = um_tenant('c4a', com_fatos=False)
+        _lead(t, status=LeadStatus.EM_FILA)
+        _lead(t, status=LeadStatus.ENVIADO, valor_proposta=5000)
+        # O filtro pediria só EM_FILA; a exportação tem que trazer os DOIS.
+        resp = cliente_de(t.admin_id).get(
+            f'/crm/exportar?status={LeadStatus.EM_FILA.value}')
+        wb = _abrir_xlsx(resp)
+        assert 'Leads' in wb.sheetnames
+        assert 'Lead.2026' not in wb.sheetnames  # não volta pelo importador
+        ws = wb['Leads']
+        assert ws.max_row == 3  # cabeçalho + 2 leads
+        cabecalho = [c.value for c in ws[1]]
+        assert len(cabecalho) == 37
+        for col in ('ID', 'Nome', 'Status', 'Contato Lead', 'E-mail',
+                    'Valor da Proposta', 'Validado por',
+                    'Dias parado no status'):
+            assert col in cabecalho, f'coluna ausente: {col}'
+
+
+def test_c4_lead_de_outro_tenant_nao_aparece():
+    """Teste 10: isolamento — a marca do tenant B não sai na planilha de A."""
+    with app.app_context():
+        a, b = dois_tenants('c4b', com_fatos=False)
+        _lead(a)
+        _lead(b)
+        wb = _abrir_xlsx(cliente_de(a.admin_id).get('/crm/exportar'))
+        ws = wb['Leads']
+        celulas = [str(c.value) for row in ws.iter_rows() for c in row if c.value]
+        assert any(a.marca in v for v in celulas)
+        assert not any(b.marca in v for v in celulas)
+
+
+def test_c4_nao_admin_e_barrado():
+    """Teste 11: mesmo padrão do exportar_modelo — flash + redirect."""
+    with app.app_context():
+        t = um_tenant('c4c', com_fatos=False)
+        from models import Usuario, TipoUsuario
+        from werkzeug.security import generate_password_hash
+        func = Usuario(username=f'{t.marca}_func', email=f'f_{t.marca}@t.local',
+                       nome=f'Func {t.marca}',
+                       password_hash=generate_password_hash('Senha@2026'),
+                       tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+                       admin_id=t.admin_id)
+        db.session.add(func)
+        db.session.commit()
+        resp = cliente_de(func.id).get('/crm/exportar')
+        assert resp.status_code == 302
+        assert 'spreadsheetml' not in resp.headers.get('Content-Type', '')
+
+
+def test_c4_sem_lead_sai_so_cabecalho():
+    """Planilha vazia não é erro (spec, tratamento de erro)."""
+    with app.app_context():
+        t = um_tenant('c4d', com_fatos=False)
+        wb = _abrir_xlsx(cliente_de(t.admin_id).get('/crm/exportar'))
+        assert wb['Leads'].max_row == 1
