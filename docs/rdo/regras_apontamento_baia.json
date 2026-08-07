@@ -200,6 +200,21 @@
       "observacao": "Mesma tarefa 21 pelo outro vocabulário: a montagem in loco aparece como 'malhas inferior e superior' (29/07), sem a palavra 'ferragens'. Decisão de 30/07: pré-montagem e montagem são fases da MESMA tarefa, não duas."
     },
     {
+      "id": "travamento-calcada-b",
+      "quando": [
+        "travamento",
+        "calçada"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 21,
+      "tarefa_nome": "Execução Ferragem Calçada, Travamento Chapas Base (Galpão B)",
+      "forma": "pct",
+      "nao_quando": [
+        "malhas"
+      ],
+      "observacao": "Terceiro vocabulário da tarefa 21. O 'nao_quando' cede os bullets de malha à regra irmã malhas-calcada-b — as duas apontam a MESMA tarefa 21, e sem isso o bullet de 30/07 ('travamento das malhas da segunda calçada') sai duas vezes no relatório. Em 30/07, 31/07 e 03/08 o RDO fala em 'travamento das armaduras' e 'travamento da armadura longitudinal' da calçada — sem as palavras 'ferragens' nem 'malhas', então os três bullets caíram como 'bullet sem regra' e a tarefa foi achada à mão. Não colide com ferragem-fundacao-b: aquela exige 'viga', e estes bullets não citam viga."
+    },
+    {
       "id": "nivelamento-calcada-b",
       "quando": [
         "solo",
@@ -245,10 +260,12 @@
     }
   ],
   "sem_tarefa_no_cronograma": [
-    "Protótipo do cocho de alimentação em Light Steel Frame (LSF) — iniciado em 21/07, finalizado em 22/07 e entregue na Fazenda em 23/07. NÃO existe tarefa de cocho no cronograma. ATUALIZAÇÃO 27/07: o Grupo Mônica decidiu por ALVENARIA, o que dispara revisão do projeto estrutural das fundações (a carga dos cochos vai de ~40 kg/m para ~700 kg/m). Continua sem tarefa até o projeto revisado chegar.",
+    "Protótipo do cocho de alimentação em Light Steel Frame (LSF) — iniciado em 21/07, finalizado em 22/07 e entregue na Fazenda em 23/07. NÃO existe tarefa de cocho no cronograma. ATUALIZAÇÃO 27/07: o Grupo Mônica decidiu por ALVENARIA, o que dispara revisão do projeto estrutural das fundações (a carga dos cochos vai de ~40 kg/m para ~700 kg/m). Continua sem tarefa até o projeto revisado chegar. ATUALIZAÇÃO 07/08: a revisão do projeto estrutural das fundações chegou em 30/07, ao fim do expediente, e trouxe o escopo de reforço registrado no item abaixo. O cocho em si segue sem tarefa.",
     "Limpeza das valas, protetores de plástico nos vergalhões, demarcação — serviços de preparação sem tarefa própria.",
     "Aplicação de lona sobre a calçada do Galpão B (27 e 28/07) — proteção da área preparada, sem tarefa própria.",
     "Instalação dos tampões de PVC na infra de esgoto (23/07) — preparo do teste de estanqueidade. A tarefa de instalação da infra hidráulica (39/84) já foi lançada a 100% em 16/07.",
-    "Posicionamento da armação das vigas longitudinais nas valas do Galpão B (23 e 28/07) — NÃO aponta na tarefa 14. Decisão de 30/07: posicionar armação já executada não é nova execução, e a 14 é a única tarefa com quantitativo (48 un), já saturada desde 10/07. Lançar só produziria clamp em 100% com warning."
+    "Posicionamento da armação das vigas longitudinais nas valas do Galpão B (23 e 28/07) — NÃO aponta na tarefa 14. Decisão de 30/07: posicionar armação já executada não é nova execução, e a 14 é a única tarefa com quantitativo (48 un), já saturada desde 10/07. Lançar só produziria clamp em 100% com warning. Vale igual para o posicionamento das armaduras das vigas longitudinais do Galpão A em 03/08 (tarefa 59, 100% desde 17/07).",
+    "REFORÇO ESTRUTURAL DA REVISÃO DO PROJETO (04 a 06/08) — escopo ADITIVO, sem tarefa: armação de 22 brocas de reforço das vigas transversais de A e B, armação dos blocos de coroamento e da laje das vigas transversais do Galpão B, escavação das novas valas de reforço, perfuração das novas brocas. Nasce da revisão estrutural entregue em 30/07 por causa dos cochos em alvenaria — não existia no cronograma contratado. Decisão de 07/08: NÃO apontar. As regras ferragem-fundacao-b/-a e blocos-coroamento-a casam esses bullets e sugerem as tarefas 14 e 59, mas ambas já estão saturadas (14 em 48/48 un desde 10/07, 59 em 100% desde 17/07): lançar só produziria clamp em 100% com warning e inflaria o acumulado. O caminho é criar as tarefas novas na revisão do cronograma, não forçar as antigas.",
+    "Caixaria (fôrma) das calçadas do Galpão B — iniciada em 04/08, uma calçada em 05/08, segunda calçada finalizada em 06/08. Não existe tarefa de caixaria. A mais próxima é a 23 'Execução de Concretagem das Calçadas e Sapatas Pilares Tronco', ainda em 0%. Decisão de 07/08: NÃO apontar na 23 — nenhum concreto foi lançado, e mostrar avanço numa tarefa de concretagem que não começou infla o físico. Fica no texto do RDO e nas fotos."
   ]
 }

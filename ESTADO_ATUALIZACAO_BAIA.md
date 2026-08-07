@@ -1,7 +1,119 @@
 # Estado da atualização da obra Baia — físico-financeiro
 
-> Documento de handoff. Última atualização: **2026-07-30**.
+> Documento de handoff. Última atualização: **2026-08-07**.
 > Resume o que foi feito nesta rodada e o que ainda falta.
+
+---
+
+## Rodada 2026-08-07 — RDOs de 30/07 a 06/08, e a virada de escopo da revisão estrutural
+
+Terceira passagem pelo mesmo caminho, sem nenhuma peça nova de código. O export
+(`Conversa do WhatsApp com 📝 Diário de Obras - Veks Engenharia (2).zip`) trouxe
+**6 dias novos: 30 e 31/07 e 03, 04, 05 e 06/08**. Não há RDO de 01 e 02/08
+(sábado e domingo) nem de 07/08 até o momento do export. O JSON canônico foi de
+31 para **37 RDOs**; o diff são **215 linhas, todas inserções** — nenhum dia
+anterior foi tocado.
+
+```bash
+python scripts/whatsapp_para_rdos.py \
+    --zip "Conversa do WhatsApp com 📝 Diário de Obras - Veks Engenharia (2).zip" \
+    --obra-marcador "Obra Itu" --regras docs/rdo/regras_apontamento_baia.json \
+    --desde 2026-07-30 --saida /tmp/payload.json
+```
+
+### O que este export muda na obra
+
+**Em 30/07, ao fim do expediente, a projetista entregou a revisão do projeto
+estrutural das fundações** — a consequência dos cochos em alvenaria que as duas
+rodadas anteriores vinham anotando como risco. De 04 a 06/08, quase tudo que a
+equipe executou é **escopo novo dessa revisão**: armação de 22 brocas de reforço
+das vigas transversais de A e B, blocos de coroamento, laje de reforço,
+escavação das novas valas, perfuração das novas brocas. **Nada disso tem tarefa
+no cronograma contratado.**
+
+Em 31/07 o próprio RDO registra que **o cronograma executivo foi revisado**; em
+05/08, reunião na obra (Eng. Gustavo/Kabod, Eng. Ana Luísa/Fort, Sr. Cido/Grupo
+Mônica, Eng. Alan) definiu que **a escavação das valas de drenagem passa a ser
+executada ANTES da concretagem das vigas baldrame e das calçadas**, para evitar
+trincas por vibração. A meta declarada é concretar as brocas em **10/08**.
+
+### O de-para aplicado — REVISAR
+
+| Dia | Tarefa | Valor | Base no texto |
+|---|---|---|---|
+| 30/07 | 21 Ferragem Calçada (B) | 85% | continuidade do travamento das malhas e das armaduras das calçadas |
+| 31/07 | 21 | 90% | "concluído o travamento das armaduras da segunda calçada do Galpão B" |
+| 03/08 | 21 | 100% | "executada a armação e o travamento da armadura longitudinal da calçada do Galpão B" |
+| 04/08 | — | — | só reforço estrutural e caixaria (ver abaixo) |
+| 05/08 | — | — | idem |
+| 06/08 | — | — | idem |
+
+**Três decisões do usuário em 07/08:**
+
+1. **A tarefa 21 fecha em 03/08, não em 31/07.** O texto de 31/07 diz "concluído
+   … finalizando esta etapa", mas 03/08 volta com armação e travamento da
+   armadura longitudinal da mesma calçada. Mantida a leitura de série contínua
+   adotada em 30/07: a tarefa cobre a ferragem das calçadas **do galpão**, não
+   de uma calçada só. 31/07 conclui a segunda calçada (90%), 03/08 fecha a
+   tarefa. De 04/08 em diante só há caixaria — nenhuma ferragem —, o que
+   confirma o fechamento em 03/08.
+2. **A caixaria das calçadas do Galpão B (04, 05 e 06/08) não aponta em lugar
+   nenhum.** Não existe tarefa de caixaria; a mais próxima é a **23 "Execução de
+   Concretagem das Calçadas e Sapatas Pilares Tronco"**, ainda em 0%. Nenhum
+   concreto foi lançado, e mostrar avanço numa tarefa de concretagem que não
+   começou infla o físico. Fica no texto do RDO e nas fotos.
+3. **O reforço estrutural não aponta nas tarefas 14 e 59.** As regras
+   `ferragem-fundacao-b`/`-a` e `blocos-coroamento-a` casam esses bullets e
+   sugerem as duas, mas **ambas já estão saturadas** (14 em 48/48 un desde
+   10/07; 59 em 100% desde 17/07): lançar produziria clamp em 100% com warning e
+   inflaria o acumulado — o mesmo erro que as duas rodadas anteriores evitaram.
+   O caminho é criar as tarefas novas na revisão do cronograma.
+
+Também não aponta o **posicionamento das armaduras das vigas longitudinais do
+Galpão A** (03/08), pela regra já firmada em 30/07: posicionar armação já
+executada não é nova execução.
+
+### ⚠️ O buraco no cronograma deixou de ser risco e virou dívida
+
+O que as rodadas anteriores registravam como aviso agora tem tamanho: **três dos
+seis dias deste export não produzem um único apontamento**, não porque a obra
+parou — ela teve 8 a 10 pessoas em campo —, mas porque o que ela executou não
+existe no cronograma. Enquanto a revisão não entrar, a Curva S vai mostrar uma
+obra parada de 04/08 em diante enquanto o custo corre.
+
+O que precisa entrar no cronograma (e ainda **não** está):
+
+- **Tarefas novas do reforço estrutural**: brocas de reforço, blocos de
+  coroamento, laje de reforço, escavação das novas valas, perfuração.
+- **Caixaria das calçadas** — ou como tarefa própria, ou desmembrando a 23 em
+  fôrma + concretagem.
+- **A reprogramação de 05/08**: valas de drenagem antes da concretagem inverte a
+  ordem de precedência entre a 19 (valas de drenagem) e a 18/23 (concretagens).
+- **O impacto do período de indefinição** (proposta enviada em 10/07 com 10 dias
+  de validade; decisão só em 27/07; projeto revisado em 30/07) segue fora do
+  cronograma e do financeiro.
+
+### Dados no repositório
+
+`cronograma_fisico_financeiro_baias.json` (e o symlink em `tests/fixtures/`)
+passou de 31 para **37 RDOs**. Fotos novas em `fotos_rdos/2026-07-30`, `-07-31`,
+`-08-03`, `-08-04`, `-08-05` e `-08-06` (**35 arquivos, +8 MB**; a pasta vai a
+45 MB). As fotos deste export **não** repetiram o problema de 27/07 — em todos
+os seis dias o engenheiro postou o texto antes das fotos, e a legenda de cada
+primeira foto confere com o texto do próprio dia.
+
+Uma regra nova em `docs/rdo/regras_apontamento_baia.json`: **`travamento-calcada-b`**
+(→ tarefa 21). É o terceiro vocabulário da mesma tarefa — depois de "ferragens"
+e "malhas", o RDO passou a dizer "travamento das armaduras"/"travamento da
+armadura longitudinal", e os três bullets caíram como "bullet sem regra". Leva
+`nao_quando: ["malhas"]` para ceder esses bullets à regra irmã, senão o de 30/07
+sai duas vezes no relatório. As três decisões acima também ficaram registradas
+em `sem_tarefa_no_cronograma`, no mesmo arquivo.
+
+🔬 **Verificação ponta a ponta contra o importador real** (obra 61047, dentro de
+transação revertida): **6 RDOs criados, 3 apontamentos, 0 pendências, 0 pulados**.
+A armadilha dos ids conferida de novo — a tarefa 21 resolveu em **Galpão B**
+(75% → 100%) e a 66, de nome idêntico no Galpão A, **ficou intacta em 60%**.
 
 ---
 
