@@ -185,11 +185,35 @@ def get_dropdown_options(slug: str, admin_id: int,
 
     for_form=True e slug CRM: retorna wrappers com .id = ext_id para que
     os selects gravem o FK correto em Lead (ex: Lead.origem_id).
+
+    Fallback (D-CRM.1): para slug CRM cujo grupo não existe OU existe com
+    ZERO linhas em dropdown_opcao (nunca semeado — as migrações 173/174 só
+    cobriram os tenants da época, e `ensure_grupo` cria grupo vazio), lê o
+    modelo legado `crm_*`, que é a fonte de verdade das FKs em Lead. O
+    gatilho é zero LINHAS, não zero ativas: grupo com opções todas
+    desativadas é estado deliberado do admin e NÃO cai no legado.
     """
     from models import DropdownGrupo, DropdownOpcao
     grupo = DropdownGrupo.query.filter_by(slug=slug, admin_id=admin_id).first()
-    if not grupo:
-        return []
+
+    grupo_semeado = grupo is not None and db.session.query(
+        DropdownOpcao.id).filter_by(grupo_id=grupo.id).first() is not None
+    if not grupo_semeado:
+        crm = _crm_model(slug)
+        if crm is None:
+            return []
+        legados = (crm.query.filter_by(admin_id=admin_id, ativo=True)
+                   .order_by(crm.id.asc()).all())
+        if legados:
+            logger.info(
+                '[dropdown_service] fallback ao legado: slug=%s admin_id=%s '
+                '(%d opções — grupo %s)', slug, admin_id, len(legados),
+                'vazio' if grupo else 'ausente')
+        from types import SimpleNamespace
+        return [
+            SimpleNamespace(id=l.id, nome=l.nome, valor=l.nome, ativo=l.ativo)
+            for l in legados
+        ]
 
     q = DropdownOpcao.query.filter_by(grupo_id=grupo.id, admin_id=admin_id)
     if not incluir_inativos:

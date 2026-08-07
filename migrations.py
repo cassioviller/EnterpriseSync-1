@@ -6172,6 +6172,74 @@ def _migration_281_conta_receber_banco_id():
                 "estorno de recebimento passa a saber de onde debitar).")
 
 
+def _migration_282_backfill_dropdown_crm():
+    """D-CRM.1 — o backfill que a 174 pulou: grupo de dropdown para TODO
+    tenant com dado nas tabelas legadas `crm_*`.
+
+    O buraco: a 173 criou `dropdown_grupo` só para os tenants daquela época,
+    e a 174 sincroniza as opções com `JOIN dropdown_grupo` — sem o grupo, o
+    JOIN não casa, ZERO linhas copiam e a migração reporta success mesmo
+    assim (⚠️ dev 07/08: 173/174 `success` em 22/07 e as duas tabelas com
+    zero linhas; os sete selects do CRM renderizam vazios). `seed_grupos_
+    sistema` só cobre admin criado por `views/admin.py`.
+
+    Aqui: (1) cria o grupo que falta a partir dos `admin_id` DISTINTOS da
+    tabela legada; (2) repete o INSERT..SELECT da 174 — que agora casa.
+    Idempotente nas duas etapas por WHERE NOT EXISTS. O leitor ganhou
+    fallback ao legado no mesmo commit (`get_dropdown_options`), então um
+    tenant que nascer torto DEPOIS desta migração ainda funciona.
+
+    Alocação: 282, plano dos quatro ajustes do CRM (C1). Livre: 283.
+    """
+    from sqlalchemy import text as sa_text
+    from services.dropdown_service import CRM_GRUPOS_META
+
+    total_grupos = 0
+    total_opcoes = 0
+    with db.engine.begin() as conn:
+        for meta in CRM_GRUPOS_META:
+            slug = meta['slug']
+            tabela = slug  # nome da tabela legada = slug (crm_origem etc.)
+
+            r = conn.execute(sa_text(f"""
+                INSERT INTO dropdown_grupo (admin_id, slug, label, modulo, editavel)
+                SELECT DISTINCT t.admin_id, :slug, :label, 'crm', TRUE
+                FROM {tabela} t
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM dropdown_grupo dg
+                    WHERE dg.slug = :slug AND dg.admin_id = t.admin_id
+                )
+            """), {'slug': slug, 'label': meta['label']})
+            total_grupos += r.rowcount
+
+            r = conn.execute(sa_text(f"""
+                INSERT INTO dropdown_opcao (admin_id, grupo_id, valor, ordem,
+                                            ativo, protegido, ext_id)
+                SELECT
+                    t.admin_id,
+                    dg.id,
+                    t.nome,
+                    (ROW_NUMBER() OVER (PARTITION BY t.admin_id ORDER BY t.id) * 10),
+                    t.ativo,
+                    false,
+                    t.id
+                FROM {tabela} t
+                JOIN dropdown_grupo dg
+                  ON dg.slug = :slug AND dg.admin_id = t.admin_id
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM dropdown_opcao do2
+                    WHERE do2.grupo_id = dg.id
+                      AND do2.admin_id = t.admin_id
+                      AND do2.ext_id = t.id
+                )
+            """), {'slug': slug})
+            total_opcoes += r.rowcount
+
+    logger.info("[Migration 282] backfill dropdown CRM: %d grupo(s) e %d "
+                "opção(ões) criados a partir das tabelas legadas.",
+                total_grupos, total_opcoes)
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -6459,6 +6527,7 @@ def executar_migracoes():
             (279, "E02 — drop de notificacao_cliente, auto-guardado pela contagem (falha e retenta se houver linha)", _migration_279_drop_notificacao_cliente),
             (280, "B5.6 / D-B5.6(A) — conta_pagar.banco_id: o banco debitado na baixa, para o estorno creditar de volta (NULL = sem banco ou pré-migração)", _migration_280_conta_pagar_banco_id),
             (281, "B6.1 / D-B6.1 — conta_receber.banco_id: o banco creditado na baixa, para o estorno de recebimento debitar de volta (NULL = sem banco, pré-migração ou OBRA_MEDICAO)", _migration_281_conta_receber_banco_id),
+            (282, "CRM C1 / D-CRM.1 — backfill dos dropdowns: cria o grupo que a 173 pulou e copia as opções legadas crm_* que a 174 não alcançou (JOIN sem grupo não casa)", _migration_282_backfill_dropdown_crm),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
