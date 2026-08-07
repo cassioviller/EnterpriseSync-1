@@ -126,8 +126,10 @@ hoje em detalhes de exibição e passam a seguir a mesma regra.
 
 ### O conserto — decisão D-CRM.2: esconder, não apagar
 
-- O badge aparece **só enquanto o lead está antes de Enviado**. Some em **Enviado,
-  Aprovado, Perdido e Congelado**. Mesma regra no kanban e na lista.
+- O badge aparece **só enquanto o lead está antes de Enviado** — a lista positiva é
+  **Em fila, Em andamento e Validação**. Some em **Enviado, Aprovado, Feedback, Perdido
+  e Congelado** (Feedback é pós-envio: "aguardando retorno" pressupõe proposta enviada).
+  Mesma regra no kanban e na lista.
 - O botão "Marcar como Validado" também sai de lead já enviado, onde não faz sentido.
 - **Os campos `validacao_aprovada`, `validado_por_id` e `validado_em` NÃO são apagados.**
 
