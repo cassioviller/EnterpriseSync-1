@@ -1024,6 +1024,12 @@ function htmlEquipeSubatividade_Edit(subMestreId) {
                                    oninput="filtrarListaFuncEdit(${subMestreId}, this.value)">
                         </div>
                         <div id="lista-func-edit-${subMestreId}"></div>
+                        <div class="px-2 py-1 border-top text-end bg-white position-sticky bottom-0">
+                            <button type="button" class="btn btn-primary btn-sm py-0 px-3"
+                                    onclick="fecharSeletorFuncEdit(${subMestreId})">
+                                <i class="fas fa-check me-1"></i>Concluir
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1059,21 +1065,31 @@ function filtrarListaFuncEdit(subMestreId, query) {
     _renderListaFuncEdit(subMestreId, filtered, query);
 }
 
+function fecharSeletorFuncEdit(subMestreId) {
+    const dd = document.getElementById(`dd-func-edit-${subMestreId}`);
+    if (dd) dd.style.display = 'none';
+}
+
 function _renderListaFuncEdit(subMestreId, lista, query) {
+    // Multi-seleção: mostra TODOS com estado marcado, clique faz toggle e o
+    // dropdown fica aberto até o Concluir/clique fora (mesmo padrão do Novo RDO).
     const container = document.getElementById(`lista-func-edit-${subMestreId}`);
     if (!container) return;
-    const jaSelecionados = (_maoObraEditSubat[subMestreId] || []).map(function(f) { return f.id; });
-    const disponiveis = lista.filter(function(f) { return !jaSelecionados.includes(f.id); });
-    if (disponiveis.length === 0) {
-        container.innerHTML = '<p class="text-muted small px-3 py-2 mb-0">Nenhum disponível</p>';
+    if (lista.length === 0) {
+        container.innerHTML = '<p class="text-muted small px-3 py-2 mb-0">Nenhum encontrado</p>';
         return;
     }
-    container.innerHTML = disponiveis.map(function(f) {
+    const jaSelecionados = (_maoObraEditSubat[subMestreId] || []).map(function(f) { return f.id; });
+    container.innerHTML = lista.map(function(f) {
         const cargo = (f.funcao || f.cargo || '').replace(/'/g, "\\'");
         const nome = f.nome.replace(/'/g, "\\'");
-        return `<button type="button" class="dropdown-item small py-1"
-                    onclick="adicionarFuncSubatEdit(${subMestreId}, ${f.id}, '${nome}', '${cargo}')">
-                    ${f.nome} <small class="text-muted">${f.funcao || f.cargo || ''}</small>
+        const marcado = jaSelecionados.includes(f.id);
+        return `<button type="button"
+                    class="dropdown-item small py-1 d-flex align-items-center gap-2${marcado ? ' active' : ''}"
+                    onclick="toggleFuncSubatEdit(${subMestreId}, ${f.id}, '${nome}', '${cargo}')">
+                    <i class="${marcado ? 'fas fa-check-square' : 'far fa-square'}"></i>
+                    <span class="flex-grow-1 text-truncate">${f.nome}</span>
+                    <small class="${marcado ? '' : 'text-muted'}">${f.funcao || f.cargo || ''}</small>
                 </button>`;
     }).join('');
 }
@@ -1096,15 +1112,18 @@ function _syncHorasFromDOMEdit(subMestreId) {
     });
 }
 
-function adicionarFuncSubatEdit(subMestreId, funcId, funcNome, funcCargo) {
+function toggleFuncSubatEdit(subMestreId, funcId, funcNome, funcCargo) {
     _syncHorasFromDOMEdit(subMestreId);
     if (!_maoObraEditSubat[subMestreId]) _maoObraEditSubat[subMestreId] = [];
-    if (!_maoObraEditSubat[subMestreId].some(function(f) { return f.id === funcId; })) {
+    const idx = _maoObraEditSubat[subMestreId].findIndex(function(f) { return f.id === funcId; });
+    if (idx >= 0) {
+        _maoObraEditSubat[subMestreId].splice(idx, 1);
+    } else {
         _maoObraEditSubat[subMestreId].push({ id: funcId, nome: funcNome, cargo: funcCargo, horas: 8.0 });
-        _renderEquipeEditSubat(subMestreId);
     }
-    const dd = document.getElementById(`dd-func-edit-${subMestreId}`);
-    if (dd) dd.style.display = 'none';
+    _renderEquipeEditSubat(subMestreId);
+    const filtro = document.getElementById(`filtro-func-edit-${subMestreId}`);
+    filtrarListaFuncEdit(subMestreId, filtro ? filtro.value : '');
 }
 
 function removerFuncSubatEdit(subMestreId, funcId) {
@@ -1112,6 +1131,11 @@ function removerFuncSubatEdit(subMestreId, funcId) {
     if (_maoObraEditSubat[subMestreId]) {
         _maoObraEditSubat[subMestreId] = _maoObraEditSubat[subMestreId].filter(function(f) { return f.id !== funcId; });
         _renderEquipeEditSubat(subMestreId);
+        const dd = document.getElementById(`dd-func-edit-${subMestreId}`);
+        if (dd && dd.style.display !== 'none') {
+            const filtro = document.getElementById(`filtro-func-edit-${subMestreId}`);
+            filtrarListaFuncEdit(subMestreId, filtro ? filtro.value : '');
+        }
     }
 }
 

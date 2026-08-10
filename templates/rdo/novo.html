@@ -771,7 +771,10 @@ async function _carregarFuncCache() {
     if (!obraId) return _funcCache;
     if (_funcCacheObraId === obraId && _funcCache.length > 0) return _funcCache;
     try {
-        const resp = await fetch(`/api/funcionarios/${obraId}`);
+        // Fase 0.5/3.2 renomeou a rota: /api/funcionarios/<int> agora é
+        // funcionário POR ID (api_funcionarios.py) e devolvia outra coisa —
+        // era por isso que a lista vinha vazia/errada.
+        const resp = await fetch(`/api/obras/${obraId}/funcionarios`);
         const data = await resp.json();
         if (data.success && data.funcionarios) {
             _funcCache = data.funcionarios;
@@ -799,6 +802,12 @@ function htmlEquipeSubatividade(subId) {
                                    oninput="filtrarListaFunc(${subId}, this.value)">
                         </div>
                         <div id="lista-func-${subId}"></div>
+                        <div class="px-2 py-1 border-top text-end bg-white position-sticky bottom-0">
+                            <button type="button" class="btn btn-primary btn-sm py-0 px-3"
+                                    onclick="fecharSeletorFunc(${subId})">
+                                <i class="fas fa-check me-1"></i>Concluir
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -807,6 +816,11 @@ function htmlEquipeSubatividade(subId) {
             </div>
         </div>
     `;
+}
+
+function fecharSeletorFunc(subId) {
+    const dd = document.getElementById(`dd-func-${subId}`);
+    if (dd) dd.style.display = 'none';
 }
 
 async function abrirSeletorFunc(subId) {
@@ -838,38 +852,53 @@ function filtrarListaFunc(subId, query) {
 }
 
 function _renderListaFunc(subId, lista, query) {
+    // Multi-seleção: a lista mostra TODOS (marcados e não), o clique faz
+    // toggle e o dropdown FICA ABERTO — fechar a cada escolha obrigava o
+    // ciclo abre-escolhe-fecha para cada funcionário.
     const container = document.getElementById(`lista-func-${subId}`);
     if (!container) return;
-    const jaSelecionados = (_maoObraSubat[subId] || []).map(f => f.id);
-    const disponiveis = lista.filter(f => !jaSelecionados.includes(f.id));
-    if (disponiveis.length === 0) {
-        container.innerHTML = '<p class="text-muted small px-3 py-2 mb-0">Nenhum disponível</p>';
+    if (lista.length === 0) {
+        container.innerHTML = '<p class="text-muted small px-3 py-2 mb-0">Nenhum encontrado</p>';
         return;
     }
-    container.innerHTML = disponiveis.map(f => {
+    const jaSelecionados = (_maoObraSubat[subId] || []).map(f => f.id);
+    container.innerHTML = lista.map(f => {
         const cargo = (f.funcao || f.cargo || '').replace(/'/g, "\\'");
         const nome = f.nome.replace(/'/g, "\\'");
-        return `<button type="button" class="dropdown-item small py-1"
-                    onclick="adicionarFuncSubat(${subId}, ${f.id}, '${nome}', '${cargo}')">
-                    ${f.nome} <small class="text-muted">${f.funcao||f.cargo||''}</small>
+        const marcado = jaSelecionados.includes(f.id);
+        return `<button type="button"
+                    class="dropdown-item small py-1 d-flex align-items-center gap-2${marcado ? ' active' : ''}"
+                    onclick="toggleFuncSubat(${subId}, ${f.id}, '${nome}', '${cargo}')">
+                    <i class="${marcado ? 'fas fa-check-square' : 'far fa-square'}"></i>
+                    <span class="flex-grow-1 text-truncate">${f.nome}</span>
+                    <small class="${marcado ? '' : 'text-muted'}">${f.funcao||f.cargo||''}</small>
                 </button>`;
     }).join('');
 }
 
-function adicionarFuncSubat(subId, funcId, funcNome, funcCargo) {
+function toggleFuncSubat(subId, funcId, funcNome, funcCargo) {
     if (!_maoObraSubat[subId]) _maoObraSubat[subId] = [];
-    if (!_maoObraSubat[subId].some(f => f.id === funcId)) {
+    const idx = _maoObraSubat[subId].findIndex(f => f.id === funcId);
+    if (idx >= 0) {
+        _maoObraSubat[subId].splice(idx, 1);
+    } else {
         _maoObraSubat[subId].push({ id: funcId, nome: funcNome, cargo: funcCargo, horas: 8.8 });
-        _renderEquipeSubat(subId);
     }
-    const dd = document.getElementById(`dd-func-${subId}`);
-    if (dd) dd.style.display = 'none';
+    _renderEquipeSubat(subId);
+    // re-renderiza a lista mantendo o filtro digitado — dropdown segue aberto
+    const filtro = document.getElementById(`filtro-func-${subId}`);
+    filtrarListaFunc(subId, filtro ? filtro.value : '');
 }
 
 function removerFuncSubat(subId, funcId) {
     if (_maoObraSubat[subId]) {
         _maoObraSubat[subId] = _maoObraSubat[subId].filter(f => f.id !== funcId);
         _renderEquipeSubat(subId);
+        const dd = document.getElementById(`dd-func-${subId}`);
+        if (dd && dd.style.display !== 'none') {
+            const filtro = document.getElementById(`filtro-func-${subId}`);
+            filtrarListaFunc(subId, filtro ? filtro.value : '');
+        }
     }
 }
 
@@ -905,81 +934,124 @@ function inicializarSistemaFuncionarios() {
 }
 
 // === SISTEMA DE FOTOS ===
+// ══════════════════════════════════════════════════════════════════
+// FOTOS DO NOVO RDO — CRUD acumulativo (2026-08-10)
+// O bug de sempre: escolher arquivos DE NOVO no mesmo <input type=file>
+// SUBSTITUI a FileList — o lote anterior sumia do POST e do preview.
+// Agora o estado mora em _fotosNovoRDO (adiciona/remove/legenda) e os
+// inputs são só porta de entrada: a cada escolha os arquivos são
+// ACUMULADOS, o input é zerado e a lista final é remontada num
+// DataTransfer no input da galeria (name="fotos[]"). As legendas saem
+// como legenda_foto_{i} SEQUENCIAL — o caminho "contador" que o backend
+// (views/rdo.py criar_rdo) já tenta primeiro.
+let _fotosNovoRDO = [];   // [{file, legenda, dataUrl}]
+
 function previewFotosNovo(event) {
-    const files = event.target.files;
-    const container = document.getElementById('previewContainerNovo');
-    container.innerHTML = '';
-    
-    if (files.length === 0) return;
-    
-    console.log(`📊 Total de arquivos recebidos do navegador: ${files.length}`);
-    
-    // 🎯 ESTRATÉGIA DEFINITIVA (v9.0.2.3):
-    // Criar mapa de fotos válidas → índices originais
-    // Isso garante que legendas sigam os índices REAIS dos arquivos (incluindo vazios)
-    const fotosValidas = [];
-    
-    Array.from(files).forEach((file, originalIndex) => {
-        if (!file || !file.name || file.name.trim() === '' || file.size === 0) {
-            console.log(`❌ Arquivo ${originalIndex} IGNORADO: vazio (${file.size} bytes)`);
-            return;
-        }
-        
+    const input = event.target;
+    Array.from(input.files || []).forEach(file => {
+        if (!file || !file.name || file.name.trim() === '' || file.size === 0) return;
         if (!file.type.startsWith('image/')) {
             alert(`${file.name} não é uma imagem válida`);
             return;
         }
-        
-        console.log(`✅ Arquivo ${originalIndex} VÁLIDO: ${file.name} (${file.size} bytes)`);
-        fotosValidas.push({ file, originalIndex });
+        if (file.size > 5 * 1024 * 1024) {
+            alert(`${file.name} passa de 5MB — reduza a foto`);
+            return;
+        }
+        const repetida = _fotosNovoRDO.some(f =>
+            f.file.name === file.name && f.file.size === file.size);
+        if (repetida) return;   // mesma foto escolhida duas vezes
+        _fotosNovoRDO.push({ file, legenda: '', dataUrl: null });
     });
-    
-    if (fotosValidas.length === 0) {
-        console.log('⚠️ Nenhuma foto válida selecionada');
-        return;
+    // zera o input: a PRÓXIMA escolha dispara change de novo (até com o
+    // mesmo arquivo) e nunca carrega FileList própria para o submit
+    input.value = '';
+    _renderFotosNovo();
+    _syncFotosNovoInput();
+}
+
+function removerFotoNovo(idx) {
+    _lerLegendasDoDOM();
+    _fotosNovoRDO.splice(idx, 1);
+    _renderFotosNovo();
+    _syncFotosNovoInput();
+}
+
+function _lerLegendasDoDOM() {
+    document.querySelectorAll('.foto-legenda-novo').forEach(inp => {
+        const i = parseInt(inp.dataset.fotoIdx, 10);
+        if (!isNaN(i) && _fotosNovoRDO[i]) _fotosNovoRDO[i].legenda = inp.value;
+    });
+}
+
+function _syncFotosNovoInput() {
+    // A lista acumulada INTEIRA vai no input da galeria; o da câmera fica
+    // sempre vazio (é só disparador). Ordem do DataTransfer = ordem dos
+    // índices = ordem que o backend percorre com o contador de legendas.
+    const gal = document.getElementById('fileInputNovoGal');
+    const cam = document.getElementById('fileInputNovoCam');
+    if (cam) cam.value = '';
+    if (!gal) return;
+    try {
+        const dt = new DataTransfer();
+        _fotosNovoRDO.forEach(f => dt.items.add(f.file));
+        gal.files = dt.files;
+    } catch (e) {
+        console.error('DataTransfer indisponível:', e);
+        alert('Seu navegador não suporta acumular fotos — selecione todas de uma vez na galeria.');
     }
-    
-    console.log(`✅ ${fotosValidas.length} fotos válidas encontradas`);
-    console.log(`📌 Índices originais das fotos válidas: ${fotosValidas.map(f => f.originalIndex).join(', ')}`);
-    
-    // Criar previews usando os índices ORIGINAIS
-    fotosValidas.forEach(({ file, originalIndex }, visualIndex) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const col = document.createElement('div');
-            col.className = 'col-6 col-md-3 mb-3';
-            col.innerHTML = `
-                <div class="card h-100">
-                    <div style="position: relative;">
-                        <img src="${e.target.result}" class="card-img-top" style="height: 150px; object-fit: cover;">
-                        <span style="position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
-                            #${visualIndex + 1}
-                        </span>
-                    </div>
-                    <div class="card-body p-2">
-                        <small class="text-muted d-block text-truncate">${file.name}</small>
-                        <small class="text-muted">${(file.size / 1024).toFixed(0)} KB</small>
-                        <div class="mt-2">
-                            <input type="text" 
-                                   name="legenda_foto_${originalIndex}"
-                                   class="form-control form-control-sm foto-legenda-novo" 
-                                   data-file-index="${originalIndex}"
-                                   data-visual-index="${visualIndex}"
-                                   placeholder="📝 Legenda da foto #${visualIndex + 1}"
-                                   form="formNovoRDO"
-                                   style="font-size: 0.85rem; border-radius: 8px;">
-                        </div>
+}
+
+function _renderFotosNovo() {
+    const container = document.getElementById('previewContainerNovo');
+    if (!container) return;
+    container.innerHTML = '';
+    _fotosNovoRDO.forEach((f, idx) => {
+        const col = document.createElement('div');
+        col.className = 'col-6 col-md-3 mb-3';
+        col.innerHTML = `
+            <div class="card h-100">
+                <div style="position: relative;">
+                    <img class="card-img-top" id="foto-novo-img-${idx}"
+                         style="height: 150px; object-fit: cover;" alt="${f.file.name}">
+                    <span style="position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
+                        #${idx + 1}
+                    </span>
+                    <button type="button" title="Remover esta foto"
+                            onclick="removerFotoNovo(${idx})"
+                            style="position: absolute; top: 5px; right: 5px; background: rgba(220,53,69,.9); color: #fff; border: 0; border-radius: 50%; width: 26px; height: 26px; line-height: 1;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="card-body p-2">
+                    <small class="text-muted d-block text-truncate">${f.file.name}</small>
+                    <small class="text-muted">${(f.file.size / 1024).toFixed(0)} KB</small>
+                    <div class="mt-2">
+                        <input type="text"
+                               name="legenda_foto_${idx}"
+                               class="form-control form-control-sm foto-legenda-novo"
+                               data-foto-idx="${idx}"
+                               value="${(f.legenda || '').replace(/"/g, '&quot;')}"
+                               oninput="_fotosNovoRDO[${idx}].legenda = this.value"
+                               placeholder="📝 Legenda da foto #${idx + 1}"
+                               form="formNovoRDO"
+                               style="font-size: 0.85rem; border-radius: 8px;">
                     </div>
                 </div>
-            `;
-            container.appendChild(col);
-        };
-        reader.readAsDataURL(file);
-        
-        console.log(`📝 Foto visual #${visualIndex + 1} → índice original ${originalIndex} → campo: legenda_foto_${originalIndex}`);
+            </div>`;
+        container.appendChild(col);
+        if (f.dataUrl) {
+            document.getElementById(`foto-novo-img-${idx}`).src = f.dataUrl;
+        } else {
+            const reader = new FileReader();
+            reader.onload = e => {
+                f.dataUrl = e.target.result;
+                const img = document.getElementById(`foto-novo-img-${idx}`);
+                if (img) img.src = f.dataUrl;
+            };
+            reader.readAsDataURL(f.file);
+        }
     });
-    
-    console.log(`✅ ${fotosValidas.length} foto(s) válida(s) prontas para upload`);
 }
 
 // === INICIALIZAÇÃO ===
