@@ -1,0 +1,23 @@
+[preparar_carga_obra] obra OB004 — Pablo E Ana Laura (admin veks)
+  sistema: 44 RDO(s) (2026-04-01 → 2026-06-23); 16 tarefa(s) viva(s), 0 com mpp_uid
+  whatsapp: 21 dia(s) de RDO
+  payload : 15 item(ns) — novos=0 enriquecidos=12 sem_mudanca=9 conflitos=0
+    enriquecidos: 2026-04-15, 2026-04-16, 2026-04-17, 2026-04-27, 2026-04-28, 2026-04-29, 2026-05-12, 2026-05-13, 2026-05-14, 2026-05-15, 2026-05-18, 2026-05-19
+    sem mudança: 2026-04-01, 2026-04-02, 2026-04-06, 2026-04-07, 2026-04-08, 2026-04-09, 2026-04-10, 2026-04-14, 2026-05-16
+  avisos (16):
+    - 2026-04-15: "00000734-AUDIO-2026-04-16-16-57-33.opus" ignorado (não é imagem)
+    - 2026-05-14: "00000856-VIDEO-2026-05-14-17-10-33.mp4" ignorado (não é imagem)
+    - 2026-04-01: comentario divergente — mantido o texto do SISTEMA (--conflito=sistema); o do chat foi descartado
+    - 2026-04-02: comentario divergente — mantido o texto do SISTEMA (--conflito=sistema); o do chat foi descartado
+    - 2026-04-06: comentario divergente — mantido o texto do SISTEMA (--conflito=sistema); o do chat foi descartado
+    - 2026-04-07: comentario divergente — mantido o texto do SISTEMA (--conflito=sistema); o do chat foi descartado
+    - 2026-04-08: comentario divergente — mantido o texto do SISTEMA (--conflito=sistema); o do chat foi descartado
+    - 2026-04-09: comentario divergente — mantido o texto do SISTEMA (--conflito=sistema); o do chat foi descartado
+    - 2026-04-10: comentario divergente — mantido o texto do SISTEMA (--conflito=sistema); o do chat foi descartado
+    - 2026-04-14: comentario do WhatsApp NÃO entrou — o dia tem mais de um RDO no sistema e o export pode ter retratado outro RDO que não o que o updater atualiza; re-exporte o zip (versão com "exportado o PRIMEIRO") e rode de novo
+    - 2026-04-16: comentario do WhatsApp NÃO entrou — o dia tem mais de um RDO no sistema e o export pode ter retratado outro RDO que não o que o updater atualiza; re-exporte o zip (versão com "exportado o PRIMEIRO") e rode de novo
+    - 2026-05-16: comentario divergente — mantido o texto do SISTEMA (--conflito=sistema); o do chat foi descartado
+    - tarefa 6 ("PLAQUEAMENTO EXTERNO + BASECOLT") termina 2026-07-15 — depois do último RDO; 100% registrado em 2026-06-23
+    - tarefa 8 ("MONTAGEM TELHADO") termina 2026-07-15 — depois do último RDO; 100% registrado em 2026-06-23
+    - tarefa 15 ("RETORNO VILA VELHA") termina 2026-08-18 — depois do último RDO; 100% registrado em 2026-06-23
+    - tarefa 10 ("PLAQUEAMENTO INTERNO PAREDE") termina 2026-08-04 — depois do último RDO; 100% registrado em 2026-06-23

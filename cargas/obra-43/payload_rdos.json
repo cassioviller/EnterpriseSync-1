@@ -1,0 +1,536 @@
+{
+  "rdos": [
+    {
+      "data": "2026-02-04",
+      "comentario": "Efetivo:\n- Abel\n- Hugo\n- Matheus\n- Vinícius\n- Leonardo\n- Roger\n- Marcus\n- Fabrício\n-\nEletricista\nFrancisco\n\nEncanador\nJoel\nZé\nJesi adriano\n\nAtividade\nDia ensolarado\nVerticalização PV2( 11 painéis colocado)\nAínda sem resposta sobre os parafusos\nVisita do técnico da Smart ( pontos observados: . Banda acústica nos painéis do PV2\n. Colocar manta asfáltica com maior lado para o lado da parede úmida\n\nFotos",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "2.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "3.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "4.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "5.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "6.jpg",
+          "legenda": ""
+        }
+      ],
+      "apontamentos": [
+        {
+          "tarefa_mpp": 492,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 494,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 497,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 606,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 507,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 493,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 608,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 609,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 501,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 475,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 498,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 478,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 474,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 611,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 481,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 479,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 483,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 482,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 503,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 484,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 604,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 574,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 610,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 612,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 400,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 404,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-02-05",
+      "comentario": "Efetivo:\n- Abel\n- Hugo\n- Matheus\n- Vinícius\n- Leonardo\n- Roger\n- Marcus\n- Fabrício\n-\nEletricista\nFrancisco\n\nEncanador\nJoel\nZé\nJesi adriano\n\nAtividade\nDia ensolarado\nVerticalização PV2 finalização da ventilação do pv2\nAínda sem resposta sobre os parafuso\nFinalização escada\nInício painelizacao telhado\n\nFotos"
+    },
+    {
+      "data": "2026-02-06",
+      "comentario": "Efetivo\nAbel\nPaulo\nLucas\nHugo\nVinícius\n\nAtividades executadas:\n\nVerticalização pv1\nMontagem de Viga lage\n\nObs\nChuva começou as 11:40 e ia e voltava\nTempo trabalhado 5h\nDificuldade para montagem das viga das lage devido não constar no caderno de montagem, foi solicitado ao Brayan mais sem retorno .\nFoi passado para a Sophia sobre material faltante do pedido de material referente ao aterramento da casa.\n\nFoto"
+    },
+    {
+      "data": "2026-02-07",
+      "comentario": "Efetivo\nAbel\nPaulo\nLucas\nHugo\nVinícius\nDavi\n\nAtividades executadas:\n\nVerticalização pv1\nMontagem de Viga lage\n\nObs\nChuva começou as 14:50 e ia e voltava\nTempo trabalhado 6h\nFoto"
+    },
+    {
+      "data": "2026-02-09",
+      "comentario": "Efetivo\nAbel\nPaulo\nLucas\nHugo\nVinícius\nFabrício\n\nAtividades executadas:\n\nVerticalização lage\nMontagem de Viga lage\n\nObs\nSem atividade hoje devido a chuva pessoal foi realocado para Gesp\nFoto"
+    },
+    {
+      "data": "2026-02-11",
+      "comentario": "Efetivo\nAbel\nMateus\nHugo\nLeonardo\nFabrício\nRicardo\n\nAtividades executadas:\nSeparação de peças dos painéis da lage\nMontagem de Viga lage\n\nObs\nDia nublado, sem chuva\nFoi montado e e fixado as vigas 1VG6 ,1vG4\nFoi montado a 1VG8 , 1VG3 e G5\nEstamos com muita dificuldade para montagem das vigas por não constar no caderno de montagem ( já foi falado com Brayan mais demora um dia pra dar retorno.\nNão conseguimos zerar a água total  em frente a garagem devido falta de ferramentas ( vou trazer amanhã).\nAngela solicitou a mudança da câmera para focar na entrada da área técnica ( vou fazer no dia de amanhã, preciso montar andaime )\nVamos precisar de mais Bits , qualidade do que foi comprado muito ruim.\nFoi marcado com o topógrafo para vir na obra amanhã fazer as marcações na lage da tubulação hidráulica.\n\nFoto"
+    },
+    {
+      "data": "2026-02-12",
+      "comentario": "Efetivo\nAbel\nMateus\nHugo\nLeonardo\nVinícius\nRenan\n\nAtividades executadas:\nMontagem de Viga lage\nInício montagem lage\n\nObs\nDia nublado, sem chuva\nFoi montado e e fixado todas as vigas da lage ( na hora da fixar não bateu com a chapas do aço laminado, tivemos que parafusar uma chapa a mais , foi pedido para a Smart mais até o momento sem retorno)\nMontado já no local painel da lages : 1L10 -  1L9\nFoi fixado a viga 1vg8 conforme medida do projeto, mais não bate com o 3D( foto em anexo)\nTopografia fez marcação dos pontos de  Hidráulica\nFoi montado um guarda corpo com algumas guias sobressalente\n\nFoto"
+    },
+    {
+      "data": "2026-02-18",
+      "comentario": "Efetivo\nAbel\nMateus\nHugo\nFabrício\nRenan\n\nAtividades executadas:\nMontagem lage\n\nObs\nDia nublado, chuva pós almoço produção só parte da manhã.\nFoi solicitado ao Brayan sobre fixação do PV superior, foi passado por ele que será na placa cimenticias mesmo.\nFoi pedido para o comércio da Smarth sobre entrega dos restantes,sem retorno até agora.\n\nFoto"
+    },
+    {
+      "data": "2026-02-19",
+      "comentario": "Efetivo\nAbel\nMateus\nHugo\nFabrício\nVinícius\nLeonardo\n\nAtividades executadas:\nMontagem lage\n\nObs\nDia ensolarado, chuva final do dia\nDia focado na montagem da lage, grande desafio devido ao peso das peças .\nPainel lage 1L06 faltando uma peça\n\nFoto"
+    },
+    {
+      "data": "2026-02-23",
+      "comentario": "Efetivo\nAbel\nDiogo\nAjudante\n\nAtividades executadas:\nCortes de mármore\n\nObs\nSó assentamentamos um peça, devido a quebra do misturador\n\nFoto",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 405,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-02-24",
+      "comentario": "Efetivo\nMateus\nHugo\nVinícius\nLeonardo\nRoger\nMarcus\nFabrício\nJoel\nJoão\n\nAtividades executadas:\nFinalização lage\nInício plaqueamento\nExecução escada hidráulica\n\nObs\nDia nublado, sem chuva\nDia focado na Finalização e início do plaqueamento\nExecução escada hidráulica\nAínda sem posição da smarth sobre o restante das placas\nMuk esteve na obra das 9:30 as 10:20 para subir placas pra lage\n\nFoto",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 537,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-02-25",
+      "comentario": "Efetivo\nMateus\nHugo\nVinícius\nLeonardo\nRoger\nMarcus\nFabrício\nJoel\nJoão\n\nAtividades executadas:\nPlaqueamento lage\nOrganização material do pv2\n\nObs\nDia nublado, sem chuva\nDia de organização do material do pv2 e finalização do plaqueamento\nExecução escada hidráulica\nAínda sem posição da smarth sobre o restante das placas .\nFoi entregue parte do material elétrico\n\nFoto"
+    },
+    {
+      "data": "2026-02-26",
+      "comentario": "Efetivo\nMateus\nHugo\nVinícius\nLeonardo\nRoger\nMarcus\nFabrício\n\nAtividades executadas:\nMontagem escada\nPainelizacao pv2\n\nObs\nDia chuvoso\nDia de montagem da escada, montagem de painel do Pv2 - ( Marcado na imagem os painéis montado hoje)\nExecuções da escada Hidráulica parada hoje devido a chuva\nPrevisão de chegada dos restantes das placas da lage segunda feira, já alinhamos o muk para já subir\nReferente a escada Hidráulica,projetista já deu os alinhamento para retornar.\n\nFoto"
+    },
+    {
+      "data": "2026-02-27",
+      "comentario": "Efetivo\nAbel\nDiogo\nAjudante\nMatheus\nFabrício\nMarcus\n\nAtividades executadas:\nCortes de mármore e assentamento de mármore\nRegularização do forro\n\nObs\nAssentamento de pisso da sala e banheiro da Ginecologista finalizado\nNão foi entregue o AC3\nBatente do DML não foi estalado devido o vão em projeto ser 0,70 e o batente de 0,90, vamos ter que meche na parede\n\nFoto",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "2.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "3.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "4.jpg",
+          "legenda": ""
+        }
+      ]
+    },
+    {
+      "data": "2026-03-02",
+      "comentario": "Efetivo\nMateus\nHugo\nVinícius\nLeonardo\nRoger\nMarcus\nFabrício\n\nJoel\nZe\n\nAtividades executadas:\nFinalização da painelizacao do pv2\nFinalização da escada\nExecuçõe escada Hidráulica\n\nObs\nDia nublado\nFinalização da montagem dos painéis do Pv2\nExecução escada Hidráulica\nTivemos a entrega pós almoço das placas cimenticias faltantes\nCaminhão muk subiu as placas\nFoi passado hj sobre o Plaqueamento externo, e tá programado para entregar sexta feira.\n\nFoto",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "2.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "3.jpg",
+          "legenda": ""
+        }
+      ],
+      "apontamentos": [
+        {
+          "tarefa_mpp": 614,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 423,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-03-04",
+      "comentario": "Efetivo\nMateus\nHugo\nVinícius\nLeonardo\nRoger\nMarcus\nFabrício\n\nAtividades executadas:\nInício verticalização pv2\nFinalização da escada\nExecução Plaqueamento lage\n\nObs\nDia ensolarado\nIniciado a verticalização do Pv2\nParafuso que mandaram não está alcançando o aço pesado, já foi solicitado para a smart.\nLage ficou 3cm maior que o projeto vamos aumentar na parede da cozinha\n\nFoto",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        }
+      ]
+    },
+    {
+      "data": "2026-03-09",
+      "comentario": "Obra Agela\nEfetivo:\n- Abel\n- Hugo\n- Matheus\n- Vinícius\n- Leonardo\n- Roger\n- Marcus\n- Fabrício\nEletricista\nFrancisco\n\nEncanador\nJoel\nZé\nJesi adriano\n\nAtividade:\nDia chuvoso\nJoel foi embora na hora do almoço devido sem condições de trabalho\ninício verticalização telhado\nExecução escada Hidráulica\nExecução infra eletrica\nExecução concretagem parte externa da casa\nFoi decidido que será caco de pedra são Tomé na parte externa da casa",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 409,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 411,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-03-18",
+      "comentario": "Efetivo:\n.Abel\n.Hugo\n. Matheus\n. Vinícius\n. Roger\n. Marcos\n. Leonardo\n\nEquipe Maranhão - 4 pedreiro\n\nEletricista - 1\n\nAtividade:\nExecução infra elétrica pavimento superior\nExecução civil entrada\nOrganização obra\nSem previsão de chegada das placas exteriores\nDescarregamento das telhas da Kisgman\n\nFotos: imagem ocultada",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 421,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 628,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-03-25",
+      "comentario": "Efetivo\n\n. Abel\n.Hugo\n. Roger.\n. Vinícius\n. Leonardo\n. Fabrício\n. Marcos\n. Lucas\n. Paulo\n\nHidráulica: 2\nMaranhão: 4\n\nAtividade:\nFinalização montagem de andaime\nConcretagem frente casinha do gás\nExecução escada casinha do gás\nCortes de excedente da lage\nInfra de água fluviais ( calhas)\nAplicação de manda asfáltica para iniciar Plaqueamento\nInício contra piso pv1\nDescarregamento material Smart , segunda parte será para amanhã\n\nFotos:",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "2.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "3.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "4.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "5.jpg",
+          "legenda": ""
+        }
+      ],
+      "apontamentos": [
+        {
+          "tarefa_mpp": 487,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 486,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 576,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 577,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 432,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 534,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 626,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 464,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-04-02",
+      "comentario": "Obra Casa Angela e Sophia\n\nEfetivo:\n\n- Abel\n- Hugo\n- Paulo\n- Josué\n- Marcos\n- Pedro\n- Davi\n- Danilo\n\nMaranhão + 3\nAbrão + 3\n\nAtividade:\n\n. Execução plaqueamento de OSB\n. execução da colocação da manda Hidrofuga\n. Execução caixa de água cinza\n. Execução contra piso\n\nFotos:"
+    },
+    {
+      "data": "2026-04-08",
+      "comentario": "Obra Casa Angela e Sophia\n\nEfetivo:\n\n- Abel\n- Hugo\n- Paulo\n- Josué\n- Marcos\n- Pedro\n- Davi\n- Danilo\n\nMaranhão + 3\nAbrão + 1\nJoel+1\nEletricista + 1\n\nAtividade:\n\n. Execução instalação das telhas ( tivemos um imprevisto com o caimento da telha em relação a platibanda, Carlos técnico da Smart irá na obra no dia 09/04 para sanar esse problema)\n. Execução caixa de água cinza\n. Limpeza dos montantes que estavam com massa do contra piso\n. Execução infra elétrica e Hidráulica\n. Concretagem rampa de acesso\n. Execução instalação calhas\nFotos:",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 422,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 627,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-04-14",
+      "comentario": "Obra Casa Angela e Sophia\n\nEfetivo:\n\n- Hugo\n- Josué\n- Pedro\n- Davi\n- Danilo\n\n2 ajudantes do Maranhão\nJoel\n\nAtividades executadas:\n-Plaqueamento com cimentícia na fachada frontal. Da lateral esquerda foi executada ontem;\n-Execução de infra de água e esgoto no pavimento Térreo\n\nObservações:\n-Foi feito uma reunião com o Brian para poder mostrar sobre o caimento da calha do fundo, explicando o porquê a calha não foi executada com a base em 90º.\nFicou dele verificar com a equipe de engenharia da Smart sobre isso;\n-Foi cobrado novamente para a Smart referente a um rolo de manta Tyvek que está faltando, impossibilitando o plaqueamento da fachada do fundo.\n-Foram deixados os parafusos das telhas na obra.\n-Foi cobrado ao Abraão referente a limpeza das guias do Pavimento Superior devido contrapiso.\n-Foi liberado pelo Joel a troca do cavalete de água provisório para o permanente.\n\nFotos:",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 346,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 164,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 165,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-05-04",
+      "comentario": "Efetivo:\n- Roger\n- Leonardo\n- Marcos\n- Josué\n\nAtividade:\n\nFinalização Plaqueamento externo\nReunião Angela: Execução Para raio\nEscolha cor da tinta\nRalo oculto chega essa semana\n\nFotos:",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 615,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 198,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 545,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-05-05",
+      "comentario": "Efetivo:\n- Roger\n- Leonardo\n\nAtividade:\n\nManutenção nas placas da escada interna\nVistoria Sofia : Muro de contenção talude será em 3 nível\nParedes de apoio nas bancadas geral da casa\nPedra ferro será assentada nos pilares da garagem\nSerá necessário fazer uma boneca de fora fora nas varanda da casa de 10cm de altura\nPé direito foi ajustado para 2,75m em todos os cômodos exceto no salão do pv1\nReunião com a Smart: Vamos deixar as tubulação de água fluvial das calhas independente até as caixas de passagem.\nBeiral será executado em todo perímetro do telhado, será feito com dois box um em cima do outro, mantendo o acréscimo de 11cm , material da estrutura será fornecido pela Smart, precisamos solicitar só o material para a vedação desse acréscimo.\n\nFotos:",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "2.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "3.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "4.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "5.jpg",
+          "legenda": ""
+        }
+      ],
+      "apontamentos": [
+        {
+          "tarefa_mpp": 347,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-07-14",
+      "comentario": "Efetivo:\nVeks - 4\nLeo pinturas - 2\nAbraão - 5\n\nAtividade :\n\nExecução foro suite 2 ( não está sendo usado o regulador , estamos utilizando o perfil f530 para estruturação devido o distanciamento da treliça para o foro)\n\nSegunda demão na massa nas fitas do térreo\n\nRegularização buracos parede\n\nAssentamento pedra ferro parede da fachada\n\nAplicação massa corrida PV Térreo ( pontos de correção na área do elevador , já passado para o executor )\n\nExecução de passagem de fio PV Térreo ( pontos de tomada confirmados com Sofia)\n\nPendências em aberto:\nCompra rodapé e perfil U - Sofia e Angela darão o ok Hoje dia 15/07\nConfirmação quadro elétrico energia solar-Sofia em contato com o fornecedor sem prazo\nConfirmação entrega textura- Abel confirmar hoje com fornecedor\nResposta email das esquadrias - Abel responderá hoje até às 13h\nConfirmar readequação parede com Smart - Sofia irá passar hoje dia 15/07 a resposta da Maria Laura\nConfirmar revestimento - Ângela irá confirmar até dia 18/07\n\nFotos:",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 618,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 102,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 166,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-07-15",
+      "comentario": "Efetivo:\nVeks - 4\nLeo pinturas - 2\nAbraão - 5\n\nAtividade :\n\nExecução foro suite 2 ( Plaqueamento )\n\nAssentamento pedra ferro parede da fachada\n\nAplicação massa corrida PV Térreo e lixamento  PV 1\n\nExecução de passagem de fio PV Térreo\n\nPendências em aberto:\nCompra rodapé e perfil U - Em aberto ( confirmando entrega )\nConfirmação quadro elétrico energia solar- Manteve o mesmo padrão\nConfirmação entrega textura- Entrega dia 17/07/2026\nResposta email das esquadrias - Resposta enviada dia 16/07\nConfirmar readequação parede com Smart - Em aberto ainda\nConfirmar revestimento - Ângela irá confirmar\n\nFotos:",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "2.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "3.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "4.jpg",
+          "legenda": ""
+        }
+      ],
+      "apontamentos": [
+        {
+          "tarefa_mpp": 406,
+          "pct": 95.0
+        },
+        {
+          "tarefa_mpp": 143,
+          "pct": 25.0
+        },
+        {
+          "tarefa_mpp": 539,
+          "pct": 9.0
+        },
+        {
+          "tarefa_mpp": 540,
+          "pct": 2.0
+        },
+        {
+          "tarefa_mpp": 607,
+          "pct": 70.0
+        },
+        {
+          "tarefa_mpp": 87,
+          "pct": 90.0
+        },
+        {
+          "tarefa_mpp": 88,
+          "pct": 49.0
+        },
+        {
+          "tarefa_mpp": 89,
+          "pct": 95.0
+        },
+        {
+          "tarefa_mpp": 643,
+          "pct": 60.0
+        },
+        {
+          "tarefa_mpp": 451,
+          "pct": 95.0
+        },
+        {
+          "tarefa_mpp": 452,
+          "pct": 90.0
+        },
+        {
+          "tarefa_mpp": 453,
+          "pct": 90.0
+        },
+        {
+          "tarefa_mpp": 202,
+          "pct": 5.0
+        },
+        {
+          "tarefa_mpp": 200,
+          "pct": 5.0
+        },
+        {
+          "tarefa_mpp": 621,
+          "pct": 50.0
+        }
+      ]
+    }
+  ]
+}
