@@ -201,7 +201,9 @@ def test_rdo_imutavel_exporta_estado_e_reimport_pula():
 
 # ── data duplicada ────────────────────────────────────────────────────
 @pytest.mark.integration
-def test_data_duplicada_exporta_mais_recente_com_aviso():
+def test_data_duplicada_exporta_o_primeiro_como_o_updater():
+    """O updater atualiza `existentes[0]` (menor id) — o export retrata o
+    MESMO RDO, senão a mescla decide olhando um e a aplicação escreve noutro."""
     from services.exportacao_rdos import exportar_obra
     from models import RDO
     with app.app_context():
@@ -217,7 +219,8 @@ def test_data_duplicada_exporta_mais_recente_com_aviso():
         conteudo, avisos = exportar_obra(obra, admin_id)
         itens = conteudo['rdos.json']['rdos']
         assert len(itens) == 1
-        assert itens[0]['comentario'] == 'linha duplicada mais nova'
+        assert itens[0]['comentario'] == 'Execução do forro da suíte 2.', \
+            'tem que exportar o PRIMEIRO (o que o updater atualiza)'
         assert any('mais de um RDO nesta data' in a for a in avisos)
 
 

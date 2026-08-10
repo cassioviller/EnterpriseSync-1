@@ -58,10 +58,15 @@ EXTENSOES_IMAGEM = ('.jpg', '.jpeg', '.png', '.webp')
 # todas as outras são continuação da anterior (é assim que texto de RDO com
 # parágrafos e bullets sobrevive à exportação).
 RE_CABECALHO = re.compile(r'^(\d{2}/\d{2}/\d{4}) (\d{2}:\d{2}) - (.*)$')
+# Formato iOS: `[DD/MM/AAAA, HH:MM:SS] resto` (arquivo `_chat.txt`). As
+# marcas U+200E que precedem o `[` já saem em `_limpar_marcas`.
+RE_CABECALHO_IOS = re.compile(r'^\[(\d{2}/\d{2}/\d{4}), (\d{2}:\d{2}):\d{2}\] (.*)$')
 # Autor é opcional: mensagem de sistema ("As mensagens e ligações são
 # protegidas...", "Fulano criou o grupo") vem sem "Autor:".
 RE_AUTOR = re.compile(r'^([^:]{1,80}): (.*)$')
 RE_ANEXO = re.compile(r'^(.+?) \(arquivo anexado\)$')
+# iOS: `<anexado: 00000042-PHOTO-....jpg>` (pt) / `<attached: ...>` (en)
+RE_ANEXO_IOS = re.compile(r'^<(?:anexado|attached): (.+?)>$')
 # "Obra Itu - RDO – 07/07/2026", "*Obra a Angela - RDO 14/07/2026*", "RDO – 22/07/2026"
 RE_RDO = re.compile(r'\bRDO\b\s*[–—:-]?\s*(\d{2}/\d{2}/\d{4})')
 # Formato antigo do grupo: primeira linha só com a data em negrito.
@@ -86,8 +91,14 @@ def _sem_acento(texto):
 
 
 def _limpar_marcas(linha):
-    """Tira as marcas de direção que o WhatsApp injeta antes de autor e anexo."""
-    return linha.replace('‎', '').replace('‏', '').replace('﻿', '')
+    """Tira as marcas de direção que o WhatsApp injeta antes de autor e anexo.
+
+    O export iOS acrescenta U+2068/U+2069 (isolamento bidi) em volta de
+    @menções — também saem, senão viram lixo no comentário do RDO.
+    """
+    for marca in ('‎', '‏', '﻿', '⁨', '⁩'):
+        linha = linha.replace(marca, '')
+    return linha
 
 
 class Mensagem:
@@ -106,7 +117,8 @@ class Mensagem:
     def finalizar(self):
         """Separa anexo e legenda depois que as continuações já entraram."""
         linhas = self.corpo.split('\n')
-        m = RE_ANEXO.match(linhas[0].strip())
+        primeira = linhas[0].strip()
+        m = RE_ANEXO.match(primeira) or RE_ANEXO_IOS.match(primeira)
         if m:
             self.anexo = m.group(1).strip()
             self.legenda = '\n'.join(linhas[1:]).strip()
@@ -136,7 +148,7 @@ def parse_mensagens(texto):
     atual = None
     for linha_bruta in texto.split('\n'):
         linha = _limpar_marcas(linha_bruta.rstrip('\r'))
-        cab = RE_CABECALHO.match(linha)
+        cab = RE_CABECALHO.match(linha) or RE_CABECALHO_IOS.match(linha)
         if cab:
             if atual is not None:
                 mensagens.append(atual.finalizar())
@@ -157,9 +169,10 @@ def parse_mensagens(texto):
     # parece "não teve RDO" em vez de "não entendi o arquivo". Falha alto.
     if not mensagens and texto.strip():
         raise ValueError(
-            'Nenhuma mensagem reconhecida no export. O parser espera o formato '
-            '"DD/MM/AAAA HH:MM - Autor: texto" (exportação em pt-BR). Confira '
-            'o idioma/locale do celular que gerou o arquivo.')
+            'Nenhuma mensagem reconhecida no export. O parser espera '
+            '"DD/MM/AAAA HH:MM - Autor: texto" (Android pt-BR) ou '
+            '"[DD/MM/AAAA, HH:MM:SS] Autor: texto" (iOS). Confira o '
+            'idioma/locale do celular que gerou o arquivo.')
     return mensagens
 
 
@@ -189,10 +202,16 @@ def _marcador_no_texto(corpo, marcadores_conhecidos):
 def agrupar_rdos(mensagens, marcador_obra, marcadores_conhecidos=()):
     """Junta cada mensagem de RDO com as fotos postadas até o próximo RDO.
 
+    `marcador_obra` aceita uma string OU uma lista de APELIDOS da mesma
+    obra — o grupo real grafa a Angela de três jeitos ("Obra a Angela",
+    "Obra casa Angela", "Obra Angela"); qualquer apelido conta como alvo.
+
     Devolve (blocos_da_obra, avisos). Bloco sem marcador herda o do bloco
     anterior do MESMO autor — e a herança vira aviso.
     """
-    conhecidos = list(dict.fromkeys(list(marcadores_conhecidos) + [marcador_obra]))
+    apelidos = ([marcador_obra] if isinstance(marcador_obra, str)
+                else list(marcador_obra))
+    conhecidos = list(dict.fromkeys(list(marcadores_conhecidos) + apelidos))
     blocos, avisos = [], []
     ultimo_marcador_por_autor = {}
     atual = None
@@ -215,12 +234,12 @@ def agrupar_rdos(mensagens, marcador_obra, marcadores_conhecidos=()):
 
     da_obra = []
     for b in blocos:
-        if b.marcador != marcador_obra:
+        if b.marcador not in apelidos:
             continue
         if b.herdou_marcador:
             avisos.append(
                 f'{b.data_rdo.isoformat()}: bloco sem marcador de obra no texto — '
-                f'atribuído a "{marcador_obra}" pelo autor ({b.autor}). Confira.'
+                f'atribuído a "{apelidos[0]}" pelo autor ({b.autor}). Confira.'
             )
         da_obra.append(b)
 
@@ -258,17 +277,31 @@ def _normalizar_titulo(linha):
     return None
 
 
-def normalizar_comentario(texto):
+def normalizar_comentario(texto, marcadores=()):
     """Texto do RDO como vai para `rdo.comentario_geral`.
 
     Tira a linha do cabeçalho ("Obra Itu - RDO – 07/07/2026"), o marcador de
     edição do WhatsApp e o negrito de asterisco; padroniza os títulos de seção
     e colapsa as linhas em branco entre bullets. O conteúdo em si é
     **verbatim** — resumir relatório de obra não é trabalho de script.
+
+    `marcadores`: no formato antigo (data na 1ª linha, marcador na 2ª) a
+    linha "Obra X" sobra no topo do comentário. Só some se casar um
+    marcador CONHECIDO — remover qualquer linha "Obra ..." engoliria
+    conteúdo real ("Obra parada por chuva").
     """
     linhas = texto.replace('<Mensagem editada>', '').split('\n')
     if linhas and (RE_RDO.search(linhas[0]) or RE_DATA_SOZINHA.match(linhas[0].strip())):
         linhas = linhas[1:]
+    conhecidos = {_sem_acento(m) for m in marcadores}
+    while linhas and conhecidos:
+        topo = _sem_acento(linhas[0].replace('*', '').strip())
+        if topo and topo in conhecidos:
+            linhas = linhas[1:]
+        elif not topo:
+            linhas = linhas[1:]
+        else:
+            break
 
     saida = []
     for linha in linhas:
@@ -536,7 +569,11 @@ def converter(caminho_zip=None, caminho_txt=None, dir_midias=None,
             continue
         if ate and bloco.data_rdo > ate:
             continue
-        comentario = normalizar_comentario(bloco.texto)
+        comentario = normalizar_comentario(
+            bloco.texto,
+            marcadores=list(marcadores_conhecidos) + (
+                [marcador_obra] if isinstance(marcador_obra, str)
+                else list(marcador_obra)))
         fotos, avisos_fotos = escrever_fotos(
             bloco, base_fotos, ler_midia, dry_run, forcar)
         avisos.extend(avisos_fotos)
@@ -570,7 +607,9 @@ def converter(caminho_zip=None, caminho_txt=None, dir_midias=None,
 
 
 def _relatorio(payload, meta, marcador_obra):
-    linhas = [f'[whatsapp_para_rdos] obra "{marcador_obra}": '
+    rotulo = (marcador_obra if isinstance(marcador_obra, str)
+              else ' | '.join(marcador_obra))
+    linhas = [f'[whatsapp_para_rdos] obra "{rotulo}": '
               f'{meta["dias"]} dia(s) de RDO']
     for item in payload['rdos']:
         sug = item.get('_sugestoes') or []
@@ -598,7 +637,9 @@ def main(argv=None):
     p.add_argument('--txt', dest='caminho_txt', help='conversa .txt já extraída')
     p.add_argument('--midias', dest='dir_midias', help='pasta das mídias (com --txt)')
     p.add_argument('--obra-marcador', default='Obra Itu',
-                   help='marcador da obra no cabeçalho do RDO (default: "Obra Itu")')
+                   help='marcador da obra no cabeçalho do RDO; aceita APELIDOS '
+                        'separados por vírgula — ex.: "Obra a Angela,Obra casa '
+                        'Angela,Obra Angela" (default: "Obra Itu")')
     p.add_argument('--outros-marcadores', default='Obra Vila velha,Obra Anderson,Obra a Angela',
                    help='marcadores das OUTRAS obras do grupo, separados por vírgula')
     p.add_argument('--desde', help='primeira data de RDO (AAAA-MM-DD)')
@@ -626,7 +667,8 @@ def main(argv=None):
         caminho_zip=args.caminho_zip,
         caminho_txt=args.caminho_txt,
         dir_midias=args.dir_midias,
-        marcador_obra=args.obra_marcador,
+        marcador_obra=([m.strip() for m in args.obra_marcador.split(',')]
+                       if ',' in args.obra_marcador else args.obra_marcador),
         marcadores_conhecidos=[m.strip() for m in args.outros_marcadores.split(',') if m.strip()],
         desde=date.fromisoformat(args.desde) if args.desde else None,
         ate=date.fromisoformat(args.ate) if args.ate else None,

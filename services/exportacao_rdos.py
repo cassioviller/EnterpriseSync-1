@@ -255,15 +255,19 @@ def exportar_obra(obra, admin_id, com_fotos=False):
             .order_by(RDO.data_relatorio, RDO.id)
             .all())
 
-    # Duas linhas na mesma data (legado permite): a mais recente é a que o
-    # upsert enxergaria — exporta ela e avisa, nunca escolhe em silêncio.
+    # Duas linhas na mesma data (legado permite): o updater atualiza o
+    # PRIMEIRO (menor id — `atualizar_rdos` avisa e usa `existentes[0]`),
+    # então o export tem que retratar ESSE, senão a mescla decide olhando
+    # um RDO e a aplicação escreve noutro. Avisa, nunca escolhe em silêncio.
     por_data = {}
     for r in rdos:
         if r.data_relatorio in por_data:
             avisos.append(
                 f'{r.data_relatorio.isoformat()}: mais de um RDO nesta data '
                 f'({por_data[r.data_relatorio].numero_rdo} e {r.numero_rdo}) '
-                f'— exportado o mais recente ({r.numero_rdo}).')
+                f'— exportado o PRIMEIRO ({por_data[r.data_relatorio].numero_rdo}), '
+                f'o mesmo que o updater atualiza.')
+            continue
         por_data[r.data_relatorio] = r
     unicos = [por_data[d] for d in sorted(por_data)]
 

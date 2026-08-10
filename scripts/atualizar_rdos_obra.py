@@ -62,7 +62,9 @@ def main(argv=None):
     p = argparse.ArgumentParser(
         description='Atualiza os RDOs de uma obra sem apagar nada.')
     p.add_argument('admin', help='admin_id ou username')
-    p.add_argument('codigo_obra', help='código da obra (Obra.codigo)')
+    p.add_argument('codigo_obra',
+                   help='código da obra (Obra.codigo); obra sem código '
+                        'aceita o id numérico como fallback')
     p.add_argument('payload', help='JSON com a seção "rdos"')
     p.add_argument('--dry-run', action='store_true')
     p.add_argument('--sem-fotos', action='store_true')
@@ -84,8 +86,13 @@ def main(argv=None):
             return 1
         obra = Obra.query.filter_by(codigo=args.codigo_obra,
                                     admin_id=admin_id).first()
+        if obra is None and str(args.codigo_obra).isdigit():
+            # Obra sem `codigo` (ex.: Angela, id 43) não tem como ser
+            # endereçada senão pelo id. Código vence; id é o fallback.
+            obra = Obra.query.filter_by(id=int(args.codigo_obra),
+                                        admin_id=admin_id).first()
         if obra is None:
-            print(f'obra código={args.codigo_obra} não encontrada para '
+            print(f'obra código/id={args.codigo_obra} não encontrada para '
                   f'admin_id={admin_id}')
             return 1
 
