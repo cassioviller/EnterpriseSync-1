@@ -28,12 +28,23 @@ from dataclasses import dataclass
 
 TIPOS_VALIDOS = ('TI', 'II', 'TT', 'IT')
 
-# Gramática oficial de uma entrada (já normalizada com strip()/upper()).
-_ENTRADA_RE = re.compile(r'^(\d+)(TI|II|TT|IT)?([+-]\d+)?$')
+# O MS Project em inglês (e muito hábito de usuário) grafa FS/SS/FF/SF —
+# aceitos como apelidos e normalizados para o vocabulário pt-BR.
+_APELIDOS_TIPO = {'FS': 'TI', 'SS': 'II', 'FF': 'TT', 'SF': 'IT'}
 
-# Forma "quase válida" com tipo de 2 letras desconhecido (ex.: 12XX+3) —
-# usada apenas para diferenciar "tipo inválido" de "formato inválido".
-_ENTRADA_TIPO_QUALQUER_RE = re.compile(r'^(\d+)([A-Z]{2})([+-]\d+)?$')
+# Gramática de uma entrada (normalizada com strip()/upper() e SEM espaços
+# internos — o Project escreve "12TI+3 dias" e aceita espaços à vontade).
+# O lag pode vir com a unidade que o Project exibe: "+3 dias", "+3d",
+# "+3dia". Só dia útil — "dd" (dias decorridos) e "%" são recusados adiante
+# com mensagem própria.
+_ENTRADA_RE = re.compile(
+    r'^(\d+)(TI|II|TT|IT|FS|SS|FF|SF)?([+-]\d+)(?:D|DIA|DIAS)?$'
+    r'|^(\d+)(TI|II|TT|IT|FS|SS|FF|SF)?$')
+
+# Formas "quase válidas", para o erro dizer O QUE está errado:
+_ENTRADA_TIPO_QUALQUER_RE = re.compile(r'^(\d+)([A-Z]{2})([+-]\d+)?[A-Z]*$')
+_LAG_PERCENTUAL_RE = re.compile(r'^\d+[A-Z]{0,2}[+-]\d+%$')
+_LAG_DECORRIDO_RE = re.compile(r'^\d+[A-Z]{0,2}[+-]\d+DD$')
 
 
 class ErroParsePredecessora(ValueError):
@@ -74,24 +85,48 @@ def parsear_predecessoras(
     linhas_vistas: set[int] = set()
 
     for entrada in re.split(r'[;,]', texto):
-        entrada = entrada.strip().upper()
+        # Espaços somem ANTES do match: o Project escreve "12TI+3 dias" e
+        # tolera "12 TI + 3" — quem digita igual ao Project não pode errar.
+        # EXCETO dígito-espaço-dígito ("12 15"): colapsar viraria a linha
+        # 1215 e criaria um vínculo errado em silêncio — é ';' esquecido.
+        bruto = entrada.strip().upper()
+        if re.search(r'\d\s+\d', bruto):
+            raise ErroParsePredecessora(
+                f"Formato inválido: '{bruto}' — separe as predecessoras "
+                f"com ';' (ex.: 12; 15TI+3)"
+            )
+        entrada = re.sub(r'\s+', '', bruto)
         if not entrada:
             continue
 
         m = _ENTRADA_RE.match(entrada)
         if not m:
+            if _LAG_PERCENTUAL_RE.match(entrada):
+                raise ErroParsePredecessora(
+                    f"Lag percentual não é suportado: '{entrada}' — "
+                    "use lag em dias úteis (ex.: 12TI+3)"
+                )
+            if _LAG_DECORRIDO_RE.match(entrada):
+                raise ErroParsePredecessora(
+                    f"Dias decorridos ('dd') não são suportados: '{entrada}' "
+                    "— o lag é sempre em dias ÚTEIS (ex.: 12TI+3)"
+                )
             m_tipo = _ENTRADA_TIPO_QUALQUER_RE.match(entrada)
-            if m_tipo:
+            if m_tipo and m_tipo.group(2) not in TIPOS_VALIDOS \
+                    and m_tipo.group(2) not in _APELIDOS_TIPO:
                 raise ErroParsePredecessora(
                     f"Tipo de vínculo inválido: '{m_tipo.group(2)}' "
-                    "(use TI, II, TT ou IT)"
+                    "(use TI, II, TT ou IT — ou FS, SS, FF, SF)"
                 )
             raise ErroParsePredecessora(
-                f"Formato inválido: '{entrada}'. Exemplos: 12, 12TI+3, 12II-2"
+                f"Formato inválido: '{entrada}'. Exemplos: 12, 12TI+3, "
+                f"12II-2, 12FS+3 dias"
             )
 
-        linha = int(m.group(1))
-        tipo = m.group(2) or 'TI'
+        # O regex tem duas alternativas (com e sem lag) — grupos 1-3 ou 4-5.
+        linha = int(m.group(1) or m.group(4))
+        tipo = (m.group(2) or m.group(5)) or 'TI'
+        tipo = _APELIDOS_TIPO.get(tipo, tipo)
         lag = int(m.group(3)) if m.group(3) else 0
 
         if linha in linhas_vistas:

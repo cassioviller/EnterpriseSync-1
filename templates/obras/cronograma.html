@@ -1169,7 +1169,8 @@ function iniciarEdicao(el, tarefaId, campo) {
       inp.className = 'cell-input';
       inp.style.cssText = 'width:auto;min-width:110px;max-width:170px;font-size:.78rem';
       inp.placeholder = 'ex: 12; 15TT+1';
-      inp.title = 'Formato Project: 12, 12TI+3, 12II-2 — separe múltiplas com ";"';
+      inp.title = 'Formato Project: 12, 12TI+3 dias, 12II-2, 12FS+3d — ' +
+                  'aceita TI/II/TT/IT ou FS/SS/FF/SF; separe múltiplas com ";"';
       inp.value = oldTexto;
       el.innerHTML = '';
       el.appendChild(inp);

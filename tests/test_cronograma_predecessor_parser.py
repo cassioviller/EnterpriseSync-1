@@ -107,13 +107,13 @@ def test_linha_inexistente():
 def test_tipo_invalido_xx():
     with pytest.raises(ErroParsePredecessora) as exc:
         parsear_predecessoras('12XX', LINHA_PARA_TAREFA)
-    assert str(exc.value) == "Tipo de vínculo inválido: 'XX' (use TI, II, TT ou IT)"
+    assert str(exc.value) == "Tipo de vínculo inválido: 'XX' (use TI, II, TT ou IT — ou FS, SS, FF, SF)"
 
 
 def test_tipo_invalido_com_lag_tambem_acusa_tipo():
     with pytest.raises(ErroParsePredecessora) as exc:
         parsear_predecessoras('12XX+3', LINHA_PARA_TAREFA)
-    assert str(exc.value) == "Tipo de vínculo inválido: 'XX' (use TI, II, TT ou IT)"
+    assert str(exc.value) == "Tipo de vínculo inválido: 'XX' (use TI, II, TT ou IT — ou FS, SS, FF, SF)"
 
 
 def test_auto_referencia():
@@ -131,7 +131,8 @@ def test_tarefa_resumo():
 def test_lixo_formato_invalido():
     with pytest.raises(ErroParsePredecessora) as exc:
         parsear_predecessoras('12T+', LINHA_PARA_TAREFA)
-    assert str(exc.value) == "Formato inválido: '12T+'. Exemplos: 12, 12TI+3, 12II-2"
+    assert str(exc.value) == ("Formato inválido: '12T+'. Exemplos: 12, 12TI+3, "
+                              "12II-2, 12FS+3 dias")
 
 
 @pytest.mark.parametrize('texto', ['abc', 'TI12', '12TI+', '+3', '12 15', '12TI3'])
@@ -214,3 +215,53 @@ def test_round_trip_formatar_depois_parse():
     ]
     texto = formatar_predecessoras(originais, TAREFA_PARA_LINHA)
     assert parsear_predecessoras(texto, LINHA_PARA_TAREFA) == originais
+
+
+# ── notação do MS Project como ele mesmo escreve (2026-08-10) ─────────
+# O Project exibe "12TI+3 dias" e aceita espaços e a grafia inglesa
+# FS/SS/FF/SF. Quem digitava exatamente o que via levava "Formato
+# inválido" — estas formas agora normalizam para o vocabulário TI/II/TT/IT.
+
+def test_lag_com_unidade_dias_do_project():
+    assert parsear_predecessoras('12TI+3 dias', LINHA_PARA_TAREFA) == [
+        VinculoParseado(112, 'TI', 3)]
+    assert parsear_predecessoras('12TT+2d', LINHA_PARA_TAREFA) == [
+        VinculoParseado(112, 'TT', 2)]
+    assert parsear_predecessoras('12II-2 DIA', LINHA_PARA_TAREFA) == [
+        VinculoParseado(112, 'II', -2)]
+
+
+def test_espacos_do_project_sao_tolerados():
+    assert parsear_predecessoras('12 TI + 3 dias', LINHA_PARA_TAREFA) == [
+        VinculoParseado(112, 'TI', 3)]
+
+
+def test_apelidos_ingleses_fs_ss_ff_sf():
+    assert parsear_predecessoras('12FS+3', LINHA_PARA_TAREFA) == [
+        VinculoParseado(112, 'TI', 3)]
+    assert parsear_predecessoras('12SS', LINHA_PARA_TAREFA) == [
+        VinculoParseado(112, 'II', 0)]
+    assert parsear_predecessoras('12FF-1d', LINHA_PARA_TAREFA) == [
+        VinculoParseado(112, 'TT', -1)]
+    assert parsear_predecessoras('12SF+2', LINHA_PARA_TAREFA) == [
+        VinculoParseado(112, 'IT', 2)]
+
+
+def test_digito_espaco_digito_nao_colapsa_em_linha_errada():
+    """'12 15' é ';' esquecido — colapsar viraria a linha 1215 e criaria
+    vínculo errado EM SILÊNCIO. Tem que ser erro de formato."""
+    with pytest.raises(ErroParsePredecessora) as exc:
+        parsear_predecessoras('12 15', LINHA_PARA_TAREFA)
+    assert "separe as predecessoras" in str(exc.value)
+
+
+def test_lag_percentual_recusado_com_mensagem_propria():
+    with pytest.raises(ErroParsePredecessora) as exc:
+        parsear_predecessoras('12TI+50%', LINHA_PARA_TAREFA)
+    assert 'percentual' in str(exc.value)
+
+
+def test_dias_decorridos_recusado_com_mensagem_propria():
+    with pytest.raises(ErroParsePredecessora) as exc:
+        parsear_predecessoras('12TI+3dd', LINHA_PARA_TAREFA)
+    assert 'ÚTEIS' in str(exc.value)
