@@ -54,6 +54,11 @@
 .crm-card.sortable-chosen { box-shadow: 0 8px 24px rgba(0,0,0,.18); }
 .crm-card__nome { font-weight: 600; color: #212529; margin-bottom: 4px; }
 .crm-card__linha { font-size: .82rem; color: #212529; margin-bottom: 2px; }
+/* Localização: o texto é livre (até 200 chars) e o card é estreito — trunca com
+   reticências e joga a versão completa (+ detalhes) no title. */
+.crm-card__local { color: #495057; }
+.crm-card__local .fa-map-marker-alt { flex: 0 0 auto; color: #6c757d; }
+.crm-card__local-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crm-card__valor {
     display: inline-block;
     font-weight: 700;
@@ -268,6 +273,14 @@
                         {% if lead.valor_proposta %}
                         <div class="crm-card__linha">
                             <span class="crm-card__valor">{{ lead.valor_proposta|brl }}</span>
+                        </div>
+                        {% endif %}
+                        {% if lead.localizacao or lead.detalhes_localizacao %}
+                        {% set loc_completa = [lead.localizacao, lead.detalhes_localizacao]|select|join(' — ') %}
+                        <div class="crm-card__linha crm-card__local d-flex align-items-center gap-1"
+                             title="{{ loc_completa }}">
+                            <i class="fas fa-map-marker-alt" aria-hidden="true"></i>
+                            <span class="crm-card__local-txt">{{ lead.localizacao or lead.detalhes_localizacao }}</span>
                         </div>
                         {% endif %}
                         {% if lead.data_chegada %}
