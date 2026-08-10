@@ -1,0 +1,598 @@
+{
+  "_meta": {
+    "formato": "carga-obra/1.0",
+    "gerado_em": "2026-08-10T13:23:42",
+    "fontes": {
+      "export": "rdos_OB004_2026-08-10.zip",
+      "whatsapp": "WhatsApp Chat - 📝 Diário de Obras - Veks Engenharia (1).zip",
+      "cronograma": "Cronograma Pablo.mpp"
+    }
+  },
+  "obra": {
+    "id": 50,
+    "codigo": "OB004",
+    "nome": "Pablo E Ana Laura",
+    "admin_id": 1640,
+    "admin_username": "veks",
+    "status": "Em andamento",
+    "data_inicio": "2026-03-30",
+    "data_previsao_fim": "2026-06-05",
+    "cronograma_revisado_em": null
+  },
+  "fotos_base": "fotos_rdos/obras/OB004",
+  "cronograma_tarefas": [
+    {
+      "uid": 19,
+      "nome": "0BRA CASA ANA E PABLO",
+      "outline": 1,
+      "inicio": "2026-03-31",
+      "fim": "2026-08-30",
+      "dias": 110.0,
+      "resumo": true
+    },
+    {
+      "uid": 12,
+      "nome": "PRIMEIRA FASE",
+      "outline": 2,
+      "inicio": "2026-03-31",
+      "fim": "2026-06-02",
+      "dias": 45.0,
+      "resumo": true
+    },
+    {
+      "uid": 1,
+      "nome": "MOBILIZAÇÃO",
+      "outline": 3,
+      "inicio": "2026-03-31",
+      "fim": "2026-04-01",
+      "dias": 2.0,
+      "resumo": false
+    },
+    {
+      "uid": 2,
+      "nome": "PAINELIZAÇÃO E VERTICALIZAÇÃO  PAREDES",
+      "outline": 3,
+      "inicio": "2026-04-02",
+      "fim": "2026-04-16",
+      "dias": 11.0,
+      "resumo": false
+    },
+    {
+      "uid": 6,
+      "nome": "PLAQUEAMENTO EXTERNO + BASECOLT",
+      "outline": 3,
+      "inicio": "2026-04-27",
+      "fim": "2026-07-15",
+      "dias": 59.0,
+      "resumo": false
+    },
+    {
+      "uid": 4,
+      "nome": "RETORNO / FOLGA",
+      "outline": 2,
+      "inicio": "2026-05-01",
+      "fim": "2026-05-08",
+      "dias": 6.0,
+      "resumo": false
+    },
+    {
+      "uid": 5,
+      "nome": "SEGUNDA FASE",
+      "outline": 2,
+      "inicio": "2026-05-09",
+      "fim": "2026-06-12",
+      "dias": 25.0,
+      "resumo": true
+    },
+    {
+      "uid": 14,
+      "nome": "RETORNO VILA VELHA",
+      "outline": 3,
+      "inicio": "2026-05-09",
+      "fim": "2026-05-10",
+      "dias": 2.0,
+      "resumo": false
+    },
+    {
+      "uid": 3,
+      "nome": "PAINELIZAÇÃO E VERTICALIZAÇÃO TELHADO",
+      "outline": 3,
+      "inicio": "2026-05-11",
+      "fim": "2026-05-15",
+      "dias": 5.0,
+      "resumo": false
+    },
+    {
+      "uid": 8,
+      "nome": "MONTAGEM TELHADO",
+      "outline": 3,
+      "inicio": "2026-05-18",
+      "fim": "2026-07-15",
+      "dias": 44.0,
+      "resumo": false
+    },
+    {
+      "uid": 7,
+      "nome": "RETORNO / FOLGA",
+      "outline": 3,
+      "inicio": "2026-06-01",
+      "fim": "2026-06-10",
+      "dias": 8.0,
+      "resumo": false
+    },
+    {
+      "uid": 9,
+      "nome": "TERCEIRA E ULTIMA FASE",
+      "outline": 2,
+      "inicio": "2026-06-13",
+      "fim": "2026-07-03",
+      "dias": 16.0,
+      "resumo": true
+    },
+    {
+      "uid": 15,
+      "nome": "RETORNO VILA VELHA",
+      "outline": 3,
+      "inicio": "2026-08-17",
+      "fim": "2026-08-18",
+      "dias": 2.0,
+      "resumo": false
+    },
+    {
+      "uid": 10,
+      "nome": "PLAQUEAMENTO INTERNO PAREDE",
+      "outline": 3,
+      "inicio": "2026-07-27",
+      "fim": "2026-08-04",
+      "dias": 7.0,
+      "resumo": false
+    },
+    {
+      "uid": 21,
+      "nome": "PLAQUEAMENTO FORRO INTERNO",
+      "outline": 3,
+      "inicio": "2026-08-17",
+      "fim": "2026-08-25",
+      "dias": 7.0,
+      "resumo": false
+    },
+    {
+      "uid": 22,
+      "nome": "RESOLUÇÃO PENDECIAS",
+      "outline": 3,
+      "inicio": "2026-08-17",
+      "fim": "2026-08-25",
+      "dias": 7.0,
+      "resumo": false
+    },
+    {
+      "uid": 11,
+      "nome": "PLAQUEAMENTO FORRO EXTERNO",
+      "outline": 3,
+      "inicio": "2026-08-17",
+      "fim": "2026-08-25",
+      "dias": 7.0,
+      "resumo": false
+    },
+    {
+      "uid": 18,
+      "nome": "RETORNO",
+      "outline": 3,
+      "inicio": "2026-08-30",
+      "fim": "2026-08-30",
+      "dias": 1.0,
+      "resumo": false
+    }
+  ],
+  "mapa_nomes": {
+    "-257": {
+      "nome": "Estrutura LSF",
+      "pai": null,
+      "caminho": []
+    },
+    "-259": {
+      "nome": "Painelização LSF",
+      "pai": "Estrutura LSF",
+      "caminho": [
+        "Estrutura LSF"
+      ]
+    },
+    "-260": {
+      "nome": "Verticalização LSF",
+      "pai": "Estrutura LSF",
+      "caminho": [
+        "Estrutura LSF"
+      ]
+    },
+    "-263": {
+      "nome": "Telhado Sanduiche",
+      "pai": null,
+      "caminho": []
+    },
+    "-264": {
+      "nome": "Fechamento com Telha",
+      "pai": "Telhado Sanduiche",
+      "caminho": [
+        "Telhado Sanduiche"
+      ]
+    },
+    "-265": {
+      "nome": "Fechamento Externo",
+      "pai": null,
+      "caminho": []
+    },
+    "-266": {
+      "nome": "Plaqueamento Externo OSB",
+      "pai": "Fechamento Externo",
+      "caminho": [
+        "Fechamento Externo"
+      ]
+    },
+    "-275": {
+      "nome": "Aplicação de membrana Hidrófuga",
+      "pai": "Fechamento Externo",
+      "caminho": [
+        "Fechamento Externo"
+      ]
+    },
+    "-267": {
+      "nome": "Plaqueamento c/ placa externa",
+      "pai": "Fechamento Externo",
+      "caminho": [
+        "Fechamento Externo"
+      ]
+    },
+    "-268": {
+      "nome": "Tratamento de junta",
+      "pai": "Fechamento Externo",
+      "caminho": [
+        "Fechamento Externo"
+      ]
+    },
+    "-269": {
+      "nome": "Tratamento da superfice Com basecoat 1 de mão",
+      "pai": "Fechamento Externo",
+      "caminho": [
+        "Fechamento Externo"
+      ]
+    },
+    "-270": {
+      "nome": "Tratamento da superfície Com basecoat 2 de mão",
+      "pai": "Fechamento Externo",
+      "caminho": [
+        "Fechamento Externo"
+      ]
+    },
+    "-271": {
+      "nome": "RETORNO/FOLGA",
+      "pai": "Fechamento Externo",
+      "caminho": [
+        "Fechamento Externo"
+      ]
+    },
+    "-272": {
+      "nome": "Fechamento Interno",
+      "pai": null,
+      "caminho": []
+    },
+    "-273": {
+      "nome": "Plaqueamento c/ placa interna",
+      "pai": "Fechamento Interno",
+      "caminho": [
+        "Fechamento Interno"
+      ]
+    },
+    "-274": {
+      "nome": "Tratamento de junta",
+      "pai": "Fechamento Interno",
+      "caminho": [
+        "Fechamento Interno"
+      ]
+    },
+    "19": {
+      "nome": "0BRA CASA ANA E PABLO",
+      "pai": null,
+      "caminho": []
+    },
+    "12": {
+      "nome": "PRIMEIRA FASE",
+      "pai": "0BRA CASA ANA E PABLO",
+      "caminho": [
+        "0BRA CASA ANA E PABLO"
+      ]
+    },
+    "1": {
+      "nome": "MOBILIZAÇÃO",
+      "pai": "PRIMEIRA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "PRIMEIRA FASE"
+      ]
+    },
+    "2": {
+      "nome": "PAINELIZAÇÃO E VERTICALIZAÇÃO  PAREDES",
+      "pai": "PRIMEIRA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "PRIMEIRA FASE"
+      ]
+    },
+    "6": {
+      "nome": "PLAQUEAMENTO EXTERNO + BASECOLT",
+      "pai": "PRIMEIRA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "PRIMEIRA FASE"
+      ]
+    },
+    "4": {
+      "nome": "RETORNO / FOLGA",
+      "pai": "0BRA CASA ANA E PABLO",
+      "caminho": [
+        "0BRA CASA ANA E PABLO"
+      ]
+    },
+    "5": {
+      "nome": "SEGUNDA FASE",
+      "pai": "0BRA CASA ANA E PABLO",
+      "caminho": [
+        "0BRA CASA ANA E PABLO"
+      ]
+    },
+    "14": {
+      "nome": "RETORNO VILA VELHA",
+      "pai": "SEGUNDA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "SEGUNDA FASE"
+      ]
+    },
+    "3": {
+      "nome": "PAINELIZAÇÃO E VERTICALIZAÇÃO TELHADO",
+      "pai": "SEGUNDA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "SEGUNDA FASE"
+      ]
+    },
+    "8": {
+      "nome": "MONTAGEM TELHADO",
+      "pai": "SEGUNDA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "SEGUNDA FASE"
+      ]
+    },
+    "7": {
+      "nome": "RETORNO / FOLGA",
+      "pai": "SEGUNDA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "SEGUNDA FASE"
+      ]
+    },
+    "9": {
+      "nome": "TERCEIRA E ULTIMA FASE",
+      "pai": "0BRA CASA ANA E PABLO",
+      "caminho": [
+        "0BRA CASA ANA E PABLO"
+      ]
+    },
+    "15": {
+      "nome": "RETORNO VILA VELHA",
+      "pai": "TERCEIRA E ULTIMA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "TERCEIRA E ULTIMA FASE"
+      ]
+    },
+    "10": {
+      "nome": "PLAQUEAMENTO INTERNO PAREDE",
+      "pai": "TERCEIRA E ULTIMA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "TERCEIRA E ULTIMA FASE"
+      ]
+    },
+    "21": {
+      "nome": "PLAQUEAMENTO FORRO INTERNO",
+      "pai": "TERCEIRA E ULTIMA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "TERCEIRA E ULTIMA FASE"
+      ]
+    },
+    "22": {
+      "nome": "RESOLUÇÃO PENDECIAS",
+      "pai": "TERCEIRA E ULTIMA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "TERCEIRA E ULTIMA FASE"
+      ]
+    },
+    "11": {
+      "nome": "PLAQUEAMENTO FORRO EXTERNO",
+      "pai": "TERCEIRA E ULTIMA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "TERCEIRA E ULTIMA FASE"
+      ]
+    },
+    "18": {
+      "nome": "RETORNO",
+      "pai": "TERCEIRA E ULTIMA FASE",
+      "caminho": [
+        "0BRA CASA ANA E PABLO",
+        "TERCEIRA E ULTIMA FASE"
+      ]
+    }
+  },
+  "rdos": [
+    {
+      "data": "2026-04-01",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 1,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-04-15",
+      "comentario": "Efetivo:\n\n- Matheus\n- Vinícius\n- Roger\n- Leonardo\n\nAtividade:\n\n. Verticalização das paredes: Começamos o dia remarcando a obra com ponto zero sendo a escada, verticalizado já hj com a nova marcação os painéis: wall - 7 , 19 , 3 , 41 , 40 , 43 , 44 , 46 , 10 , 13 , 48.\n\nFotos:"
+    },
+    {
+      "data": "2026-04-16",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        }
+      ],
+      "apontamentos": [
+        {
+          "tarefa_mpp": 2,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-04-17",
+      "comentario": "Efetivo:\n\n- Matheus\n- Vinícius\n- Roger\n- Leonardo\n- Marcos\n\nAtividade:\n\n. Início painelizaçao treliça telhado: foram montado 13 treliças de 168 total ( truss 164-74-13-86-12-122-11-165-10-169-7-192-67)\n\nFotos:"
+    },
+    {
+      "data": "2026-04-27",
+      "comentario": "Efetivo:\n\n- Matheus\n- Vinícius\n- Roger\n- Leonardo\n- Marcos\n\nAtividade:\n\n. Plaqueamento externo com placa Cimenticia, foi executado o Plaqueamento do trecho um da casa\n\nFotos: imagem ocultada"
+    },
+    {
+      "data": "2026-04-28",
+      "comentario": "Efetivo:\n\n- Matheus\n- Vinícius\n- Roger\n- Leonardo\n- Marcos\n\nAtividade:\n\n. Plaqueamento externo com placa Cimenticia, 32m2 + recortes de janela e porta\n\nFotos:"
+    },
+    {
+      "data": "2026-04-29",
+      "comentario": "Efetivo:\n\n- Matheus\n- Vinícius\n- Roger\n- Leonardo\n- Marcos\n\nAtividade:\n\n. Tratamento de junta fachada externa\n. Plaqueamento inteiro OSB/ primeiro lado 45m2\n\nFotos: imagem ocultada"
+    },
+    {
+      "data": "2026-05-12",
+      "comentario": "Efetivo:\n- Matheus\n- Roger\n- Leonardo\n- Josué\n\nAtividade:\n\nPainelizacão das treliças do telhado: Foram montado 40 painel, e já colocando as chapas de reforço\nTruss128,123,173,192,154,151,90, 119, 120,92, 127,129,130,131,95,117,118,116,69,115,921,114,55,00,55,163,165,134,152,155,169,186,191,176,\n\nCliente pediu para fazer uma meia parede de 50cm na janela da sala\nFoi iniciado hoje a montagem do andaime em madeira\n\nFotos:",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 4,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 14,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-05-13",
+      "comentario": "Efetivo:\n- Matheus\n- Roger\n- Leonardo\n- Josué\n\nAtividade:\n\nPainelizacão das treliças do telhado: Foram montado 32 painel, e já colocando as chapas de reforço\nTruss064,,62,48,63,70,14,31,101,111,112,110,126,42,46,109,20,23,53,56,55,21,72,77,3,102,61,103,57,60,45,58,7\n\nMontagem do andaime em execução do trecho de trás da casa\n\nFotos:",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "2.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "3.jpg",
+          "legenda": ""
+        }
+      ]
+    },
+    {
+      "data": "2026-05-14",
+      "comentario": "Efetivo:\n- Matheus\n- Roger\n- Leonardo\n- Josué\n- Gustavo\n- Davi\n\nAtividade:\n\nPainelizacão das treliças do telhado: Foram montado 35 painel, e já colocando as chapas de reforço\nTruss104,108,113,86,26,67,106,108,66,frame1,68,65,11,24,100,59,89,74,52,85,49,35,frame6,153,39,12,36,29,13,40,33,frame4,\nCom peça faltando 37,\n\nMontagem do andaime em execução do trecho de trás da casa\n\nGrande atraso hoje devido as peças terem vindo faltam e misturado eles os pacotes, tínhamos que ficar abrindo pacote e ficar procurando peça por peça\n\nDevido a esse atraso não começamos a verticalização\n\nMontagem do andaime continua no trecho da entrada da garagem\n\nAcabou na obra o parafuso sextavado PB , foi passado para a Jaqueline, que levantou que o sextavado era só para a união de um painel a outra, pendente a resolução dessa ocorrência\n\nFoi iniciado a separação dos painéis para iniciar a verticalização\n\nFeita a limpeza e organização do canteiro de obra\n\nPablo informou que telhas chegam entre 18 e 19/05\n\nFoi passado também medidas das calhas para efetuar pedido dela\n\nFotos:",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "2.jpg",
+          "legenda": ""
+        }
+      ]
+    },
+    {
+      "data": "2026-05-15",
+      "comentario": "Efetivo:\n- Matheus\n- Roger\n- Leonardo\n- Josué\n- Gustavo\n- Davi\n\nAtividade:\n\nFoi finalizado a montagem dos painéis restante do telhado.\nFoi organizado já os painéis em segurança de montagem.\n\nFotos: <anexado: 00000858-PHOTO-2026-05-19-19-47-45.jpg>",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "2.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "3.jpg",
+          "legenda": ""
+        }
+      ],
+      "apontamentos": [
+        {
+          "tarefa_mpp": 3,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-05-18",
+      "comentario": "Efetivo:\n- Matheus\n- Roger\n- Leonardo\n- Josué\n- Gustavo\n\nAtividade:\nFoi verticalizado 13 painel do telhado hoje\nFoi passado pra Jaqueline divergências no projeto ( duas treliça com mesmo nome ), ela nos atualizou com o projeto já arrumado , tivemos que realocar 5 treliças para seguir o projeto novo\nFinalização do andaime de madeira, e aprovado pela equipe de execução\n\nFotos:"
+    },
+    {
+      "data": "2026-05-19",
+      "comentario": "Efetivo:\n- Matheus\n- Roger\n- Leonardo\n- Josué\n- Gustavo\n\nAtividade:\nFoi verticalizado 12 painel do telhado hoje\nHoje tivemos uma produção um pouco menor , devido as treliças serem traspassada umas nas outras\n\nFotos:",
+      "fotos": [
+        {
+          "arquivo": "1.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "2.jpg",
+          "legenda": ""
+        },
+        {
+          "arquivo": "3.jpg",
+          "legenda": ""
+        }
+      ]
+    },
+    {
+      "data": "2026-06-11",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 7,
+          "pct": 100.0
+        }
+      ]
+    },
+    {
+      "data": "2026-06-23",
+      "apontamentos": [
+        {
+          "tarefa_mpp": 6,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 8,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 15,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 10,
+          "pct": 100.0
+        }
+      ]
+    }
+  ]
+}

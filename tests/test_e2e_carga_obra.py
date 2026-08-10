@@ -175,14 +175,14 @@ def test_e2e_obra_nova_fluxo_completo(tmp_path):
             '--fotos-base', str(tmp_path / 'fotos'),
         ])
         assert rc == 0
-        payload = json.load(open(tmp_path / 'saida' / 'payload_rdos.json'))
+        payload = json.load(open(tmp_path / 'saida' / f'carga_obra_{obra_id}.json'))
         assert [i['data'] for i in payload['rdos']] == \
             ['2026-06-05', '2026-06-10']
 
         # aplicação pela CLI real — obra SEM código: fallback por id
         rc = atualizar_rdos_obra.main([
             username, str(obra_id),
-            str(tmp_path / 'saida' / 'payload_rdos.json'),
+            str(tmp_path / 'saida' / f'carga_obra_{obra_id}.json'),
             '--fotos-base', str(tmp_path / 'fotos')])
         assert rc == 0
 
@@ -217,7 +217,7 @@ def test_e2e_obra_nova_fluxo_completo(tmp_path):
                  RDOFoto.query.join(RDO).filter(RDO.obra_id == obra_id).count())
         rc = atualizar_rdos_obra.main([
             username, str(obra_id),
-            str(tmp_path / 'saida' / 'payload_rdos.json'),
+            str(tmp_path / 'saida' / f'carga_obra_{obra_id}.json'),
             '--fotos-base', str(tmp_path / 'fotos')])
         assert rc == 0
         depois = (RDO.query.filter_by(obra_id=obra_id).count(),
@@ -289,7 +289,7 @@ def test_e2e_obra_em_andamento_protege_o_que_existe(tmp_path):
 
         rc = atualizar_rdos_obra.main([
             username, 'E2E-B',
-            str(tmp_path / 'saida' / 'payload_rdos.json'),
+            str(tmp_path / 'saida' / 'carga_obra_E2E-B.json'),
             '--fotos-base', str(tmp_path / 'fotos')])
         assert rc == 0
         db.session.expire_all()

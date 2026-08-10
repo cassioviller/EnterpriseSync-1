@@ -1630,6 +1630,48 @@ def exportar_rdos_obra_zip(obra_id):
     return response
 
 
+@main_bp.route('/obras/<int:obra_id>/rdos/carga', methods=['GET', 'POST'])
+@admin_required
+def carga_obra_json_view(obra_id):
+    """Upload do JSON de carga (cronograma + RDOs, não-destrutivo) gerado
+    por scripts/preparar_carga_obra.py. GET mostra o formulário; POST roda
+    em modo prévia (default, rollback) ou aplica quando o modo é 'aplicar'.
+    Runbook: RDO.md §6."""
+    from utils.tenant import get_tenant_admin_id
+    tenant = get_tenant_admin_id()
+    if tenant is None:
+        abort(404)
+    obra = Obra.query.filter_by(id=obra_id, admin_id=tenant).first()
+    if obra is None:
+        abort(404)
+
+    relatorio, erro, modo = None, None, 'previa'
+    if request.method == 'POST':
+        from services.carga_obra_json import (
+            CargaInvalida, aplicar_carga_obra, formatar_relatorio_carga)
+        modo = request.form.get('modo') or 'previa'
+        arquivo = request.files.get('arquivo')
+        if not arquivo or not arquivo.filename:
+            erro = 'Selecione o arquivo JSON da carga.'
+        else:
+            try:
+                payload = json.load(arquivo.stream)
+                rel = aplicar_carga_obra(
+                    obra, tenant, payload,
+                    usuario_id=getattr(current_user, 'id', None),
+                    dry_run=(modo != 'aplicar'))
+                relatorio = formatar_relatorio_carga(rel, obra)
+            except CargaInvalida as e:
+                erro = str(e)
+            except ValueError as e:
+                erro = f'Arquivo não é um JSON válido: {e}'
+            except Exception as e:
+                logger.exception('CARGA_JSON obra=%s falhou', obra_id)
+                erro = f'Falha na carga: {e}'
+    return render_template('obras/carga_obra_json.html', obra=obra,
+                           relatorio=relatorio, erro=erro, modo=modo)
+
+
 @main_bp.route('/rdo/<int:id>/finalizar', methods=['POST'])
 @login_required   # Fase 5 — era @admin_required, que recusa FUNCIONARIO
                   # (auth.py:29). O APONTADOR não conseguia submeter o

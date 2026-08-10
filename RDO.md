@@ -252,24 +252,35 @@ Regras que o preparo impõe (nada em silêncio):
 - **data com 2 RDOs no sistema** → o export retrata o PRIMEIRO (o mesmo
   que o updater atualiza); zip antigo ("mais recente") segura o texto.
 
-### Aplicar (produção, nesta ORDEM)
+### Aplicar (produção) — um upload só
 
-```bash
-# 1) aba Cronograma da obra: Importar .mpp → prévia → Aplicar
-#    (grava mpp_uid; SEM isso os apontamentos do payload não resolvem)
-# 2) o payload (obra sem código aceita o id):
-python scripts/atualizar_rdos_obra.py veks 43 \
-    cargas/obra-43/payload_rdos.json --fotos-base fotos_rdos/obras/43 --dry-run
-# sem pendências → rodar de novo sem --dry-run
-```
+O preparo gera `cargas/obra-<slug>/carga_obra_<slug>.json` — autossuficiente
+(identidade da obra + cronograma do .mpp + RDOs + mapa + fotos_base). Na
+página da obra → aba RDOs → **"Atualizar por JSON"**:
 
-Em obra COM RDO o `pct_project` do .mpp **não** carrega no import do
-cronograma (por design) — é o payload que leva as %. Reaplicar o payload
-é idempotente.
+1. subir o arquivo em modo **Prévia** — roda as duas fases e desfaz
+   (relatório igual, banco intacto);
+2. relatório ok → subir de novo em modo **Aplicar**.
 
-- Código: `views/rdo.py` (rota do zip), `services/exportacao_rdos.py`,
+O upload faz as duas fases na ordem certa e numa transação só
+(`services/carga_obra_json.py`): cronograma primeiro (casada por
+`mpp_uid`/nome único atualiza NO LUGAR com id preservado e ganha o uid;
+nova insere; ausente é arquivada `ativa=False` — nunca DELETE; versão
+anterior arquivada com snapshot, nova versão ativa com snapshot), depois
+o upsert dos RDOs. O `%` NUNCA entra pela fase de cronograma — vem dos
+apontamentos dos RDOs (e a sincronização pós-commit só roda quando o
+payload tem RDOs). O JSON declara de que obra é: subir na obra errada é
+recusado antes de qualquer escrita. Reaplicar é idempotente.
+
+CLI alternativa (só RDOs, sem a fase de cronograma):
+`python scripts/atualizar_rdos_obra.py veks 43 cargas/obra-43/carga_obra_43.json
+--fotos-base fotos_rdos/obras/43 --dry-run` — obra sem código aceita o id.
+
+- Código: `views/rdo.py` (rotas do zip e do upload "Atualizar por JSON"),
+  `services/exportacao_rdos.py`, `services/carga_obra_json.py`,
   `scripts/preparar_carga_obra.py`, `scripts/whatsapp_para_rdos.py`
   (parser iOS + apelidos), `scripts/atualizar_rdos_obra.py`.
-- Testes: `tests/test_e2e_carga_obra.py` (ponta a ponta, rota→banco),
+- Testes: `tests/test_carga_obra_json.py` (upload completo pela tela),
+  `test_e2e_carga_obra.py` (ponta a ponta via CLIs),
   `test_exportacao_rdos.py`, `test_preparar_carga_obra.py`,
   `test_whatsapp_parser_ios.py`.

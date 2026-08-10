@@ -431,15 +431,15 @@ def main(argv=None):
     payload, rel = mesclar(rdos_sistema, rdos_whats, mapa_nomes, duplicadas,
                            politica_conflito=args.conflito)
 
-    rel_pct = None
+    rel_pct, tarefas_mpp = None, []
     if args.mpp:
         sys.path.insert(0, _RAIZ)
         from services.mpp_parser import parse_cronograma
-        folhas = parse_cronograma(args.mpp)['tarefas']
+        tarefas_mpp = parse_cronograma(args.mpp)['tarefas']
         imutaveis = [d for d, r in rdos_sistema.items()
                      if r.get('_estado') in ESTADOS_IMUTAVEIS]
         payload, rel_pct = distribuir_pct(
-            payload, list(rdos_sistema), folhas, imutaveis)
+            payload, list(rdos_sistema), tarefas_mpp, imutaveis)
         rel['avisos'].extend(rel_pct['avisos'])
         rel['pendencias'].extend(rel_pct['pendencias'])
 
@@ -459,19 +459,65 @@ def main(argv=None):
         return 0
 
     os.makedirs(saida_dir, exist_ok=True)
-    caminho_payload = os.path.join(saida_dir, 'payload_rdos.json')
-    with open(caminho_payload, 'w', encoding='utf-8') as fh:
-        json.dump({'rdos': payload}, fh, ensure_ascii=False, indent=2)
+
+    # Mapa para os apontamentos: o do zip (chaves negativas das tarefas
+    # atuais) + o derivado do .mpp (uids novos), para o fallback por nome.
+    mapa_final = dict(mapa_nomes)
+    pilha = {}
+    for t in tarefas_mpp:
+        nivel = int(t.get('outline') or 0)
+        if nivel < 1:
+            continue
+        for n in [n for n in pilha if n >= nivel]:
+            del pilha[n]
+        caminho = [pilha[n] for n in sorted(pilha)]
+        pilha[nivel] = t.get('nome')
+        mapa_final[str(int(t['uid']))] = {
+            'nome': t.get('nome'),
+            'pai': caminho[-1] if caminho else None,
+            'caminho': caminho,
+        }
+
+    # JSON ÚNICO e autossuficiente — o que a tela "Atualizar por JSON" da
+    # página da obra consome (services/carga_obra_json.py).
+    carga = {
+        '_meta': {
+            'formato': 'carga-obra/1.0',
+            'gerado_em': obra_json['_meta'].get('gerado_em'),
+            'fontes': {
+                'export': os.path.basename(args.export),
+                'whatsapp': os.path.basename(args.whatsapp or '') or None,
+                'cronograma': os.path.basename(args.mpp or '') or None,
+            },
+        },
+        'obra': obra_json['obra'],
+        'fotos_base': os.path.relpath(fotos_base, _RAIZ),
+        'cronograma_tarefas': [
+            {'uid': int(t['uid']), 'nome': t.get('nome'),
+             'outline': t.get('outline'), 'inicio': t.get('inicio'),
+             'fim': t.get('fim'), 'dias': t.get('dias'),
+             'resumo': bool(t.get('resumo'))}
+            for t in tarefas_mpp if int(t.get('outline') or 0) >= 1
+        ],
+        'mapa_nomes': mapa_final,
+        'rdos': payload,
+    }
+    caminho_carga = os.path.join(saida_dir, f'carga_obra_{slug}.json')
+    with open(caminho_carga, 'w', encoding='utf-8') as fh:
+        json.dump(carga, fh, ensure_ascii=False, indent=2)
         fh.write('\n')
     with open(os.path.join(saida_dir, 'relatorio.txt'), 'w',
               encoding='utf-8') as fh:
         fh.write(_relatorio(obra_json, meta_whats, payload, rel) + '\n')
-    print(f'  payload : {caminho_payload}')
+    print(f'  carga   : {caminho_carga}')
     print(f'  fotos   : {fotos_base}/')
-    print(f'  aplicar : python scripts/atualizar_rdos_obra.py '
+    print(f'  aplicar : página da obra → aba RDOs → "Atualizar por JSON" → '
+          f'subir o arquivo → Prévia → Aplicar')
+    print(f'  (CLI alternativa: python scripts/atualizar_rdos_obra.py '
           f'{o["admin_username"] or o["admin_id"]} {slug} '
-          f'{os.path.relpath(caminho_payload, _RAIZ)} '
-          f'--fotos-base {os.path.relpath(fotos_base, _RAIZ)} --dry-run')
+          f'{os.path.relpath(caminho_carga, _RAIZ)} '
+          f'--fotos-base {os.path.relpath(fotos_base, _RAIZ)} --dry-run '
+          f'— só RDOs, sem a fase de cronograma)')
     return 0
 
 

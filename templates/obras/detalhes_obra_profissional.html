@@ -2095,11 +2095,18 @@ Ela vale 72 horas e será trocada por uma senha só sua no primeiro acesso.</tex
                     <span class="badge bg-light text-dark ms-2">{{ rdos|length }}</span>
                 </h3>
                 {% if current_user.is_authenticated and current_user.tipo_usuario.name in ('ADMIN', 'SUPER_ADMIN') %}
+                <span>
                 <a href="{{ url_for('main.exportar_rdos_obra_zip', obra_id=obra.id) }}"
                    class="btn btn-outline-secondary btn-sm"
                    title="Baixa obra.json + rdos.json + mapa_nomes.json — o retrato para a carga local de RDOs">
                     <i class="fas fa-file-export me-1"></i> Exportar RDOs (.zip)
                 </a>
+                <a href="{{ url_for('main.carga_obra_json_view', obra_id=obra.id) }}"
+                   class="btn btn-outline-primary btn-sm"
+                   title="Sobe o carga_obra_*.json: atualiza cronograma e RDOs sem apagar nada (prévia antes de aplicar)">
+                    <i class="fas fa-file-import me-1"></i> Atualizar por JSON
+                </a>
+                </span>
                 {% endif %}
             </div>
             <div class="obra-card-body" style="padding: 0;">
@@ -2168,6 +2175,11 @@ Ela vale 72 horas e será trocada por uma senha só sua no primeiro acesso.</tex
                    class="btn btn-outline-secondary btn-sm ms-2"
                    title="Mesmo sem RDO o zip carrega a tabela de tarefas do cronograma — a base da carga local">
                     <i class="fas fa-file-export me-1"></i> Exportar RDOs (.zip)
+                </a>
+                <a href="{{ url_for('main.carga_obra_json_view', obra_id=obra.id) }}"
+                   class="btn btn-outline-primary btn-sm ms-2"
+                   title="Sobe o carga_obra_*.json: atualiza cronograma e RDOs sem apagar nada (prévia antes de aplicar)">
+                    <i class="fas fa-file-import me-1"></i> Atualizar por JSON
                 </a>
                 {% endif %}
             </div>

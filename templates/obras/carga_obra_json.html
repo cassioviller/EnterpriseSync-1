@@ -1,0 +1,55 @@
+{% extends "base_completo.html" %}
+{% block title %}Atualizar por JSON — {{ obra.nome }}{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 860px;">
+  <h3>Atualizar obra por JSON — {{ obra.nome }}</h3>
+  <p class="text-muted mb-1">
+    Consome o arquivo <code>carga_obra_*.json</code> gerado pelo preparo local
+    (<code>scripts/preparar_carga_obra.py</code>). Atualiza o <strong>cronograma</strong>
+    (casada atualiza no lugar, nova insere, ausente é arquivada — nunca apagada)
+    e faz o <strong>upsert dos RDOs</strong> por data (assinado é pulado, foto
+    existente é preservada).
+  </p>
+  <p class="text-muted">Rode a <strong>prévia</strong> primeiro: ela executa tudo
+    e desfaz — o relatório sai igual, o banco fica intacto.</p>
+
+  {% if erro %}<div class="alert alert-danger">{{ erro }}</div>{% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="card p-3 mb-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="file" name="arquivo" accept="application/json,.json"
+           class="form-control mb-3" required>
+    <div class="mb-3">
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="modo" value="previa"
+               id="modoPrevia" {% if modo != 'aplicar' %}checked{% endif %}>
+        <label class="form-check-label" for="modoPrevia">
+          <strong>Prévia</strong> — mostra o que faria, não grava nada
+        </label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="modo" value="aplicar"
+               id="modoAplicar" {% if modo == 'aplicar' %}checked{% endif %}>
+        <label class="form-check-label" for="modoAplicar">
+          <strong>Aplicar</strong> — grava cronograma e RDOs
+        </label>
+      </div>
+    </div>
+    <button class="btn btn-primary" type="submit">Executar</button>
+    <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}"
+       class="btn btn-link">Voltar à obra</a>
+  </form>
+
+  {% if relatorio %}
+  <div class="card">
+    <div class="card-header">
+      Relatório {% if modo != 'aplicar' %}<span class="badge bg-secondary">prévia — nada gravado</span>
+      {% else %}<span class="badge bg-success">aplicado</span>{% endif %}
+    </div>
+    <div class="card-body" style="overflow-x:auto;">
+      <pre class="mb-0" style="white-space: pre-wrap;">{{ relatorio }}</pre>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
