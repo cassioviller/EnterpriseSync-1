@@ -225,7 +225,10 @@ def test_fluxo_completo_preparar_e_subir_pela_tela(tmp_path):
                '<OutlineLevel>2</OutlineLevel><Start>2026-05-21T08:00:00</Start>'
                '<Finish>2026-06-30T17:00:00</Finish><Duration>PT208H0M0S</Duration>'
                '<PercentComplete>40</PercentComplete><Summary>0</Summary>'
-               '<Milestone>0</Milestone></Task>'
+               '<Milestone>0</Milestone>'
+               '<PredecessorLink><PredecessorUID>2</PredecessorUID>'
+               '<Type>1</Type><LinkLag>4800</LinkLag></PredecessorLink>'
+               '</Task>'
                '</Tasks></Project>')
         (tmp_path / 'crono.xml').write_text(xml, encoding='utf-8')
 
@@ -241,7 +244,7 @@ def test_fluxo_completo_preparar_e_subir_pela_tela(tmp_path):
         assert rc == 0
         caminho = tmp_path / 'saida' / f'carga_obra_{obra_id}.json'
         carga = json.loads(caminho.read_text())
-        assert carga['_meta']['formato'] == 'carga-obra/1.0'
+        assert carga['_meta']['formato'].startswith('carga-obra/1.')
         assert carga['obra']['id'] == obra_id
         assert len(carga['cronograma_tarefas']) == 3
 
@@ -279,6 +282,12 @@ def test_fluxo_completo_preparar_e_subir_pela_tela(tmp_path):
         assert pcts[nova.id] == pytest.approx(40.0)
         assert estrutura.percentual_concluido == pytest.approx(100.0)
 
+        # predecessora do MSPDI (Type 1 = FS, LinkLag 4800 = 1 dia útil)
+        from models import TarefaVinculo
+        v = TarefaVinculo.query.filter_by(obra_id=obra_id).one()
+        assert (v.predecessora_id, v.sucessora_id) == (estrutura.id, nova.id)
+        assert (v.tipo, v.lag_dias) == ('TI', 1)
+
 
 @pytest.mark.integration
 def test_rota_json_de_outra_obra_mostra_erro_e_tenant_alheio_404():
@@ -301,3 +310,36 @@ def test_rota_json_de_outra_obra_mostra_erro_e_tenant_alheio_404():
     with app.app_context():
         alheia = cli.get(f'/obras/{outra.id}/rdos/carga')
     assert alheia.status_code == 404
+
+
+@pytest.mark.integration
+def test_predecessoras_do_json_viram_tarefa_vinculo():
+    from models import TarefaCronograma, TarefaVinculo
+    from services.carga_obra_json import aplicar_carga_obra
+    with app.app_context():
+        admin, obra, _ = _tenant_obra()
+        payload = _payload(obra)
+        # Nova Frente depende de Estrutura: FS+2 (inglês do MPXJ) e um
+        # vínculo com ponta em resumo, que TEM que ser pulado com registro
+        payload['cronograma_tarefas'][2]['predecessoras'] = [
+            {'uid': 2, 'tipo': 'FS', 'lag_dias': 2.0},
+            {'uid': 1, 'tipo': 'SS', 'lag_dias': 0},   # uid 1 é resumo
+        ]
+        rel = aplicar_carga_obra(obra, admin.id, payload, dry_run=False)
+        c = rel['cronograma']
+        assert c['vinculos'] == 1
+        assert any('resumo' in v for v in c['vinculos_pulados'])
+
+        estrutura = TarefaCronograma.query.filter_by(
+            obra_id=obra.id, mpp_uid=2).one()
+        nova = TarefaCronograma.query.filter_by(
+            obra_id=obra.id, mpp_uid=3).one()
+        v = TarefaVinculo.query.filter_by(obra_id=obra.id).one()
+        assert (v.predecessora_id, v.sucessora_id) == (estrutura.id, nova.id)
+        assert (v.tipo, v.lag_dias) == ('TI', 2), 'FS vira TI; lag inteiro'
+        assert nova.predecessora_id == estrutura.id, \
+            'legado espelhado com a primeira TI'
+
+        # reaplicar substitui (delete+insert), não duplica
+        rel2 = aplicar_carga_obra(obra, admin.id, payload, dry_run=False)
+        assert TarefaVinculo.query.filter_by(obra_id=obra.id).count() == 1

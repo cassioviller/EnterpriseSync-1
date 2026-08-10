@@ -94,6 +94,11 @@ def _fotos_base_segura(payload):
     return candidato
 
 
+# MPXJ/MSPDI entregam o tipo do vínculo em inglês; o banco fala pt-BR.
+_TIPO_VINCULO_PT = {'FS': 'TI', 'SS': 'II', 'FF': 'TT', 'SF': 'IT',
+                    'TI': 'TI', 'II': 'II', 'TT': 'TT', 'IT': 'IT'}
+
+
 def _atualizar_cronograma(obra, admin_id, tarefas_json):
     """Fase 1: aplica a estrutura do JSON sobre o cronograma vivo.
 
@@ -103,7 +108,8 @@ def _atualizar_cronograma(obra, admin_id, tarefas_json):
     from models import TarefaCronograma
 
     rel = {'casadas_uid': 0, 'casadas_nome': 0, 'inseridas': 0,
-           'arquivadas': [], 'avisos': []}
+           'arquivadas': [], 'vinculos': 0, 'vinculos_pulados': [],
+           'avisos': []}
 
     vivas = TarefaCronograma.do_cronograma_interno(obra.id, admin_id).all()
     total_antes = (TarefaCronograma.query
@@ -116,7 +122,9 @@ def _atualizar_cronograma(obra, admin_id, tarefas_json):
             por_uid[int(t.mpp_uid)] = t
         por_nome.setdefault(_sem_acento(t.nome_tarefa), []).append(t)
 
-    casadas_ids, aplicadas = set(), {}
+    casadas_ids = set()
+    alvo_por_uid = {}
+    resumo_uids = {int(t['uid']) for t in tarefas_json if t.get('resumo')}
     # ordem do arquivo = ordem do cronograma; pilha por nível dá o pai
     pilha = {}
     itens = [t for t in tarefas_json if int(t.get('outline') or 0) >= 1]
@@ -157,12 +165,16 @@ def _atualizar_cronograma(obra, admin_id, tarefas_json):
         # percentual_concluido: NUNCA aqui — vem dos apontamentos dos RDOs.
         db.session.flush()
         casadas_ids.add(alvo.id)
+        alvo_por_uid[uid] = alvo
 
         # pilha por nível de outline: o pai é o último nível ACIMA do meu
         for n in [n for n in pilha if n >= nivel]:
             del pilha[n]
         alvo.tarefa_pai_id = pilha[max(pilha)] if pilha else None
         pilha[nivel] = alvo.id
+
+    _aplicar_vinculos(obra, admin_id, tarefas_json, alvo_por_uid,
+                      resumo_uids, rel)
 
     agora = datetime.utcnow()
     for t in vivas:
@@ -178,6 +190,66 @@ def _atualizar_cronograma(obra, admin_id, tarefas_json):
     assert total_depois >= total_antes, \
         'carga JSON nunca remove tarefa — bug interno, abortando'
     return rel
+
+
+def _aplicar_vinculos(obra, admin_id, tarefas_json, alvo_por_uid,
+                      resumo_uids, rel):
+    """Predecessoras do .mpp → `TarefaVinculo` (a fonte que a grade lê).
+
+    O JSON define a estrutura NOVA inteira, então os vínculos da obra são
+    substituídos pelos dele (delete+insert — o mesmo "o texto vence" da
+    célula de predecessoras do editor). Vínculo com ponta em tarefa-resumo
+    é pulado com registro: o editor só aceita folha↔folha. As DATAS não
+    são recalculadas aqui — valem as do Project; os vínculos passam a
+    governar a partir da primeira edição na grade (mesma regra do rollout
+    da flag). Também espelha o legado `predecessora_id` = primeira TI.
+    """
+    from app import db
+    from models import TarefaVinculo
+
+    tem_vinculo = any(t.get('predecessoras') for t in tarefas_json)
+    if not tem_vinculo:
+        return
+
+    TarefaVinculo.query.filter_by(
+        obra_id=obra.id, admin_id=admin_id).delete(synchronize_session=False)
+
+    for tj in tarefas_json:
+        preds = tj.get('predecessoras') or []
+        if not preds:
+            continue
+        suc_uid = int(tj['uid'])
+        suc = alvo_por_uid.get(suc_uid)
+        if suc is None:
+            continue
+        primeira_ti = None
+        for p in preds:
+            pred_uid = int(p['uid'])
+            tipo = _TIPO_VINCULO_PT.get(str(p.get('tipo') or 'FS').upper())
+            pred = alvo_por_uid.get(pred_uid)
+            motivo = None
+            if pred is None:
+                motivo = f'predecessora uid={pred_uid} não está no arquivo'
+            elif tipo is None:
+                motivo = f'tipo de vínculo desconhecido: {p.get("tipo")!r}'
+            elif suc_uid in resumo_uids or pred_uid in resumo_uids:
+                motivo = 'ponta em tarefa-resumo (editor só aceita folhas)'
+            elif pred.id == suc.id:
+                motivo = 'auto-referência'
+            if motivo:
+                rel['vinculos_pulados'].append(
+                    f'{pred_uid}→{suc_uid}: {motivo}')
+                continue
+            db.session.add(TarefaVinculo(
+                admin_id=admin_id, obra_id=obra.id,
+                predecessora_id=pred.id, sucessora_id=suc.id,
+                tipo=tipo, lag_dias=int(round(float(p.get('lag_dias') or 0)))))
+            rel['vinculos'] += 1
+            if tipo == 'TI' and primeira_ti is None:
+                primeira_ti = pred.id
+        # legado congelado, mas espelhado — mesma decisão do M05
+        suc.predecessora_id = primeira_ti
+    db.session.flush()
 
 
 def _versionar(obra, admin_id, usuario_id, observacao):
@@ -283,8 +355,13 @@ def formatar_relatorio_carga(rel, obra):
         linhas += [
             f'  cronograma: {c["casadas_uid"]} casada(s) por uid, '
             f'{c["casadas_nome"]} por nome, {c["inseridas"]} inserida(s), '
-            f'{len(c["arquivadas"])} arquivada(s) — nada apagado',
+            f'{len(c["arquivadas"])} arquivada(s) — nada apagado; '
+            f'{c.get("vinculos", 0)} vínculo(s) de predecessora aplicado(s)',
         ]
+        if c.get('vinculos_pulados'):
+            linhas.append(f'    vínculos pulados '
+                          f'({len(c["vinculos_pulados"])}):')
+            linhas.extend(f'      - {v}' for v in c['vinculos_pulados'][:10])
         if c['arquivadas']:
             linhas.append('    arquivadas: ' + ', '.join(c['arquivadas'][:12])
                           + (' …' if len(c['arquivadas']) > 12 else ''))

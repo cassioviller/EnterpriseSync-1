@@ -482,7 +482,7 @@ def main(argv=None):
     # página da obra consome (services/carga_obra_json.py).
     carga = {
         '_meta': {
-            'formato': 'carga-obra/1.0',
+            'formato': 'carga-obra/1.1',  # 1.1: + predecessoras por tarefa
             'gerado_em': obra_json['_meta'].get('gerado_em'),
             'fontes': {
                 'export': os.path.basename(args.export),
@@ -496,7 +496,14 @@ def main(argv=None):
             {'uid': int(t['uid']), 'nome': t.get('nome'),
              'outline': t.get('outline'), 'inicio': t.get('inicio'),
              'fim': t.get('fim'), 'dias': t.get('dias'),
-             'resumo': bool(t.get('resumo'))}
+             'resumo': bool(t.get('resumo')),
+             # Vínculos do Project (FS/SS/FF/SF + lag em dias) — viram
+             # TarefaVinculo na carga; a grade recalcula a partir deles.
+             'predecessoras': [
+                 {'uid': int(p['uid']), 'tipo': p.get('tipo') or 'FS',
+                  'lag_dias': p.get('lag_dias') or 0}
+                 for p in (t.get('predecessoras') or []) if p.get('uid')
+             ]}
             for t in tarefas_mpp if int(t.get('outline') or 0) >= 1
         ],
         'mapa_nomes': mapa_final,
