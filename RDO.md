@@ -200,3 +200,76 @@ pela tela do RDO (o reimport sozinho, com a pasta vazia, nunca remove).
 ```bash
 GIT_CONFIG_NOSYSTEM=1 python3 -m pytest tests/test_importacao_fisico_financeiro.py -q
 ```
+
+---
+
+## 6. Carga de QUALQUER obra — export + WhatsApp + % do .mpp (2026-08-10)
+
+> A generalização não-destrutiva do fluxo da Baia, para obra que JÁ existe
+> em produção (casos Angela id=43 e Pablo/OB004). Plano e decisões:
+> `docs/superpowers/plans/2026-08-10-carga-nao-destrutiva-cronograma-rdos.md`.
+
+Três artefatos entram na raiz do repo:
+
+1. **Zip do botão "Exportar RDOs (.zip)"** (aba RDOs da página da obra) —
+   obra.json (identidade + tabela de tarefas) + rdos.json + mapa_nomes.json.
+   Autossuficiente: os scripts locais não tocam o banco de produção.
+2. **Export da conversa do WhatsApp** — Android ("Conversa do WhatsApp
+   com ...zip") OU iOS ("WhatsApp Chat - ...zip" com `_chat.txt`); o
+   parser entende os dois. Marcadores com várias grafias entram como
+   apelidos separados por vírgula.
+3. **Cronograma `.mpp`/`.xml`** com as % (opcional) — as FOLHAS com pct>0
+   viram apontamentos distribuídos pelos dias de RDO: 100% no primeiro
+   RDO ≥ `data_fim` da tarefa; parcial no último RDO (snapshot: afirmar
+   antes inventaria história).
+
+### Preparar (local, sem banco)
+
+```bash
+python scripts/preparar_carga_obra.py \
+    --export rdos_43_2026-08-10.zip \
+    --whatsapp "WhatsApp Chat - ....zip" \
+    --obra-marcador "Obra a Angela,Obra casa Angela,Obra Angela" \
+    --mpp "Veks - Angela - Cronograma Atual25.05.mpp" \
+    --corrigir-data 2016-03-09=2026-03-09 \
+    --conflito sistema
+```
+
+Sai `cargas/obra-<codigo|id>/payload_rdos.json` + relatório + fotos em
+`fotos_rdos/obras/<codigo|id>/<data>/` — base POR OBRA; a base legada
+`fotos_rdos/<data>/` é da Baia e não é tocada.
+
+Regras que o preparo impõe (nada em silêncio):
+
+- **dia só no chat** → item novo; **campo vazio no sistema** → completado;
+- **campo preenchido nos dois lados e diferente** → `--conflito sistema`
+  mantém o do sistema com aviso (decisão de 2026-08-10: o que entrou
+  manualmente é o registro curado); default `pendencia` para revisão;
+- **RDO assinado/aprovado/retificado** → pulado; **ano implausível**
+  (typo "2016") → pendência, corrigível por `--corrigir-data`;
+- **dia com foto no banco** → fotos do chat descartadas (o updater
+  preserva as existentes);
+- **data com 2 RDOs no sistema** → o export retrata o PRIMEIRO (o mesmo
+  que o updater atualiza); zip antigo ("mais recente") segura o texto.
+
+### Aplicar (produção, nesta ORDEM)
+
+```bash
+# 1) aba Cronograma da obra: Importar .mpp → prévia → Aplicar
+#    (grava mpp_uid; SEM isso os apontamentos do payload não resolvem)
+# 2) o payload (obra sem código aceita o id):
+python scripts/atualizar_rdos_obra.py veks 43 \
+    cargas/obra-43/payload_rdos.json --fotos-base fotos_rdos/obras/43 --dry-run
+# sem pendências → rodar de novo sem --dry-run
+```
+
+Em obra COM RDO o `pct_project` do .mpp **não** carrega no import do
+cronograma (por design) — é o payload que leva as %. Reaplicar o payload
+é idempotente.
+
+- Código: `views/rdo.py` (rota do zip), `services/exportacao_rdos.py`,
+  `scripts/preparar_carga_obra.py`, `scripts/whatsapp_para_rdos.py`
+  (parser iOS + apelidos), `scripts/atualizar_rdos_obra.py`.
+- Testes: `tests/test_e2e_carga_obra.py` (ponta a ponta, rota→banco),
+  `test_exportacao_rdos.py`, `test_preparar_carga_obra.py`,
+  `test_whatsapp_parser_ios.py`.

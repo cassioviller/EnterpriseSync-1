@@ -38,11 +38,17 @@ nome+ancestrais do `IndiceTarefas` (mesmo formato de `mapa_nomes_do_json`).
 
 | # | Entrega | Estado |
 |---|---|---|
-| 1 | **Export**: `services/exportacao_rdos.py` + rota zip + botão + testes | esta rodada |
-| 2 | `preflight` (diagnóstico local: tarefas vivas, RDOs, versão, mpp_uid, 5 portas) | |
-| 3 | Fase cronograma via serviços M03–M05 em CLI, parada obrigatória em `decisao_requerida` | |
-| 4 | Fase RDO: mescla export+WhatsApp (`_conflito` por data) + fotos por obra (`fotos_rdos/obras/<codigo>/<data>/`) | |
-| 5 | Relatório único + `--dry-run` ponta a ponta (default; gravar exige `--aplicar`) | |
+| 1 | **Export**: `services/exportacao_rdos.py` + rota zip + botão + testes | ✅ 2026-08-10 |
+| 2 | Diagnóstico local | ✅ absorvido: o cabeçalho do relatório de `preparar_carga_obra` traz tarefas/RDOs/mpp_uid do zip; as 5 portas seguem em `scripts/diagnostico_cronograma_tenant.py` |
+| 3 | Fase cronograma | ✅ resolvida SEM código novo: o fluxo web M03–M05 (aba Cronograma → prévia → Aplicar) já é não-destrutivo e grava `mpp_uid`; as % viram apontamentos pela fase 4 (a carga inicial de `pct_project` não roda em obra com RDO) |
+| 4 | Mescla export+WhatsApp + fotos por obra + distribuição de % do .mpp | ✅ `scripts/preparar_carga_obra.py` (parser iOS + apelidos em `whatsapp_para_rdos.py`; política `--conflito sistema` decidida em 2026-08-10) |
+| 5 | Relatório único + dry-run ponta a ponta | ✅ nas duas CLIs; E2E rota→banco em `tests/test_e2e_carga_obra.py` |
+
+**Revisão de 2026-08-10** (5 achados, todos corrigidos): CLI aceita id de
+obra sem código; export retrata o PRIMEIRO RDO em data duplicada (o mesmo
+que o updater atualiza) e a mescla segura texto de zip antigo; marcador
+não vaza no comentário; item novo só com chaves que o updater lê; folha
+100% sem `data_fim` avisa. Runbook operacional: `RDO.md` §6.
 
 ### Fase 1 — o zip de export (read-only, risco zero)
 
