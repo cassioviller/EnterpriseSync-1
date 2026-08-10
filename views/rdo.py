@@ -1599,6 +1599,37 @@ def exportar_rdo_pdf(rdo_id):
         return redirect(url_for('main.visualizar_rdo', id=rdo_id))
 
 
+@main_bp.route('/obras/<int:obra_id>/rdos/exportar')
+@admin_required
+def exportar_rdos_obra_zip(obra_id):
+    """Zip autossuficiente com os RDOs da obra (obra.json + rdos.json +
+    mapa_nomes.json [+ fotos/ com ?fotos=1]) — o retrato que alimenta a
+    carga local não-destrutiva. Read-only.
+    Plano: docs/superpowers/plans/2026-08-10-carga-nao-destrutiva-cronograma-rdos.md
+    """
+    from utils.tenant import get_tenant_admin_id
+    tenant = get_tenant_admin_id()
+    if tenant is None:
+        abort(404)
+    obra = Obra.query.filter_by(id=obra_id, admin_id=tenant).first()
+    if obra is None:
+        abort(404)  # 404 e não 403: não vazar existência de obra alheia
+
+    from services.exportacao_rdos import exportar_obra, montar_zip
+    com_fotos = request.args.get('fotos') == '1'
+    conteudo, avisos = exportar_obra(obra, tenant, com_fotos=com_fotos)
+    for aviso in avisos:
+        logger.info('EXPORT_RDOS obra=%s: %s', obra.id, aviso)
+
+    buf = montar_zip(conteudo)
+    nome = (f"rdos_{obra.codigo or obra.id}_"
+            f"{date.today().isoformat()}.zip").replace('/', '-')
+    response = make_response(buf.read())
+    response.headers['Content-Type'] = 'application/zip'
+    response.headers['Content-Disposition'] = f'attachment; filename="{nome}"'
+    return response
+
+
 @main_bp.route('/rdo/<int:id>/finalizar', methods=['POST'])
 @login_required   # Fase 5 — era @admin_required, que recusa FUNCIONARIO
                   # (auth.py:29). O APONTADOR não conseguia submeter o
