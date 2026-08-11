@@ -177,3 +177,116 @@ def test_mesmo_item_nao_entra_duas_vezes_no_mesmo_recebimento():
         with pytest.raises(IntegrityError):
             db.session.commit()
         db.session.rollback()
+
+
+# ---------------------------------------------------------------------------
+# R2 — a flag por tenant e o carimbo do regime
+# ---------------------------------------------------------------------------
+
+def _ligar_flag(admin_id, valor=True):
+    from scripts.flag_recebimento_atesto import definir_flag
+    return definir_flag(admin_id, valor)
+
+
+def test_flag_desligada_por_padrao():
+    """Ninguém vira sozinho: tenant novo nasce no regime antigo."""
+    from scripts.flag_recebimento_atesto import recebimento_atesto_ativo
+    with app.app_context():
+        admin = _admin()
+        assert recebimento_atesto_ativo(admin.id) is False
+
+
+def test_flag_falha_fechada():
+    """Qualquer erro devolve False — o regime NOVO nunca liga por acidente.
+
+    Mesma postura de `governanca_ativa` (scripts/flag_compras_governanca.py):
+    numa flag que muda de onde o estoque recebe entrada, o modo de falha
+    seguro é o comportamento ANTIGO.
+    """
+    from scripts.flag_recebimento_atesto import recebimento_atesto_ativo
+    with app.app_context():
+        assert recebimento_atesto_ativo(None) is False
+        assert recebimento_atesto_ativo(999_999_999) is False
+
+
+def test_carimbo_do_regime_segue_a_flag():
+    """O pedido nasce com o regime que o tenant tinha NAQUELE momento."""
+    from services.recebimento_pedido import regime_do_tenant
+    with app.app_context():
+        admin = _admin()
+        assert regime_do_tenant(admin.id) is False
+
+        _ligar_flag(admin.id, True)
+        assert regime_do_tenant(admin.id) is True
+
+
+def test_desligar_a_flag_nao_muda_pedido_ja_criado():
+    """O teste que trava a razão de carimbar na LINHA em vez de comparar datas.
+
+    A flag é um booleano que alguém liga e desliga. Se o regime fosse
+    `created_at > data_de_corte`, cada toggle reinterpretaria retroativamente
+    pedidos já fechados — um pedido recebido sob o regime antigo passaria a
+    ser cobrado pelo novo. Carimbado na linha, o passado não se move.
+    """
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        forn = _fornecedor(admin.id)
+
+        _ligar_flag(admin.id, True)
+        from services.recebimento_pedido import regime_do_tenant
+        pedido = _pedido(admin.id, obra.id, forn.id)
+        pedido.exige_atesto = regime_do_tenant(admin.id)
+        db.session.commit()
+        assert pedido.exige_atesto is True
+
+        _ligar_flag(admin.id, False)
+        db.session.refresh(pedido)
+        assert pedido.exige_atesto is True, (
+            'desligar a flag reescreveu o regime de um pedido já criado')
+
+
+def test_todo_ponto_que_cria_pedido_carimba_o_regime():
+    """Guarda de fonte: nenhum `PedidoCompra(...)` sem `exige_atesto`.
+
+    Os testes de cima exercitam `regime_do_tenant`, não a LIGAÇÃO dele nas
+    rotas — os dois carimbos poderiam sumir num refactor e nada ficaria
+    vermelho. Um pedido criado sem carimbo nasce no regime antigo por default
+    da coluna: silenciosamente, o estoque volta a entrar na emissão para
+    aquele caminho, e ninguém descobre até o estoque não bater.
+
+    Mesmo formato do teste de fonte em tests/test_p4_formula_unica_progresso.py.
+    Se um terceiro ponto de criação nascer, este teste exige que ele decida
+    sobre o regime em vez de herdar o default por descuido.
+    """
+    import re
+
+    caminho = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'compras_views.py')
+    with open(caminho, encoding='utf-8') as f:
+        fonte = f.read()
+
+    # Cada construção de PedidoCompra e o que vem até o fecha-parênteses.
+    construcoes = re.findall(r'PedidoCompra\((.*?)\n\s*\)', fonte, re.DOTALL)
+    assert construcoes, 'nenhuma construção de PedidoCompra encontrada'
+    sem_carimbo = [c for c in construcoes if 'exige_atesto' not in c]
+    assert not sem_carimbo, (
+        f'{len(sem_carimbo)} de {len(construcoes)} construções de PedidoCompra '
+        f'não carimbam `exige_atesto`. Um pedido sem carimbo cai no regime '
+        f'antigo por default e o estoque volta a entrar na emissão sem aviso.')
+
+
+def test_guard_recusa_ligar_sem_almoxarifado():
+    """Ligar em tenant sem catálogo cria pedido que ninguém consegue receber.
+
+    Com o regime novo o estoque só entra pelo atesto, e o atesto só gera
+    movimento para item de catálogo. Tenant sem `AlmoxarifadoItem` nenhum
+    ligaria a chave e ficaria sem entrada de estoque em lugar nenhum.
+    """
+    from scripts.flag_recebimento_atesto import pode_ligar
+    with app.app_context():
+        admin = _admin()
+        ok, motivo = pode_ligar(admin.id)
+        assert ok is False
+        assert 'almoxarifado' in motivo.lower()

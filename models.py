@@ -4374,6 +4374,17 @@ class ConfiguracaoEmpresa(db.Model):
     compras_governanca_ativa = db.Column(db.Boolean, nullable=False,
                                          default=False, server_default='false')
 
+    # Fase 4 — flag de rollout do recebimento com atesto, por tenant.
+    # Default FALSE: com ela desligada, o estoque entra na EMISSÃO do pedido
+    # (compras_views._gerar_entrada_almoxarifado) exatamente como sempre.
+    # Ligada, os pedidos NOVOS nascem com `exige_atesto=True` e o estoque
+    # passa a nascer do atesto de recebimento — e só dele.
+    # A virada é por tenant porque muda de onde o almoxarifado recebe entrada,
+    # e isso não se faz no parque inteiro num deploy. Liga-se por
+    # scripts/flag_recebimento_atesto.py. Irmã de compras_governanca_ativa.
+    recebimento_atesto_ativo = db.Column(db.Boolean, nullable=False,
+                                         default=False, server_default='false')
+
     # Cronograma editável Fase 1 — motor de agendamento novo
     # (multi-predecessoras via tarefa_vinculo, caminho crítico) mais a grade
     # tipo planilha com menu de botão direito. Nasceu como flag de rollout

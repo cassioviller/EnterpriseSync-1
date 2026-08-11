@@ -58,6 +58,19 @@ def _admin_id():
     return get_tenant_admin_id()
 
 
+def _regime_recebimento(admin_id):
+    """O regime de recebimento a carimbar num pedido que nasce agora.
+
+    Indireção de uma linha de propósito: os DOIS pontos que criam
+    `PedidoCompra` (o POST avulso e a emissão a partir de requisição) chamam
+    esta função em vez de ler a flag cada um por si. Duas leituras são duas
+    chances de divergirem na regra — e a regra aqui decide se o estoque entra
+    na emissão ou só no atesto.
+    """
+    from services.recebimento_pedido import regime_do_tenant
+    return regime_do_tenant(admin_id)
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # HELPERS DE PROCESSAMENTO — dois fluxos de compra
 # ═════════════════════════════════════════════════════════════════════════════
@@ -754,6 +767,9 @@ def nova_post():
             responsavel_id=responsavel_id,
             data_vencimento_primeira_parcela=data_primeira_parcela,
             intervalo_parcelas_dias=intervalo_parcelas_dias,
+            # Fase 4 — o regime é carimbado no nascimento e não muda depois,
+            # nem se a flag do tenant for desligada (services/recebimento_pedido).
+            exige_atesto=_regime_recebimento(admin_id),
         )
         db.session.add(pedido)
         db.session.flush()
@@ -1731,6 +1747,8 @@ def requisicao_emitir_pedido(requisicao_id):
             admin_id=admin_id,
             responsavel_id=current_user.id,
             requisicao_id=requisicao.id,
+            # Fase 4 — idem ao POST avulso: mesma função, mesmo carimbo.
+            exige_atesto=_regime_recebimento(admin_id),
         )
         db.session.add(pedido)
         db.session.flush()
