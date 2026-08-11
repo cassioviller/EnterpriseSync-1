@@ -24,6 +24,29 @@ from services.mpp_parser import _achar_java_home
 # Mesma tabela de scripts/verificar_paridade_mspdi.py (Task 2 do M03).
 _FATOR_UNIDADE_DIA = {'d': 1.0, 'h': 1 / 8.0, 'm': 1 / 480.0, 'w': 5.0, 'mo': 20.0}
 
+# Unidades DECORRIDAS do Project (24 h corridas, ignoram fim de semana) →
+# dias CORRIDOS. O sistema inteiro modela lag em dias ÚTEIS — a célula de
+# predecessoras da tela chega a recusar 'dd' explicitamente
+# (services/cronograma_predecessor_parser.py) —, então o valor corrido é
+# convertido por _CORRIDO_PARA_UTIL logo em seguida.
+#
+# Apareceu em 11/08 no "Veks - Angela - Cronograma Atual  05-08-2026.mpp":
+# UM vínculo, a tarefa 11 ("Medição em obra dos demais itens", FS +2ed).
+# Antes disso o parser levantava RuntimeError e o arquivo inteiro não abria.
+_FATOR_UNIDADE_CORRIDA = {
+    'em': 1 / 1440.0, 'eh': 1 / 24.0, 'ed': 1.0,
+    'ew': 7.0, 'emo': 30.0, 'ey': 365.0,
+}
+
+# 5 dias úteis por 7 corridos. É aproximação — não conhece feriado nem
+# calendário da obra —, e por isso ARREDONDA PARA BAIXO no uso: o
+# `cronograma_scheduler` faz `int(lag_dias)`, então +2ed vira 1.428571 e
+# agenda como +1 dia útil. Confere no caso comum: 2 dias corridos a partir de
+# uma sexta caem no domingo, e o próximo dia útil é a segunda — 1 dia útil.
+# Lag percentual ('%', 'e%') continua levantando: é relativo à duração da
+# predecessora, não dá para converter sem ela.
+_CORRIDO_PARA_UTIL = 5.0 / 7.0
+
 
 def _d(v):
     if v is None:
@@ -55,6 +78,10 @@ def _lag_dias(rel):
     valor = float(lag.getDuration())
     unidade = str(lag.getUnits().toString())
     fator = _FATOR_UNIDADE_DIA.get(unidade)
+    if fator is None:
+        corrido = _FATOR_UNIDADE_CORRIDA.get(unidade)
+        if corrido is not None:
+            fator = corrido * _CORRIDO_PARA_UTIL
     if fator is None:
         raise RuntimeError(f'unidade de lag do MPXJ não tratada: {unidade!r} '
                            f'(valor={valor}) — NÃO arredondar; tratar o formato.')

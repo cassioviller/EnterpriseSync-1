@@ -28,8 +28,11 @@ from services.mspdi_parser import parse_mspdi  # noqa: E402
 CAMPOS_LEGADOS = ['outline', 'nome', 'inicio', 'fim', 'dias', 'pct_fisico',
                   'predecessoras', 'resumo']
 
-# TimeUnit.toString() do MPXJ → fator para dias úteis (8h/dia, 5d/semana).
-_FATOR_UNIDADE_DIA = {'d': 1.0, 'h': 1 / 8.0, 'm': 1 / 480.0, 'w': 5.0, 'mo': 20.0}
+# As tabelas de conversão de lag (inclusive as unidades DECORRIDAS, tratadas
+# em 11/08) vivem no worker — duplicá-las aqui já custou uma divergência a
+# procurar: este script existe justamente para provar que os dois caminhos
+# dão o mesmo número.
+from services.mpp_parser_worker import _lag_dias as _lag_dias_mpxj  # noqa: E402
 
 
 def projetar_legado(tarefa):
@@ -45,19 +48,6 @@ def projetar_legado(tarefa):
         'predecessoras': [p['id'] for p in tarefa['predecessoras']],
         'resumo': tarefa['resumo'],
     }
-
-
-def _lag_dias_mpxj(rel):
-    lag = rel.getLag()
-    if lag is None:
-        return 0.0
-    valor = float(lag.getDuration())
-    unidade = str(lag.getUnits().toString())
-    fator = _FATOR_UNIDADE_DIA.get(unidade)
-    if fator is None:
-        raise RuntimeError(f'unidade de lag do MPXJ não tratada: {unidade!r} '
-                           f'(valor={valor}) — NÃO arredondar; tratar o formato.')
-    return valor * fator
 
 
 def dump_mpxj_estendido(caminho_mpp):
