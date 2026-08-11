@@ -39,7 +39,7 @@ do legado depende de R2. R7 fecha.
 
 ## R1 — Modelos e migrations 283/284
 
-- [ ] **Step 1 (red):** testes que provam o esqueleto:
+- [x] **Step 1 (red):** testes que provam o esqueleto:
   - `RecebimentoPedido` e `RecebimentoPedidoItem` importáveis de `models`;
   - `UNIQUE (pedido_id, sequencia)` recusa duas sequências iguais no mesmo pedido;
   - `UNIQUE (recebimento_id, pedido_item_id)` recusa o mesmo item duas vezes no mesmo
@@ -48,44 +48,44 @@ do legado depende de R2. R7 fecha.
     `nao_recebido` num pedido recém-criado.
 
   Rodar e **ver os quatro vermelhos**.
-- [ ] **Step 2:** os dois modelos em `models.py`, junto de `PedidoCompra` (não no fim do
+- [x] **Step 2:** os dois modelos em `models.py`, junto de `PedidoCompra` (não no fim do
   arquivo — vizinhança importa para quem lê). Docstring no padrão da casa: o que é, por
   que existe, e a decisão do número derivado (`PC-1234/2`) em vez de sequência global.
-- [ ] **Step 3:** colunas `exige_atesto` (bool, NOT NULL, default False) e
+- [x] **Step 3:** colunas `exige_atesto` (bool, NOT NULL, default False) e
   `situacao_recebimento` (String(24), NOT NULL, default `'nao_recebido'`) em
   `PedidoCompra`.
-- [ ] **Step 4:** `migration_283_recebimento_atesto` em `migrations.py` — cria as duas
+- [x] **Step 4:** `migration_283_recebimento_atesto` em `migrations.py` — cria as duas
   tabelas com as constraints e os índices do spec, e as duas colunas em `pedido_compra`.
   Sem backfill: pedido histórico é legado por definição, e `exige_atesto=False` descreve
   exatamente o que aconteceu com ele. Registrar na lista em `migrations.py` com o número
   **283**. ⚠️ Conferir `migration_history` no dev **antes** de fixar o número — a última
   do repositório é a 282 (conferido no dev em 11/08 — o grep ingênuo por `def migration_` mostra 266 porque as recentes usam prefixo `_`).
-- [ ] **Step 5:** `migration_284_flag_recebimento_atesto` — coluna
+- [x] **Step 5:** `migration_284_flag_recebimento_atesto` — coluna
   `configuracao_empresa.recebimento_atesto_ativo` (bool, NOT NULL, default False).
-- [ ] **Step 6 (green):** os quatro testes verdes. Aplicar as duas migrations no dev e
+- [x] **Step 6 (green):** os quatro testes verdes. Aplicar as duas migrations no dev e
   conferir por `psql`: tabelas, constraints, índices e defaults das colunas novas.
-- [ ] **Step 7:** commit — `feat(compras): tabelas de recebimento e atesto (migrations 283/284)`
+- [x] **Step 7:** commit — `feat(compras): tabelas de recebimento e atesto (migrations 283/284)`
 
 ## R2 — Flag por tenant e o carimbo do regime
 
-- [ ] **Step 1 (red):** testes:
+- [x] **Step 1 (red):** testes:
   - pedido criado com a flag **desligada** nasce `exige_atesto=False`;
   - pedido criado com a flag **ligada** nasce `exige_atesto=True`;
   - **desligar a flag depois não muda** o `exige_atesto` de pedido já criado — é o teste
     que trava a razão de carimbar na linha em vez de comparar datas;
   - `recebimento_atesto_ativo(admin_id)` devolve `False` em qualquer erro (falha
     fechada, igual a `governanca_ativa`).
-- [ ] **Step 2:** `scripts/flag_recebimento_atesto.py`, no formato de
+- [x] **Step 2:** `scripts/flag_recebimento_atesto.py`, no formato de
   `scripts/flag_compras_governanca.py`: `recebimento_atesto_ativo(admin_id)`,
   `definir_flag`, e `main()` com consulta / `--ligar` / `--desligar` / `--forcar`.
-- [ ] **Step 3:** guard do `--ligar`: recusa tenant sem nenhum `AlmoxarifadoItem`
+- [x] **Step 3:** guard do `--ligar`: recusa tenant sem nenhum `AlmoxarifadoItem`
   cadastrado, com a mensagem dizendo o porquê (ligar ali cria pedido que ninguém
   consegue receber). Mesma forma dos dois guards que o `flag_compras_governanca` já tem.
-- [ ] **Step 4:** carimbar `exige_atesto` na criação do pedido, nos **dois** pontos que
+- [x] **Step 4:** carimbar `exige_atesto` na criação do pedido, nos **dois** pontos que
   criam `PedidoCompra` em `compras_views.py` (o POST avulso e a emissão a partir de
   requisição). Uma função só lê a flag; os dois pontos chamam ela.
-- [ ] **Step 5 (green):** os quatro verdes.
-- [ ] **Step 6:** commit — `feat(compras): flag recebimento_atesto por tenant e carimbo do regime no pedido`
+- [x] **Step 5 (green):** os quatro verdes.
+- [x] **Step 6:** commit — `feat(compras): flag recebimento_atesto por tenant e carimbo do regime no pedido`
 
 ## R3 — O serviço: documento, validações e situação
 
