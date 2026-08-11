@@ -522,7 +522,14 @@ def test_caixa_faseado_pelas_datas_das_linhas():
             json.load(open(caminho, encoding='utf-8')), aid)['obra_id'])
         # zera as linhas de todas as etapas (agregados → 0) e cria UMA linha veks
         # isolada em 2027-03 na primeira etapa
-        oscs = ObraServicoCusto.query.filter_by(obra_id=obra.id, admin_id=aid).all()
+        # `order_by` obrigatório: sem ele o Postgres devolve as etapas na ordem
+        # que quiser (varia com o estado da tabela), `oscs[0]` cai numa etapa
+        # diferente conforme o teste rode sozinho ou depois de outros arquivos,
+        # e o teste fica flaky. Visto em 11/08: passou isolado e falhou na
+        # suíte de 5 arquivos, com a MESMA fixture.
+        oscs = (ObraServicoCusto.query
+                .filter_by(obra_id=obra.id, admin_id=aid)
+                .order_by(ObraServicoCusto.id).all())
         osc_ids = [o.id for o in oscs]
         ObraServicoCustoItem.query.filter(
             ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids)).delete(synchronize_session=False)
@@ -558,7 +565,14 @@ def test_caixa_fallback_complementar_linha_sem_data():
                                'cronograma_fisico_financeiro_baias.json')
         obra = Obra.query.get(importar_fisico_financeiro(
             json.load(open(caminho, encoding='utf-8')), aid)['obra_id'])
-        oscs = ObraServicoCusto.query.filter_by(obra_id=obra.id, admin_id=aid).all()
+        # `order_by` obrigatório: sem ele o Postgres devolve as etapas na ordem
+        # que quiser (varia com o estado da tabela), `oscs[0]` cai numa etapa
+        # diferente conforme o teste rode sozinho ou depois de outros arquivos,
+        # e o teste fica flaky. Visto em 11/08: passou isolado e falhou na
+        # suíte de 5 arquivos, com a MESMA fixture.
+        oscs = (ObraServicoCusto.query
+                .filter_by(obra_id=obra.id, admin_id=aid)
+                .order_by(ObraServicoCusto.id).all())
         baseline = fluxo_caixa(obra)
         total_base = sum(float(l['gasto_veks']) for l in baseline['linhas'])
         veks0_orig = float(oscs[0].mao_obra_a_realizar or 0)
