@@ -5,7 +5,7 @@
     "fontes": {
       "export": "rdos_43_2026-08-10.zip",
       "whatsapp": "WhatsApp Chat - 📝 Diário de Obras - Veks Engenharia (1).zip",
-      "cronograma": "Veks - Angela - Cronograma Atual25.05.mpp"
+      "cronograma": "Veks - Angela - Cronograma Atual  07-07-2026.mpp"
     }
   },
   "obra": {
@@ -26,8 +26,8 @@
       "nome": "Cronograma Angela - Santo Antônio do Pinhal",
       "outline": 1,
       "inicio": "2024-09-16",
-      "fim": "2026-10-30",
-      "dias": 555.0,
+      "fim": "2026-09-22",
+      "dias": 526.25,
       "resumo": true,
       "predecessoras": []
     },
@@ -313,8 +313,8 @@
       "nome": "Civil",
       "outline": 2,
       "inicio": "2024-09-16",
-      "fim": "2026-03-19",
-      "dias": 394.0,
+      "fim": "2026-08-11",
+      "dias": 497.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -350,11 +350,11 @@
     },
     {
       "uid": 658,
-      "nome": "Alvenaria ofuro",
+      "nome": "Alvenaria LSF ofuro",
       "outline": 3,
-      "inicio": "2024-09-16",
-      "fim": "2024-09-24",
-      "dias": 7.0,
+      "inicio": "2026-08-05",
+      "fim": "2026-08-11",
+      "dias": 5.0,
       "resumo": false,
       "predecessoras": []
     },
@@ -373,8 +373,8 @@
       "nome": "Área técnica",
       "outline": 2,
       "inicio": "2025-10-09",
-      "fim": "2026-08-28",
-      "dias": 231.5,
+      "fim": "2026-09-22",
+      "dias": 248.25,
       "resumo": true,
       "predecessoras": []
     },
@@ -398,8 +398,8 @@
       "uid": 575,
       "nome": "Instalação de Veneziana",
       "outline": 3,
-      "inicio": "2026-08-27",
-      "fim": "2026-08-28",
+      "inicio": "2026-09-21",
+      "fim": "2026-09-22",
       "dias": 1.0,
       "resumo": false,
       "predecessoras": [
@@ -715,8 +715,8 @@
       "nome": "Fechamento de Paredes Externas",
       "outline": 2,
       "inicio": "2026-03-18",
-      "fim": "2026-06-11",
-      "dias": 62.0,
+      "fim": "2026-07-17",
+      "dias": 88.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -809,8 +809,8 @@
       "nome": "Instalação de tela e aplicação de basecoat",
       "outline": 3,
       "inicio": "2026-05-15",
-      "fim": "2026-06-11",
-      "dias": 20.0,
+      "fim": "2026-07-17",
+      "dias": 46.0,
       "resumo": false,
       "predecessoras": [
         {
@@ -825,8 +825,8 @@
       "nome": "Instalação de cantoneiras e pingadeira",
       "outline": 3,
       "inicio": "2026-05-15",
-      "fim": "2026-06-11",
-      "dias": 20.0,
+      "fim": "2026-06-30",
+      "dias": 33.0,
       "resumo": false,
       "predecessoras": [
         {
@@ -841,8 +841,8 @@
       "nome": "Instalações Hidráulicas",
       "outline": 2,
       "inicio": "2026-03-18",
-      "fim": "2026-08-13",
-      "dias": 107.0,
+      "fim": "2026-08-05",
+      "dias": 101.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -851,8 +851,8 @@
       "nome": "Descidas de águas pluviais",
       "outline": 3,
       "inicio": "2026-03-27",
-      "fim": "2026-06-08",
-      "dias": 50.0,
+      "fim": "2026-08-05",
+      "dias": 92.2,
       "resumo": false,
       "predecessoras": [
         {
@@ -867,8 +867,8 @@
       "nome": "Térreo",
       "outline": 3,
       "inicio": "2026-03-18",
-      "fim": "2026-06-08",
-      "dias": 58.25,
+      "fim": "2026-07-17",
+      "dias": 88.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -893,8 +893,8 @@
       "nome": "Esgoto",
       "outline": 4,
       "inicio": "2026-03-24",
-      "fim": "2026-05-29",
-      "dias": 49.0,
+      "fim": "2026-07-17",
+      "dias": 84.0,
       "resumo": false,
       "predecessoras": [
         {
@@ -1033,8 +1033,8 @@
       "nome": "Área técnica - Caixa d'água",
       "outline": 3,
       "inicio": "2026-06-08",
-      "fim": "2026-08-13",
-      "dias": 49.0,
+      "fim": "2026-08-05",
+      "dias": 43.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -1043,8 +1043,8 @@
       "nome": "Instalação de caixa d'água",
       "outline": 4,
       "inicio": "2026-06-08",
-      "fim": "2026-06-12",
-      "dias": 5.0,
+      "fim": "2026-07-17",
+      "dias": 30.0,
       "resumo": false,
       "predecessoras": []
     },
@@ -1052,9 +1052,9 @@
       "uid": 648,
       "nome": "Instalação de filtro",
       "outline": 4,
-      "inicio": "2026-08-08",
-      "fim": "2026-08-13",
-      "dias": 5.0,
+      "inicio": "2026-07-17",
+      "fim": "2026-07-17",
+      "dias": 0.0,
       "resumo": false,
       "predecessoras": []
     },
@@ -1063,8 +1063,8 @@
       "nome": "Pressurizador",
       "outline": 4,
       "inicio": "2026-06-08",
-      "fim": "2026-06-12",
-      "dias": 5.0,
+      "fim": "2026-08-05",
+      "dias": 43.0,
       "resumo": false,
       "predecessoras": []
     },
@@ -1072,9 +1072,9 @@
       "uid": 83,
       "nome": "Instalações Elétricas",
       "outline": 2,
-      "inicio": "2025-02-03",
-      "fim": "2026-10-30",
-      "dias": 455.0,
+      "inicio": "2026-03-17",
+      "fim": "2026-08-26",
+      "dias": 117.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -1082,9 +1082,9 @@
       "uid": 603,
       "nome": "Instalção de para-raios",
       "outline": 3,
-      "inicio": "2026-05-26",
-      "fim": "2026-05-29",
-      "dias": 4.0,
+      "inicio": "2026-08-05",
+      "fim": "2026-08-05",
+      "dias": 1.0,
       "resumo": false,
       "predecessoras": []
     },
@@ -1093,8 +1093,8 @@
       "nome": "Térreo",
       "outline": 3,
       "inicio": "2026-05-04",
-      "fim": "2026-06-26",
-      "dias": 39.5,
+      "fim": "2026-08-26",
+      "dias": 83.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -1134,8 +1134,8 @@
       "nome": "Caixinhas de parede, cabeamentos, quadros e disjuntores",
       "outline": 4,
       "inicio": "2026-06-15",
-      "fim": "2026-06-24",
-      "dias": 7.0,
+      "fim": "2026-07-15",
+      "dias": 21.5,
       "resumo": false,
       "predecessoras": [
         {
@@ -1149,13 +1149,13 @@
       "uid": 624,
       "nome": "Acabamento e luminarias",
       "outline": 4,
-      "inicio": "2026-06-16",
-      "fim": "2026-06-26",
+      "inicio": "2026-08-17",
+      "fim": "2026-08-26",
       "dias": 8.0,
       "resumo": false,
       "predecessoras": [
         {
-          "uid": 517,
+          "uid": 520,
           "tipo": "FS",
           "lag_dias": 0
         }
@@ -1166,8 +1166,8 @@
       "nome": "1° Andar",
       "outline": 3,
       "inicio": "2026-03-17",
-      "fim": "2026-07-08",
-      "dias": 81.5,
+      "fim": "2026-07-17",
+      "dias": 88.5,
       "resumo": true,
       "predecessoras": []
     },
@@ -1196,7 +1196,7 @@
       "nome": "Caixinhas de parede, cabeamentos, quadros e disjuntores",
       "outline": 4,
       "inicio": "2026-06-29",
-      "fim": "2026-07-08",
+      "fim": "2026-07-13",
       "dias": 7.0,
       "resumo": false,
       "predecessoras": [
@@ -1211,13 +1211,13 @@
       "uid": 623,
       "nome": "Acabamento e luminarias",
       "outline": 4,
-      "inicio": "2026-06-26",
-      "fim": "2026-07-02",
+      "inicio": "2026-07-13",
+      "fim": "2026-07-17",
       "dias": 4.0,
       "resumo": false,
       "predecessoras": [
         {
-          "uid": 517,
+          "uid": 465,
           "tipo": "FS",
           "lag_dias": 0
         }
@@ -1227,9 +1227,9 @@
       "uid": 133,
       "nome": "Fechamento de Paredes Internas",
       "outline": 2,
-      "inicio": "2026-05-01",
-      "fim": "2026-07-08",
-      "dias": 48.5,
+      "inicio": "2026-05-05",
+      "fim": "2026-07-27",
+      "dias": 60.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -1237,9 +1237,9 @@
       "uid": 217,
       "nome": "Térreo",
       "outline": 3,
-      "inicio": "2026-05-01",
-      "fim": "2026-07-01",
-      "dias": 43.5,
+      "inicio": "2026-05-05",
+      "fim": "2026-07-27",
+      "dias": 60.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -1248,8 +1248,8 @@
       "nome": "Instalação de lã entre as placas",
       "outline": 4,
       "inicio": "2026-05-05",
-      "fim": "2026-06-01",
-      "dias": 20.0,
+      "fim": "2026-06-12",
+      "dias": 29.0,
       "resumo": false,
       "predecessoras": []
     },
@@ -1257,9 +1257,9 @@
       "uid": 200,
       "nome": "Execução de plaqueamento interno",
       "outline": 4,
-      "inicio": "2026-05-01",
-      "fim": "2026-06-15",
-      "dias": 10.0,
+      "inicio": "2026-06-19",
+      "fim": "2026-06-19",
+      "dias": 1.0,
       "resumo": false,
       "predecessoras": [
         {
@@ -1273,9 +1273,9 @@
       "uid": 134,
       "nome": "Aplicação de massa na parte interna, juntas e parafusos",
       "outline": 4,
-      "inicio": "2026-06-15",
-      "fim": "2026-06-22",
-      "dias": 5.0,
+      "inicio": "2026-06-29",
+      "fim": "2026-07-07",
+      "dias": 7.0,
       "resumo": false,
       "predecessoras": [
         {
@@ -1289,25 +1289,19 @@
       "uid": 455,
       "nome": "Execução de forro de gesso acartonado",
       "outline": 4,
-      "inicio": "2026-06-24",
-      "fim": "2026-07-01",
-      "dias": 5.0,
+      "inicio": "2026-07-08",
+      "fim": "2026-07-27",
+      "dias": 14.0,
       "resumo": false,
-      "predecessoras": [
-        {
-          "uid": 460,
-          "tipo": "FS",
-          "lag_dias": 0
-        }
-      ]
+      "predecessoras": []
     },
     {
       "uid": 444,
       "nome": "1° Andar",
       "outline": 3,
-      "inicio": "2026-06-02",
-      "fim": "2026-07-08",
-      "dias": 26.5,
+      "inicio": "2026-06-15",
+      "fim": "2026-07-27",
+      "dias": 31.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -1315,9 +1309,9 @@
       "uid": 445,
       "nome": "Execução de plaqueamento interno",
       "outline": 4,
-      "inicio": "2026-06-15",
-      "fim": "2026-07-01",
-      "dias": 12.0,
+      "inicio": "2026-06-22",
+      "fim": "2026-06-26",
+      "dias": 5.0,
       "resumo": false,
       "predecessoras": [
         {
@@ -1331,8 +1325,8 @@
       "uid": 446,
       "nome": "Instalação de lã entre as placas",
       "outline": 4,
-      "inicio": "2026-06-02",
-      "fim": "2026-06-03",
+      "inicio": "2026-06-15",
+      "fim": "2026-06-16",
       "dias": 2.0,
       "resumo": false,
       "predecessoras": [
@@ -1347,9 +1341,9 @@
       "uid": 448,
       "nome": "Aplicação de massa na parte interna, juntas e parafusos",
       "outline": 4,
-      "inicio": "2026-06-22",
-      "fim": "2026-06-29",
-      "dias": 5.0,
+      "inicio": "2026-07-08",
+      "fim": "2026-07-08",
+      "dias": 0.0,
       "resumo": false,
       "predecessoras": [
         {
@@ -1363,24 +1357,18 @@
       "uid": 456,
       "nome": "Execução de forro de gesso acartonado",
       "outline": 4,
-      "inicio": "2026-07-01",
-      "fim": "2026-07-08",
+      "inicio": "2026-07-21",
+      "fim": "2026-07-27",
       "dias": 5.0,
       "resumo": false,
-      "predecessoras": [
-        {
-          "uid": 455,
-          "tipo": "FS",
-          "lag_dias": 0
-        }
-      ]
+      "predecessoras": []
     },
     {
       "uid": 598,
       "nome": "Instalação energia solar",
       "outline": 2,
-      "inicio": "2026-07-08",
-      "fim": "2026-07-22",
+      "inicio": "2026-07-13",
+      "fim": "2026-07-27",
       "dias": 10.0,
       "resumo": false,
       "predecessoras": [
@@ -1396,8 +1384,8 @@
       "nome": "Instalações de Infra de AC Split",
       "outline": 2,
       "inicio": "2026-04-08",
-      "fim": "2026-08-13",
-      "dias": 91.5,
+      "fim": "2026-09-07",
+      "dias": 108.25,
       "resumo": true,
       "predecessoras": [
         {
@@ -1441,8 +1429,8 @@
       "uid": 622,
       "nome": "Instalação maquinas",
       "outline": 3,
-      "inicio": "2026-08-10",
-      "fim": "2026-08-13",
+      "inicio": "2026-09-02",
+      "fim": "2026-09-07",
       "dias": 3.0,
       "resumo": false,
       "predecessoras": [
@@ -1458,8 +1446,8 @@
       "nome": "Instalações de gás",
       "outline": 2,
       "inicio": "2026-04-17",
-      "fim": "2026-06-26",
-      "dias": 51.0,
+      "fim": "2026-08-05",
+      "dias": 79.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -1467,8 +1455,8 @@
       "uid": 544,
       "nome": "Passagem de tubulação de gás",
       "outline": 3,
-      "inicio": "2026-06-12",
-      "fim": "2026-06-18",
+      "inicio": "2026-07-08",
+      "fim": "2026-07-14",
       "dias": 5.0,
       "resumo": false,
       "predecessoras": [
@@ -1499,8 +1487,8 @@
       "uid": 630,
       "nome": "Instalação de porta na casa de gás",
       "outline": 3,
-      "inicio": "2026-06-26",
-      "fim": "2026-06-26",
+      "inicio": "2026-08-05",
+      "fim": "2026-08-05",
       "dias": 1.0,
       "resumo": false,
       "predecessoras": []
@@ -1509,9 +1497,9 @@
       "uid": 16,
       "nome": "Impermeabilização",
       "outline": 2,
-      "inicio": "2026-06-01",
-      "fim": "2026-06-11",
-      "dias": 9.0,
+      "inicio": "2026-07-13",
+      "fim": "2026-08-11",
+      "dias": 22.0,
       "resumo": true,
       "predecessoras": []
     },
@@ -1519,24 +1507,18 @@
       "uid": 181,
       "nome": "Impermeabilização varandas",
       "outline": 3,
-      "inicio": "2026-06-01",
-      "fim": "2026-06-09",
+      "inicio": "2026-08-03",
+      "fim": "2026-08-11",
       "dias": 7.0,
       "resumo": false,
-      "predecessoras": [
-        {
-          "uid": 615,
-          "tipo": "FS",
-          "lag_dias": 0
-        }
-      ]
+      "predecessoras": []
     },
     {
       "uid": 508,
       "nome": "Impermeabilização banheiros",
       "outline": 3,
-      "inicio": "2026-06-01",
-      "fim": "2026-06-09",
+      "inicio": "2026-07-13",
+      "fim": "2026-07-21",
       "dias": 7.0,
       "resumo": false,
       "predecessoras": []
@@ -1545,8 +1527,8 @@
       "uid": 442,
       "nome": "Impermeabilização cozinha e area de serviço",
       "outline": 3,
-      "inicio": "2026-06-10",
-      "fim": "2026-06-11",
+      "inicio": "2026-07-22",
+      "fim": "2026-07-23",
       "dias": 2.0,
       "resumo": false,
       "predecessoras": [
@@ -1562,8 +1544,8 @@
       "nome": "Pintura Interna",
       "outline": 2,
       "inicio": "2026-03-20",
-      "fim": "2026-08-19",
-      "dias": 108.5,
+      "fim": "2026-09-11",
+      "dias": 125.25,
       "resumo": true,
       "predecessoras": []
     },
@@ -1571,8 +1553,8 @@
       "uid": 518,
       "nome": "Térreo",
       "outline": 3,
-      "inicio": "2026-07-01",
-      "fim": "2026-07-21",
+      "inicio": "2026-07-28",
+      "fim": "2026-08-14",
       "dias": 14.0,
       "resumo": true,
       "predecessoras": []
@@ -1581,8 +1563,8 @@
       "uid": 519,
       "nome": "Emassamento e lixamento interno de paredes e forro",
       "outline": 4,
-      "inicio": "2026-07-01",
-      "fim": "2026-07-10",
+      "inicio": "2026-07-28",
+      "fim": "2026-08-05",
       "dias": 7.0,
       "resumo": false,
       "predecessoras": [
@@ -1597,8 +1579,8 @@
       "uid": 520,
       "nome": "2 demão de pintura com tinta latex",
       "outline": 4,
-      "inicio": "2026-07-10",
-      "fim": "2026-07-21",
+      "inicio": "2026-08-06",
+      "fim": "2026-08-14",
       "dias": 7.0,
       "resumo": false,
       "predecessoras": [
@@ -1613,9 +1595,9 @@
       "uid": 521,
       "nome": "1° Andar",
       "outline": 3,
-      "inicio": "2026-03-20",
-      "fim": "2026-08-19",
-      "dias": 108.5,
+      "inicio": "2026-08-04",
+      "fim": "2026-09-02",
+      "dias": 21.25,
       "resumo": true,
       "predecessoras": []
     },
@@ -1623,8 +1605,8 @@
       "uid": 522,
       "nome": "Emassamento e lixamento interno de paredes e forro",
       "outline": 4,
-      "inicio": "2026-07-21",
-      "fim": "2026-07-30",
+      "inicio": "2026-08-04",
+      "fim": "2026-08-24",
       "dias": 7.0,
       "resumo": false,
       "predecessoras": [
@@ -1639,8 +1621,8 @@
       "uid": 523,
       "nome": "2 demão de pintura com tinta latex",
       "outline": 4,
-      "inicio": "2026-07-30",
-      "fim": "2026-08-10",
+      "inicio": "2026-08-24",
+      "fim": "2026-09-02",
       "dias": 7.0,
       "resumo": false,
       "predecessoras": [
@@ -1654,30 +1636,30 @@
     {
       "uid": 15,
       "nome": "Revestimento de piso e azulejo",
-      "outline": 4,
+      "outline": 3,
       "inicio": "2026-03-20",
-      "fim": "2026-08-19",
-      "dias": 108.5,
+      "fim": "2026-09-11",
+      "dias": 125.25,
       "resumo": true,
       "predecessoras": []
     },
     {
       "uid": 256,
       "nome": "Térreo",
-      "outline": 5,
+      "outline": 4,
       "inicio": "2026-03-20",
-      "fim": "2026-07-17",
-      "dias": 85.5,
+      "fim": "2026-08-20",
+      "dias": 110.0,
       "resumo": true,
       "predecessoras": []
     },
     {
       "uid": 621,
       "nome": "Assentamento de pedras garagem/ Horta / entrada",
-      "outline": 6,
+      "outline": 5,
       "inicio": "2026-03-20",
-      "fim": "2026-04-08",
-      "dias": 14.0,
+      "fim": "2026-07-17",
+      "dias": 86.0,
       "resumo": false,
       "predecessoras": [
         {
@@ -1690,25 +1672,19 @@
     {
       "uid": 175,
       "nome": "Assentamento de piso cerâmico",
-      "outline": 6,
-      "inicio": "2026-07-01",
-      "fim": "2026-07-17",
+      "outline": 5,
+      "inicio": "2026-08-05",
+      "fim": "2026-08-20",
       "dias": 12.0,
       "resumo": false,
-      "predecessoras": [
-        {
-          "uid": 455,
-          "tipo": "FS",
-          "lag_dias": 0
-        }
-      ]
+      "predecessoras": []
     },
     {
       "uid": 528,
-      "nome": "Instalação de soleira portas externas",
-      "outline": 6,
-      "inicio": "2026-06-12",
-      "fim": "2026-06-22",
+      "nome": "Instalação de Peitoril",
+      "outline": 5,
+      "inicio": "2026-07-24",
+      "fim": "2026-08-03",
       "dias": 7.0,
       "resumo": false,
       "predecessoras": [
@@ -1722,25 +1698,19 @@
     {
       "uid": 177,
       "nome": "Assentamento de azulejo áreas molhadas",
-      "outline": 6,
-      "inicio": "2026-06-12",
-      "fim": "2026-06-18",
+      "outline": 5,
+      "inicio": "2026-08-03",
+      "fim": "2026-08-07",
       "dias": 5.0,
       "resumo": false,
-      "predecessoras": [
-        {
-          "uid": 442,
-          "tipo": "FS",
-          "lag_dias": 0
-        }
-      ]
+      "predecessoras": []
     },
     {
       "uid": 654,
       "nome": "Revestimento casa do gás",
-      "outline": 6,
-      "inicio": "2026-06-01",
-      "fim": "2026-06-03",
+      "outline": 5,
+      "inicio": "2026-08-03",
+      "fim": "2026-08-05",
       "dias": 3.0,
       "resumo": false,
       "predecessoras": []
@@ -1748,29 +1718,29 @@
     {
       "uid": 655,
       "nome": "Rodapé invertido",
-      "outline": 6,
-      "inicio": "2026-03-20",
-      "fim": "2026-03-20",
-      "dias": 1.0,
+      "outline": 5,
+      "inicio": "2026-07-20",
+      "fim": "2026-07-24",
+      "dias": 5.0,
       "resumo": false,
       "predecessoras": []
     },
     {
       "uid": 257,
       "nome": "1° Andar",
-      "outline": 5,
-      "inicio": "2026-06-19",
-      "fim": "2026-08-19",
-      "dias": 43.5,
+      "outline": 4,
+      "inicio": "2026-07-20",
+      "fim": "2026-09-11",
+      "dias": 39.25,
       "resumo": true,
       "predecessoras": []
     },
     {
       "uid": 259,
       "nome": "Assentamento de piso cerâmico",
-      "outline": 6,
-      "inicio": "2026-07-30",
-      "fim": "2026-08-19",
+      "outline": 5,
+      "inicio": "2026-08-24",
+      "fim": "2026-09-11",
       "dias": 14.0,
       "resumo": false,
       "predecessoras": [
@@ -1784,9 +1754,9 @@
     {
       "uid": 529,
       "nome": "Instalação de soleira",
-      "outline": 6,
-      "inicio": "2026-07-30",
-      "fim": "2026-08-03",
+      "outline": 5,
+      "inicio": "2026-08-24",
+      "fim": "2026-08-26",
       "dias": 2.0,
       "resumo": false,
       "predecessoras": [
@@ -1800,9 +1770,9 @@
     {
       "uid": 260,
       "nome": "Assentamento de azulejo áreas molhadas",
-      "outline": 6,
-      "inicio": "2026-06-19",
-      "fim": "2026-07-02",
+      "outline": 5,
+      "inicio": "2026-08-10",
+      "fim": "2026-08-21",
       "dias": 10.0,
       "resumo": false,
       "predecessoras": [
@@ -1816,10 +1786,10 @@
     {
       "uid": 656,
       "nome": "Rodapé invertido",
-      "outline": 6,
-      "inicio": "2026-06-19",
-      "fim": "2026-06-19",
-      "dias": 1.0,
+      "outline": 5,
+      "inicio": "2026-07-20",
+      "fim": "2026-07-24",
+      "dias": 5.0,
       "resumo": false,
       "predecessoras": []
     },
@@ -1827,8 +1797,8 @@
       "uid": 657,
       "nome": "Instalação de aquecedor a gás",
       "outline": 1,
-      "inicio": "2026-08-31",
-      "fim": "2026-08-31",
+      "inicio": "2026-08-03",
+      "fim": "2026-08-03",
       "dias": 1.0,
       "resumo": false,
       "predecessoras": []
@@ -1863,9 +1833,9 @@
       "uid": 183,
       "nome": "Acabamentos",
       "outline": 1,
-      "inicio": "2026-04-09",
-      "fim": "2026-10-01",
-      "dias": 125.5,
+      "inicio": "2024-08-05",
+      "fim": "2026-10-05",
+      "dias": 565.25,
       "resumo": true,
       "predecessoras": []
     },
@@ -1873,8 +1843,8 @@
       "uid": 184,
       "nome": "Instalação de bancada",
       "outline": 2,
-      "inicio": "2026-08-10",
-      "fim": "2026-08-17",
+      "inicio": "2026-09-02",
+      "fim": "2026-09-09",
       "dias": 5.0,
       "resumo": false,
       "predecessoras": [
@@ -1889,8 +1859,8 @@
       "uid": 513,
       "nome": "Louças e metais",
       "outline": 2,
-      "inicio": "2026-08-10",
-      "fim": "2026-08-19",
+      "inicio": "2026-09-02",
+      "fim": "2026-09-11",
       "dias": 7.0,
       "resumo": false,
       "predecessoras": [
@@ -1905,9 +1875,9 @@
       "uid": 187,
       "nome": "Esquadrias e portas",
       "outline": 2,
-      "inicio": "2026-04-09",
-      "fim": "2026-08-27",
-      "dias": 100.5,
+      "inicio": "2026-07-20",
+      "fim": "2026-09-21",
+      "dias": 45.25,
       "resumo": true,
       "predecessoras": []
     },
@@ -1915,8 +1885,8 @@
       "uid": 531,
       "nome": "Instalação de peitoril",
       "outline": 3,
-      "inicio": "2026-07-30",
-      "fim": "2026-08-13",
+      "inicio": "2026-08-24",
+      "fim": "2026-09-07",
       "dias": 10.0,
       "resumo": false,
       "predecessoras": [
@@ -1931,8 +1901,8 @@
       "uid": 192,
       "nome": "Instalação de janelas de PVC",
       "outline": 3,
-      "inicio": "2026-08-13",
-      "fim": "2026-08-27",
+      "inicio": "2026-09-07",
+      "fim": "2026-09-21",
       "dias": 10.0,
       "resumo": false,
       "predecessoras": [
@@ -1947,8 +1917,8 @@
       "uid": 593,
       "nome": "Instalação de guarda-corpos",
       "outline": 3,
-      "inicio": "2026-08-19",
-      "fim": "2026-08-26",
+      "inicio": "2026-09-11",
+      "fim": "2026-09-18",
       "dias": 5.0,
       "resumo": false,
       "predecessoras": [
@@ -1963,8 +1933,8 @@
       "uid": 191,
       "nome": "Instalação de portas de madeira",
       "outline": 3,
-      "inicio": "2026-07-30",
-      "fim": "2026-08-13",
+      "inicio": "2026-08-24",
+      "fim": "2026-09-07",
       "dias": 10.0,
       "resumo": false,
       "predecessoras": [
@@ -1979,8 +1949,8 @@
       "uid": 594,
       "nome": "Instalação do portão de entrada",
       "outline": 3,
-      "inicio": "2026-04-09",
-      "fim": "2026-04-15",
+      "inicio": "2026-07-20",
+      "fim": "2026-07-24",
       "dias": 5.0,
       "resumo": false,
       "predecessoras": [
@@ -1995,88 +1965,48 @@
       "uid": 524,
       "nome": "Pintura Externa",
       "outline": 2,
-      "inicio": "2026-06-12",
-      "fim": "2026-09-24",
-      "dias": 74.5,
+      "inicio": "2026-07-20",
+      "fim": "2026-08-07",
+      "dias": 15.0,
       "resumo": true,
-      "predecessoras": [
-        {
-          "uid": 540,
-          "tipo": "FS",
-          "lag_dias": 0
-        }
-      ]
+      "predecessoras": []
     },
     {
       "uid": 631,
-      "nome": "Primeira demão de tinta latex",
+      "nome": "Aplicação de textura",
       "outline": 3,
-      "inicio": "2026-06-12",
-      "fim": "2026-07-23",
-      "dias": 30.0,
+      "inicio": "2026-07-20",
+      "fim": "2026-08-07",
+      "dias": 15.0,
       "resumo": false,
-      "predecessoras": [
-        {
-          "uid": 540,
-          "tipo": "FS",
-          "lag_dias": 0
-        }
-      ]
-    },
-    {
-      "uid": 625,
-      "nome": "2 demão de pintura com tinta latex",
-      "outline": 3,
-      "inicio": "2026-08-27",
-      "fim": "2026-09-24",
-      "dias": 20.0,
-      "resumo": false,
-      "predecessoras": [
-        {
-          "uid": 192,
-          "tipo": "FS",
-          "lag_dias": 0
-        }
-      ]
+      "predecessoras": []
     },
     {
       "uid": 596,
       "nome": "Jardim e paisagismo",
       "outline": 2,
-      "inicio": "2026-04-09",
-      "fim": "2026-04-22",
+      "inicio": "2026-09-01",
+      "fim": "2026-09-14",
       "dias": 10.0,
       "resumo": false,
-      "predecessoras": [
-        {
-          "uid": 621,
-          "tipo": "FS",
-          "lag_dias": 0
-        }
-      ]
+      "predecessoras": []
     },
     {
       "uid": 597,
       "nome": "Iluminação externa",
       "outline": 2,
-      "inicio": "2026-09-24",
-      "fim": "2026-10-01",
+      "inicio": "2024-08-05",
+      "fim": "2024-08-09",
       "dias": 5.0,
       "resumo": false,
-      "predecessoras": [
-        {
-          "uid": 524,
-          "tipo": "FS",
-          "lag_dias": 0
-        }
-      ]
+      "predecessoras": []
     },
     {
       "uid": 550,
       "nome": "Limpeza",
       "outline": 2,
-      "inicio": "2026-08-27",
-      "fim": "2026-09-10",
+      "inicio": "2026-09-21",
+      "fim": "2026-10-05",
       "dias": 10.0,
       "resumo": false,
       "predecessoras": [
@@ -2091,8 +2021,8 @@
       "uid": 632,
       "nome": "Alambrado de divisa do terreno",
       "outline": 2,
-      "inicio": "2026-04-09",
-      "fim": "2026-04-09",
+      "inicio": "2024-08-05",
+      "fim": "2024-08-05",
       "dias": 1.0,
       "resumo": false,
       "predecessoras": []
@@ -2101,8 +2031,8 @@
       "uid": 635,
       "nome": "Pintura de estrutura metálica geral da obra",
       "outline": 2,
-      "inicio": "2026-04-09",
-      "fim": "2026-04-09",
+      "inicio": "2024-08-05",
+      "fim": "2024-08-05",
       "dias": 1.0,
       "resumo": false,
       "predecessoras": []
@@ -2111,8 +2041,8 @@
       "uid": 636,
       "nome": "Troca da caixa de entrada de água",
       "outline": 2,
-      "inicio": "2026-04-09",
-      "fim": "2026-04-09",
+      "inicio": "2024-08-05",
+      "fim": "2024-08-05",
       "dias": 1.0,
       "resumo": false,
       "predecessoras": []
@@ -2531,7 +2461,7 @@
       ]
     },
     "658": {
-      "nome": "Alvenaria ofuro",
+      "nome": "Alvenaria LSF ofuro",
       "pai": "Civil",
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
@@ -3375,11 +3305,10 @@
     },
     "15": {
       "nome": "Revestimento de piso e azulejo",
-      "pai": "1° Andar",
+      "pai": "Pintura Interna",
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
-        "Pintura Interna",
-        "1° Andar"
+        "Pintura Interna"
       ]
     },
     "256": {
@@ -3388,7 +3317,6 @@
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo"
       ]
     },
@@ -3398,7 +3326,6 @@
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo",
         "Térreo"
       ]
@@ -3409,18 +3336,16 @@
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo",
         "Térreo"
       ]
     },
     "528": {
-      "nome": "Instalação de soleira portas externas",
+      "nome": "Instalação de Peitoril",
       "pai": "Térreo",
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo",
         "Térreo"
       ]
@@ -3431,7 +3356,6 @@
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo",
         "Térreo"
       ]
@@ -3442,7 +3366,6 @@
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo",
         "Térreo"
       ]
@@ -3453,7 +3376,6 @@
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo",
         "Térreo"
       ]
@@ -3464,7 +3386,6 @@
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo"
       ]
     },
@@ -3474,7 +3395,6 @@
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo",
         "1° Andar"
       ]
@@ -3485,7 +3405,6 @@
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo",
         "1° Andar"
       ]
@@ -3496,7 +3415,6 @@
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo",
         "1° Andar"
       ]
@@ -3507,7 +3425,6 @@
       "caminho": [
         "Cronograma Angela - Santo Antônio do Pinhal",
         "Pintura Interna",
-        "1° Andar",
         "Revestimento de piso e azulejo",
         "1° Andar"
       ]
@@ -3601,15 +3518,7 @@
       ]
     },
     "631": {
-      "nome": "Primeira demão de tinta latex",
-      "pai": "Pintura Externa",
-      "caminho": [
-        "Acabamentos",
-        "Pintura Externa"
-      ]
-    },
-    "625": {
-      "nome": "2 demão de pintura com tinta latex",
+      "nome": "Aplicação de textura",
       "pai": "Pintura Externa",
       "caminho": [
         "Acabamentos",
@@ -3792,6 +3701,10 @@
         },
         {
           "tarefa_mpp": 404,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 629,
           "pct": 100.0
         }
       ]
@@ -4095,11 +4008,87 @@
       "comentario": "Efetivo:\nVeks - 4\nLeo pinturas - 2\nAbraão - 5\n\nAtividade :\n\nExecução foro suite 2 ( não está sendo usado o regulador , estamos utilizando o perfil f530 para estruturação devido o distanciamento da treliça para o foro)\n\nSegunda demão na massa nas fitas do térreo\n\nRegularização buracos parede\n\nAssentamento pedra ferro parede da fachada\n\nAplicação massa corrida PV Térreo ( pontos de correção na área do elevador , já passado para o executor )\n\nExecução de passagem de fio PV Térreo ( pontos de tomada confirmados com Sofia)\n\nPendências em aberto:\nCompra rodapé e perfil U - Sofia e Angela darão o ok Hoje dia 15/07\nConfirmação quadro elétrico energia solar-Sofia em contato com o fornecedor sem prazo\nConfirmação entrega textura- Abel confirmar hoje com fornecedor\nResposta email das esquadrias - Abel responderá hoje até às 13h\nConfirmar readequação parede com Smart - Sofia irá passar hoje dia 15/07 a resposta da Maria Laura\nConfirmar revestimento - Ângela irá confirmar até dia 18/07\n\nFotos:",
       "apontamentos": [
         {
+          "tarefa_mpp": 406,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 641,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 143,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 540,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 88,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 89,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 643,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 644,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 451,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 452,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 453,
+          "pct": 100.0
+        },
+        {
           "tarefa_mpp": 618,
           "pct": 100.0
         },
         {
+          "tarefa_mpp": 645,
+          "pct": 100.0
+        },
+        {
           "tarefa_mpp": 102,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 652,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 653,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 202,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 200,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 445,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 446,
+          "pct": 100.0
+        },
+        {
+          "tarefa_mpp": 448,
           "pct": 100.0
         },
         {
@@ -4131,20 +4120,8 @@
       ],
       "apontamentos": [
         {
-          "tarefa_mpp": 406,
-          "pct": 95.0
-        },
-        {
-          "tarefa_mpp": 143,
-          "pct": 25.0
-        },
-        {
           "tarefa_mpp": 539,
-          "pct": 9.0
-        },
-        {
-          "tarefa_mpp": 540,
-          "pct": 2.0
+          "pct": 60.0
         },
         {
           "tarefa_mpp": 607,
@@ -4152,43 +4129,35 @@
         },
         {
           "tarefa_mpp": 87,
-          "pct": 90.0
+          "pct": 70.0
         },
         {
-          "tarefa_mpp": 88,
-          "pct": 49.0
-        },
-        {
-          "tarefa_mpp": 89,
-          "pct": 95.0
-        },
-        {
-          "tarefa_mpp": 643,
+          "tarefa_mpp": 460,
           "pct": 60.0
         },
         {
-          "tarefa_mpp": 451,
-          "pct": 95.0
+          "tarefa_mpp": 465,
+          "pct": 50.0
         },
         {
-          "tarefa_mpp": 452,
+          "tarefa_mpp": 134,
           "pct": 90.0
         },
         {
-          "tarefa_mpp": 453,
-          "pct": 90.0
+          "tarefa_mpp": 544,
+          "pct": 60.0
         },
         {
-          "tarefa_mpp": 202,
-          "pct": 5.0
-        },
-        {
-          "tarefa_mpp": 200,
-          "pct": 5.0
+          "tarefa_mpp": 522,
+          "pct": 25.0
         },
         {
           "tarefa_mpp": 621,
-          "pct": 50.0
+          "pct": 80.0
+        },
+        {
+          "tarefa_mpp": 528,
+          "pct": 100.0
         }
       ]
     }

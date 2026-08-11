@@ -3,7 +3,7 @@
   whatsapp: 26 dia(s) de RDO
   payload : 26 item(ns) — novos=26 enriquecidos=0 sem_mudanca=0 conflitos=0
     novos: 2026-02-04, 2026-02-05, 2026-02-06, 2026-02-07, 2026-02-09, 2026-02-11, 2026-02-12, 2026-02-18, 2026-02-19, 2026-02-23, 2026-02-24, 2026-02-25, 2026-02-26, 2026-02-27, 2026-03-02, 2026-03-04, 2026-03-09, 2026-03-18, 2026-03-25, 2026-04-02, 2026-04-08, 2026-04-14, 2026-05-04, 2026-05-05, 2026-07-14, 2026-07-15
-  avisos (9):
+  avisos (10):
     - 2016-03-09: bloco sem marcador de obra no texto — atribuído a "Obra a Angela" pelo autor (Abel - Encarregado). Confira.
     - 2026-02-23: 2 blocos para o mesmo dia — o último prevalece (mensagem editada/reenviada?).
     - 2026-02-27: 2 blocos para o mesmo dia — o último prevalece (mensagem editada/reenviada?).
@@ -13,3 +13,4 @@
     - 2026-03-04: "00000556-VIDEO-2026-03-04-09-13-22.mp4" ignorado (não é imagem)
     - 2026-04-08: "00000694-AUDIO-2026-04-09-07-41-47.opus" ignorado (não é imagem)
     - 2016-03-09 CORRIGIDA para 2026-03-09 por --corrigir-data (typo do chat)
+    - tarefa 528 ("Instalação de Peitoril") termina 2026-08-03 — depois do último RDO; 100% registrado em 2026-07-15
