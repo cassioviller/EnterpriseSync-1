@@ -290,3 +290,213 @@ def test_guard_recusa_ligar_sem_almoxarifado():
         ok, motivo = pode_ligar(admin.id)
         assert ok is False
         assert 'almoxarifado' in motivo.lower()
+
+
+# ---------------------------------------------------------------------------
+# R3 — o serviço: documento, validações e situação derivada
+# ---------------------------------------------------------------------------
+
+def _cenario_pedido(qtd=50):
+    """Tenant + obra + pedido de UM item com `qtd` unidades, regime novo."""
+    admin = _admin()
+    obra = _obra(admin.id)
+    forn = _fornecedor(admin.id)
+    pedido = _pedido(admin.id, obra.id, forn.id,
+                     itens=(('Cimento CP-II', qtd, 32.50),))
+    pedido.exige_atesto = True
+    db.session.commit()
+    item = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).first()
+    return admin, obra, pedido, item
+
+
+def _receber(pedido, usuario, item, qtd, **kw):
+    from services.recebimento_pedido import registrar_recebimento
+    return registrar_recebimento(
+        pedido, usuario, [(item.id, Decimal(str(qtd)))],
+        data=kw.pop('data', date(2026, 8, 5)), **kw)
+
+
+def test_recebimento_parcial_deixa_o_pedido_parcial():
+    with app.app_context():
+        admin, _obr, pedido, item = _cenario_pedido(50)
+        _receber(pedido, admin, item, 30)
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'parcial'
+
+
+def test_segundo_recebimento_completa_o_pedido():
+    """As quantidades ACUMULAM entre entregas — 30 + 20 fecha os 50."""
+    with app.app_context():
+        admin, _obr, pedido, item = _cenario_pedido(50)
+        _receber(pedido, admin, item, 30)
+        _receber(pedido, admin, item, 20, data=date(2026, 8, 7))
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'recebido'
+
+
+def test_encerrar_saldo_faltando_quantidade():
+    """"Chegaram 48 dos 50 e o resto não vem" — fecha, mas fica marcado."""
+    with app.app_context():
+        admin, _obr, pedido, item = _cenario_pedido(50)
+        _receber(pedido, admin, item, 48, encerra_saldo=True,
+                 motivo='fornecedor não entrega o saldo')
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'encerrado_com_saldo'
+
+
+def test_encerrar_saldo_com_tudo_entregue_e_so_recebido():
+    """A ordem de avaliação importa: encerrar o que já veio inteiro não é
+    "encerrado com saldo" — não há saldo. Sem esta regra o relatório de
+    saldo em aberto contaria pedido completo."""
+    with app.app_context():
+        admin, _obr, pedido, item = _cenario_pedido(50)
+        _receber(pedido, admin, item, 50, encerra_saldo=True,
+                 motivo='entrega única')
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'recebido'
+
+
+@pytest.mark.parametrize('qtd', [0, -5])
+def test_quantidade_nao_positiva_recusa(qtd):
+    """Devolução não é recebimento negativo, e não entra nesta fase."""
+    from services.recebimento_pedido import RecebimentoInvalido
+    with app.app_context():
+        admin, _obr, pedido, item = _cenario_pedido(50)
+        with pytest.raises(RecebimentoInvalido):
+            _receber(pedido, admin, item, qtd)
+
+
+def test_sobre_entrega_recusa_por_padrao():
+    from services.recebimento_pedido import RecebimentoInvalido
+    with app.app_context():
+        admin, _obr, pedido, item = _cenario_pedido(50)
+        with pytest.raises(RecebimentoInvalido) as e:
+            _receber(pedido, admin, item, 60)
+        assert '50' in str(e.value)
+
+
+def test_sobre_entrega_passa_quando_liberada():
+    """Mesmo par bloqueio-com-liberação-explícita do `permitir_sobreexecucao`
+    do RDO: chegar mais é legítimo, passar despercebido não é."""
+    with app.app_context():
+        admin, _obr, pedido, item = _cenario_pedido(50)
+        _receber(pedido, admin, item, 60, permitir_sobre_entrega=True)
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'recebido'
+
+
+def test_encerrar_saldo_sem_motivo_recusa():
+    """O motivo é o que torna o encerramento auditável seis meses depois."""
+    from services.recebimento_pedido import RecebimentoInvalido
+    with app.app_context():
+        admin, _obr, pedido, item = _cenario_pedido(50)
+        with pytest.raises(RecebimentoInvalido) as e:
+            _receber(pedido, admin, item, 48, encerra_saldo=True)
+        assert 'motivo' in str(e.value).lower()
+
+
+def test_recebimento_depois_de_encerrado_recusa_dizendo_quem_e_quando():
+    with app.app_context():
+        from services.recebimento_pedido import RecebimentoInvalido
+        admin, _obr, pedido, item = _cenario_pedido(50)
+        _receber(pedido, admin, item, 48, encerra_saldo=True,
+                 motivo='fornecedor não entrega o saldo')
+
+        with pytest.raises(RecebimentoInvalido) as e:
+            _receber(pedido, admin, item, 2, data=date(2026, 8, 9))
+        msg = str(e.value)
+        assert admin.nome in msg, 'a recusa tem que dizer QUEM encerrou'
+        assert '05/08/2026' in msg, 'a recusa tem que dizer QUANDO'
+
+
+def test_sequencia_incrementa_por_pedido():
+    from models import RecebimentoPedido
+    with app.app_context():
+        admin, _obr, pedido, item = _cenario_pedido(90)
+        for i, qtd in enumerate([10, 20, 30], start=1):
+            rec = _receber(pedido, admin, item, qtd,
+                           data=date(2026, 8, 5 + i))
+            assert rec.sequencia == i
+            assert rec.rotulo.endswith(f'/{i}')
+        assert RecebimentoPedido.query.filter_by(pedido_id=pedido.id).count() == 3
+
+
+def test_situacao_para_e_pura_e_bate_com_o_persistido():
+    """A função que o sensor de drift da R7 vai reusar."""
+    from services.recebimento_pedido import situacao_para
+    with app.app_context():
+        admin, _obr, pedido, item = _cenario_pedido(50)
+        assert situacao_para(pedido) == 'nao_recebido'
+        _receber(pedido, admin, item, 30)
+        db.session.refresh(pedido)
+        assert situacao_para(pedido) == pedido.situacao_recebimento == 'parcial'
+
+
+# --- quem pode atestar -----------------------------------------------------
+
+def _pessoa_com_papel(admin_id, obra_id, papel):
+    """Usuário do tenant com vínculo de obra, e o escopo LIGADO.
+
+    Sem `escopo_obra_ativo`, `papel_na_obra` devolve GESTOR para todo
+    autenticado do tenant (comportamento pré-Fase 1) e a distinção de papéis
+    — que é o que este bloco testa — não vale.
+    """
+    from models import PapelObra, UsuarioObra
+    from scripts.flag_escopo_obra import definir_flag as _escopo
+
+    _escopo(admin_id, True)
+    suf = uuid.uuid4().hex[:8]
+    u = Usuario(
+        username=f'rp_{suf}', email=f'rp_{suf}@test.local', nome=f'P {suf}',
+        password_hash=generate_password_hash('Senha@2026'),
+        tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+        versao_sistema='v2', admin_id=admin_id)
+    db.session.add(u)
+    db.session.commit()
+    db.session.add(UsuarioObra(usuario_id=u.id, obra_id=obra_id,
+                               papel=PapelObra[papel], ativo=True,
+                               admin_id=admin_id))
+    db.session.commit()
+    return u
+
+
+@pytest.mark.parametrize('papel', ['GESTOR', 'APONTADOR', 'COMPRADOR'])
+def test_papeis_de_obra_podem_atestar(papel):
+    """Quem está na obra recebe o caminhão. Decisão explícita do spec: não há
+    checagem de "foi você que pediu" — em equipe pequena é sempre a mesma
+    pessoa, e travar isso deixaria material parado no portão."""
+    with app.app_context():
+        admin, obra, pedido, item = _cenario_pedido(50)
+        pessoa = _pessoa_com_papel(admin.id, obra.id, papel)
+        _receber(pedido, pessoa, item, 10)
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'parcial'
+
+
+def test_leitor_nao_atesta():
+    """LEITOR é só leitura em toda a Fase 1, e atestar é escrita que libera
+    dinheiro na fase seguinte."""
+    from services.recebimento_pedido import RecebimentoInvalido
+    with app.app_context():
+        admin, obra, pedido, item = _cenario_pedido(50)
+        leitor = _pessoa_com_papel(admin.id, obra.id, 'LEITOR')
+        with pytest.raises(RecebimentoInvalido):
+            _receber(pedido, leitor, item, 10)
+
+
+def test_sem_vinculo_com_a_obra_nao_atesta():
+    from services.recebimento_pedido import RecebimentoInvalido
+    with app.app_context():
+        admin, obra, pedido, item = _cenario_pedido(50)
+        from scripts.flag_escopo_obra import definir_flag as _escopo
+        _escopo(admin.id, True)
+        suf = uuid.uuid4().hex[:8]
+        estranho = Usuario(
+            username=f'rx_{suf}', email=f'rx_{suf}@test.local', nome='Sem Vinculo',
+            password_hash=generate_password_hash('Senha@2026'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            versao_sistema='v2', admin_id=admin.id)
+        db.session.add(estranho)
+        db.session.commit()
+        with pytest.raises(RecebimentoInvalido):
+            _receber(pedido, estranho, item, 10)

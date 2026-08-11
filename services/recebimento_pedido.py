@@ -2,14 +2,30 @@
 
 O caminho ÚNICO de escrita do recebimento, no molde do chokepoint que a Fase 3
 usa em services/requisicao_compra.py. Quem grava recebimento passa por aqui;
-quem quiser gravar por fora vai divergir do `situacao_recebimento` persistido, e
-o scripts/verificar_consistencia_recebimento.py denuncia.
+quem gravar por fora vai divergir do `situacao_recebimento` persistido, e o
+scripts/verificar_consistencia_recebimento.py denuncia.
 
 Spec: docs/superpowers/specs/2026-08-11-recebimento-atesto-design.md
 """
 import logging
+from decimal import Decimal
 
 logger = logging.getLogger('recebimento_pedido')
+
+# As quatro situações de `PedidoCompra.situacao_recebimento`.
+NAO_RECEBIDO = 'nao_recebido'
+PARCIAL = 'parcial'
+RECEBIDO = 'recebido'
+ENCERRADO_COM_SALDO = 'encerrado_com_saldo'
+
+
+class RecebimentoInvalido(Exception):
+    """Violação de regra de recebimento — dado errado, não bug.
+
+    A mensagem é exibida ao usuário verbatim (a rota da R6 e o relatório de
+    pendências da carga usam o texto como está). Escreva para humano: o que
+    está errado e o que fazer.
+    """
 
 
 def regime_do_tenant(admin_id):
@@ -26,3 +42,196 @@ def regime_do_tenant(admin_id):
     """
     from scripts.flag_recebimento_atesto import recebimento_atesto_ativo
     return bool(recebimento_atesto_ativo(admin_id))
+
+
+def _d(valor):
+    return Decimal(str(valor or 0))
+
+
+def recebido_por_item(pedido):
+    """{pedido_item_id: quantidade acumulada} somando TODOS os recebimentos.
+
+    A soma é o que decide a situação do pedido — por isso ela vive numa função
+    só, e não espalhada entre quem grava e quem confere.
+    """
+    from models import RecebimentoPedido, RecebimentoPedidoItem, db
+
+    linhas = (db.session.query(RecebimentoPedidoItem)
+              .join(RecebimentoPedido,
+                    RecebimentoPedido.id == RecebimentoPedidoItem.recebimento_id)
+              .filter(RecebimentoPedido.pedido_id == pedido.id)
+              .all())
+    acumulado = {}
+    for linha in linhas:
+        acumulado[linha.pedido_item_id] = (
+            acumulado.get(linha.pedido_item_id, Decimal('0'))
+            + _d(linha.quantidade_recebida))
+    return acumulado
+
+
+def _encerramento(pedido):
+    """O recebimento que encerrou o saldo deste pedido, ou None."""
+    from models import RecebimentoPedido
+    return (RecebimentoPedido.query
+            .filter_by(pedido_id=pedido.id, encerra_saldo=True)
+            .order_by(RecebimentoPedido.sequencia)
+            .first())
+
+
+def situacao_para(pedido):
+    """A situação de recebimento DERIVADA — função pura de leitura.
+
+    Separada de quem grava de propósito: é esta que o
+    scripts/verificar_consistencia_recebimento.py (R7) compara com o valor
+    persistido para achar drift. Se a regra vivesse dentro de
+    `registrar_recebimento`, o sensor teria de reimplementá-la — e um sensor
+    que reimplementa o que vigia não vigia nada.
+
+    A ordem das perguntas é a regra:
+      1. nada recebido            → nao_recebido
+      2. todo item completo       → recebido   (mesmo com encerra_saldo:
+                                                não há saldo a encerrar)
+      3. alguém encerrou o saldo  → encerrado_com_saldo
+      4. resto                    → parcial
+    """
+    from models import PedidoCompraItem
+
+    acumulado = recebido_por_item(pedido)
+    if not acumulado or all(q <= 0 for q in acumulado.values()):
+        return NAO_RECEBIDO
+
+    itens = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).all()
+    completo = all(
+        acumulado.get(item.id, Decimal('0')) >= _d(item.quantidade)
+        for item in itens)
+    if completo:
+        return RECEBIDO
+    if _encerramento(pedido) is not None:
+        return ENCERRADO_COM_SALDO
+    return PARCIAL
+
+
+def _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega):
+    """Quantidades: positivas, de itens DESTE pedido, e sem estourar o pedido."""
+    from models import PedidoCompraItem
+
+    if not linhas:
+        raise RecebimentoInvalido(
+            'informe ao menos um item recebido — recebimento vazio não é '
+            'atesto de nada.')
+
+    itens = {i.id: i for i in
+             PedidoCompraItem.query.filter_by(pedido_id=pedido.id).all()}
+    vistos = set()
+    for item_id, quantidade in linhas:
+        if item_id in vistos:
+            raise RecebimentoInvalido(
+                f'o item {item_id} aparece duas vezes neste recebimento — '
+                f'some as quantidades numa linha só.')
+        vistos.add(item_id)
+
+        item = itens.get(item_id)
+        if item is None:
+            raise RecebimentoInvalido(
+                f'o item {item_id} não é deste pedido.')
+
+        qtd = _d(quantidade)
+        if qtd <= 0:
+            raise RecebimentoInvalido(
+                f'"{item.descricao}": a quantidade recebida tem de ser maior '
+                f'que zero. Devolução não é recebimento negativo.')
+
+        if not permitir_sobre_entrega:
+            total = acumulado.get(item_id, Decimal('0')) + qtd
+            pedido_qtd = _d(item.quantidade)
+            if total > pedido_qtd:
+                ja = acumulado.get(item_id, Decimal('0'))
+                raise RecebimentoInvalido(
+                    f'"{item.descricao}": recebendo {qtd} chega a {total}, '
+                    f'acima dos {pedido_qtd} do pedido'
+                    + (f' ({ja} já recebidos)' if ja else '')
+                    + '. Se veio mais mesmo, marque a sobre-entrega e '
+                      'justifique.')
+
+
+def registrar_recebimento(pedido, usuario, linhas, data, observacao=None,
+                          encerra_saldo=False, motivo=None,
+                          permitir_sobre_entrega=False):
+    """Grava UM recebimento do pedido. Uma transação, um commit.
+
+    `linhas`: iterável de `(pedido_item_id, quantidade)`. Só os itens que
+    chegaram — item ausente é item que não veio nesta entrega, não item com
+    quantidade zero.
+
+    Devolve o `RecebimentoPedido` criado. Levanta `RecebimentoInvalido` com
+    mensagem para humano quando alguma regra não bate; nada é gravado nesse
+    caso.
+
+    NÃO gera movimento de estoque nesta rodada — isso entra na R4, e é o que
+    faz o estoque passar a nascer do atesto em vez da emissão do pedido.
+    """
+    from models import RecebimentoPedido, RecebimentoPedidoItem, db
+    from utils.autorizacao import usuario_pode_receber_na_obra
+
+    linhas = list(linhas or [])
+
+    if not usuario_pode_receber_na_obra(usuario, pedido.obra_id):
+        raise RecebimentoInvalido(
+            'você não tem permissão para atestar recebimento nesta obra.')
+
+    if encerra_saldo and not (motivo or '').strip():
+        raise RecebimentoInvalido(
+            'para encerrar o saldo é preciso dizer por quê — é o motivo que '
+            'explica, seis meses depois, por que o pedido fechou incompleto.')
+
+    # Trava a linha do pedido ANTES de somar: sem isso duas telas abertas
+    # somam contra o mesmo acumulado e furam juntas o limite de quantidade.
+    db.session.query(type(pedido)).filter_by(id=pedido.id).with_for_update().first()
+
+    ja_encerrado = _encerramento(pedido)
+    if ja_encerrado is not None:
+        quem = getattr(ja_encerrado.recebido_por, 'nome', None) or 'alguém'
+        quando = ja_encerrado.data_recebimento.strftime('%d/%m/%Y')
+        raise RecebimentoInvalido(
+            f'o saldo deste pedido foi encerrado por {quem} em {quando} '
+            f'("{(ja_encerrado.motivo_encerramento or "").strip()}"). Para '
+            f'receber mais, reabra o pedido ou emita um pedido novo.')
+
+    acumulado = recebido_por_item(pedido)
+    _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega)
+
+    ultima = (RecebimentoPedido.query
+              .filter_by(pedido_id=pedido.id)
+              .order_by(RecebimentoPedido.sequencia.desc())
+              .first())
+    sequencia = (ultima.sequencia + 1) if ultima else 1
+
+    recebimento = RecebimentoPedido(
+        pedido_id=pedido.id,
+        admin_id=pedido.admin_id,
+        sequencia=sequencia,
+        recebido_por_id=usuario.id,
+        data_recebimento=data,
+        observacao=observacao,
+        encerra_saldo=bool(encerra_saldo),
+        motivo_encerramento=(motivo or None) if encerra_saldo else None,
+    )
+    db.session.add(recebimento)
+    db.session.flush()
+
+    for item_id, quantidade in linhas:
+        db.session.add(RecebimentoPedidoItem(
+            recebimento_id=recebimento.id,
+            admin_id=pedido.admin_id,
+            pedido_item_id=item_id,
+            quantidade_recebida=_d(quantidade),
+        ))
+    db.session.flush()
+
+    pedido.situacao_recebimento = situacao_para(pedido)
+    db.session.commit()
+
+    logger.info('recebimento %s: %s itens por usuario=%s — pedido agora %s',
+                recebimento.rotulo, len(linhas), usuario.id,
+                pedido.situacao_recebimento)
+    return recebimento
