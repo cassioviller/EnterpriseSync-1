@@ -263,14 +263,14 @@ Os testes de integração seguem o padrão de `tests/test_fase3_portal_seguranca
 
 ## Migrations
 
-- **267** — cria `recebimento_pedido` e `recebimento_pedido_item`; acrescenta
+- **283** — cria `recebimento_pedido` e `recebimento_pedido_item`; acrescenta
   `pedido_compra.exige_atesto` (default False) e `pedido_compra.situacao_recebimento`
   (default `nao_recebido`). Backfill: nenhum. Pedido histórico é legado por definição, e
   `exige_atesto=False` é exatamente o que descreve o que aconteceu com ele.
-- **268** — `configuracao_empresa.recebimento_atesto_ativo`, default False.
+- **284** — `configuracao_empresa.recebimento_atesto_ativo`, default False.
 
 Registradas na lista de `migrations.py:6505` no formato existente. A última migration do
-repositório é a 266.
+repositório é a 282.
 
 ---
 

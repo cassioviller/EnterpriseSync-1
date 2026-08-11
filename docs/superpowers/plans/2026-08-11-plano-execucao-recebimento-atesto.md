@@ -37,7 +37,7 @@ do legado depende de R2. R7 fecha.
 
 ---
 
-## R1 — Modelos e migrations 267/268
+## R1 — Modelos e migrations 283/284
 
 - [ ] **Step 1 (red):** testes que provam o esqueleto:
   - `RecebimentoPedido` e `RecebimentoPedidoItem` importáveis de `models`;
@@ -54,17 +54,17 @@ do legado depende de R2. R7 fecha.
 - [ ] **Step 3:** colunas `exige_atesto` (bool, NOT NULL, default False) e
   `situacao_recebimento` (String(24), NOT NULL, default `'nao_recebido'`) em
   `PedidoCompra`.
-- [ ] **Step 4:** `migration_267_recebimento_atesto` em `migrations.py` — cria as duas
+- [ ] **Step 4:** `migration_283_recebimento_atesto` em `migrations.py` — cria as duas
   tabelas com as constraints e os índices do spec, e as duas colunas em `pedido_compra`.
   Sem backfill: pedido histórico é legado por definição, e `exige_atesto=False` descreve
   exatamente o que aconteceu com ele. Registrar na lista em `migrations.py` com o número
-  **267**. ⚠️ Conferir `migration_history` no dev **antes** de fixar o número — a última
-  do repositório é a 266, mas o dev pode estar à frente.
-- [ ] **Step 5:** `migration_268_flag_recebimento_atesto` — coluna
+  **283**. ⚠️ Conferir `migration_history` no dev **antes** de fixar o número — a última
+  do repositório é a 282 (conferido no dev em 11/08 — o grep ingênuo por `def migration_` mostra 266 porque as recentes usam prefixo `_`).
+- [ ] **Step 5:** `migration_284_flag_recebimento_atesto` — coluna
   `configuracao_empresa.recebimento_atesto_ativo` (bool, NOT NULL, default False).
 - [ ] **Step 6 (green):** os quatro testes verdes. Aplicar as duas migrations no dev e
   conferir por `psql`: tabelas, constraints, índices e defaults das colunas novas.
-- [ ] **Step 7:** commit — `feat(compras): tabelas de recebimento e atesto (migrations 267/268)`
+- [ ] **Step 7:** commit — `feat(compras): tabelas de recebimento e atesto (migrations 283/284)`
 
 ## R2 — Flag por tenant e o carimbo do regime
 
@@ -194,6 +194,6 @@ O conserto da dupla escrita. É o passo de maior risco do plano: mexe em almoxar
 | Risco | Mitigação |
 |---|---|
 | Mexer no almoxarifado quebra tenant em produção | Tudo atrás de `exige_atesto`, que é carimbado por pedido. Tenant sem flag não muda de comportamento, e o teste da R4 Step 1 (quarto caso) guarda isso |
-| Número da migration colidir com o dev | Conferir `migration_history` antes de fixar 267/268 (lição registrada na B6.1) |
+| Número da migration colidir com o dev | Conferir `migration_history` antes de fixar 283/284 (lição registrada na B6.1) |
 | Dupla escrita voltar num refactor futuro | A regressão explícita da R4 Step 1 é o guarda permanente |
 | `situacao_recebimento` sair de sincronia | Sensor de drift da R7, no padrão do cronograma |
