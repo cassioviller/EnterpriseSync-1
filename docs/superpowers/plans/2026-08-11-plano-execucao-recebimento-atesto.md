@@ -89,7 +89,7 @@ do legado depende de R2. R7 fecha.
 
 ## R3 — O serviço: documento, validações e situação
 
-- [ ] **Step 1 (red):** testes do `registrar_recebimento`, um por regra do spec:
+- [x] **Step 1 (red):** testes do `registrar_recebimento`, um por regra do spec:
   - recebimento parcial → `situacao_recebimento == 'parcial'`;
   - segundo recebimento completando → `'recebido'`;
   - `encerra_saldo=True` faltando quantidade → `'encerrado_com_saldo'`;
@@ -102,18 +102,18 @@ do legado depende de R2. R7 fecha.
   - `LEITOR` da obra → recusa; `GESTOR`/`APONTADOR`/`COMPRADOR`/`ALMOXARIFE` → aceita;
   - solicitante e emissor **podem** atestar (decisão explícita do spec — o teste existe
     para que ninguém "conserte" isso sem ler a decisão).
-- [ ] **Step 2:** `pode_receber_na_obra(obra_id)` em `utils/autorizacao.py`, ao lado de
+- [x] **Step 2:** `pode_receber_na_obra(obra_id)` em `utils/autorizacao.py`, ao lado de
   `pode_requisitar_na_obra` e `pode_apontar_na_obra`.
-- [ ] **Step 3:** `services/recebimento_pedido.py` com `registrar_recebimento(...)` — o
+- [x] **Step 3:** `services/recebimento_pedido.py` com `registrar_recebimento(...)` — o
   **único** caminho de escrita, no molde do chokepoint de `services/requisicao_compra.py`.
   Nesta rodada ele ainda **não** toca estoque: cria o documento, valida e atualiza a
   situação. Uma transação; `SELECT … FOR UPDATE` no pedido antes de somar quantidades.
-- [ ] **Step 4:** `situacao_para(pedido)` como função pura, separada de quem grava — é o
+- [x] **Step 4:** `situacao_para(pedido)` como função pura, separada de quem grava — é o
   que o script de consistência da R7 vai reusar sem duplicar regra.
-- [ ] **Step 5 (green + mutação):** todos verdes. Mutação de sanidade: trocar `>=` por
+- [x] **Step 5 (green + mutação):** todos verdes. Mutação de sanidade: trocar `>=` por
   `>` na derivação de `'recebido'` e confirmar que o teste do segundo recebimento
   **mata** a mutação.
-- [ ] **Step 6:** commit — `feat(compras): servico de recebimento — documento, validacoes e situacao derivada`
+- [x] **Step 6:** commit — `feat(compras): servico de recebimento — documento, validacoes e situacao derivada`
 
 ## R4 — O estoque passa a nascer do atesto
 
