@@ -687,12 +687,14 @@ def test_mapa_nomes_do_json_real_separa_os_dois_galpoes():
                            'cronograma_fisico_financeiro_baias.json')
     with open(caminho, encoding='utf-8') as fh:
         mapa = mapa_nomes_do_json(json.load(fh))
-    assert mapa[14]['nome'] == 'Execução de Ferragens Para Fundação'
-    assert mapa[59]['nome'] == 'Execução de Ferragens Para Fundação'
-    assert mapa[14]['pai'] == mapa[59]['pai'] == 'Fundação'
-    # 14 é do Galpão B e 59 é do Galpão A — sim, nesta ordem.
-    assert 'Galpão B' in mapa[14]['caminho']
-    assert 'Galpão A' in mapa[59]['caminho']
+    # ids do CRONOGRAMA BAIAS 10.08 (eram 14 e 59 no 06.07 — a revisão
+    # estrutural renumerou tudo; hoje o 14 é "Concretagem das Brocas")
+    assert mapa[13]['nome'] == 'Execução de Ferragens Para Fundação'
+    assert mapa[63]['nome'] == 'Execução de Ferragens Para Fundação'
+    assert mapa[13]['pai'] == mapa[63]['pai'] == 'Fundação'
+    # 13 é do Galpão B e 63 é do Galpão A — sim, nesta ordem.
+    assert 'Galpão B' in mapa[13]['caminho']
+    assert 'Galpão A' in mapa[63]['caminho']
 
 
 # ── garantia de que o import destrutivo continua intacto ──────────────

@@ -40,8 +40,8 @@ Formato de cada item de `rdos` (o mesmo da seção `"rdos"` do JSON canônico):
      "comentario": "Efetivo: 05 colaboradores\\n\\nAtividades executadas:…",
      "mao_de_obra": 0,
      "fotos": [{"arquivo": "1.jpg", "legenda": "…"}],
-     "apontamentos": [{"tarefa_mpp": 59, "pct": 65},
-                      {"tarefa_mpp": 14, "quantidade": 10}]}
+     "apontamentos": [{"tarefa_mpp": 63, "pct": 65},
+                      {"tarefa_mpp": 13, "quantidade": 10}]}
 
 Chaves começadas por `_` (ex.: `_sugestoes`, escrito por
 `scripts/whatsapp_para_rdos.py`) são ignoradas de propósito: servem à revisão

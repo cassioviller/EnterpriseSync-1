@@ -148,15 +148,15 @@ def test_recusa_reimport_destrutivo_em_obra_migrada():
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURE_BAIA = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             'fixtures', 'cronograma_fisico_financeiro_baias.json')
-MPP_0607 = os.path.join(RAIZ, 'CRONOGRAMA 06.07.mpp')
+MPP_BAIA = os.path.join(RAIZ, 'CRONOGRAMA BAIAS 10.08.mpp')
 
 from services.mpp_parser import java_disponivel  # noqa: E402
 
 requer_java = pytest.mark.skipif(not java_disponivel(),
                                  reason='JVM indisponível')
 requer_fixture = pytest.mark.skipif(
-    not (os.path.exists(FIXTURE_BAIA) and os.path.exists(MPP_0607)),
-    reason='fixture canônica ou CRONOGRAMA 06.07.mpp ausentes')
+    not (os.path.exists(FIXTURE_BAIA) and os.path.exists(MPP_BAIA)),
+    reason='fixture canônica ou CRONOGRAMA BAIAS 10.08.mpp ausentes')
 
 
 def _client_como(user_id):
@@ -176,9 +176,11 @@ def test_migracao_completa_da_baia_com_equivalencia_e_rollback(
 
     monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
 
-    # 1) Criação inicial pela fixture canônica (101 tarefas, 31 RDOs — eram 19
-    #    até 27/07, quando os 7 dias de 14 a 22/07 vieram do WhatsApp, e 26 até
-    #    30/07, quando entraram os 5 dias de 23 a 29/07).
+    # 1) Criação inicial pela fixture canônica (109 tarefas, 37 RDOs — eram 19
+    #    até 27/07, quando os 7 dias de 14 a 22/07 vieram do WhatsApp, 26 até
+    #    30/07 com os 5 dias de 23 a 29/07, 31 até 07/08 e 37 com os 6 dias de
+    #    30/07 a 06/08; as tarefas eram 101 até a revisão estrutural entrar
+    #    pelo CRONOGRAMA BAIAS 10.08.mpp).
     with app.app_context():
         admin, _ = _ambiente()
         aid = admin.id
@@ -188,15 +190,15 @@ def test_migracao_completa_da_baia_com_equivalencia_e_rollback(
         versao_pre = CronogramaVersao.query.filter_by(
             obra_id=oid, status='ativa').one()
         versao_pre_id = versao_pre.id
-    assert estado_a['n_tarefas_ativas'] == 101
-    assert len(estado_a['rdos']) == 31
+    assert estado_a['n_tarefas_ativas'] == 109
+    assert len(estado_a['rdos']) == 37
     assert estado_a['n_apontamentos'] > 0
 
     # 2) Upload do .mpp REAL de origem pelo pipeline novo (M03).
     c = _client_como(aid)
-    with open(MPP_0607, 'rb') as fh:
+    with open(MPP_BAIA, 'rb') as fh:
         r = c.post(f'/obras/{oid}/cronograma/importacoes',
-                   data={'arquivo': (fh, 'CRONOGRAMA 06.07.mpp')},
+                   data={'arquivo': (fh, 'CRONOGRAMA BAIAS 10.08.mpp')},
                    content_type='multipart/form-data')
     assert r.status_code == 201, r.get_json()
     iid = r.get_json()['importacao_id']
@@ -246,7 +248,7 @@ def test_migracao_completa_da_baia_com_equivalencia_e_rollback(
     resultado = comparar_estados(estado_a, estado_b)
     assert resultado['equivalente'], resultado['divergencias']
     # Identidades gravadas para as próximas importações.
-    assert com_uid >= 95, f'uids gravados: {com_uid}/101'
+    assert com_uid >= 100, f'uids gravados: {com_uid}/109'
 
     # 6) Rollback ensaiado: restaurar a versão pré-migração e re-verificar.
     r = c.post(f'/obras/{oid}/cronograma/versoes/{versao_pre_id}/restaurar')

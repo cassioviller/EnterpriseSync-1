@@ -84,7 +84,7 @@ def test_importa_cria_obra_com_contrato():
         assert obra.admin_id == admin_id
         assert abs(float(obra.valor_contrato) - 1505613.76) < 0.01
         assert obra.data_inicio == date(2026, 6, 8)
-        assert obra.data_previsao_fim == date(2026, 10, 8)
+        assert obra.data_previsao_fim == date(2026, 10, 19)
         assert obra.endereco == 'Fazenda Santa Mônica'  # exibido no portal
 
 
@@ -97,9 +97,10 @@ def test_importa_cria_etapas_tarefas_e_custos():
         admin_id = _novo_admin()
         res = importar_fisico_financeiro(_carregar_json(), admin_id)
         oid = res['obra_id']
-        # Cronograma físico = espelho fiel das 101 tarefas do .mpp (06.07, split A/B), no outline.
+        # Cronograma físico = espelho fiel das 109 tarefas do .mpp (BAIAS 10.08,
+        # split A/B, com a revisão estrutural de 30/07), no outline.
         tarefas = TarefaCronograma.query.filter_by(obra_id=oid, admin_id=admin_id).all()
-        assert len(tarefas) == 101
+        assert len(tarefas) == 109
         raizes = [t for t in tarefas if t.tarefa_pai_id is None]
         assert len(raizes) == 1 and 'OBRA' in (raizes[0].nome_tarefa or '').upper()
         nomes = {(t.nome_tarefa or '').upper() for t in tarefas}
@@ -202,8 +203,8 @@ def test_reimport_nao_duplica():
         oid2 = importar_fisico_financeiro(_carregar_json(), admin_id)['obra_id']
         assert oid1 == oid2
         assert Obra.query.filter_by(admin_id=admin_id).count() == 1
-        # cronograma não duplica: continua com as 101 tarefas do .mpp, 1 raiz (OBRA)
-        assert TarefaCronograma.query.filter_by(obra_id=oid1).count() == 101
+        # cronograma não duplica: continua com as 109 tarefas do .mpp, 1 raiz (OBRA)
+        assert TarefaCronograma.query.filter_by(obra_id=oid1).count() == 109
         assert TarefaCronograma.query.filter_by(obra_id=oid1, tarefa_pai_id=None).count() == 1
         assert MedicaoContrato.query.filter_by(obra_id=oid1).count() == 6
 
@@ -611,10 +612,12 @@ def test_apontamento_quantitativo_deriva_percentual_e_acumula():
         caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
                                'cronograma_fisico_financeiro_baias.json')
         payload = json.load(open(caminho, encoding='utf-8'))
-        # t15 já tem quantidade_total=48 na fixture; aponta 10 e depois +15
+        # a "Execução de Ferragens Para Fundação" (Galpão B) é a única com
+        # quantidade_total=48 na fixture — id 13 no CRONOGRAMA BAIAS 10.08
+        # (era 14 no 06.07; o 14 de hoje é "Concretagem das Brocas")
         payload['rdos'] = [
-            {"data": "2026-06-30", "apontamentos": [{"tarefa_mpp": 14, "quantidade": 10}]},
-            {"data": "2026-07-01", "apontamentos": [{"tarefa_mpp": 14, "quantidade": 15}]},
+            {"data": "2026-06-30", "apontamentos": [{"tarefa_mpp": 13, "quantidade": 10}]},
+            {"data": "2026-07-01", "apontamentos": [{"tarefa_mpp": 13, "quantidade": 15}]},
         ]
         oid = importar_fisico_financeiro(payload, aid)['obra_id']
         # 2 tarefas homônimas (Galpão A/B); a com quantidade_total é a do apontamento
@@ -699,16 +702,21 @@ def test_fixture_baia_traz_rdos_do_relatorio():
         caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
                                'cronograma_fisico_financeiro_baias.json')
         payload = json.load(open(caminho, encoding='utf-8'))
-        assert len(payload.get('rdos', [])) == 31
+        assert len(payload.get('rdos', [])) == 37
         oid = importar_fisico_financeiro(payload, aid)['obra_id']
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 31
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 37
         por_nome = {t.nome_tarefa: float(t.percentual_concluido or 0) for t in
                     TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
         assert por_nome['Estudo de Solo SPT'] == 100.0
-        assert por_nome['Execução de projetos LSF, Telhado, Piso, Baldrame, Fundação para Pilares de Madeira'] == 65.0
+        # 100% e não 65% desde 11/08: a curva intermediária dessas duas continua
+        # vindo do texto dos RDOs, mas o FECHAMENTO passou a ser o %concluído do
+        # CRONOGRAMA BAIAS 10.08.mpp — o diário parou de citar o projeto em
+        # 30/06 e nunca citou a mobilização da equipe. Ver FECHAMENTO_PROJECT em
+        # scripts/rebuild_baia_from_1008_mpp.py e ESTADO_ATUALIZACAO_BAIA.md.
+        assert por_nome['Execução de projetos LSF, Telhado, Piso, Baldrame, Fundação para Pilares de Madeira'] == 100.0
         assert por_nome['Fazenda: Nivelamento dos Platôs'] == 100.0
         assert por_nome['Execução de Gabarito'] == 100.0
-        # ferragens das brocas (id14, quantitativo 48/48) concluída até 06/07
+        # ferragens das brocas (id13, quantitativo 48/48) concluída até 06/07
         ferr = (TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid)
                 .filter(TarefaCronograma.quantidade_total.isnot(None)).first())
         assert round(float(ferr.percentual_concluido), 2) == 100.0  # 48/48
@@ -717,7 +725,7 @@ def test_fixture_baia_traz_rdos_do_relatorio():
                  TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()
                  if t.nome_tarefa in ('Escavação De Fundação Para Baldrames', 'Escavação Das Brocas')]
         assert escav and all(v == 100.0 for v in escav)
-        assert por_nome['Mobilização Equipe'] == 0.0
+        assert por_nome['Mobilização Equipe'] == 100.0  # idem: veio do Project
 
 
 def test_calcular_progresso_rdo_fallback_sem_quantidade_total():
@@ -900,7 +908,7 @@ def test_fixture_rdos_sem_mao_de_obra():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(d, aid)['obra_id']
         rdo_ids = [r.id for r in RDO.query.filter_by(obra_id=oid, admin_id=aid).all()]
-        assert len(rdo_ids) == 31
+        assert len(rdo_ids) == 37
         assert RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).count() == 0
 
 
@@ -1210,7 +1218,7 @@ def test_reimport_limpa_custo_obra_referenciando_rdo():
         # reimporta — não deve levantar IntegrityError de FK
         oid2 = importar_fisico_financeiro(payload, aid)['obra_id']
         assert oid2 == oid
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 31
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 37
         assert CustoObra.query.filter_by(obra_id=oid, tipo='mao_obra').count() == 0
 
 
@@ -1253,7 +1261,8 @@ def test_apontamentos_do_mesmo_nome_em_galpoes_distintos_sao_distinguiveis():
     O caso real: "AJR - Maquinário: …" (Galpão B, 60→80%) e
     "Ajr - Maquinário: …" (Galpão A, 0→60%) no mesmo dia. Só se distinguiam
     por um acaso de grafia herdado do .mpp — a atividade seguinte que
-    repetisse a grafia ficaria indistinguível.
+    repetisse a grafia ficaria indistinguível. O CRONOGRAMA BAIAS 10.08.mpp
+    igualou as duas grafias e provou o ponto: hoje só o ancestral distingue.
     """
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from models import TarefaCronograma
@@ -1262,7 +1271,7 @@ def test_apontamentos_do_mesmo_nome_em_galpoes_distintos_sao_distinguiveis():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
 
-        alvo = 'nivelamento das calçadas'
+        alvo = 'nivelamento e compactação das calçadas'
         tarefas = [t for t in TarefaCronograma.query.filter_by(
             obra_id=oid, admin_id=aid).all()
             if alvo in (t.nome_tarefa or '').lower()]
@@ -1457,22 +1466,26 @@ def test_cadastrar_quantitativo_nao_reescreve_avanco_ja_lancado_em_percentual():
     """
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from models import TarefaCronograma
-    from utils.cronograma_engine import calcular_progresso_rdo
+    from utils.cronograma_engine import (calcular_progresso_rdo,
+                                         caminho_ancestrais_tarefa)
     from datetime import date
     with app.app_context():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
-        # `like` e não `ilike`: o cronograma da Baia tem DUAS tarefas com
-        # este nome, diferindo só na caixa ('AJR - …' id 20 do .mpp e
-        # 'Ajr - …' id 65). É a de caixa alta que a medição de 28/07 usou —
-        # 60% em 21/07, 80% em 22/07 e, desde a rodada de 30/07, 90% em 23/07
-        # e 100% em 24/07 ("concluída a compactação do solo das calçadas").
-        # O assert abaixo trava a escolha: se o fixture mudar, o teste diz o
-        # porquê em vez de sortear — foi o que aconteceu em 30/07.
-        alvos = TarefaCronograma.query.filter(
+        # O cronograma da Baia tem DUAS tarefas "AJR - Maquinário…", uma por
+        # galpão. É a do Galpão B que a medição de 28/07 usou — 60% em 21/07,
+        # 80% em 22/07 e, desde a rodada de 30/07, 90% em 23/07 e 100% em
+        # 24/07 ("concluída a compactação do solo das calçadas"). Até o
+        # CRONOGRAMA BAIAS 10.08.mpp as duas diferiam na caixa da 1ª letra
+        # ('AJR -' no B, 'Ajr -' no A) e um `like('AJR - %')` bastava; a
+        # revisão igualou a grafia, então a escolha passa a ser pelo ANCESTRAL,
+        # que é o que de fato distingue as duas.
+        alvos = [t for t in TarefaCronograma.query.filter(
             TarefaCronograma.obra_id == oid, TarefaCronograma.admin_id == aid,
             TarefaCronograma.nome_tarefa.like('AJR - %')).all()
-        assert len(alvos) == 1, f'esperava 1 tarefa "AJR - ", veio {len(alvos)}'
+            if 'Galpão B' in caminho_ancestrais_tarefa(t)]
+        assert len(alvos) == 1, (
+            f'esperava 1 tarefa "AJR - " no Galpão B, veio {len(alvos)}')
         t = alvos[0]
         assert t is not None
 
@@ -1555,21 +1568,25 @@ def test_sincronizar_nao_zera_tarefa_com_historico_em_percentual():
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from models import TarefaCronograma
     from utils.cronograma_engine import (sincronizar_percentuais_obra,
-                                         atualizar_percentual_tarefa)
+                                         atualizar_percentual_tarefa,
+                                         caminho_ancestrais_tarefa)
     with app.app_context():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
-        # `like` e não `ilike`: o cronograma da Baia tem DUAS tarefas com
-        # este nome, diferindo só na caixa ('AJR - …' id 20 do .mpp e
-        # 'Ajr - …' id 65). É a de caixa alta que a medição de 28/07 usou —
-        # 60% em 21/07, 80% em 22/07 e, desde a rodada de 30/07, 90% em 23/07
-        # e 100% em 24/07 ("concluída a compactação do solo das calçadas").
-        # O assert abaixo trava a escolha: se o fixture mudar, o teste diz o
-        # porquê em vez de sortear — foi o que aconteceu em 30/07.
-        alvos = TarefaCronograma.query.filter(
+        # O cronograma da Baia tem DUAS tarefas "AJR - Maquinário…", uma por
+        # galpão. É a do Galpão B que a medição de 28/07 usou — 60% em 21/07,
+        # 80% em 22/07 e, desde a rodada de 30/07, 90% em 23/07 e 100% em
+        # 24/07 ("concluída a compactação do solo das calçadas"). Até o
+        # CRONOGRAMA BAIAS 10.08.mpp as duas diferiam na caixa da 1ª letra
+        # ('AJR -' no B, 'Ajr -' no A) e um `like('AJR - %')` bastava; a
+        # revisão igualou a grafia, então a escolha passa a ser pelo ANCESTRAL,
+        # que é o que de fato distingue as duas.
+        alvos = [t for t in TarefaCronograma.query.filter(
             TarefaCronograma.obra_id == oid, TarefaCronograma.admin_id == aid,
             TarefaCronograma.nome_tarefa.like('AJR - %')).all()
-        assert len(alvos) == 1, f'esperava 1 tarefa "AJR - ", veio {len(alvos)}'
+            if 'Galpão B' in caminho_ancestrais_tarefa(t)]
+        assert len(alvos) == 1, (
+            f'esperava 1 tarefa "AJR - " no Galpão B, veio {len(alvos)}')
         t = alvos[0]
         assert t.percentual_concluido == 100.0, 'cenário base mudou'
 

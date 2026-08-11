@@ -1,110 +1,161 @@
 # Estado da atualização da obra Baia — físico-financeiro
 
-> Documento de handoff. Última atualização: **2026-08-07**.
+> Documento de handoff. Última atualização: **2026-08-11**.
 > Resume o que foi feito nesta rodada e o que ainda falta.
 
 ---
 
-## 🔴 PENDENTE — atualizar o cronograma e ENTÃO revisar os percentuais
+## ✅ RESOLVIDO em 11/08 — o cronograma revisado entrou
 
-**Decisão do usuário em 07/08: o cronograma será atualizado com os itens abaixo,
-mas não hoje.** Enquanto isso não acontece, os dias 04, 05 e 06/08 estão no JSON
-com `apontamentos: []` — o texto e as fotos entraram, o físico não. Não é
-esquecimento: é que o serviço executado não tem tarefa onde ser lançado.
+**O `CRONOGRAMA BAIAS 10.08.mpp` é a revisão que este documento esperava desde
+07/08.** Ele traz tudo o que a seção pendente listava, e o JSON canônico foi
+regenerado a partir dele por `scripts/rebuild_baia_from_1008_mpp.py`. O caminho
+escolhido pelo usuário é o **reimport do JSON canônico** — cronograma e
+percentuais numa operação só, como nas rodadas anteriores.
 
-### 1º — o que entra no cronograma
-
-| Item | De onde vem |
+| O que faltava | Onde está agora |
 |---|---|
-| Brocas de reforço das vigas transversais (A e B) | revisão estrutural entregue em 30/07 |
-| Blocos de coroamento das vigas transversais (B) | idem |
-| Laje de reforço das vigas transversais (B) | idem |
-| Escavação das novas valas de reforço | idem |
-| Perfuração das novas brocas | idem |
-| Caixaria (fôrma) das calçadas | ou tarefa própria, ou desmembrar a **23** em fôrma + concretagem |
-| Precedência: valas de drenagem **antes** das concretagens | reunião na obra em 05/08 — inverte a ordem entre a **19** e a **18/23** |
+| Brocas de reforço das vigas transversais (A e B) | `22` Escavação de novas valas e brocas (B, 05–06/08) e `69` (A, 07–10/08) |
+| Blocos de coroamento e laje de reforço (B) | `23` Execução de armação de ferragem da nova fundação (B) e `70` (A) |
+| Escavação das novas valas / perfuração das brocas | idem `22` / `69` |
+| Caixaria das calçadas | virou escopo da `21` (B) e `73` (A), renomeadas para "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação" |
+| Drenagem **antes** das concretagens | aplicado: valas 12–14/08, concretagem vigas/calçadas 17/08 |
+| Período de indefinição (10/07 a 30/07) | `19` Revisão do Projeto Fundação e LSF (28–30/07) e `20` Fase de Orçamento e Fornecimento de aço (31/07–04/08) |
 
-O caminho é a **aba Cronograma da página da obra (M09)** — importar o `.mpp`
-revisado, decidir os mapeamentos na prévia, aplicar. **Não** é o reimport do
-JSON canônico, que é recusado em obra já versionada por `.mpp` e, se passasse,
-apagaria tarefas, propostas, medições e os RDOs.
+**Números:** 101 → **109 tarefas** (25 novas, 17 saíram, 39 com datas mudadas).
+Fim do cronograma: **08/10 → 19/10** (+11 dias úteis), refletido em
+`contrato.data_fim_cronograma`. Os 37 RDOs, o contrato, os custos por etapa, as
+medições, o fluxo de caixa e o resumo vieram intactos da produção.
 
-### 2º — só depois, revisar os percentuais dos dias que ficaram sem
+### Como os apontamentos atravessaram a renumeração
 
-Com as tarefas novas existindo, os dias **04, 05 e 06/08** (mais os que se
-acumularem até lá) precisam de uma passagem de de-para para lançar o físico que
-hoje está só no texto. O caminho é o mesmo de sempre e **não apaga nada** —
-`services/atualizacao_rdos.py` faz upsert por `(obra_id, data_relatorio)`:
+Entre os dois `.mpp` os ids mudam (17 tarefas saíram, 25 entraram) e **44 nomes
+se repetem entre Galpão A e B**. O de-para é feito pelo **caminho hierárquico**
+(`Galpão X > Fundação > nome`), nunca pelo id nem pelo nome solto — casar por
+nome trocaria A por B em metade da fundação. 87 das 101 tarefas antigas casaram;
+das 14 sem par, só uma tinha apontamento (ver REVISAR nº 3).
+
+### O físico: forma pelos RDOs, fechamento pelo Project — REVISAR
+
+**Fonte trocada em 11/08.** A primeira passagem estimou tudo do texto dos RDOs;
+o engenheiro confirmou depois que a **coluna %concluído do `.mpp` está
+atualizada**, e ela passou a valer como fechamento. As duas leituras já
+concordavam em **18 tarefas** — a estimativa por texto acertou a maior parte.
+Ficou assim:
+
+* a **curva intermediária** continua vindo do texto do RDO (é ela que dá a
+  forma do avanço dia a dia, e é a única coisa que o Project não sabe);
+* o **valor final de cada tarefa** é o do Project (`FECHAMENTO_PROJECT`, no
+  script), aplicado no RDO mais recente dentro da janela da tarefa.
+
+| Dia | Tarefa | Valor | De onde vem |
+|---|---|---|---|
+| 28/07 | `19` Revisão do Projeto (B) | 33% | texto: questionamentos encaminhados ao Eng. Gustavo |
+| 29/07 | `19` | 66% | texto: questionamentos esclarecidos aos projetistas |
+| 30/07 | `19` | 100% | texto: "a projetista estrutural encaminhou a revisão" · = Project |
+| 31/07 | `20` Orçamento e Fornecimento de aço | 60% | texto: equipamento contratado e ferragem adquirida |
+| 04/08 | `20` | 100% | texto: "recebido na obra o aço dos reforços" · = Project |
+| 04/08 | `23` Armação da nova fundação (B) | 30% | texto: 22 brocas + início do coroamento e da laje |
+| 05/08 | `22` Novas valas e brocas (B) | 50% | texto: escavação das valas das novas lajes |
+| 05/08 | `23` | 60% | texto: 08 vigas transversais armadas |
+| 06/08 | `22` | **100%** | **Project** (o texto sustentava 75% — a perfuração estava só "iniciada") |
+| 06/08 | `23` | **100%** | **Project** (texto: 85%; a tarefa fecha em 10/08 no `.mpp`) |
+| 06/08 | `70` Armação da nova fundação (A) | **100%** | **Project** (texto: 30% em 04/08) |
+| 06/08 | `69` Novas valas e brocas (A) | **100%** | **Project** — ⚠️ antecipado, ver nº 2 |
+| 06/08 | `24` Valas de drenagem (B) | **50%** | **Project** — ⚠️ antecipado, ver nº 2 |
+| 28/07 → 06/08 | `21` Caixaria + Ferragem das Calçadas (B) | 50 → 100% | texto, série reescalada — ver nº 1 |
+| 30/06 · 29/06 · 08/07 · 17/07 · 23/07 · 31/07 · 05/08 | `3` `4` `15` `17` `65` `67` `34` | **100%** | **Project** — serviços que o diário não reporta (projeto, mobilização, concreto magro, entrega de chapas, fabricação de aço) |
+
+**Quatro coisas para você conferir:**
+
+1. **A série da tarefa `21` foi reescalada.** A tarefa mudou de escopo: era
+   "Execução Ferragem Calçada, Travamento Chapas Base" e agora inclui a
+   **caixaria**. A série antiga fechava 100% em 03/08 só com a ferragem — não
+   havia como acrescentar os três dias de caixaria (04, 05 e 06/08) sem
+   estourar. Nova série: 24/07 30% · 27/07 45% · 28/07 50% · 29/07 55% ·
+   30/07 60% · 31/07 65% · **03/08 70% (fecha a ferragem)** · 04/08 80% ·
+   05/08 90% · **06/08 100%** ("finalizada a caixaria da segunda calçada").
+   Os percentuais de 24/07 a 03/08 mudaram de valor — o serviço apontado é o
+   mesmo, o denominador é que cresceu. O fechamento em 100% bate com o Project.
+2. **Dois fechamentos são ANTECIPADOS, e a data está errada de propósito.**
+   O apontamento precisa de um RDO para existir, e o export do WhatsApp termina
+   em **06/08**. As tarefas `69` (novas valas e brocas do Galpão A, janela
+   07–10/08) e `24` (valas de drenagem, janela 08–11/08) têm % no Project mas a
+   janela inteira cai **depois** do último RDO — o de 06/08 ainda registrava a
+   drenagem aguardando liberação do Grupo Mônica. Elas entraram em 06/08 com o
+   valor do Project: **o valor fica certo, a data adianta 1 a 4 dias.** Mesmo
+   efeito menor em `22`, `23` e `70`, que o Project fecha em 10/08. O próximo
+   export do WhatsApp corrige as datas sozinho.
+3. **Duas tarefas o RDO dá por feitas e o Project não: `45` e `92`
+   (Instalação Infra Hidráulica, B e A).** O RDO de 16/07 as lançou a 100%; o
+   `.mpp` de 10/08 traz 0%. **Não foram rebaixadas** — o RDO é o documento do
+   que foi executado, e rebaixar seria retrocesso (o atualizador recusa).
+   ✅ **Confirmado em 11/08: a infra está mesmo 100% nos dois galpões.** O JSON
+   já está certo; quem precisa de correção é a coluna %concluído do `.mpp` —
+   **avise o engenheiro antes da próxima revisão do cronograma**, senão o
+   próximo `.mpp` volta com 0% e a divergência reaparece.
+4. **Os apontamentos de 17 e 20/07 da tarefa `66` (A) foram descartados.** O
+   serviço daqueles dias foi a armação das 12 sapatas dos pilares de tronco, que
+   a "Execução de Ferragens Para Fundação" (A) já fechou em 100% em 17/07. A
+   ferragem das calçadas do Galpão A foi **reprogramada para 17–21/08** e está
+   em 0% no cronograma novo — herdar os 60% ali inflaria o físico do galpão.
+   São os únicos 2 apontamentos perdidos no de-para. **Se você discordar, o
+   destino é a tarefa `73` e a reversão é uma linha em `DE_PARA_MANUAL`.**
+
+Resultado: **32 das 88 tarefas-folha com físico**, e as únicas divergências
+contra o `.mpp` são as duas do item 3 — **conferidas em 11/08 e resolvidas a
+favor do JSON**. Um único RDO segue sem físico (`2026-07-20`, o dia das
+sapatas dos troncos).
+
+### O que o cronograma novo ainda não comporta
+
+- **Fabricação de Aço para Pilares** (`34`, B) e **Entrega das Chapas Base**
+  (`17` B / `67` A) são serviços de fornecedor: nenhum bullet de RDO confirma a
+  fabricação ou a entrega, e o físico delas veio **só** do Project. Se essa
+  coluna estiver desatualizada nesses itens, ninguém no diário desmente.
+- O **impacto financeiro do período de indefinição** (proposta de 10/07 com 10
+  dias de validade, decisão em 27/07, projeto revisado em 30/07) agora tem
+  tarefa no cronograma (`19` e `20`), mas **segue fora do financeiro** — nenhum
+  custo novo foi lançado nas etapas.
+- `2026-07-20` é o único RDO sem físico (era o dia das sapatas dos troncos).
+- **O Galpão A da Cobertura segue em 0%, e está certo.** `81` "Fabricação de
+  Aço para Pilares" (A) está em 0% no Project enquanto a gêmea do Galpão B
+  (`34`) está em 100%, ambas com a mesma janela 14/07–05/08. ✅ **Confirmado em
+  11/08: fabricou-se só o do Galpão B.** Não é esquecimento no `.mpp` — nada a
+  corrigir aqui.
+
+> ⚠️ **O cronograma revisado passa da data contratual — e o 19/10 está
+> confirmado (11/08).** `data_fim_contratual` é **05/10** e o cronograma fecha
+> em **19/10** — 14 dias corridos além.
+> O contrato prevê multa moratória de **0,03% ao dia, teto de 30%**
+> (`contrato.multa_moratoria`), e a **Medição 4 (5%, "entrega")** está datada de
+> 05/10 no `medicoes`. Nem a data contratual, nem o cronograma de medições, nem
+> o `fluxo_caixa_mensal` (forecast REV01, jun–nov) foram mexidos nesta rodada:
+> o `.mpp` é o físico revisado, não um aditivo. **Isso é decisão comercial, não
+> de engenharia — precisa ir para o cliente.**
+
+### Como aplicar
 
 ```bash
-SIGE_ENABLE_DEMO_SEED=false python scripts/atualizar_rdos_obra.py \
-    <admin> 10 /tmp/payload_revisao.json --dry-run   # revisa a resolução
+# 1) regenerar (já feito — refaça se editar o de-para do script)
+python scripts/rebuild_baia_from_1008_mpp.py
+
+# 2) reimport em produção, FORA do gunicorn (docs/deploy-checklist-easypanel.md)
+SIGE_ENABLE_DEMO_SEED=false python scripts/seed_fisico_financeiro_baias.py <admin>
 ```
 
-Um RDO que já existe é **atualizado**, não recriado: os campos de texto só são
-sobrescritos se vierem no payload (dia sem `comentario` não zera o que está lá),
-e os apontamentos entram por `registrar_apontamento`. Basta um payload com a
-`data` e os `apontamentos` novos.
-
-> ⚠️ **A janela para fazer isso sem retificador tem prazo — e ele não é uma
-> data, é um estado.** Os RDOs nascem por este caminho em `preenchido`, que
-> ainda é corrigível. Assim que um deles for para `assinado` ou `aprovado`, ele
-> entra em `ESTADOS_IMUTAVEIS` (`services/rdo_ciclo_vida.py`) e o atualizador
-> passa a **PULÁ-LO** com o aviso "para corrigir, emita um RDO retificador" —
-> o lançamento retroativo deixa de ser possível por este caminho.
-> **Enquanto o cronograma não for atualizado, não assine nem aprove os RDOs de
-> 04/08 em diante.**
-
-### Se a atualização for pelo REIMPORT do JSON canônico (plano do usuário, ~10/08)
-
-O usuário informou em 07/08 que pretende atualizar o cronograma **pela
-importação, como fazia antes** — o reimport do JSON canônico —, provavelmente na
-segunda 10/08. Isso **continua possível**, e muda o roteiro acima para melhor.
-Três coisas verificadas no código em 07/08:
-
-**1. O guard do M09 não bloqueia esta obra.** `_recusar_se_versionada_pelo_fluxo_novo`
-(`services/importacao_fisico_financeiro.py:815`) só recusa obra com
-`CronogramaVersao` de origem `upload_mspdi`/`upload_mpp`. Versão de origem
-`json_canonico` **não** bloqueia — e é a única que a obra tem (conferido em dev:
-1 versão, `json_canonico`). **Confira em produção antes de segunda:** se em
-algum momento o `.mpp` foi importado por lá pela aba Cronograma, o reimport
-passa a ser recusado e o caminho vira obrigatoriamente a aba.
-
-**2. Pelo reimport, cronograma e percentuais viram UMA operação só.** Como o
-import reconstrói tudo a partir do JSON, as tarefas novas do reforço entram em
-`eap`/`cronograma_tarefas` e os apontamentos de 04, 05 e 06/08 entram na seção
-`rdos` do **mesmo arquivo**. Não é preciso passar por `atualizar_rdos_obra.py`
-depois — ele existe para o caminho não-destrutivo, que aqui deixa de ser
-necessário.
-
-**3. O reimport é destrutivo e o JSON precisa ser a verdade inteira.** Ele apaga
-e recria, nesta ordem: propostas e seus itens, orçamentos e seus itens, itens de
-medição, `ObraServicoCusto`, `TarefaCronograma`, `MedicaoContrato` e **todos os
-RDOs da obra** (`importacao_fisico_financeiro.py:153-175` e `:376`). Tudo volta
-do JSON. Logo, **qualquer coisa lançada na UI depois do último sync do JSON se
-perde** — mão de obra editada em RDO, foto anexada à mão, RDO criado pela tela.
-
-> 🔴 **Um único RDO assinado aborta o reimport inteiro.** `_materializar_rdos`
-> apaga os RDOs com `db.session.delete` sem checar estado, e a guarda
-> `before_flush` de `services/rdo_ciclo_vida.py` cobre `session.deleted` — o
-> importador **não** usa `escrita_de_ciclo_de_vida()`. Verificado em dev: com um
-> RDO posto em `assinado`, o delete levanta
-> `RDOImutavel: RDO ... está assinado e não aceita mais alteração`, e a
-> transação inteira cai — não é "pula aquele dia", é o import todo. Hoje os 37
-> RDOs estão em `preenchido`, então o caminho está livre. **Não assine nem
-> aprove nenhum RDO da Baia antes do reimport de segunda.**
-
-### O custo de deixar como está
-
-Três dos seis dias deste export não produzem um único apontamento — não porque a
-obra parou (teve 8 a 10 pessoas em campo), mas porque o que ela executou não
-existe no cronograma. Até a revisão entrar, **a Curva S mostra a obra parada de
-04/08 em diante enquanto o custo corre**, e os indicadores de avanço físico ×
-financeiro (SPI/CPI) ficam distorcidos no mesmo período. Continua fora do
-cronograma e do financeiro, também, o impacto do período de indefinição
-(proposta enviada em 10/07 com 10 dias de validade; decisão em 27/07; projeto
-revisado em 30/07).
-
+> 🔴 **O reimport continua destrutivo e um único RDO assinado o aborta inteiro.**
+> Ele apaga e recria propostas, orçamentos, itens de medição, `ObraServicoCusto`,
+> `TarefaCronograma`, `MedicaoContrato` e **todos os RDOs da obra** — tudo volta
+> do JSON, e o que tiver sido lançado pela UI depois do último sync se perde.
+> `_materializar_rdos` deleta sem checar estado e a guarda `before_flush` de
+> `services/rdo_ciclo_vida.py` derruba a transação toda. **Confira antes que
+> nenhum RDO da Baia esteja `assinado`/`aprovado`/`retificado`.**
+>
+> Confira também que a obra **não** tem `CronogramaVersao` de origem
+> `upload_mspdi`/`upload_mpp`: `_recusar_se_versionada_pelo_fluxo_novo`
+> (`services/importacao_fisico_financeiro.py:815`) recusaria o reimport, e o
+> caminho viraria obrigatoriamente a aba Cronograma (M09).
 ---
 
 ## Rodada 2026-08-07 — RDOs de 30/07 a 06/08, e a virada de escopo da revisão estrutural

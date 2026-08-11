@@ -7,7 +7,7 @@
     "(sem acento, minúsculas) e o galpão do bullet bate com o da regra.",
     "",
     "IMPORTANTE — os ids do cronograma NÃO seguem a ordem que a intuição sugere:",
-    "  11–52 = Galpão B     55–96 = Galpão A",
+    "  10–58 = Galpão B     59–105 = Galpão A",
     "Os dois galpões repetem os mesmos nomes de tarefa e têm o MESMO pai",
     "('Fundação'); só o avô ('Galpão A'/'Galpão B') distingue.",
     "",
@@ -32,10 +32,15 @@
         "viga"
       ],
       "galpao": "B",
-      "tarefa_mpp": 14,
+      "tarefa_mpp": 13,
       "tarefa_nome": "Execução de Ferragens Para Fundação (Galpão B)",
       "forma": "fracao",
-      "observacao": "Única tarefa com quantitativo (48 un). Confira se o dia deve entrar em quantidade em vez de percentual."
+      "observacao": "Única tarefa com quantitativo (48 un). Confira se o dia deve entrar em quantidade em vez de percentual.",
+      "nao_quando": [
+        "blocos de coroamento",
+        "laje das vigas transversais",
+        "reforço"
+      ]
     },
     {
       "id": "ferragem-fundacao-a",
@@ -44,9 +49,14 @@
         "viga"
       ],
       "galpao": "A",
-      "tarefa_mpp": 59,
+      "tarefa_mpp": 63,
       "tarefa_nome": "Execução de Ferragens Para Fundação (Galpão A)",
-      "forma": "fracao"
+      "forma": "fracao",
+      "nao_quando": [
+        "blocos de coroamento",
+        "laje das vigas transversais",
+        "reforço"
+      ]
     },
     {
       "id": "blocos-coroamento-a",
@@ -54,8 +64,8 @@
         "blocos de coroamento"
       ],
       "galpao": "A",
-      "tarefa_mpp": 59,
-      "tarefa_nome": "Execução de Ferragens Para Fundação (Galpão A)",
+      "tarefa_mpp": 70,
+      "tarefa_nome": "Execução de armação de ferragem da nova fundação (Galpão A)",
       "forma": "pct"
     },
     {
@@ -65,7 +75,7 @@
         "brocas"
       ],
       "galpao": "B",
-      "tarefa_mpp": 15,
+      "tarefa_mpp": 14,
       "tarefa_nome": "Concretagem das Brocas (Galpão B)",
       "forma": "marco"
     },
@@ -76,7 +86,7 @@
         "brocas"
       ],
       "galpao": "A",
-      "tarefa_mpp": 60,
+      "tarefa_mpp": 64,
       "tarefa_nome": "Concretagem das Brocas (Galpão A)",
       "forma": "marco"
     },
@@ -86,7 +96,7 @@
         "concreto magro"
       ],
       "galpao": "B",
-      "tarefa_mpp": 16,
+      "tarefa_mpp": 15,
       "tarefa_nome": "Aplicação Concreto Magro nas Vigas Baldrames (Galpão B)",
       "forma": "marco",
       "pct_parcial": 60,
@@ -101,7 +111,7 @@
         "concreto magro"
       ],
       "galpao": "A",
-      "tarefa_mpp": 61,
+      "tarefa_mpp": 65,
       "tarefa_nome": "Aplicação Concreto Magro nas Vigas Baldrames (Galpão A)",
       "forma": "marco",
       "pct_parcial": 60,
@@ -117,7 +127,7 @@
         "esgoto"
       ],
       "galpao": "B",
-      "tarefa_mpp": 13,
+      "tarefa_mpp": 16,
       "tarefa_nome": "Escavação Para Instalação Da Hidraulica (Galpão B)",
       "forma": "marco",
       "pct_parcial": 50,
@@ -132,7 +142,7 @@
         "esgoto"
       ],
       "galpao": "A",
-      "tarefa_mpp": 57,
+      "tarefa_mpp": 66,
       "tarefa_nome": "Escavação Para Instalação Da Hidraulica (Galpão A)",
       "forma": "marco",
       "pct_parcial": 50,
@@ -147,7 +157,7 @@
         "esgoto"
       ],
       "galpao": "B",
-      "tarefa_mpp": 39,
+      "tarefa_mpp": 45,
       "tarefa_nome": "Instalação Infra Hidráulica (Galpão B)",
       "forma": "marco",
       "observacao": "ANTECIPAÇÃO: a tarefa está planejada para agosto. Apontar aqui muda o físico de uma etapa futura — confirme antes de aplicar."
@@ -159,21 +169,10 @@
         "esgoto"
       ],
       "galpao": "A",
-      "tarefa_mpp": 84,
+      "tarefa_mpp": 92,
       "tarefa_nome": "Instalação Infra Hidráulica (Galpão A)",
       "forma": "marco",
       "observacao": "ANTECIPAÇÃO: ver a regra irmã do Galpão B."
-    },
-    {
-      "id": "ferragem-calcada-sapatas-a",
-      "quando": [
-        "armação",
-        "sapatas"
-      ],
-      "galpao": "A",
-      "tarefa_mpp": 66,
-      "tarefa_nome": "Execução Ferragem Calçada, Travamento Chapas Base (Galpão A)",
-      "forma": "pct"
     },
     {
       "id": "ferragem-calcada-b",
@@ -183,7 +182,7 @@
       ],
       "galpao": "B",
       "tarefa_mpp": 21,
-      "tarefa_nome": "Execução Ferragem Calçada, Travamento Chapas Base (Galpão B)",
+      "tarefa_nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base (Galpão B)",
       "forma": "pct",
       "observacao": "Nasceu na rodada 30/07, em que 'iniciada/concluída a armação das ferragens das calçadas do Galpão B' (24 e 27/07) caiu como 'bullet sem regra'. Não colide com nivelamento-calcada-b: aquela exige 'solo', esta exige 'ferragens'."
     },
@@ -195,7 +194,7 @@
       ],
       "galpao": "B",
       "tarefa_mpp": 21,
-      "tarefa_nome": "Execução Ferragem Calçada, Travamento Chapas Base (Galpão B)",
+      "tarefa_nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base (Galpão B)",
       "forma": "pct",
       "observacao": "Mesma tarefa 21 pelo outro vocabulário: a montagem in loco aparece como 'malhas inferior e superior' (29/07), sem a palavra 'ferragens'. Decisão de 30/07: pré-montagem e montagem são fases da MESMA tarefa, não duas."
     },
@@ -207,7 +206,7 @@
       ],
       "galpao": "B",
       "tarefa_mpp": 21,
-      "tarefa_nome": "Execução Ferragem Calçada, Travamento Chapas Base (Galpão B)",
+      "tarefa_nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base (Galpão B)",
       "forma": "pct",
       "nao_quando": [
         "malhas"
@@ -221,8 +220,8 @@
         "calçada"
       ],
       "galpao": "B",
-      "tarefa_mpp": 20,
-      "tarefa_nome": "AJR - Maquinário: Nivelamento Das Calçadas (Galpão B)",
+      "tarefa_mpp": 18,
+      "tarefa_nome": "AJR - Maquinário: Execução De Nivelamento e Compactação das Calçadas (Galpão B)",
       "forma": "pct"
     },
     {
@@ -232,31 +231,167 @@
         "calçada"
       ],
       "galpao": "A",
-      "tarefa_mpp": 65,
-      "tarefa_nome": "AJR - Maquinário: Nivelamento Das Calçadas (Galpão A)",
+      "tarefa_mpp": 68,
+      "tarefa_nome": "AJR - Maquinário: Execução De Nivelamento e Compactação Das Calçadas (Galpão A)",
       "forma": "pct"
     },
     {
-      "id": "chapas-base-b",
+      "id": "reforco-fundacao-b",
       "quando": [
-        "chapas-base",
-        "locação"
+        "armação",
+        "reforço"
       ],
       "galpao": "B",
-      "tarefa_mpp": 17,
-      "tarefa_nome": "Locação das Chapas Base com Topógrafo (Galpão B)",
-      "forma": "pct"
+      "tarefa_mpp": 23,
+      "forma": "pct",
+      "observacao": "Brocas de reforço, blocos de coroamento e laje das vigas transversais — escopo da revisão de 30/07.",
+      "tarefa_nome": "Execução de armação de ferragem da nova fundação, caixaria e posicionamento da armação nas valas (Galpão B)"
     },
     {
-      "id": "chapas-base-a",
+      "id": "reforco-fundacao-a",
       "quando": [
-        "chapas-base",
-        "locação"
+        "armação",
+        "reforço"
       ],
       "galpao": "A",
-      "tarefa_mpp": 62,
-      "tarefa_nome": "Locação das Chapas Base com Topógrafo (Galpão A)",
-      "forma": "pct"
+      "tarefa_mpp": 70,
+      "forma": "pct",
+      "tarefa_nome": "Execução de armação de ferragem da nova fundação (Galpão A)"
+    },
+    {
+      "id": "blocos-coroamento-b",
+      "quando": [
+        "blocos de coroamento"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 23,
+      "forma": "pct",
+      "tarefa_nome": "Execução de armação de ferragem da nova fundação, caixaria e posicionamento da armação nas valas (Galpão B)"
+    },
+    {
+      "id": "laje-vigas-transversais-b",
+      "quando": [
+        "laje",
+        "vigas transversais"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 23,
+      "forma": "pct",
+      "tarefa_nome": "Execução de armação de ferragem da nova fundação, caixaria e posicionamento da armação nas valas (Galpão B)"
+    },
+    {
+      "id": "laje-vigas-transversais-a",
+      "quando": [
+        "laje",
+        "vigas transversais"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 70,
+      "forma": "pct",
+      "tarefa_nome": "Execução de armação de ferragem da nova fundação (Galpão A)"
+    },
+    {
+      "id": "escavacao-valas-reforco-b",
+      "quando": [
+        "escava",
+        "valas"
+      ],
+      "nao_quando": [
+        "esgoto",
+        "drenagem"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 22,
+      "forma": "marco",
+      "pct_parcial": 50,
+      "observacao": "nao_quando separa das valas de esgoto (infra hidráulica) e das valas de drenagem da Fazenda, que têm tarefa própria.",
+      "tarefa_nome": "Escavação de novas valas e brocas das vigas transversais (Galpão B)"
+    },
+    {
+      "id": "escavacao-valas-reforco-a",
+      "quando": [
+        "escava",
+        "valas"
+      ],
+      "nao_quando": [
+        "esgoto",
+        "drenagem"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 69,
+      "forma": "marco",
+      "pct_parcial": 50,
+      "tarefa_nome": "Escavação de novas valas e brocas das vigas transversais (Galpão A)"
+    },
+    {
+      "id": "perfuracao-brocas-reforco-b",
+      "quando": [
+        "perfuração",
+        "brocas"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 22,
+      "forma": "marco",
+      "pct_parcial": 75,
+      "tarefa_nome": "Escavação de novas valas e brocas das vigas transversais (Galpão B)"
+    },
+    {
+      "id": "perfuracao-brocas-reforco-a",
+      "quando": [
+        "perfuração",
+        "brocas"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 69,
+      "forma": "marco",
+      "pct_parcial": 75,
+      "tarefa_nome": "Escavação de novas valas e brocas das vigas transversais (Galpão A)"
+    },
+    {
+      "id": "caixaria-calcada-b",
+      "quando": [
+        "caixaria",
+        "calçada"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 21,
+      "forma": "pct",
+      "observacao": "A caixaria virou escopo da mesma tarefa da ferragem das calçadas — ver a série reescalada em ESTADO_ATUALIZACAO_BAIA.md.",
+      "tarefa_nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base (Galpão B)"
+    },
+    {
+      "id": "caixaria-calcada-a",
+      "quando": [
+        "caixaria",
+        "calçada"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 73,
+      "forma": "pct",
+      "tarefa_nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base (Galpão A)"
+    },
+    {
+      "id": "drenagem-valas-b",
+      "quando": [
+        "drenagem"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 24,
+      "forma": "marco",
+      "pct_parcial": 50,
+      "observacao": "Reunião de 05/08: a drenagem passou a vir ANTES das concretagens. Tarefa da Fazenda — físico sem custo.",
+      "tarefa_nome": "Fazenda: Escavação das Valas de Drenagem e Preenchimento 1ª Camada de Material Drenante (Galpão B)"
+    },
+    {
+      "id": "drenagem-valas-a",
+      "quando": [
+        "drenagem"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 72,
+      "forma": "marco",
+      "pct_parcial": 50,
+      "tarefa_nome": "Fazenda: Escavação das Valas de Drenagem e Preenchimento 1ª Camada de Material Drenante (Galpão A)"
     }
   ],
   "sem_tarefa_no_cronograma": [
@@ -266,6 +401,9 @@
     "Instalação dos tampões de PVC na infra de esgoto (23/07) — preparo do teste de estanqueidade. A tarefa de instalação da infra hidráulica (39/84) já foi lançada a 100% em 16/07.",
     "Posicionamento da armação das vigas longitudinais nas valas do Galpão B (23 e 28/07) — NÃO aponta na tarefa 14. Decisão de 30/07: posicionar armação já executada não é nova execução, e a 14 é a única tarefa com quantitativo (48 un), já saturada desde 10/07. Lançar só produziria clamp em 100% com warning. Vale igual para o posicionamento das armaduras das vigas longitudinais do Galpão A em 03/08 (tarefa 59, 100% desde 17/07).",
     "REFORÇO ESTRUTURAL DA REVISÃO DO PROJETO (04 a 06/08) — escopo ADITIVO, sem tarefa: armação de 22 brocas de reforço das vigas transversais de A e B, armação dos blocos de coroamento e da laje das vigas transversais do Galpão B, escavação das novas valas de reforço, perfuração das novas brocas. Nasce da revisão estrutural entregue em 30/07 por causa dos cochos em alvenaria — não existia no cronograma contratado. Decisão de 07/08: NÃO apontar. As regras ferragem-fundacao-b/-a e blocos-coroamento-a casam esses bullets e sugerem as tarefas 14 e 59, mas ambas já estão saturadas (14 em 48/48 un desde 10/07, 59 em 100% desde 17/07): lançar só produziria clamp em 100% com warning e inflaria o acumulado. O caminho é criar as tarefas novas na revisão do cronograma, não forçar as antigas.",
-    "Caixaria (fôrma) das calçadas do Galpão B — iniciada em 04/08, uma calçada em 05/08, segunda calçada finalizada em 06/08. Não existe tarefa de caixaria. A mais próxima é a 23 'Execução de Concretagem das Calçadas e Sapatas Pilares Tronco', ainda em 0%. Decisão de 07/08: NÃO apontar na 23 — nenhum concreto foi lançado, e mostrar avanço numa tarefa de concretagem que não começou infla o físico. Fica no texto do RDO e nas fotos."
+    "Caixaria (fôrma) das calçadas do Galpão B — iniciada em 04/08, uma calçada em 05/08, segunda calçada finalizada em 06/08. Não existe tarefa de caixaria. A mais próxima é a 23 'Execução de Concretagem das Calçadas e Sapatas Pilares Tronco', ainda em 0%. Decisão de 07/08: NÃO apontar na 23 — nenhum concreto foi lançado, e mostrar avanço numa tarefa de concretagem que não começou infla o físico. Fica no texto do RDO e nas fotos.",
+    "ATUALIZAÇÃO 11/08: \"Locação das Chapas Base com Topógrafo\" (17/62 no 06.07) saiu do cronograma revisado — no lugar entrou \"Entrega das Chapas Base\" (17/67), que é fornecimento e não aparece no diário. As regras chapas-base-a/b foram removidas.",
+    "ATUALIZAÇÃO 11/08: a armação das sapatas dos pilares de tronco (12 un, 17 e 20/07 no Galpão A) continua sem tarefa — a revisão não trouxe sucessora para a \"Execução Ferragem Calçada, Travamento Chapas Base\" (66) daqueles dias. A regra ferragem-calcada-sapatas-a foi removida e os 2 apontamentos históricos foram descartados no de-para.",
+    "ATUALIZAÇÃO 11/08: o cocho em alvenaria em si segue sem tarefa própria; o que a revisão trouxe foi a \"Revisão do Projeto Fundação e LSF - Execução de Cocho em Alvenaria\" (19), que é a tarefa do PROJETO, não da execução."
   ]
 }
