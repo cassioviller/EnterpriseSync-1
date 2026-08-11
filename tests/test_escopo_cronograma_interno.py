@@ -349,3 +349,97 @@ def test_primeira_importacao_de_tenant_sem_calendario_e_atomica(monkeypatch):
             'primeira importação deixou obra parcial para trás'
         assert TarefaCronograma.query.filter_by(admin_id=aid).count() == 0
         assert RDO.query.filter_by(admin_id=aid).count() == 0
+
+
+def test_clone_do_cronograma_cliente_ignora_arquivada():
+    """O SEXTO consumidor, achado em 11/08 — e o pior de encontrar, porque o
+    estrago aparece na tela do CLIENTE.
+
+    `gerar_cronograma_cliente` clonava `is_cliente=False` sem filtrar `ativa`,
+    então toda tarefa arquivada virava linha no portal. Some enquanto ninguém
+    arquiva nada; aparece depois de qualquer carga de cronograma, já que a
+    disciplina do M05 é nunca deletar — marca `ativa=False`. Na carga da
+    Angela de 11/08 foram 30 arquivadas contra 159 inseridas — a EAP antiga
+    inteira virava linha fantasma no portal, misturada à nova. E fica: a cópia
+    é uma FOTO (`sincronizar_percentuais_obra` roda com `cliente=False` em
+    todos os pontos de produção), então o percentual clonado nunca mais é
+    recalculado — linha errada que entra, só sai regenerando.
+
+    A arquivada deste teste tem nome PRÓPRIO de propósito. A do `_ambiente`
+    se chama "Fundação" como a viva, e o `deduplicar_tarefas_cronograma` que
+    roda no fim da rota a absorve — o teste passaria com o bug no lugar. No
+    caso real da Angela as arquivadas são a EAP antiga, com nomes que não
+    existem na nova (zero sobreposição), e nada as absorve.
+    """
+    from models import TarefaCronograma
+    with app.app_context():
+        ctx = _ambiente()
+        db.session.add(TarefaCronograma(
+            obra_id=ctx['obra'].id, admin_id=ctx['admin_id'],
+            nome_tarefa='Alvenaria da EAP antiga', ordem=9, duracao_dias=10,
+            data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 20),
+            percentual_concluido=0.0, ativa=False))
+        db.session.commit()
+
+        c = app.test_client()
+        with c.session_transaction() as sess:
+            sess['_user_id'] = str(ctx['admin_id'])
+            sess['_fresh'] = True
+
+        r = c.post(f"/obras/{ctx['obra'].id}/cronograma-cliente/gerar",
+                   follow_redirects=False)
+        assert r.status_code in (302, 303), r.status_code
+
+        clones = (TarefaCronograma.query
+                  .filter_by(obra_id=ctx['obra'].id, admin_id=ctx['admin_id'],
+                             is_cliente=True)
+                  .all())
+        nomes = sorted(t.nome_tarefa for t in clones)
+        assert nomes == ['Fundação'], (
+            'a arquivada vazou para o portal do cliente: '
+            f'{[(t.nome_tarefa, t.percentual_concluido) for t in clones]}')
+        # e é a VIVA que foi clonada — não a arquivada, que tambem se chama
+        # "Fundação" e teria passado num assert que só contasse linhas.
+        assert clones[0].percentual_concluido == pytest.approx(60.0)
+
+
+def test_clone_do_cronograma_cliente_preserva_a_hierarquia():
+    """Rede de proteção do fix acima: trocar a query-fonte não pode quebrar o
+    remapeamento de `tarefa_pai_id`, que roda numa 2ª passagem sobre a MESMA
+    sequência. Um pai vivo com uma filha viva e uma filha arquivada tem de
+    virar um pai com UMA filha — com o vínculo intacto, não solto."""
+    from models import TarefaCronograma
+    with app.app_context():
+        ctx = _ambiente()
+        pai = ctx['interna']
+        filha_viva = TarefaCronograma(
+            obra_id=ctx['obra'].id, admin_id=ctx['admin_id'],
+            nome_tarefa='Sapatas', ordem=4, duracao_dias=5,
+            data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 10),
+            percentual_concluido=80.0, tarefa_pai_id=pai.id)
+        filha_morta = TarefaCronograma(
+            obra_id=ctx['obra'].id, admin_id=ctx['admin_id'],
+            nome_tarefa='Sapatas da EAP antiga', ordem=5, duracao_dias=5,
+            data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 10),
+            percentual_concluido=0.0, tarefa_pai_id=pai.id, ativa=False)
+        db.session.add_all([filha_viva, filha_morta])
+        db.session.commit()
+
+        c = app.test_client()
+        with c.session_transaction() as sess:
+            sess['_user_id'] = str(ctx['admin_id'])
+            sess['_fresh'] = True
+        r = c.post(f"/obras/{ctx['obra'].id}/cronograma-cliente/gerar",
+                   follow_redirects=False)
+        assert r.status_code in (302, 303), r.status_code
+
+        clones = (TarefaCronograma.query
+                  .filter_by(obra_id=ctx['obra'].id, admin_id=ctx['admin_id'],
+                             is_cliente=True)
+                  .order_by(TarefaCronograma.ordem).all())
+        assert len(clones) == 2, [t.nome_tarefa for t in clones]
+        pai_clone, filha_clone = clones
+        assert filha_clone.nome_tarefa == 'Sapatas'
+        assert filha_clone.percentual_concluido == pytest.approx(80.0)
+        assert filha_clone.tarefa_pai_id == pai_clone.id, (
+            'o remapeamento pai/filho se perdeu ao trocar a query-fonte')

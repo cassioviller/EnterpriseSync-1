@@ -3153,10 +3153,26 @@ def gerar_cronograma_cliente(obra_id):
 
         from models import TarefaCronograma
 
-        # 1) Tarefas-fonte: cronograma interno da obra
+        # 1) Tarefas-fonte: cronograma interno e VIVO da obra.
+        #
+        # `do_cronograma_interno` e não `.query` com is_cliente=False: sem o
+        # filtro `ativa`, as tarefas ARQUIVADAS vinham junto e viravam linha no
+        # portal do cliente. É a mesma armadilha da varredura P1 de 27/07 (ver
+        # o docstring do helper) — esta rota tinha ficado de fora, e é logo a
+        # que o cliente enxerga.
+        #
+        # Aparece depois de QUALQUER carga que arquive tarefa: a M05 nunca
+        # deleta, marca `ativa=False`. A carga da Angela de 11/08 arquivou 30 e
+        # inseriu 159 — o clone levava as 189, e as 30 viravam linha fantasma
+        # no portal, com a EAP antiga misturada à nova.
+        #
+        # O estrago fica: esta cópia é uma FOTO. `sincronizar_percentuais_obra`
+        # roda com `cliente=False` em todos os pontos de produção, então o
+        # `percentual_concluido` clonado aqui nunca mais é recalculado — só
+        # muda quando alguém regenera. Linha errada que entra, fica.
         tarefas_internas = (
-            TarefaCronograma.query
-            .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
+            TarefaCronograma
+            .do_cronograma_interno(obra_id, admin_id)
             .order_by(TarefaCronograma.ordem)
             .all()
         )
