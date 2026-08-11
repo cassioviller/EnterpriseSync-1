@@ -1,0 +1,367 @@
+[
+ {
+  "data": "2026-08-10",
+  "clima": "Não informado",
+  "precipitacao": "Não informado",
+  "comentario": "RDO de alinhamento do físico ao cronograma.\n\nNão descreve um dia de obra: existe para trazer o %concluído do arquivo Veks - Angela - Cronograma Atual  11-08-2026.mpp para dentro dos apontamentos, que é onde o sistema guarda o avanço físico. Sem isto, a sincronização zera toda tarefa sem apontamento e o percentual do Project se perde.\n\n89 tarefa(s) alinhada(s). Efetivo não se aplica.",
+  "mao_de_obra": 0,
+  "apontamentos": [
+   {
+    "tarefa_mpp": 492,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 494,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 497,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 606,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 507,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 493,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 608,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 609,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 501,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 475,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 498,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 478,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 474,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 611,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 481,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 479,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 483,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 482,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 503,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 487,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 486,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 484,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 604,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 574,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 576,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 577,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 610,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 612,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 400,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 404,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 537,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 405,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 406,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 614,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 423,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 409,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 411,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 432,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 534,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 421,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 422,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 629,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 615,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 641,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 626,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 627,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 346,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 198,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 347,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 143,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 540,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 539,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 631,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 660,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 607,
+    "pct": 65.0
+   },
+   {
+    "tarefa_mpp": 628,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 87,
+    "pct": 57.0
+   },
+   {
+    "tarefa_mpp": 88,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 89,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 643,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 644,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 451,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 452,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 453,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 618,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 645,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 102,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 652,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 460,
+    "pct": 60.0
+   },
+   {
+    "tarefa_mpp": 464,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 653,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 465,
+    "pct": 70.0
+   },
+   {
+    "tarefa_mpp": 202,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 200,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 134,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 455,
+    "pct": 95.0
+   },
+   {
+    "tarefa_mpp": 445,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 446,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 448,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 456,
+    "pct": 70.0
+   },
+   {
+    "tarefa_mpp": 164,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 165,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 166,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 544,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 545,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 522,
+    "pct": 43.0
+   },
+   {
+    "tarefa_mpp": 621,
+    "pct": 48.0
+   },
+   {
+    "tarefa_mpp": 531,
+    "pct": 100.0
+   },
+   {
+    "tarefa_mpp": 636,
+    "pct": 100.0
+   }
+  ]
+ }
+]
