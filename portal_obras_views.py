@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+from collections import Counter
 from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 
@@ -191,23 +192,70 @@ def portal_obra(token: str):
         .all()
     )
 
-    # Progresso REAL das tarefas internas (is_cliente=False), sincronizado dos RDOs,
-    # indexado por nome. O cronograma do cliente (is_cliente=True) NÃO recebe sync de
-    # RDO — suas folhas ficariam congeladas (ex.: 0% mesmo com o serviço concluído).
-    # Refletimos aqui o % da tarefa interna de mesmo nome para o portal mostrar o
-    # avanço real; sem correspondente, mantém o próprio percentual.
+    # Progresso REAL das tarefas internas (is_cliente=False), sincronizado dos
+    # RDOs. O cronograma do cliente (is_cliente=True) NÃO recebe sync de RDO —
+    # é uma FOTO tirada por `gerar_cronograma_cliente` (views/obras.py:3196) e
+    # suas folhas ficariam congeladas (ex.: 0% mesmo com o serviço concluído).
+    # Refletimos aqui o % da tarefa interna correspondente para o portal mostrar
+    # o avanço real; sem correspondente, mantém o próprio percentual.
+    #
+    # A correspondência é pelo CAMINHO na árvore, não pelo `nome_tarefa` puro.
+    # Nome puro é ambíguo: numa EAP por pavimento o mesmo nome existe uma vez
+    # por andar, e o dict guardava só a ÚLTIMA tarefa de cada nome — todo andar
+    # exibia o percentual do último. Na obra da Angela (11/08) são 53 das 159
+    # tarefas em colisão: "Térreo" 6×, "1° Andar" 5×, e as quatro atividades de
+    # fechamento 2× cada. O portal mostrava 100/100/100/70 nos DOIS andares
+    # enquanto o RDO do Térreo dizia 5/5/90/95, e o pai "1° Andar" aparecia com
+    # 0% acima de quatro filhas em 100%.
+    #
+    # O caminho desempata porque o clone preserva a hierarquia (`tarefa_pai_id`
+    # remapeado na 2ª passagem de `gerar_cronograma_cliente`): a folha do Térreo
+    # e a do 1° Andar têm o mesmo nome e caminhos distintos.
+    def _caminho(t, por_id):
+        """'Fechamento › Térreo › Plaqueamento' — da raiz até a própria tarefa.
+
+        Para em ciclo de `tarefa_pai_id`: a coluna é auto-referente e nada no
+        banco garante aciclicidade (mesma guarda de `caminho_ancestrais_tarefa`).
+        """
+        partes, vistos, atual = [], set(), t
+        while atual is not None and atual.id not in vistos:
+            vistos.add(atual.id)
+            partes.append(atual.nome_tarefa)
+            atual = por_id.get(atual.tarefa_pai_id) if atual.tarefa_pai_id else None
+        return ' › '.join(reversed(partes))
+
+    _internas = [t for t in tarefas if not t.is_cliente]
+    _internas_por_id = {t.id: t for t in _internas}
+    _sync_por_caminho = {
+        _caminho(t, _internas_por_id): (t.percentual_concluido or 0.0)
+        for t in _internas
+    }
+    # Fallback por nome SÓ para nome internamente único. Serve à cópia-cliente
+    # antiga, tirada antes de uma carga que remexeu a EAP: o caminho não casa
+    # mais, mas o nome ainda identifica a tarefa sem ambiguidade. Nome repetido
+    # fica de fora de propósito — exibir o percentual de um irmão sorteado é
+    # pior que exibir o valor congelado, porque parece certo.
+    _contagem_nomes = Counter(t.nome_tarefa for t in _internas)
     _sync_por_nome = {
         t.nome_tarefa: (t.percentual_concluido or 0.0)
-        for t in tarefas if not t.is_cliente
+        for t in _internas if _contagem_nomes[t.nome_tarefa] == 1
     }
+    _cliente_por_id = {t.id: t for t in _tarefas_cliente}
+
+    def _percentual_de(t):
+        caminho = _caminho(t, _cliente_por_id)
+        if caminho in _sync_por_caminho:
+            return _sync_por_caminho[caminho]
+        if t.nome_tarefa in _sync_por_nome:
+            return _sync_por_nome[t.nome_tarefa]
+        return t.percentual_concluido or 0.0
 
     def _make_node(t):
         return SimpleNamespace(
             id=t.id,
             tarefa_pai_id=t.tarefa_pai_id,
             nome_tarefa=t.nome_tarefa,
-            percentual_apresentacao=_sync_por_nome.get(
-                t.nome_tarefa, t.percentual_concluido or 0.0),
+            percentual_apresentacao=_percentual_de(t),
             data_inicio_apresentacao=t.data_inicio,
             data_fim_apresentacao=t.data_fim,
             ordem=t.ordem,

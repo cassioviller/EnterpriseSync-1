@@ -105,16 +105,52 @@ def montar(caminho_mpp, data=None, comentario=None):
     return item, rel
 
 
+def envelopar(item, carga_ref):
+    """Embrulha o RDO no formato `carga-obra/1.1`, para subir pela TELA
+    (página da obra → aba RDOs → "Atualizar por JSON").
+
+    Sem `cronograma_tarefas` de propósito: `aplicar_carga_obra` só roda a fase
+    de cronograma `if tarefas_json`, então o arquivo entra como carga SÓ de
+    RDO — não insere, não arquiva, não versiona nada. Só o apontamento.
+
+    `carga_ref` é a carga da obra (cargas/obra-N/carga_obra_N.json), de onde
+    saem o bloco `obra` (a tela recusa o arquivo se ele não disser de que obra
+    é — subir na obra errada é o erro mais provável do fluxo) e o `mapa_nomes`
+    (fallback de resolução por nome, para as tarefas sem `mpp_uid`).
+    """
+    with open(carga_ref, encoding='utf-8') as f:
+        carga = json.load(f)
+    return {
+        '_meta': {
+            'formato': 'carga-obra/1.1',
+            'gerado_em': item['data'],
+            'fontes': {'cronograma': carga.get('_meta', {})
+                       .get('fontes', {}).get('cronograma')},
+            'observacao': 'Carga SÓ de RDO: sem "cronograma_tarefas", a fase '
+                          'de cronograma não roda.',
+        },
+        'obra': carga['obra'],
+        'mapa_nomes': carga.get('mapa_nomes') or {},
+        'rdos': [item],
+    }
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     p.add_argument('mpp', help='cronograma .mpp/.xml com os % vigentes')
     p.add_argument('--data', help='data do RDO (AAAA-MM-DD); default: a '
                                   'data_status do arquivo')
     p.add_argument('--saida', help='payload de saída; default: stdout')
+    p.add_argument('--para-tela', metavar='CARGA.json',
+                   help='embrulha em carga-obra/1.1 para subir pela aba RDOs '
+                        'da obra, usando o bloco "obra" e o "mapa_nomes" '
+                        'desta carga. Sem isto a saída é a LISTA que o '
+                        'scripts/atualizar_rdos_obra.py consome — e que a '
+                        'tela recusa')
     args = p.parse_args(argv)
 
     item, rel = montar(args.mpp, args.data)
-    payload = [item]
+    payload = envelopar(item, args.para_tela) if args.para_tela else [item]
 
     if args.saida:
         os.makedirs(os.path.dirname(os.path.abspath(args.saida)), exist_ok=True)
@@ -138,9 +174,18 @@ def main(argv=None):
                   file=sys.stderr)
     if args.saida:
         print(f"  payload: {args.saida}", file=sys.stderr)
-        print(f"  revisar: SIGE_ENABLE_DEMO_SEED=false python "
-              f"scripts/atualizar_rdos_obra.py <admin> <obra> {args.saida} "
-              f"--sem-fotos --dry-run", file=sys.stderr)
+        if args.para_tela:
+            print(f"  formato: carga-obra/1.1 (SÓ RDO — sem "
+                  f"cronograma_tarefas, a fase de cronograma não roda)",
+                  file=sys.stderr)
+            print(f"  aplicar: página da obra → aba RDOs → 'Atualizar por "
+                  f"JSON' → Prévia → Aplicar", file=sys.stderr)
+        else:
+            print(f"  formato: LISTA de RDOs (para o CLI; a TELA recusa — "
+                  f"use --para-tela para o outro formato)", file=sys.stderr)
+            print(f"  revisar: SIGE_ENABLE_DEMO_SEED=false python "
+                  f"scripts/atualizar_rdos_obra.py <admin> <obra> "
+                  f"{args.saida} --sem-fotos --dry-run", file=sys.stderr)
 
 
 if __name__ == '__main__':

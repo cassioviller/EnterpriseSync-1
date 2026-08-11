@@ -1,0 +1,1880 @@
+{
+ "_meta": {
+  "formato": "carga-obra/1.1",
+  "gerado_em": "2026-08-10",
+  "fontes": {
+   "cronograma": "Veks - Angela - Cronograma Atual  11-08-2026.mpp"
+  },
+  "observacao": "Carga SÓ de RDO: sem \"cronograma_tarefas\", a fase de cronograma não roda."
+ },
+ "obra": {
+  "id": 43,
+  "codigo": null,
+  "nome": "Angela Cid",
+  "admin_id": 1640,
+  "admin_username": "veks",
+  "status": "Em andamento",
+  "data_inicio": "2026-03-16",
+  "data_previsao_fim": null,
+  "cronograma_revisado_em": null
+ },
+ "mapa_nomes": {
+  "-208": {
+   "nome": "Reforço da laje da garagem",
+   "pai": null,
+   "caminho": []
+  },
+  "-209": {
+   "nome": "Montagem de vigas para passarela",
+   "pai": null,
+   "caminho": []
+  },
+  "-211": {
+   "nome": "Estrutura",
+   "pai": null,
+   "caminho": []
+  },
+  "-212": {
+   "nome": "Painelização LSF",
+   "pai": "Estrutura",
+   "caminho": [
+    "Estrutura"
+   ]
+  },
+  "-213": {
+   "nome": "Verticalização LSF",
+   "pai": "Estrutura",
+   "caminho": [
+    "Estrutura"
+   ]
+  },
+  "-214": {
+   "nome": "Instalação de chapa para beiral",
+   "pai": null,
+   "caminho": []
+  },
+  "-215": {
+   "nome": "Fechamento Externo",
+   "pai": null,
+   "caminho": []
+  },
+  "-216": {
+   "nome": "Aplicação de membrana Hidrófuga",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-217": {
+   "nome": "Plaqueamento com glasroc",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-218": {
+   "nome": "Tratamento de junta",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-219": {
+   "nome": "Acabamento da junta",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-220": {
+   "nome": "Tratamento da superfice Com basecoat 1 de mão",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-221": {
+   "nome": "Tratamento da superfície Com basecoat 2 de mão",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-222": {
+   "nome": "Fechamento Interno",
+   "pai": null,
+   "caminho": []
+  },
+  "-223": {
+   "nome": "Aplicação de isolamento termoacustico",
+   "pai": "Fechamento Interno",
+   "caminho": [
+    "Fechamento Interno"
+   ]
+  },
+  "-224": {
+   "nome": "Plaqueamento com ST/RU",
+   "pai": "Fechamento Interno",
+   "caminho": [
+    "Fechamento Interno"
+   ]
+  },
+  "-225": {
+   "nome": "Tratamento de junta",
+   "pai": "Fechamento Interno",
+   "caminho": [
+    "Fechamento Interno"
+   ]
+  },
+  "-226": {
+   "nome": "Acabamento da junta",
+   "pai": "Fechamento Interno",
+   "caminho": [
+    "Fechamento Interno"
+   ]
+  },
+  "-227": {
+   "nome": "Fechamento Externo",
+   "pai": null,
+   "caminho": []
+  },
+  "-228": {
+   "nome": "Estrutura de forro f530",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-229": {
+   "nome": "Plaqueamento",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-230": {
+   "nome": "Tratamento de junta",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-231": {
+   "nome": "Acabamento da junta",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-232": {
+   "nome": "Tratamento da superfice Com basecoat 1 de mão",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-233": {
+   "nome": "Tratamento da superfície Com basecoat 2 de mão",
+   "pai": "Fechamento Externo",
+   "caminho": [
+    "Fechamento Externo"
+   ]
+  },
+  "-234": {
+   "nome": "Forros Internos",
+   "pai": null,
+   "caminho": []
+  },
+  "-235": {
+   "nome": "Estrutura de forro f530",
+   "pai": "Forros Internos",
+   "caminho": [
+    "Forros Internos"
+   ]
+  },
+  "-236": {
+   "nome": "Plaqueamento com ST/RU",
+   "pai": "Forros Internos",
+   "caminho": [
+    "Forros Internos"
+   ]
+  },
+  "-237": {
+   "nome": "Tratamento de junta",
+   "pai": "Forros Internos",
+   "caminho": [
+    "Forros Internos"
+   ]
+  },
+  "-238": {
+   "nome": "Acabamento da junta",
+   "pai": "Forros Internos",
+   "caminho": [
+    "Forros Internos"
+   ]
+  },
+  "111": {
+   "nome": "Cronograma Angela - Santo Antônio do Pinhal",
+   "pai": null,
+   "caminho": []
+  },
+  "383": {
+   "nome": "Início de obra",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "492": {
+   "nome": "Orçamento carpintaria para banheiros e proteção periférica",
+   "pai": "Início de obra",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Início de obra"
+   ]
+  },
+  "494": {
+   "nome": "Ligação provisória de água e energia",
+   "pai": "Início de obra",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Início de obra"
+   ]
+  },
+  "497": {
+   "nome": "Marcação de obra com topografia (terreno e fundação)",
+   "pai": "Início de obra",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Início de obra"
+   ]
+  },
+  "606": {
+   "nome": "Marcação de obra com topografia (terreno e fundação)",
+   "pai": "Início de obra",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Início de obra"
+   ]
+  },
+  "507": {
+   "nome": "Colocar o container (almoxarifado/escritório)",
+   "pai": "Início de obra",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Início de obra"
+   ]
+  },
+  "493": {
+   "nome": "Montagem de banheiros e proteção periférica",
+   "pai": "Início de obra",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Início de obra"
+   ]
+  },
+  "608": {
+   "nome": "Execução de Muro de Arrimo",
+   "pai": "Início de obra",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Início de obra"
+   ]
+  },
+  "609": {
+   "nome": "Execução de muro de Arrimo ''S''",
+   "pai": "Início de obra",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Início de obra"
+   ]
+  },
+  "501": {
+   "nome": "Terraplenagem - Aterramento e compactação",
+   "pai": "Início de obra",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Início de obra"
+   ]
+  },
+  "424": {
+   "nome": "Fundação",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "475": {
+   "nome": "Escavação de sapatas",
+   "pai": "Fundação",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fundação"
+   ]
+  },
+  "498": {
+   "nome": "Execução das formas",
+   "pai": "Fundação",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fundação"
+   ]
+  },
+  "478": {
+   "nome": "Colocação de armadura das sapatas",
+   "pai": "Fundação",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fundação"
+   ]
+  },
+  "474": {
+   "nome": "Concretagem das sapatas",
+   "pai": "Fundação",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fundação"
+   ]
+  },
+  "633": {
+   "nome": "Testes de corpos de prova",
+   "pai": "Fundação",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fundação"
+   ]
+  },
+  "480": {
+   "nome": "Estrutura Metalica",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "611": {
+   "nome": "Entrega material da estrutura metalica",
+   "pai": "Estrutura Metalica",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Estrutura Metalica"
+   ]
+  },
+  "481": {
+   "nome": "Marcação de pilares com topografia",
+   "pai": "Estrutura Metalica",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Estrutura Metalica"
+   ]
+  },
+  "479": {
+   "nome": "Montagem de estrutura metalica e fixações",
+   "pai": "Estrutura Metalica",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Estrutura Metalica"
+   ]
+  },
+  "483": {
+   "nome": "Montagem de laje steel deck (área técnica e térreo)",
+   "pai": "Estrutura Metalica",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Estrutura Metalica"
+   ]
+  },
+  "482": {
+   "nome": "Concretagem de laje steel deck (área técnica e térreo)",
+   "pai": "Estrutura Metalica",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Estrutura Metalica"
+   ]
+  },
+  "503": {
+   "nome": "Regularização de laje steel deck (área técnica e térreo)",
+   "pai": "Estrutura Metalica",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Estrutura Metalica"
+   ]
+  },
+  "485": {
+   "nome": "Civil",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "487": {
+   "nome": "Execução de entrada do terreno",
+   "pai": "Civil",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Civil"
+   ]
+  },
+  "486": {
+   "nome": "Execução concretagem entrada de carros",
+   "pai": "Civil",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Civil"
+   ]
+  },
+  "484": {
+   "nome": "Execução de muro para horta",
+   "pai": "Civil",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Civil"
+   ]
+  },
+  "604": {
+   "nome": "Montagem de escada externa (térreo - área técnica)",
+   "pai": "Civil",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Civil"
+   ]
+  },
+  "573": {
+   "nome": "Área técnica",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "574": {
+   "nome": "Assentamento de Alvenaria",
+   "pai": "Área técnica",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Área técnica"
+   ]
+  },
+  "575": {
+   "nome": "Instalação de Veneziana",
+   "pai": "Área técnica",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Área técnica"
+   ]
+  },
+  "576": {
+   "nome": "Chapisco Alvenaria",
+   "pai": "Área técnica",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Área técnica"
+   ]
+  },
+  "577": {
+   "nome": "Reboco Alvenaria",
+   "pai": "Área técnica",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Área técnica"
+   ]
+  },
+  "398": {
+   "nome": "Light Steel Frame",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "399": {
+   "nome": "Térreo",
+   "pai": "Light Steel Frame",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame"
+   ]
+  },
+  "610": {
+   "nome": "Entrega de material",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Térreo"
+   ]
+  },
+  "612": {
+   "nome": "Montagem do Aço Pesado",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Térreo"
+   ]
+  },
+  "400": {
+   "nome": "Painelização do LSF",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Térreo"
+   ]
+  },
+  "404": {
+   "nome": "Verticalização do LSF",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Térreo"
+   ]
+  },
+  "537": {
+   "nome": "Montagem de escada interna (térreo - 1° andar)",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Térreo"
+   ]
+  },
+  "405": {
+   "nome": "Montagem dos painéis de laje",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Térreo"
+   ]
+  },
+  "406": {
+   "nome": "Costuras e fixação de chapas gousset, cantoneiras etc",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Térreo"
+   ]
+  },
+  "408": {
+   "nome": "Superior",
+   "pai": "Light Steel Frame",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame"
+   ]
+  },
+  "614": {
+   "nome": "Plaqueamento do laje piso",
+   "pai": "Superior",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Superior"
+   ]
+  },
+  "423": {
+   "nome": "Painelização do LSF",
+   "pai": "Superior",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Superior"
+   ]
+  },
+  "409": {
+   "nome": "Verticalização do LSF",
+   "pai": "Superior",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Superior"
+   ]
+  },
+  "411": {
+   "nome": "Costuras e fixação de chapas gousset, cantoneiras etc",
+   "pai": "Superior",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Superior"
+   ]
+  },
+  "432": {
+   "nome": "Tratamento de juntas da laje de placa cimenticia",
+   "pai": "Superior",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Superior"
+   ]
+  },
+  "534": {
+   "nome": "Regularização laje",
+   "pai": "Superior",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Light Steel Frame",
+    "Superior"
+   ]
+  },
+  "419": {
+   "nome": "Cobertura",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "421": {
+   "nome": "Montagem do aço cobertura",
+   "pai": "Cobertura",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Cobertura"
+   ]
+  },
+  "422": {
+   "nome": "Instalação de calhas",
+   "pai": "Cobertura",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Cobertura"
+   ]
+  },
+  "629": {
+   "nome": "Instalação de rufos",
+   "pai": "Cobertura",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Cobertura"
+   ]
+  },
+  "615": {
+   "nome": "Montagem telhado",
+   "pai": "Cobertura",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Cobertura"
+   ]
+  },
+  "641": {
+   "nome": "Aumentar platibanda",
+   "pai": "Cobertura",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Cobertura"
+   ]
+  },
+  "12": {
+   "nome": "Fechamento de Paredes Externas",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "626": {
+   "nome": "Montagem andaimes",
+   "pai": "Fechamento de Paredes Externas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Externas"
+   ]
+  },
+  "627": {
+   "nome": "Plaqueamento de placa OSB",
+   "pai": "Fechamento de Paredes Externas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Externas"
+   ]
+  },
+  "346": {
+   "nome": "Manta hidrófuga",
+   "pai": "Fechamento de Paredes Externas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Externas"
+   ]
+  },
+  "198": {
+   "nome": "Plaqueamento de placa NEXTERA",
+   "pai": "Fechamento de Paredes Externas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Externas"
+   ]
+  },
+  "347": {
+   "nome": "Vedação de portas e janelas com manta",
+   "pai": "Fechamento de Paredes Externas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Externas"
+   ]
+  },
+  "143": {
+   "nome": "Tratamento de juntas",
+   "pai": "Fechamento de Paredes Externas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Externas"
+   ]
+  },
+  "540": {
+   "nome": "Instalação de cantoneiras e pingadeira",
+   "pai": "Fechamento de Paredes Externas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Externas"
+   ]
+  },
+  "539": {
+   "nome": "Instalação de tela e aplicação de basecoat",
+   "pai": "Fechamento de Paredes Externas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Externas"
+   ]
+  },
+  "524": {
+   "nome": "Pintura Externa",
+   "pai": "Fechamento de Paredes Externas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Externas"
+   ]
+  },
+  "631": {
+   "nome": "Aplicação de textura",
+   "pai": "Pintura Externa",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Externas",
+    "Pintura Externa"
+   ]
+  },
+  "660": {
+   "nome": "Desmontagem Andaime",
+   "pai": "Fechamento de Paredes Externas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Externas"
+   ]
+  },
+  "74": {
+   "nome": "Instalações Hidráulicas",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "607": {
+   "nome": "Descidas de águas pluviais",
+   "pai": "Instalações Hidráulicas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas"
+   ]
+  },
+  "233": {
+   "nome": "Térreo",
+   "pai": "Instalações Hidráulicas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas"
+   ]
+  },
+  "628": {
+   "nome": "Corte na lage para passante",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "Térreo"
+   ]
+  },
+  "87": {
+   "nome": "Esgoto",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "Térreo"
+   ]
+  },
+  "88": {
+   "nome": "Água Fria",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "Térreo"
+   ]
+  },
+  "89": {
+   "nome": "Água Quente",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "Térreo"
+   ]
+  },
+  "643": {
+   "nome": "Fixação de tubulações",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "Térreo"
+   ]
+  },
+  "644": {
+   "nome": "Teste de tubulações",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "Térreo"
+   ]
+  },
+  "450": {
+   "nome": "1° Andar",
+   "pai": "Instalações Hidráulicas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas"
+   ]
+  },
+  "451": {
+   "nome": "Esgoto",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "1° Andar"
+   ]
+  },
+  "452": {
+   "nome": "Água Fria",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "1° Andar"
+   ]
+  },
+  "453": {
+   "nome": "Água Quente",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "1° Andar"
+   ]
+  },
+  "618": {
+   "nome": "Fixação de tubulações",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "1° Andar"
+   ]
+  },
+  "645": {
+   "nome": "Teste de tubulações",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "1° Andar"
+   ]
+  },
+  "242": {
+   "nome": "Área técnica - Caixa d'água",
+   "pai": "Instalações Hidráulicas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas"
+   ]
+  },
+  "647": {
+   "nome": "Instalação de caixa d'água",
+   "pai": "Área técnica - Caixa d'água",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "Área técnica - Caixa d'água"
+   ]
+  },
+  "648": {
+   "nome": "Instalação de filtro",
+   "pai": "Área técnica - Caixa d'água",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "Área técnica - Caixa d'água"
+   ]
+  },
+  "650": {
+   "nome": "Pressurizador",
+   "pai": "Área técnica - Caixa d'água",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Hidráulicas",
+    "Área técnica - Caixa d'água"
+   ]
+  },
+  "83": {
+   "nome": "Instalações Elétricas",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "603": {
+   "nome": "Instalção de para-raios",
+   "pai": "Instalações Elétricas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Elétricas"
+   ]
+  },
+  "246": {
+   "nome": "Térreo",
+   "pai": "Instalações Elétricas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Elétricas"
+   ]
+  },
+  "102": {
+   "nome": "Infra - conduíte, fixadores e caixinhas teto",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Elétricas",
+    "Térreo"
+   ]
+  },
+  "652": {
+   "nome": "Execução de apoio para caixas elétricas",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Elétricas",
+    "Térreo"
+   ]
+  },
+  "460": {
+   "nome": "Caixinhas de parede, cabeamentos, quadros e disjuntores",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Elétricas",
+    "Térreo"
+   ]
+  },
+  "624": {
+   "nome": "Acabamento e luminarias",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Elétricas",
+    "Térreo"
+   ]
+  },
+  "463": {
+   "nome": "1° Andar",
+   "pai": "Instalações Elétricas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Elétricas"
+   ]
+  },
+  "464": {
+   "nome": "Infra - conduíte, fixadores e caixinhas teto",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Elétricas",
+    "1° Andar"
+   ]
+  },
+  "653": {
+   "nome": "Execução de apoio para caixas elétricas",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Elétricas",
+    "1° Andar"
+   ]
+  },
+  "465": {
+   "nome": "Caixinhas de parede, cabeamentos, quadros e disjuntores",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Elétricas",
+    "1° Andar"
+   ]
+  },
+  "623": {
+   "nome": "Acabamento e luminarias",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações Elétricas",
+    "1° Andar"
+   ]
+  },
+  "133": {
+   "nome": "Fechamento de Paredes Internas",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "217": {
+   "nome": "Térreo",
+   "pai": "Fechamento de Paredes Internas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Internas"
+   ]
+  },
+  "202": {
+   "nome": "Instalação de lã entre as placas",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Internas",
+    "Térreo"
+   ]
+  },
+  "200": {
+   "nome": "Execução de plaqueamento interno",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Internas",
+    "Térreo"
+   ]
+  },
+  "134": {
+   "nome": "Aplicação de massa na parte interna, juntas e parafusos",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Internas",
+    "Térreo"
+   ]
+  },
+  "455": {
+   "nome": "Execução de forro de gesso acartonado",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Internas",
+    "Térreo"
+   ]
+  },
+  "444": {
+   "nome": "1° Andar",
+   "pai": "Fechamento de Paredes Internas",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Internas"
+   ]
+  },
+  "445": {
+   "nome": "Execução de plaqueamento interno",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Internas",
+    "1° Andar"
+   ]
+  },
+  "446": {
+   "nome": "Instalação de lã entre as placas",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Internas",
+    "1° Andar"
+   ]
+  },
+  "448": {
+   "nome": "Aplicação de massa na parte interna, juntas e parafusos",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Internas",
+    "1° Andar"
+   ]
+  },
+  "456": {
+   "nome": "Execução de forro de gesso acartonado",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Fechamento de Paredes Internas",
+    "1° Andar"
+   ]
+  },
+  "598": {
+   "nome": "Instalação energia solar",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "163": {
+   "nome": "Instalações de Infra de AC Split",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "164": {
+   "nome": "Passagem da infra - tubulação frigorígena",
+   "pai": "Instalações de Infra de AC Split",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações de Infra de AC Split"
+   ]
+  },
+  "165": {
+   "nome": "Elétrica",
+   "pai": "Instalações de Infra de AC Split",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações de Infra de AC Split"
+   ]
+  },
+  "166": {
+   "nome": "Dreno",
+   "pai": "Instalações de Infra de AC Split",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações de Infra de AC Split"
+   ]
+  },
+  "622": {
+   "nome": "Instalação maquinas",
+   "pai": "Instalações de Infra de AC Split",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações de Infra de AC Split"
+   ]
+  },
+  "543": {
+   "nome": "Instalações de gás",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "544": {
+   "nome": "Passagem de tubulação de gás",
+   "pai": "Instalações de gás",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações de gás"
+   ]
+  },
+  "545": {
+   "nome": "Casa de gás",
+   "pai": "Instalações de gás",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações de gás"
+   ]
+  },
+  "630": {
+   "nome": "Instalação de porta na casa de gás",
+   "pai": "Instalações de gás",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Instalações de gás"
+   ]
+  },
+  "16": {
+   "nome": "Impermeabilização",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "181": {
+   "nome": "Impermeabilização varandas",
+   "pai": "Impermeabilização",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Impermeabilização"
+   ]
+  },
+  "508": {
+   "nome": "Impermeabilização banheiros",
+   "pai": "Impermeabilização",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Impermeabilização"
+   ]
+  },
+  "442": {
+   "nome": "Impermeabilização cozinha e area de serviço",
+   "pai": "Impermeabilização",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Impermeabilização"
+   ]
+  },
+  "517": {
+   "nome": "Pintura Interna",
+   "pai": "Cronograma Angela - Santo Antônio do Pinhal",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal"
+   ]
+  },
+  "518": {
+   "nome": "Térreo",
+   "pai": "Pintura Interna",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna"
+   ]
+  },
+  "519": {
+   "nome": "Emassamento e lixamento interno de paredes e forro",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "Térreo"
+   ]
+  },
+  "520": {
+   "nome": "2 demão de pintura com tinta latex",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "Térreo"
+   ]
+  },
+  "521": {
+   "nome": "1° Andar",
+   "pai": "Pintura Interna",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna"
+   ]
+  },
+  "522": {
+   "nome": "Emassamento e lixamento interno de paredes e forro",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "1° Andar"
+   ]
+  },
+  "523": {
+   "nome": "2 demão de pintura com tinta latex",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "1° Andar"
+   ]
+  },
+  "15": {
+   "nome": "Revestimento de piso e azulejo",
+   "pai": "Pintura Interna",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna"
+   ]
+  },
+  "256": {
+   "nome": "Térreo",
+   "pai": "Revestimento de piso e azulejo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "Revestimento de piso e azulejo"
+   ]
+  },
+  "621": {
+   "nome": "Assentamento de pedras garagem/ Horta / entrada",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "Revestimento de piso e azulejo",
+    "Térreo"
+   ]
+  },
+  "175": {
+   "nome": "Assentamento de piso cerâmico",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "Revestimento de piso e azulejo",
+    "Térreo"
+   ]
+  },
+  "177": {
+   "nome": "Assentamento de azulejo áreas molhadas",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "Revestimento de piso e azulejo",
+    "Térreo"
+   ]
+  },
+  "655": {
+   "nome": "Rodapé invertido",
+   "pai": "Térreo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "Revestimento de piso e azulejo",
+    "Térreo"
+   ]
+  },
+  "257": {
+   "nome": "1° Andar",
+   "pai": "Revestimento de piso e azulejo",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "Revestimento de piso e azulejo"
+   ]
+  },
+  "259": {
+   "nome": "Assentamento de piso cerâmico",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "Revestimento de piso e azulejo",
+    "1° Andar"
+   ]
+  },
+  "529": {
+   "nome": "Instalação de soleira",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "Revestimento de piso e azulejo",
+    "1° Andar"
+   ]
+  },
+  "656": {
+   "nome": "Rodapé invertido",
+   "pai": "1° Andar",
+   "caminho": [
+    "Cronograma Angela - Santo Antônio do Pinhal",
+    "Pintura Interna",
+    "Revestimento de piso e azulejo",
+    "1° Andar"
+   ]
+  },
+  "657": {
+   "nome": "Instalação de aquecedor a gás",
+   "pai": null,
+   "caminho": []
+  },
+  "584": {
+   "nome": "Instalação de ofurô e equipamentos",
+   "pai": null,
+   "caminho": []
+  },
+  "588": {
+   "nome": "Instalação de churrasqueira",
+   "pai": null,
+   "caminho": []
+  },
+  "183": {
+   "nome": "Acabamentos",
+   "pai": null,
+   "caminho": []
+  },
+  "184": {
+   "nome": "Instalação de bancada",
+   "pai": "Acabamentos",
+   "caminho": [
+    "Acabamentos"
+   ]
+  },
+  "513": {
+   "nome": "Louças e metais",
+   "pai": "Acabamentos",
+   "caminho": [
+    "Acabamentos"
+   ]
+  },
+  "187": {
+   "nome": "Esquadrias e portas",
+   "pai": "Acabamentos",
+   "caminho": [
+    "Acabamentos"
+   ]
+  },
+  "531": {
+   "nome": "Instalação de peitoril",
+   "pai": "Esquadrias e portas",
+   "caminho": [
+    "Acabamentos",
+    "Esquadrias e portas"
+   ]
+  },
+  "192": {
+   "nome": "Instalação de janelas de PVC",
+   "pai": "Esquadrias e portas",
+   "caminho": [
+    "Acabamentos",
+    "Esquadrias e portas"
+   ]
+  },
+  "593": {
+   "nome": "Instalação de guarda-corpos",
+   "pai": "Esquadrias e portas",
+   "caminho": [
+    "Acabamentos",
+    "Esquadrias e portas"
+   ]
+  },
+  "191": {
+   "nome": "Instalação de portas de madeira",
+   "pai": "Esquadrias e portas",
+   "caminho": [
+    "Acabamentos",
+    "Esquadrias e portas"
+   ]
+  },
+  "594": {
+   "nome": "Instalação do portão de entrada",
+   "pai": "Esquadrias e portas",
+   "caminho": [
+    "Acabamentos",
+    "Esquadrias e portas"
+   ]
+  },
+  "596": {
+   "nome": "Jardim e paisagismo",
+   "pai": "Acabamentos",
+   "caminho": [
+    "Acabamentos"
+   ]
+  },
+  "597": {
+   "nome": "Iluminação externa",
+   "pai": "Acabamentos",
+   "caminho": [
+    "Acabamentos"
+   ]
+  },
+  "550": {
+   "nome": "Limpeza",
+   "pai": "Acabamentos",
+   "caminho": [
+    "Acabamentos"
+   ]
+  },
+  "632": {
+   "nome": "Alambrado de divisa do terreno",
+   "pai": "Acabamentos",
+   "caminho": [
+    "Acabamentos"
+   ]
+  },
+  "635": {
+   "nome": "Pintura de estrutura metálica geral da obra",
+   "pai": "Acabamentos",
+   "caminho": [
+    "Acabamentos"
+   ]
+  },
+  "636": {
+   "nome": "Troca da caixa de entrada de água",
+   "pai": "Acabamentos",
+   "caminho": [
+    "Acabamentos"
+   ]
+  }
+ },
+ "rdos": [
+  {
+   "data": "2026-08-10",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "RDO de alinhamento do físico ao cronograma.\n\nNão descreve um dia de obra: existe para trazer o %concluído do arquivo Veks - Angela - Cronograma Atual  11-08-2026.mpp para dentro dos apontamentos, que é onde o sistema guarda o avanço físico. Sem isto, a sincronização zera toda tarefa sem apontamento e o percentual do Project se perde.\n\n89 tarefa(s) alinhada(s). Efetivo não se aplica.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 492,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 494,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 497,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 606,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 507,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 493,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 608,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 609,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 501,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 475,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 498,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 478,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 474,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 611,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 481,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 479,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 483,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 482,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 503,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 487,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 486,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 484,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 604,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 574,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 576,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 577,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 610,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 612,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 400,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 404,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 537,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 405,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 406,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 614,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 423,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 409,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 411,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 432,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 534,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 421,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 422,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 629,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 615,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 641,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 626,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 627,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 346,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 198,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 347,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 143,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 540,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 539,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 631,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 660,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 607,
+     "pct": 65.0
+    },
+    {
+     "tarefa_mpp": 628,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 87,
+     "pct": 57.0
+    },
+    {
+     "tarefa_mpp": 88,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 89,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 643,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 644,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 451,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 452,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 453,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 618,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 645,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 102,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 652,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 460,
+     "pct": 60.0
+    },
+    {
+     "tarefa_mpp": 464,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 653,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 465,
+     "pct": 70.0
+    },
+    {
+     "tarefa_mpp": 202,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 200,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 134,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 455,
+     "pct": 95.0
+    },
+    {
+     "tarefa_mpp": 445,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 446,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 448,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 456,
+     "pct": 70.0
+    },
+    {
+     "tarefa_mpp": 164,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 165,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 166,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 544,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 545,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 522,
+     "pct": 43.0
+    },
+    {
+     "tarefa_mpp": 621,
+     "pct": 48.0
+    },
+    {
+     "tarefa_mpp": 531,
+     "pct": 100.0
+    },
+    {
+     "tarefa_mpp": 636,
+     "pct": 100.0
+    }
+   ]
+  }
+ ]
+}

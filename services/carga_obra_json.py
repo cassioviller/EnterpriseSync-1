@@ -63,6 +63,21 @@ def _data(valor):
 def validar_payload(payload, obra):
     """Formato e destino. O JSON diz de que obra é — subir na obra errada
     é o erro mais provável do fluxo, e tem que falhar ANTES de escrever."""
+    # Antes de qualquer `.get`: o erro mais comum de quem sobe arquivo aqui é
+    # mandar o payload-lista de `scripts/atualizar_rdos_obra.py`, que é uma
+    # LISTA de RDOs. Sem esta guarda a tela devolvia o AttributeError cru
+    # ("'list' object has no attribute 'get'"), que não diz o que fazer.
+    if isinstance(payload, list):
+        raise CargaInvalida(
+            'este arquivo é uma LISTA de RDOs — o payload de '
+            'scripts/atualizar_rdos_obra.py, não uma carga de obra. Para '
+            'subir por aqui ele precisa do envelope carga-obra/1.1 (com '
+            '"_meta", "obra" e "rdos"); pelo CLI, use o próprio '
+            'atualizar_rdos_obra.py')
+    if not isinstance(payload, dict):
+        raise CargaInvalida(
+            f'JSON inesperado ({type(payload).__name__}) — esperava um objeto '
+            f'no formato carga-obra/1.1')
     formato = str((payload.get('_meta') or {}).get('formato', ''))
     if not formato.startswith('carga-obra/1.'):
         raise CargaInvalida(
