@@ -111,6 +111,34 @@ def situacao_para(pedido):
     return PARCIAL
 
 
+def valor_atestado(pedido):
+    """Σ (quantidade recebida × preço unitário) — o que CHEGOU vale quanto?
+
+    O gancho da fase financeira: é este número que o Fluxo A vai usar para
+    pagar o que chegou em vez do que foi pedido. Fica exposto já nesta fase
+    porque é barato agora e caro descobrir depois que não dá para calcular.
+
+    Inclui item de texto livre — frete não movimenta estoque, mas foi
+    entregue e é para pagar — e ignora o saldo não entregue, que é
+    exatamente o que a fase financeira vai evitar pagar.
+    """
+    from models import PedidoCompraItem
+
+    acumulado = recebido_por_item(pedido)
+    if not acumulado:
+        return Decimal('0')
+
+    itens = {i.id: i for i in
+             PedidoCompraItem.query.filter_by(pedido_id=pedido.id).all()}
+    total = Decimal('0')
+    for item_id, quantidade in acumulado.items():
+        item = itens.get(item_id)
+        if item is None:
+            continue
+        total += _d(quantidade) * _d(item.preco_unitario)
+    return total
+
+
 def _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega):
     """Quantidades: positivas, de itens DESTE pedido, e sem estourar o pedido."""
     from models import PedidoCompraItem

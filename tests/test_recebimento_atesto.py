@@ -1037,3 +1037,117 @@ def test_rota_antiga_recusa_pedido_do_regime_novo():
         assert _entradas(pedido_id) == [], (
             'a rota antiga lançou estoque de um pedido que exige atesto')
     assert 'atesto' in _flashes(cli).lower() or 'recebimento' in _flashes(cli).lower()
+
+
+# ---------------------------------------------------------------------------
+# R7 — consistência e o gancho da fase financeira
+# ---------------------------------------------------------------------------
+#
+# `valor_atestado` é o número que o Fluxo A da fase financeira vai usar para
+# pagar o que CHEGOU em vez do que foi pedido. Barato expor agora, caro
+# descobrir depois que não dá para calcular.
+#
+# O sensor de drift é o par: `situacao_recebimento` é derivada, e derivada
+# persistida sai de sincronia na primeira escrita que passa por fora do
+# serviço. O script compara o persistido com `situacao_para` — a MESMA função
+# que grava —, e é por isso que ela é pura e vive separada de quem grava.
+
+
+def test_valor_atestado_soma_so_o_que_chegou():
+    """30 dos 50 sacos a R$ 32,50 → R$ 975, não os R$ 1.625 do pedido.
+
+    O saldo não entregue não entra: pagar por ele é exatamente o que a fase
+    financeira vai evitar com este número.
+    """
+    from services.recebimento_pedido import valor_atestado
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+        assert valor_atestado(pedido) == Decimal('0'), (
+            'pedido sem recebimento tem valor atestado zero')
+
+        _receber(pedido, admin, item, 30)
+        assert valor_atestado(pedido) == Decimal('975.00')
+
+        _receber(pedido, admin, item, 20, data=date(2026, 8, 7))
+        assert valor_atestado(pedido) == Decimal('1625.00'), (
+            'com tudo entregue, o atestado tem que bater com o pedido')
+
+
+def test_valor_atestado_conta_item_de_texto_livre():
+    """Frete não está no catálogo e não movimenta estoque — mas foi entregue,
+    e é para pagar."""
+    from services.recebimento_pedido import valor_atestado
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        forn = _fornecedor(admin.id)
+        pedido = _pedido(admin.id, obra.id, forn.id,
+                         itens=(('Frete do caminhão', 2, 350.00),))
+        pedido.exige_atesto = True
+        db.session.commit()
+        item = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).first()
+
+        _receber(pedido, admin, item, 1)
+
+        assert valor_atestado(pedido) == Decimal('350.00'), (
+            'item fora do catálogo ficou de fora do valor atestado')
+
+
+def test_sensor_acha_drift_quando_alguem_escreve_a_situacao_na_marra():
+    """A escrita por fora do serviço é o que o sensor existe para pegar."""
+    from scripts.verificar_consistencia_recebimento import verificar
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+        _receber(pedido, admin, item, 30)
+
+        rel = verificar(admin.id)
+        assert rel['consistente'] is True, (
+            f'o serviço deixou drift no próprio caminho feliz: {rel}')
+
+        # O UPDATE na marra que o sensor tem de denunciar.
+        pedido.situacao_recebimento = 'recebido'
+        db.session.commit()
+
+        rel = verificar(admin.id)
+        assert rel['consistente'] is False
+        assert len(rel['divergencias']) == 1
+        divergencia = rel['divergencias'][0]
+        assert divergencia['pedido_id'] == pedido.id
+        assert divergencia['persistido'] == 'recebido'
+        assert divergencia['derivado'] == 'parcial'
+
+
+def test_sensor_ignora_pedido_do_regime_antigo():
+    """Pedido legado não tem situação de recebimento para conferir.
+
+    Ele nasce `nao_recebido` por default da coluna e nunca é atualizado —
+    varrer esses seria produzir drift de mentira em todo tenant que ainda não
+    virou, e um sensor que grita sempre não é lido nunca.
+    """
+    from scripts.verificar_consistencia_recebimento import verificar
+    with app.app_context():
+        admin, _obr, pedido, _item, _almox = _cenario_com_catalogo(
+            50, exige_atesto=False)
+        pedido.situacao_recebimento = 'recebido'
+        db.session.commit()
+
+        rel = verificar(admin.id)
+        assert rel['consistente'] is True, (
+            'o sensor apontou drift em pedido do regime antigo')
+        assert rel['pedidos_verificados'] == 0
+
+
+def test_sensor_devolve_exit_1_no_drift_e_2_no_erro_de_uso():
+    """Os códigos de saída são o contrato com quem chama de cron."""
+    from scripts.verificar_consistencia_recebimento import main
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+        _receber(pedido, admin, item, 30)
+        admin_id = admin.id
+
+    assert main([str(admin_id), '--json']) == 0
+    with app.app_context():
+        db.session.get(PedidoCompra, pedido.id).situacao_recebimento = 'recebido'
+        db.session.commit()
+    assert main([str(admin_id)]) == 1
+    assert main(['999999999']) == 2
