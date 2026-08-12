@@ -164,18 +164,23 @@ O conserto da dupla escrita. É o passo de maior risco do plano: mexe em almoxar
 
 ## R6 — Tela de recebimento
 
-- [ ] **Step 1 (red):** testes de rota: `GET` da tela por quem tem papel; `POST` grava e
+- [x] **Step 1 (red):** testes de rota: `GET` da tela por quem tem papel; `POST` grava e
   redireciona; `POST` em pedido legado (`exige_atesto=False`) **recusa com mensagem
   explícita**, em vez de aceitar e não fazer nada — que é o defeito atual do botão;
-  `LEITOR` recebe 403.
-- [ ] **Step 2:** rota nova em `compras_views.py` + template no molde de
-  `templates/compras/`, utilizável no celular: um campo de quantidade por item já
+  `LEITOR` recebe 403. **Mais um fora do plano**: recebimento todo zerado recusa sem
+  gravar documento.
+- [x] **Step 2:** rota `/compras/<id>/recebimento` (GET e POST) + `templates/compras/
+  recebimento.html`, utilizável no celular: um campo de quantidade por item já
   preenchido com o que falta, observação, e o par encerrar-saldo + motivo.
-- [ ] **Step 3:** em `templates/compras/detalhe.html`, o botão passa a apontar para a
+- [x] **Step 3:** em `templates/compras/detalhe.html`, o botão passa a apontar para a
   tela nova quando `pedido.exige_atesto`, e continua no `POST` antigo quando não. A
-  situação de recebimento aparece no detalhe e na listagem.
-- [ ] **Step 4 (green):** verdes.
-- [ ] **Step 5:** commit — `feat(compras): tela de recebimento na obra, com parcial e encerramento de saldo`
+  situação de recebimento aparece no detalhe e na listagem — **vazia de propósito em
+  pedido legado**: inventar "Não recebido" ali seria mentir sobre estoque que entrou na
+  emissão. **Fora do plano, e necessário**: a rota antiga passa a recusar pedido com
+  `exige_atesto`. O botão já não aponta para lá, mas quem tiver a URL ainda pode postar
+  — e lá a quantidade lançada é a INTEIRA. Tem teste dedicado.
+- [x] **Step 4 (green):** verdes.
+- [x] **Step 5:** commit — `feat(compras): tela de recebimento na obra, com parcial e encerramento de saldo`
 
 ## R7 — Consistência e o gancho da fase financeira
 
