@@ -855,7 +855,16 @@ def nova_post():
             except Exception as _re:
                 logger.warning(f"[WARN] Reembolso compra nao processado: {_re}")
 
-            flash('Compra registrada com sucesso! Custo, contas a pagar e entrada no almoxarifado geradas.', 'success')
+            if pedido.exige_atesto:
+                # No regime novo o estoque NÃO entra aqui — entra no atesto.
+                # Repetir a mensagem antiga faria quem lê não abrir a tela de
+                # recebimento quando o caminhão chegasse, e o material ficaria
+                # sem lançamento em lugar nenhum.
+                flash('Compra registrada com sucesso! Custo e contas a pagar '
+                      'gerados. O estoque entra quando o recebimento for '
+                      'atestado na obra.', 'success')
+            else:
+                flash('Compra registrada com sucesso! Custo, contas a pagar e entrada no almoxarifado geradas.', 'success')
 
         else:  # tipo_compra == 'aprovacao_cliente'
             # Apenas persiste o pedido + itens. Custos e movimentos só serão criados
@@ -1184,6 +1193,7 @@ def recebimento(pedido_id):
         pedido=pedido,
         itens=itens,
         falta={item_id: _num_enxuto(qtd) for item_id, qtd in falta.items()},
+        pedido_qtd={i.id: _num_enxuto(i.quantidade) for i in itens},
         recebido={item_id: _num_enxuto(qtd)
                   for item_id, qtd in acumulado.items()},
         recebimentos=pedido.recebimentos.all(),

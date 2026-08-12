@@ -2171,3 +2171,86 @@ def test_tela_tem_campo_de_justificativa_da_sobre_entrega():
     assert 'permitir_sobre_entrega' in corpo
     assert 'observacao' in corpo, (
         'a tela marca a sobre-entrega e não oferece onde justificar')
+
+
+# ---------------------------------------------------------------------------
+# C8 — a tela para de mentir
+# ---------------------------------------------------------------------------
+#
+# Revisão de 12/08, achados 9 e 14. Dois textos errados, nenhum inofensivo.
+#
+# `Decimal('50.000').normalize()` sai como `5E+1` — a coluna é `Numeric(12,3)`,
+# então TODA quantidade redonda virava notação científica na única linha da
+# tela que diz quanto foi pedido. Quem confere caminhão não consegue comparar
+# "chegou" com "5E+1".
+#
+# E a emissão continuava afirmando "entrada no almoxarifado geradas" para
+# pedido do regime novo, onde ela deliberadamente não acontece — a mensagem
+# contradizendo a coluna de situação que a própria fase criou.
+
+
+def test_quantidade_pedida_aparece_legivel_na_tela():
+    from helpers_tenant import cliente_de
+    with app.app_context():
+        admin_id, pedido_id, _item_a, _item_b = _cenario_dois_itens(
+            qtd_a=50, qtd_b=1200)
+
+    corpo = cliente_de(admin_id).get(
+        f'/compras/{pedido_id}/recebimento').get_data(as_text=True)
+
+    assert 'E+' not in corpo, (
+        'a quantidade pedida saiu em notação científica — 50 vira "5E+1" e '
+        '1200 vira "1.2E+3"')
+    assert 'Pedido: 50' in corpo
+    assert 'Pedido: 1200' in corpo
+
+
+def test_emissao_no_regime_novo_nao_promete_estoque_que_nao_criou():
+    """A mensagem não pode contradizer a coluna de situação da própria fase.
+
+    Quem lê "entrada no almoxarifado geradas" não abre a tela de recebimento
+    quando o caminhão chega — e semanas depois o material não está lançado em
+    lugar nenhum.
+    """
+    from helpers_tenant import cliente_de
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        forn = _fornecedor(admin.id)
+        _ligar_flag(admin.id, True)
+        admin_id, obra_id, forn_id = admin.id, obra.id, forn.id
+
+    cli = cliente_de(admin_id)
+    cli.post('/compras/nova', data={
+        'fornecedor_id': forn_id, 'obra_id': obra_id,
+        'data_compra': '2026-08-05', 'tipo_compra': 'normal',
+        'condicao_pagamento': 'a_vista', 'parcelas': '1',
+        'item_descricao[]': 'Cimento CP-II', 'item_quantidade[]': '50',
+        'item_preco[]': '32.50',
+    })
+
+    aviso = _flashes(cli)
+    assert 'almoxarifado' not in aviso.lower() or 'recebimento' in aviso.lower(), (
+        f'a emissão prometeu entrada no almoxarifado num pedido que exige '
+        f'atesto. Veio: {aviso!r}')
+
+
+def test_emissao_no_regime_antigo_continua_dizendo_o_que_dizia():
+    """O contrapeso: para quem está em produção, nem a mensagem muda."""
+    from helpers_tenant import cliente_de
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        forn = _fornecedor(admin.id)
+        admin_id, obra_id, forn_id = admin.id, obra.id, forn.id
+
+    cli = cliente_de(admin_id)
+    cli.post('/compras/nova', data={
+        'fornecedor_id': forn_id, 'obra_id': obra_id,
+        'data_compra': '2026-08-05', 'tipo_compra': 'normal',
+        'condicao_pagamento': 'a_vista', 'parcelas': '1',
+        'item_descricao[]': 'Cimento CP-II', 'item_quantidade[]': '50',
+        'item_preco[]': '32.50',
+    })
+
+    assert 'almoxarifado' in _flashes(cli).lower()

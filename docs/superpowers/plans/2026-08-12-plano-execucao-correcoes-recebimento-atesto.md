@@ -262,19 +262,19 @@ motivo.
 
 **Fecha os achados 9 e 14.** Dois textos errados, nenhum deles inofensivo.
 
-- [ ] **Step 1 (red):**
+- [x] **Step 1 (red):**
   - `templates/compras/recebimento.html` mostra "Pedido: 50", não "Pedido: 5E+1"
     (`Decimal('50.000').normalize()` sai em notação científica para todo número redondo —
     100 vira `1E+2`, 1200 vira `1.2E+3`);
   - emissão de pedido com `exige_atesto` **não** afirma que a entrada no almoxarifado foi
     gerada; emissão de pedido legado continua afirmando, palavra por palavra.
-- [ ] **Step 2:** o template passa a usar o helper `_num_enxuto` que a própria rota já
+- [x] **Step 2:** o template passa a usar o helper `_num_enxuto` que a própria rota já
   criou para isso (expor como filtro ou passar o dicionário pronto — decidir na hora, pelo
   que ficar mais legível).
-- [ ] **Step 3:** o flash da emissão passa a descrever o que de fato aconteceu, e a dizer
+- [x] **Step 3:** o flash da emissão passa a descrever o que de fato aconteceu, e a dizer
   o próximo passo ("o estoque entra quando o recebimento for atestado").
-- [ ] **Step 4 (green):** verdes.
-- [ ] **Step 5:** commit — `fix(compras): a tela para de mentir sobre quantidade e sobre estoque`
+- [x] **Step 4 (green):** verdes.
+- [x] **Step 5:** commit — `fix(compras): a tela para de mentir sobre quantidade e sobre estoque`
 
 ## C9 — O teste-guarda passa a guardar o repositório inteiro
 

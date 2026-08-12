@@ -85,7 +85,11 @@
           <div class="col-12 col-sm-7">
             <div class="fw-semibold">{{ item.descricao }}</div>
             <small class="text-muted">
-              Pedido: {{ item.quantidade.normalize() }}
+              {# `.normalize()` sozinho sai em notação científica: a coluna é
+                 Numeric(12,3), então 50 vira "5E+1" e 1200 vira "1.2E+3". O
+                 helper que a própria rota já usa para preencher os campos é
+                 quem sabe formatar isso. #}
+              Pedido: {{ pedido_qtd.get(item.id, '') }}
               {%- if recebido.get(item.id) %}
                 · já recebido: {{ recebido.get(item.id) }}
               {%- endif %}
