@@ -314,3 +314,109 @@ def registrar_recebimento(pedido, usuario, linhas, data, observacao=None,
                 'pedido agora %s', recebimento.rotulo, len(linhas), movimentos,
                 usuario.id, pedido.situacao_recebimento)
     return recebimento
+
+
+def _lote_do_movimento(movimento_id):
+    from models import AlmoxarifadoEstoque
+    return AlmoxarifadoEstoque.query.filter_by(
+        entrada_movimento_id=movimento_id).first()
+
+
+def _ja_teve_saida(lote):
+    """O material deste lote já saiu da prateleira?
+
+    A regra é o disponível ter caído abaixo do que entrou. É o que TODO
+    caminho de saída faz (views/almoxarifado/movimentos.py e o consumo direto
+    de compras_views._gerar_saida_almoxarifado, que zera o disponível e marca
+    CONSUMIDO): baixar `quantidade_disponivel` é o efeito comum a todos, e
+    status é consequência dele — no zero vira CONSUMIDO.
+    """
+    inicial = _d(lote.quantidade_inicial if lote.quantidade_inicial is not None
+                 else lote.quantidade)
+    return _d(lote.quantidade_disponivel) < inicial
+
+
+def excluir_recebimento(recebimento, usuario):
+    """Apaga o ÚLTIMO recebimento do pedido, estornando o estoque que gerou.
+
+    Errar a quantidade digitada é o erro mais comum de quem recebe caminhão no
+    portão, e o conserto não pode ser um segundo recebimento com número
+    negativo — quantidade negativa é justamente o que `registrar_recebimento`
+    recusa.
+
+    Duas condições, e as duas existem por uma razão física:
+
+    * **só o último.** A `sequencia` é 1, 2, 3 e não tem buraco: furar o meio
+      quebraria o rótulo que a tela mostra (`PC-1234/2` passaria a apontar
+      para outro fato).
+    * **só enquanto o material estiver na prateleira.** Estornar a entrada de
+      um lote já consumido deixaria estoque negativo e uma saída apontando
+      para um lote que deixou de existir.
+
+    O estorno usa `RecebimentoPedidoItem.almoxarifado_movimento_id` — é para
+    isso que a coluna existe. Levanta `RecebimentoInvalido` com mensagem para
+    humano; nada é apagado nesse caso.
+    """
+    from models import AlmoxarifadoMovimento, RecebimentoPedido, db
+    from utils.autorizacao import usuario_pode_receber_na_obra
+
+    pedido = recebimento.pedido
+
+    if not usuario_pode_receber_na_obra(usuario, pedido.obra_id):
+        raise RecebimentoInvalido(
+            'você não tem permissão para excluir recebimento nesta obra.')
+
+    db.session.query(type(pedido)).filter_by(id=pedido.id).with_for_update().first()
+
+    ultimo = (RecebimentoPedido.query
+              .filter_by(pedido_id=pedido.id)
+              .order_by(RecebimentoPedido.sequencia.desc())
+              .first())
+    if ultimo is None or ultimo.id != recebimento.id:
+        raise RecebimentoInvalido(
+            f'só o último recebimento do pedido pode ser excluído, e o último '
+            f'é o {ultimo.rotulo}. Exclua ele primeiro.')
+
+    # Valida TUDO antes de apagar QUALQUER coisa: recusa que já estornou
+    # metade dos movimentos deixa o estoque pior do que encontrou.
+    linhas = list(recebimento.itens)
+    a_estornar = []
+    for linha in linhas:
+        if not linha.almoxarifado_movimento_id:
+            continue
+        mov = db.session.get(AlmoxarifadoMovimento,
+                             linha.almoxarifado_movimento_id)
+        if mov is None:
+            continue
+        lote = _lote_do_movimento(mov.id)
+        if lote is not None and _ja_teve_saida(lote):
+            nome = getattr(mov.item, 'nome', None) or linha.pedido_item.descricao
+            raise RecebimentoInvalido(
+                f'"{nome}" deste recebimento já teve saída do almoxarifado — '
+                f'o material foi consumido e a entrada não pode ser desfeita. '
+                f'Registre a devolução ao fornecedor em vez de excluir.')
+        a_estornar.append((linha, mov, lote))
+
+    rotulo = recebimento.rotulo
+    for linha, mov, lote in a_estornar:
+        # A ordem importa: `estoque_id` no movimento e `entrada_movimento_id`
+        # no lote apontam um para o outro. Soltar o vínculo antes de apagar
+        # evita que o banco recuse por FK.
+        linha.almoxarifado_movimento_id = None
+        mov.estoque_id = None
+        db.session.flush()
+        if lote is not None:
+            db.session.delete(lote)
+        db.session.delete(mov)
+    db.session.flush()
+
+    db.session.delete(recebimento)  # as linhas vão junto (delete-orphan)
+    db.session.flush()
+
+    pedido.situacao_recebimento = situacao_para(pedido)
+    db.session.commit()
+
+    logger.info('recebimento %s excluido por usuario=%s (%s movimentos '
+                'estornados) — pedido agora %s', rotulo, usuario.id,
+                len(a_estornar), pedido.situacao_recebimento)
+    return pedido.situacao_recebimento

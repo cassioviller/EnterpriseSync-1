@@ -719,3 +719,124 @@ def test_rota_receber_antiga_continua_valendo_para_pedido_legado():
         entradas = _entradas(pedido_id)
         assert len(entradas) == 1, 'a rota antiga parou de receber pedido legado'
         assert float(entradas[0].quantidade) == 50.0
+
+
+# ---------------------------------------------------------------------------
+# R5 — exclusão do último recebimento, com estorno
+# ---------------------------------------------------------------------------
+#
+# Errar a quantidade digitada é o erro mais comum de quem recebe caminhão no
+# portão. Sem exclusão, o conserto seria um segundo recebimento com número
+# negativo — e quantidade negativa é justamente o que esta fase recusa.
+#
+# Só o ÚLTIMO sai, e só enquanto o material ainda estiver na prateleira: uma
+# vez consumido, desfazer a entrada deixaria o estoque negativo e a saída
+# apontando para um lote que nunca existiu.
+
+
+def _lote_de(movimento_id):
+    from models import AlmoxarifadoEstoque
+    return AlmoxarifadoEstoque.query.filter_by(
+        entrada_movimento_id=movimento_id).first()
+
+
+def _excluir(recebimento, usuario):
+    from services.recebimento_pedido import excluir_recebimento
+    return excluir_recebimento(recebimento, usuario)
+
+
+def test_excluir_o_ultimo_recebimento_estorna_o_estoque_e_recalcula():
+    """30 + 20 fecha o pedido; excluir o segundo devolve o pedido a `parcial`
+    e some com a ENTRADA de 20 — a de 30 fica, porque aquele atesto vale."""
+    from models import RecebimentoPedido
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+        _receber(pedido, admin, item, 30)
+        segundo = _receber(pedido, admin, item, 20, data=date(2026, 8, 7))
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'recebido', 'sanidade'
+        mov_id = segundo.itens[0].almoxarifado_movimento_id
+
+        _excluir(segundo, admin)
+
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'parcial', (
+            'a situação não voltou ao que a soma dos recebimentos restantes diz')
+        entradas = _entradas(pedido.id)
+        assert len(entradas) == 1, 'o estorno não removeu a ENTRADA do atesto'
+        assert float(entradas[0].quantidade) == 30.0, (
+            'sobrou a ENTRADA errada — o estorno pegou o recebimento que fica')
+        assert _lote_de(mov_id) is None, 'o lote do movimento estornado ficou'
+        assert RecebimentoPedido.query.filter_by(pedido_id=pedido.id).count() == 1
+
+
+def test_excluir_o_unico_recebimento_devolve_o_pedido_a_nao_recebido():
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+        rec = _receber(pedido, admin, item, 30)
+
+        _excluir(rec, admin)
+
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'nao_recebido'
+        assert _entradas(pedido.id) == []
+
+
+def test_excluir_recebimento_que_nao_e_o_ultimo_recusa():
+    """A sequência é 1, 2, 3 e não tem buraco.
+
+    Furar o meio quebraria o rótulo que a tela mostra (`PC-1234/2` passaria a
+    apontar para outro fato) e deixaria o acumulado do item dependendo de qual
+    documento alguém apagou.
+    """
+    from services.recebimento_pedido import RecebimentoInvalido
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+        primeiro = _receber(pedido, admin, item, 30)
+        _receber(pedido, admin, item, 20, data=date(2026, 8, 7))
+
+        with pytest.raises(RecebimentoInvalido) as e:
+            _excluir(primeiro, admin)
+        assert '/2' in str(e.value), (
+            'a recusa tem que dizer QUAL é o último — sem isso quem errou não '
+            'sabe o que excluir primeiro')
+        assert len(_entradas(pedido.id)) == 2, 'a recusa estornou alguma coisa'
+
+
+def test_excluir_recusa_quando_o_lote_ja_teve_saida():
+    """Material consumido não volta pelo desfazer.
+
+    Estornar aqui deixaria o estoque negativo e a saída apontando para um lote
+    que deixou de existir. A recusa nomeia o item porque quem recebeu precisa
+    saber o que já foi usado antes de decidir o que fazer.
+    """
+    from services.recebimento_pedido import RecebimentoInvalido
+    with app.app_context():
+        admin, _obr, pedido, item, almox = _cenario_com_catalogo(50)
+        rec = _receber(pedido, admin, item, 30)
+
+        # O que a saída do almoxarifado faz com o lote (views/almoxarifado/
+        # movimentos.py): baixa o disponível e marca CONSUMIDO no zero.
+        lote = _lote_de(rec.itens[0].almoxarifado_movimento_id)
+        lote.quantidade_disponivel = Decimal('10')
+        lote.quantidade = Decimal('10')
+        db.session.commit()
+
+        with pytest.raises(RecebimentoInvalido) as e:
+            _excluir(rec, admin)
+        assert almox.nome in str(e.value), (
+            'a recusa tem que nomear o item que já foi consumido')
+        assert len(_entradas(pedido.id)) == 1, 'a recusa estornou mesmo assim'
+
+
+def test_leitor_nao_exclui_recebimento():
+    """Excluir é escrita sobre o mesmo fato que atestar — mesma porta."""
+    from services.recebimento_pedido import RecebimentoInvalido
+    with app.app_context():
+        admin, obra, pedido, item, _almox = _cenario_com_catalogo(50)
+        rec = _receber(pedido, admin, item, 30)
+        leitor = _pessoa_com_papel(admin.id, obra.id, 'LEITOR')
+
+        with pytest.raises(RecebimentoInvalido):
+            _excluir(rec, leitor)
+        assert len(_entradas(pedido.id)) == 1
