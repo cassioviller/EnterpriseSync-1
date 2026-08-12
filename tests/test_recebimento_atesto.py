@@ -1867,3 +1867,87 @@ def test_excluir_pedido_sem_recebimento_continua_funcionando():
     with app.app_context():
         from models import PedidoCompra
         assert db.session.get(PedidoCompra, pedido_id) is None
+
+
+# ---------------------------------------------------------------------------
+# C4 — não se atesta o que o cliente ainda não aprovou
+# ---------------------------------------------------------------------------
+#
+# Revisão de 12/08, achado 5.
+#
+# No regime antigo, o estoque de `tipo_compra='aprovacao_cliente'` só existia
+# depois do aceite no portal: era `processar_compra_aprovada_cliente` quem
+# criava a ENTRADA, e ela só roda na aprovação. Com `exige_atesto=True` essa
+# ordem se perdeu — qualquer papel de obra abria a tela, atestava, e o
+# almoxarifado ganhava lote de uma compra que o cliente ainda podia recusar.
+# E se recusasse (`status_aprovacao_cliente='RECUSADO'`), nada revertia.
+#
+# O spec já dizia, na tabela de casos de borda: "Pedido cancelado/excluído →
+# recusa recebimento". A regra existia no papel e não no código.
+
+
+def _cenario_aprovacao_cliente(status='AGUARDANDO_APROVACAO_CLIENTE'):
+    admin, obra, pedido, item, almox = _cenario_com_catalogo(50)
+    pedido.tipo_compra = 'aprovacao_cliente'
+    pedido.status_aprovacao_cliente = status
+    db.session.commit()
+    return admin, obra, pedido, item
+
+
+@pytest.mark.parametrize('status', ['AGUARDANDO_APROVACAO_CLIENTE',
+                                    'PENDENTE', 'RECUSADO'])
+def test_servico_recusa_atesto_sem_aprovacao_do_cliente(status):
+    """A regra vive no serviço: bloquear só na rota deixa CLI e job passando."""
+    from services.recebimento_pedido import RecebimentoInvalido
+    with app.app_context():
+        admin, _obra, pedido, item = _cenario_aprovacao_cliente(status)
+
+        with pytest.raises(RecebimentoInvalido) as e:
+            _receber(pedido, admin, item, 30)
+
+        assert 'cliente' in str(e.value).lower(), (
+            f'a recusa não explica que falta o aceite do cliente: {e.value}')
+        assert _entradas(pedido.id) == []
+        assert _saidas(pedido.id) == []
+
+
+def test_atesto_passa_depois_do_aceite_do_cliente():
+    """O contrapeso: aprovado, o fluxo é o de sempre."""
+    with app.app_context():
+        admin, _obra, pedido, item = _cenario_aprovacao_cliente('APROVADO')
+
+        _receber(pedido, admin, item, 30)
+
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'parcial'
+        assert len(_entradas(pedido.id)) == 1
+
+
+def test_tela_recusa_pedido_esperando_o_cliente_dizendo_por_que():
+    from helpers_tenant import cliente_de
+    with app.app_context():
+        admin, _obra, pedido, item = _cenario_aprovacao_cliente()
+        admin_id, pedido_id, item_id = admin.id, pedido.id, item.id
+    cli = cliente_de(admin_id)
+
+    resposta = cli.post(f'/compras/{pedido_id}/recebimento',
+                        data={f'qtd_{item_id}': '30',
+                              'data_recebimento': '2026-08-05'})
+
+    assert resposta.status_code == 302
+    assert 'cliente' in _flashes(cli).lower()
+    with app.app_context():
+        assert _recebimentos_de(pedido_id) == []
+
+
+def test_pedido_normal_nao_e_afetado_pela_checagem_de_aprovacao():
+    """`status_aprovacao_cliente` fica NULL em pedido normal, e isso não pode
+    virar recusa — seria bloquear o caminho comum por causa da borda."""
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+        assert pedido.tipo_compra == 'normal', 'sanidade'
+
+        _receber(pedido, admin, item, 30)
+
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'parcial'

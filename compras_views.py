@@ -1102,6 +1102,7 @@ def recebimento(pedido_id):
     from flask import abort
 
     from services.recebimento_pedido import (RecebimentoInvalido,
+                                             validar_estado_do_pedido,
                                              recebido_por_item,
                                              registrar_recebimento)
 
@@ -1120,6 +1121,15 @@ def recebimento(pedido_id):
         flash('Este pedido é do regime antigo: o estoque dele já entrou na '
               'emissão da compra, e receber de novo o contaria em dobro. Use '
               'o botão de recebimento no estoque, na tela do pedido.', 'warning')
+        return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
+    # A mesma regra do serviço, perguntada antes de a tela abrir: deixar
+    # alguém preencher quantidade por item para levar a recusa no POST é
+    # gastar o tempo de quem está com o caminhão parado no portão.
+    try:
+        validar_estado_do_pedido(pedido)
+    except RecebimentoInvalido as e:
+        flash(str(e), 'warning')
         return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
 
     itens = PedidoCompraItem.query.filter_by(pedido_id=pedido_id).all()

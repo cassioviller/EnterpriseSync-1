@@ -13,15 +13,15 @@ from decimal import Decimal
 logger = logging.getLogger('recebimento_pedido')
 
 # As quatro situações de `PedidoCompra.situacao_recebimento`.
-# O que cabe em `recebimento_pedido_item.quantidade_recebida`, que é
-# `Numeric(12,3)`. Passar disso é DataError no flush, não regra de negócio —
-# e quem recebe caminhão merece a mensagem, não a página de erro.
-QUANTIDADE_MAXIMA = Decimal('999999999.999')
-
 NAO_RECEBIDO = 'nao_recebido'
 PARCIAL = 'parcial'
 RECEBIDO = 'recebido'
 ENCERRADO_COM_SALDO = 'encerrado_com_saldo'
+
+# O que cabe em `recebimento_pedido_item.quantidade_recebida`, que é
+# `Numeric(12,3)`. Passar disso é DataError no flush, não regra de negócio —
+# e quem recebe caminhão merece a mensagem, não a página de erro.
+QUANTIDADE_MAXIMA = Decimal('999999999.999')
 
 
 class RecebimentoInvalido(Exception):
@@ -227,6 +227,35 @@ def descricao_da_saida(pedido, lote_ref):
     return None
 
 
+def validar_estado_do_pedido(pedido):
+    """O pedido está num estado em que atestar faz sentido? — C4.
+
+    Hoje há uma pergunta só, e ela é sobre `tipo_compra='aprovacao_cliente'`:
+    no regime antigo o estoque desses pedidos só existia depois do aceite no
+    portal, porque quem o criava era `processar_compra_aprovada_cliente`, e
+    ela só roda na aprovação. Com o atesto no comando, essa ordem se perdia —
+    qualquer papel de obra podia atestar antes, e o almoxarifado ganhava lote
+    de uma compra que o cliente ainda podia recusar. Se recusasse, nada
+    revertia.
+
+    Pedido `normal` tem `status_aprovacao_cliente` NULL e não passa por aqui:
+    bloquear o caminho comum por causa da borda seria a troca errada.
+
+    A checagem vive no serviço, e não só na rota, porque o serviço é o
+    chokepoint — quem chama de CLI, de job ou de teste tem de esbarrar nela
+    igual.
+    """
+    if pedido.tipo_compra != 'aprovacao_cliente':
+        return
+
+    if (pedido.status_aprovacao_cliente or '').upper() != 'APROVADO':
+        raise RecebimentoInvalido(
+            'esta compra é de faturamento direto e ainda não foi aprovada '
+            'pelo cliente no portal. Receber agora criaria estoque de uma '
+            'compra que o cliente ainda pode recusar — e a recusa não desfaz '
+            'movimento de almoxarifado. Aguarde o aceite.')
+
+
 def _lancar_no_estoque(pedido, recebimento, linha, item, usuario_id):
     """ENTRADA + lote FIFO da quantidade que ESTA linha atestou, e a SAÍDA pareada.
 
@@ -355,6 +384,8 @@ def registrar_recebimento(pedido, usuario, linhas, data, observacao=None,
     if not usuario_pode_receber_na_obra(usuario, pedido.obra_id):
         raise RecebimentoInvalido(
             'você não tem permissão para atestar recebimento nesta obra.')
+
+    validar_estado_do_pedido(pedido)
 
     if encerra_saldo and not (motivo or '').strip():
         raise RecebimentoInvalido(

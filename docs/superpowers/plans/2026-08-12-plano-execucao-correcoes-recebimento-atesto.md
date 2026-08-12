@@ -182,18 +182,18 @@ correção de C2 quebra a R5 se esta rodada não vier junto.
 estoque de `tipo_compra='aprovacao_cliente'` só existia depois do aceite no portal. No
 regime novo qualquer papel de obra atesta antes, e nada reverte se o cliente recusar.
 
-- [ ] **Step 1 (red):**
+- [x] **Step 1 (red):**
   - `GET` da tela de recebimento num pedido `aprovacao_cliente` ainda
     `AGUARDANDO_APROVACAO_CLIENTE` → recusa com a razão dita, sem 403 cru;
   - `registrar_recebimento` no mesmo pedido → `RecebimentoInvalido` (o serviço é o
     chokepoint: bloquear só na rota deixa o CLI e o job passando);
   - depois do aceite → atesta normalmente;
   - pedido `normal` não é afetado por nenhuma das duas checagens.
-- [ ] **Step 2:** a checagem de estado no serviço, junto das outras validações de
+- [x] **Step 2:** a checagem de estado no serviço, junto das outras validações de
   `registrar_recebimento`, e a mensagem correspondente na rota.
-- [ ] **Step 3 (green + mutação):** verdes. Mutação: aceitar `RECUSADO` como estado
+- [x] **Step 3 (green + mutação):** verdes. Mutação: aceitar `RECUSADO` como estado
   válido e confirmar que o primeiro teste mata.
-- [ ] **Step 4:** commit — `fix(compras): atesto exige a aprovacao do cliente quando ela existe`
+- [x] **Step 4:** commit — `fix(compras): atesto exige a aprovacao do cliente quando ela existe`
 
 ## C5 — Ninguém fica sem caminho: pedido sem obra, e botão que não engana
 
