@@ -220,7 +220,7 @@ regime novo qualquer papel de obra atesta antes, e nada reverte se o cliente rec
 a única alternativa que a tela oferece é aceitar o valor pré-preenchido, registrando
 material que nunca chegou.
 
-- [ ] **Step 1 (red):**
+- [x] **Step 1 (red):**
   - recebimento com zero itens e `encerra_saldo=True` + motivo → **grava**, situação
     `encerrado_com_saldo`, **zero** movimentos de estoque;
   - recebimento com zero itens e `encerra_saldo=False` → continua recusando ("recebimento
@@ -228,16 +228,16 @@ material que nunca chegou.
   - pedido em que **nada** chegou e o fornecedor cancelou → `encerrado_com_saldo`, não
     `nao_recebido`;
   - `valor_atestado` de um pedido encerrado sem nenhum item recebido = 0.
-- [ ] **Step 2:** `_validar_linhas` aceita lista vazia quando `encerra_saldo` (o motivo
+- [x] **Step 2:** `_validar_linhas` aceita lista vazia quando `encerra_saldo` (o motivo
   já é obrigatório, e é ele que explica o fato seis meses depois).
-- [ ] **Step 3:** reordenar `situacao_para`: encerramento passa a ser perguntado **antes**
+- [x] **Step 3:** reordenar `situacao_para`: encerramento passa a ser perguntado **antes**
   de "nada recebido" e **depois** de "tudo completo". A ordem das perguntas é a regra, e o
   docstring dela tem de ser atualizado junto.
-- [ ] **Step 4:** conferir `scripts/verificar_consistencia_recebimento.py` contra a ordem
+- [x] **Step 4:** conferir `scripts/verificar_consistencia_recebimento.py` contra a ordem
   nova — o sensor reusa `situacao_para` de propósito, mas o teste dele fixa cenários.
-- [ ] **Step 5 (green + mutação):** verdes. Mutação: voltar a ordem antiga em
+- [x] **Step 5 (green + mutação):** verdes. Mutação: voltar a ordem antiga em
   `situacao_para` e confirmar que o teste do pedido cancelado mata.
-- [ ] **Step 6:** commit — `feat(compras): encerrar o saldo sem inventar quantidade recebida`
+- [x] **Step 6:** commit — `feat(compras): encerrar o saldo sem inventar quantidade recebida`
 
 ## C7 — Sobre-entrega com justificativa, como o spec prometeu
 

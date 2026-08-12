@@ -93,26 +93,34 @@ def situacao_para(pedido):
     que reimplementa o que vigia não vigia nada.
 
     A ordem das perguntas é a regra:
-      1. nada recebido            → nao_recebido
-      2. todo item completo       → recebido   (mesmo com encerra_saldo:
+      1. todo item completo       → recebido   (mesmo com encerra_saldo:
                                                 não há saldo a encerrar)
-      3. alguém encerrou o saldo  → encerrado_com_saldo
+      2. alguém encerrou o saldo  → encerrado_com_saldo
+      3. nada recebido            → nao_recebido
       4. resto                    → parcial
+
+    "Nada recebido" desceu para depois do encerramento (C6, 12/08). Pedido
+    cancelado pelo fornecedor antes da primeira entrega tem zero recebido E um
+    encerramento gravado; responder `nao_recebido` ali seria descrever como
+    "ainda esperando o caminhão" um pedido que já foi fechado por escrito.
     """
     from models import PedidoCompraItem
 
     acumulado = recebido_por_item(pedido)
-    if not acumulado or all(q <= 0 for q in acumulado.values()):
-        return NAO_RECEBIDO
+    nada_chegou = not acumulado or all(q <= 0 for q in acumulado.values())
 
-    itens = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).all()
-    completo = all(
-        acumulado.get(item.id, Decimal('0')) >= _d(item.quantidade)
-        for item in itens)
-    if completo:
-        return RECEBIDO
+    if not nada_chegou:
+        itens = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).all()
+        completo = all(
+            acumulado.get(item.id, Decimal('0')) >= _d(item.quantidade)
+            for item in itens)
+        if completo:
+            return RECEBIDO
+
     if _encerramento(pedido) is not None:
         return ENCERRADO_COM_SALDO
+    if nada_chegou:
+        return NAO_RECEBIDO
     return PARCIAL
 
 
@@ -144,11 +152,12 @@ def valor_atestado(pedido):
     return total
 
 
-def _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega):
+def _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega,
+                    encerra_saldo=False):
     """Quantidades: positivas, de itens DESTE pedido, e sem estourar o pedido."""
     from models import PedidoCompraItem
 
-    if not linhas:
+    if not linhas and not encerra_saldo:
         raise RecebimentoInvalido(
             'informe ao menos um item recebido — recebimento vazio não é '
             'atesto de nada.')
@@ -406,7 +415,12 @@ def registrar_recebimento(pedido, usuario, linhas, data, observacao=None,
             f'receber mais, reabra o pedido ou emita um pedido novo.')
 
     acumulado = recebido_por_item(pedido)
-    _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega)
+    # Recebimento sem linha nenhuma só passa quando encerra o saldo: aí ele é
+    # o atesto do que NÃO vai chegar, e o motivo (já exigido acima) é o
+    # conteúdo do documento. Sem essa porta, quem ouviu do fornecedor que o
+    # resto não vem tinha de registrar material que nunca chegou.
+    _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega,
+                    encerra_saldo=encerra_saldo)
 
     ultima = (RecebimentoPedido.query
               .filter_by(pedido_id=pedido.id)

@@ -1951,3 +1951,120 @@ def test_pedido_normal_nao_e_afetado_pela_checagem_de_aprovacao():
 
         db.session.refresh(pedido)
         assert pedido.situacao_recebimento == 'parcial'
+
+
+# ---------------------------------------------------------------------------
+# C6 — "o resto não vem" sem inventar quantidade
+# ---------------------------------------------------------------------------
+#
+# Revisão de 12/08, achado 8.
+#
+# Encerrar o saldo exigia informar ao menos um item recebido. Quem tinha
+# recebido 30 de 50 e ouvia do fornecedor que os 20 não vinham só tinha duas
+# saídas: zerar os campos e ser recusado ("recebimento vazio não é atesto de
+# nada"), deixando o pedido `parcial` para sempre; ou aceitar o valor
+# pré-preenchido e registrar 20 sacos que nunca chegaram, gerando ENTRADA
+# fantasma no almoxarifado e marcando o pedido como `recebido`.
+#
+# Encerramento com motivo É um atesto — do que NÃO vai chegar. E a ordem das
+# perguntas de `situacao_para` muda junto: um pedido cancelado antes da
+# primeira entrega estava caindo em `nao_recebido`, que descreve um pedido
+# ainda esperando o caminhão.
+
+
+def test_encerrar_saldo_sem_item_recebido():
+    """Marcar "o resto não vem" com os campos zerados grava, e não lança estoque."""
+    from services.recebimento_pedido import registrar_recebimento
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+        _receber(pedido, admin, item, 30)
+
+        rec = registrar_recebimento(
+            pedido, admin, [], date(2026, 8, 9), encerra_saldo=True,
+            motivo='fornecedor não entrega o resto')
+
+        assert rec is not None
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'encerrado_com_saldo'
+        assert len(_entradas(pedido.id)) == 1, (
+            'o encerramento sem item lançou estoque de material que não chegou')
+
+
+def test_recebimento_vazio_sem_encerramento_continua_recusado():
+    """O contrapeso: submeter tudo zerado por engano continua sendo engano."""
+    from services.recebimento_pedido import (RecebimentoInvalido,
+                                             registrar_recebimento)
+    with app.app_context():
+        admin, _obr, pedido, _item, _almox = _cenario_com_catalogo(50)
+
+        with pytest.raises(RecebimentoInvalido):
+            registrar_recebimento(pedido, admin, [], date(2026, 8, 9))
+
+
+def test_pedido_cancelado_antes_da_primeira_entrega_fica_encerrado():
+    """Nada chegou e o fornecedor cancelou: `encerrado_com_saldo`, não `nao_recebido`.
+
+    `nao_recebido` descreve pedido que ainda espera o caminhão. Dizer isso de
+    um pedido que já foi encerrado é a situação persistida mentindo sobre um
+    fato registrado — e é o que a ordem antiga das perguntas fazia, porque
+    "nada recebido" vinha antes de "alguém encerrou".
+    """
+    from services.recebimento_pedido import registrar_recebimento
+    with app.app_context():
+        admin, _obr, pedido, _item, _almox = _cenario_com_catalogo(50)
+
+        registrar_recebimento(pedido, admin, [], date(2026, 8, 9),
+                              encerra_saldo=True,
+                              motivo='fornecedor cancelou a entrega')
+
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'encerrado_com_saldo'
+
+
+def test_encerramento_completo_continua_sendo_recebido():
+    """Recebeu tudo E marcou encerrar: `recebido` vence — não há saldo a encerrar.
+
+    A ordem entre "completo" e "encerrado" não muda nesta rodada, e este teste
+    é quem trava isso.
+    """
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+
+        _receber(pedido, admin, item, 50, encerra_saldo=True,
+                 motivo='veio tudo de uma vez')
+
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'recebido'
+
+
+def test_valor_atestado_de_pedido_encerrado_sem_entrega_e_zero():
+    """A fase financeira não pode pagar nada por um pedido que não chegou."""
+    from services.recebimento_pedido import registrar_recebimento, valor_atestado
+    with app.app_context():
+        admin, _obr, pedido, _item, _almox = _cenario_com_catalogo(50)
+
+        registrar_recebimento(pedido, admin, [], date(2026, 8, 9),
+                              encerra_saldo=True, motivo='cancelado')
+
+        assert valor_atestado(pedido) == Decimal('0')
+
+
+def test_tela_encerra_saldo_com_os_campos_zerados():
+    """O caminho que o usuário percorre de verdade: marca a caixa, zera tudo."""
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, item_id = _cenario_de_rota()
+    cli = cliente_de(admin_id)
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_id}': '30', 'data_recebimento': '2026-08-05'})
+
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_id}': '', 'data_recebimento': '2026-08-09',
+                   'encerra_saldo': 'on',
+                   'motivo_encerramento': 'fornecedor não entrega o resto'})
+
+    with app.app_context():
+        from models import PedidoCompra
+        assert db.session.get(
+            PedidoCompra, pedido_id).situacao_recebimento == \
+            'encerrado_com_saldo', f'flashes: {_flashes(cli)!r}'
+        assert len(_entradas(pedido_id)) == 1

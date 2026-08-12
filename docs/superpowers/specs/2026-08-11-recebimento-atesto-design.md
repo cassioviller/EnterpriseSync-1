@@ -221,12 +221,19 @@ viva onde as outras vivem.
 
 ### Derivação da situação
 
-| Condição | Situação |
-|---|---|
-| Nenhum recebimento | `nao_recebido` |
-| Algum item com soma recebida < quantidade pedida | `parcial` |
-| Todos os itens com soma ≥ quantidade pedida | `recebido` |
-| `encerra_saldo=True` em algum recebimento e ainda falta quantidade | `encerrado_com_saldo` |
+A ordem das perguntas é a regra:
+
+| # | Condição | Situação |
+|---|---|---|
+| 1 | Todos os itens com soma ≥ quantidade pedida | `recebido` |
+| 2 | `encerra_saldo=True` em algum recebimento | `encerrado_com_saldo` |
+| 3 | Nenhuma quantidade recebida | `nao_recebido` |
+| 4 | Resto | `parcial` |
+
+O encerramento vem **antes** de "nada recebido" (correção C6, 12/08): pedido cancelado
+pelo fornecedor antes da primeira entrega tem zero recebido *e* um encerramento gravado,
+e responder `nao_recebido` ali descreveria como "ainda esperando o caminhão" um pedido
+que já foi fechado por escrito.
 
 ### O que a rota antiga faz
 
@@ -255,6 +262,8 @@ Os movimentos nascem com `pedido_compra_id` preenchido, então a dedup do handle
 | Recebeu mais que o pedido | Recusa, salvo `permitir_sobre_entrega` com justificativa |
 | Saldo já encerrado | Recusa novo recebimento, dizendo quem encerrou e quando |
 | `encerra_saldo` sem motivo | Recusa — o motivo é o que torna o encerramento auditável |
+| `encerra_saldo` sem item nenhum | **Aceita** (C6): é o atesto do que NÃO vai chegar, e o motivo é o conteúdo do documento. Sem esta porta, quem ouviu do fornecedor que o resto não vem teria de registrar material que nunca chegou |
+| Recebimento vazio **sem** encerrar | Recusa — submeter tudo zerado é engano de dedo |
 | Quantidade ≤ 0 | Recusa. Devolução não é recebimento negativo, e não entra nesta fase |
 | Dois recebimentos simultâneos | `SELECT … FOR UPDATE` no pedido dentro da transação; sem isso duas telas abertas furam o limite de quantidade |
 | Errou a quantidade | Pode excluir **o último** recebimento do pedido, estornando os movimentos que gerou — e recusando se algum lote já teve saída, porque aí o material já foi consumido |
