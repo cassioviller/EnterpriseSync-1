@@ -6172,6 +6172,37 @@ def _migration_281_conta_receber_banco_id():
                 "estorno de recebimento passa a saber de onde debitar).")
 
 
+def _migration_286_timbre_pdf():
+    """`configuracao_empresa.timbre_pdf` — a identidade dos PDFs, em JSON.
+
+    O cabeçalho dos PDFs vinha de dois lugares e nenhum era editável de ponta a
+    ponta: texto e logo de campos soltos desta tabela, e cores de constantes no
+    código, iguais para todo tenant. Esta coluna guarda o JSON versionado que a
+    tela de Configurações importa e exporta (`services/timbre_pdf`).
+
+    NULL = tenant nunca importou, e aí `carregar()` cai nos campos soltos e,
+    na falta deles, nos tokens do kit oficial. É o que torna a coluna aditiva:
+    ninguém muda de comportamento por ela existir.
+
+    Alocação do número: **286**, e não 283. A faixa 283-285 está tomada pela
+    branch `feat/recebimento-atesto`, que ainda NÃO foi mesclada em `main` —
+    conferir antes de fixar é a lição da B6.1, repetida na R1 do plano de
+    compras, e aqui ela apareceu de novo: `main` termina em 282 e o número
+    "livre" seria 283, que colidiria no dia do merge.
+
+    Idempotente por `IF NOT EXISTS`. `jsonb` e não `json`: o Postgres compara e
+    indexa jsonb, e a diferença de custo na escrita é irrelevante para uma
+    linha por tenant.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+            "timbre_pdf JSONB"))
+    logger.info("[Migration 286] configuracao_empresa.timbre_pdf criada "
+                "(timbre dos PDFs por tenant, importável por JSON).")
+
+
 def _migration_282_backfill_dropdown_crm():
     """D-CRM.1 — o backfill que a 174 pulou: grupo de dropdown para TODO
     tenant com dado nas tabelas legadas `crm_*`.
@@ -6528,6 +6559,7 @@ def executar_migracoes():
             (280, "B5.6 / D-B5.6(A) — conta_pagar.banco_id: o banco debitado na baixa, para o estorno creditar de volta (NULL = sem banco ou pré-migração)", _migration_280_conta_pagar_banco_id),
             (281, "B6.1 / D-B6.1 — conta_receber.banco_id: o banco creditado na baixa, para o estorno de recebimento debitar de volta (NULL = sem banco, pré-migração ou OBRA_MEDICAO)", _migration_281_conta_receber_banco_id),
             (282, "CRM C1 / D-CRM.1 — backfill dos dropdowns: cria o grupo que a 173 pulou e copia as opções legadas crm_* que a 174 não alcançou (JOIN sem grupo não casa)", _migration_282_backfill_dropdown_crm),
+            (286, "Timbre dos PDFs — configuracao_empresa.timbre_pdf (JSONB): logo, dados da empresa e cores num JSON importável pela tela. 283-285 estão tomadas pela branch feat/recebimento-atesto, ainda não mesclada", _migration_286_timbre_pdf),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

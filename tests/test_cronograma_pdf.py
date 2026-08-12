@@ -38,11 +38,24 @@ from models import (Cliente, ConfiguracaoEmpresa, Obra, PapelObra,
 
 pytestmark = pytest.mark.integration
 
-# PNG 1×1 transparente — a menor imagem válida, para o caminho da logo boa.
-PNG_MINIMO_B64 = (
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAF'
-    'gAJ/mrjXAAAAAElFTkSuQmCC'
-)
+def _png_valido_b64() -> str:
+    """PNG real em base64, gerado na hora pelo PIL.
+
+    O blob "1x1 transparente" que estava aqui tinha o checksum do IDAT
+    quebrado: `Image.open` engolia e o `ImageReader` da reportlab recusava, o
+    que fazia o caminho da logo cair no fallback SEM falhar teste nenhum. A
+    validação do timbre (`Image.verify`) é que expôs isso.
+    """
+    import base64
+    import io
+
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new('RGB', (8, 4), (22, 41, 74)).save(buf, format='PNG')
+    return base64.b64encode(buf.getvalue()).decode('ascii')
+
+
+PNG_MINIMO_B64 = _png_valido_b64()
 
 
 @pytest.fixture(autouse=True)

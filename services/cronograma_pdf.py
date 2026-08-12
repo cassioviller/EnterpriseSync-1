@@ -74,6 +74,19 @@ FILETE_DISTANCIA_MM = 4     # do rodapé do cabeçalho até o filete
 FILETE_LARANJA_MM = 34
 FOOTBAR_ALTURA_MM = 2
 
+# Piso do `_cor()`: quando o timbre do tenant não traz a chave, vale o token do
+# kit. As constantes acima continuam sendo a fonte desse piso — e o dicionário
+# existe para que `_cor` não precise de um `if` por cor.
+PADRAO_CORES = {
+    'navy': NAVY,
+    'navy_rotulo': NAVY_ROTULO,
+    'laranja': LARANJA,
+    'fio': FIO,
+    'cinza': CINZA,
+    'ink': INK,
+    'realce_linha': '#EEF0F4',
+}
+
 SANS = 'Helvetica'
 SANS_BOLD = 'Helvetica-Bold'
 # Preenchidos por `_registrar_serifada()`: o kit pede Georgia com 'DejaVu
@@ -281,27 +294,47 @@ def _percentual_da_linha(tarefa, progresso_geral: float, *,
     return float(tarefa.percentual_concluido or 0.0)
 
 
-def montar_marca_tenant(admin_id: int) -> dict:
-    """A identidade visual do tenant: nome, dados de contato e logo.
+def _cor(marca: dict, chave: str) -> str:
+    """A cor do timbre do tenant, com o token do kit como piso.
 
-    A forma do documento é a mesma para todo tenant; o que varia é a marca.
-    Preferência de logo: `logo_pdf_base64` (a específica para PDF) →
-    `logo_base64`. Tenant sem `ConfiguracaoEmpresa` recebe o mesmo nome
-    padrão que `cronograma_obra` usa ('Empresa'), em vez de erro.
+    O desenho lê tudo por aqui em vez de usar as constantes do módulo: é o que
+    permite a um tenant trocar o navy pelo verde dele sem tocar em código, e
+    ao mesmo tempo garante que uma chave ausente (ou um timbre antigo, salvo
+    antes de a cor existir) caia no padrão em vez de estourar KeyError no meio
+    da geração.
     """
-    from models import ConfiguracaoEmpresa
+    cores = marca.get('cores') or {}
+    valor = cores.get(chave)
+    if isinstance(valor, str) and valor:
+        return valor
+    return PADRAO_CORES.get(chave, NAVY)
 
-    config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
-    if config is None:
-        return {'nome': 'Empresa', 'cnpj': '', 'endereco': '', 'website': '',
-                'logo': None}
 
+def montar_marca_tenant(admin_id: int) -> dict:
+    """A identidade visual do tenant: dados, logo e CORES.
+
+    A forma do documento é a mesma para todo tenant; o que varia é a marca. E
+    desde o timbre em JSON (migration 286), variam também as cores: quem
+    resolve a precedência entre os tokens do kit, os campos soltos da tela e o
+    JSON importado é `services/timbre_pdf.carregar` — aqui só se traduz o
+    resultado para o vocabulário do desenho (bytes de logo em vez de base64).
+
+    A razão social entra como linha própria quando existe: é o
+    "Angelin Engenharia Ltda. · CNPJ …" do papel oficial, que não cabia em
+    `nome_empresa` sozinho.
+    """
+    from services.timbre_pdf import carregar
+
+    timbre = carregar(admin_id)
+    empresa = timbre['empresa']
     return {
-        'nome': config.nome_empresa or 'Empresa',
-        'cnpj': config.cnpj or '',
-        'endereco': (config.endereco or '').replace('\n', ' ').strip(),
-        'website': config.website or '',
-        'logo': _logo_em_bytes(config.logo_pdf_base64 or config.logo_base64),
+        'nome': empresa.get('nome') or 'Empresa',
+        'razao_social': empresa.get('razao_social') or '',
+        'cnpj': empresa.get('cnpj') or '',
+        'endereco': empresa.get('endereco') or '',
+        'website': empresa.get('website') or '',
+        'logo': _logo_em_bytes(timbre.get('logo_base64')),
+        'cores': timbre.get('cores') or {},
     }
 
 
@@ -364,6 +397,10 @@ def exportar_cronograma_pdf(dados: dict, marca: dict) -> bytes:
 
     _registrar_serifada()
 
+    # Cores do TENANT, resolvidas uma vez: os estilos e o canvas leem daqui, e
+    # não das constantes do módulo. É o que faz o timbre em JSON valer.
+    C = {chave: colors.HexColor(_cor(marca, chave)) for chave in PADRAO_CORES}
+
     buf = io.BytesIO()
     margem = MARGEM_LATERAL_MM * mm
     # Geometria do kit, somada de cima para baixo: padding do topo (11mm) +
@@ -399,32 +436,32 @@ def exportar_cronograma_pdf(dados: dict, marca: dict) -> bytes:
     #   tbody -> 9.2pt, lh 1.45
     est_etiqueta = ParagraphStyle('etiqueta', fontName=SANS_BOLD, fontSize=8,
                                   leading=11, charSpace=2.6 * 0.75,
-                                  textColor=colors.HexColor(LARANJA),
+                                  textColor=C['laranja'],
                                   spaceAfter=2.5 * mm)
     est_titulo = ParagraphStyle('titulo', fontName=SERIFADA, fontSize=21,
                                 leading=21 * 1.18,
-                                textColor=colors.HexColor(NAVY))
+                                textColor=C['navy'])
     est_lead = ParagraphStyle('lead', fontName=SANS, fontSize=9.6,
                               leading=9.6 * 1.45, spaceBefore=2.5 * mm,
                               textColor=colors.HexColor('#4B5563'))
     est_rotulo = ParagraphStyle('rotulo', fontName=SANS_BOLD, fontSize=7.2,
                                 leading=10, charSpace=1.6 * 0.75,
-                                textColor=colors.HexColor(NAVY_ROTULO),
+                                textColor=C['navy_rotulo'],
                                 spaceAfter=1.4 * mm)
     est_valor = ParagraphStyle('valor', fontName=SANS, fontSize=9.4,
                                leading=9.4 * 1.35,
-                               textColor=colors.HexColor(INK))
+                               textColor=C['ink'])
     est_cabecalho = ParagraphStyle('cab', fontName=SANS_BOLD, fontSize=7.6,
                                    leading=10.5, charSpace=1.4 * 0.75,
                                    textColor=colors.HexColor(BRANCO))
     est_celula = ParagraphStyle('celula', fontName=SANS, fontSize=9.2,
                                 leading=9.2 * 1.45,
-                                textColor=colors.HexColor(INK))
+                                textColor=C['ink'])
     est_celula_pai = ParagraphStyle('celula_pai', parent=est_celula,
                                     fontName=SANS_BOLD,
-                                    textColor=colors.HexColor(NAVY))
+                                    textColor=C['navy'])
     est_vazio = ParagraphStyle('vazio', fontName=SANS, fontSize=9.4,
-                               leading=13, textColor=colors.HexColor(CINZA))
+                               leading=13, textColor=C['cinza'])
 
     historia = [
         # O `margin-top: 8mm` da `.tag` precisa ser um espaçador explícito: o
@@ -435,7 +472,7 @@ def exportar_cronograma_pdf(dados: dict, marca: dict) -> bytes:
         Paragraph('Cronograma Físico', est_titulo),
         Paragraph(_lead(obra), est_lead),
         Spacer(1, 4.5 * mm),
-        _grade_informacoes(obra, est_rotulo, est_valor, doc.width),
+        _grade_informacoes(obra, est_rotulo, est_valor, doc.width, C),
         Spacer(1, 6.5 * mm),
     ]
 
@@ -447,9 +484,9 @@ def exportar_cronograma_pdf(dados: dict, marca: dict) -> bytes:
             'Nenhuma tarefa cadastrada neste cronograma.', est_vazio))
     else:
         historia.append(_tabela(linhas, doc.width, est_celula, est_celula_pai,
-                                est_cabecalho))
+                                est_cabecalho, C, _cor(marca, 'laranja')))
 
-    doc.build(historia, canvasmaker=_canvas_com_marca(marca, obra))
+    doc.build(historia, canvasmaker=_canvas_com_marca(marca, obra, C))
     return buf.getvalue()
 
 
@@ -489,7 +526,7 @@ def _lead(obra: dict) -> str:
     return ' · '.join(partes) + '.'
 
 
-def _grade_informacoes(obra: dict, est_rotulo, est_valor, largura):
+def _grade_informacoes(obra: dict, est_rotulo, est_valor, largura, C):
     """`.grid` do kit: caixa de fio fino, DUAS colunas, rótulo em caixa-alta
     espaçada sobre o valor.
 
@@ -526,8 +563,8 @@ def _grade_informacoes(obra: dict, est_rotulo, est_valor, largura):
 
     tabela = Table(corpo, colWidths=[largura / 2, largura / 2])
     tabela.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor(FIO)),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor(FIO)),
+        ('BOX', (0, 0), (-1, -1), 0.5, C['fio']),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, C['fio']),
         ('LEFTPADDING', (0, 0), (-1, -1), 4 * mm),
         ('RIGHTPADDING', (0, 0), (-1, -1), 4 * mm),
         ('TOPPADDING', (0, 0), (-1, -1), 2.5 * mm),
@@ -537,7 +574,8 @@ def _grade_informacoes(obra: dict, est_rotulo, est_valor, largura):
     return tabela
 
 
-def _tabela(linhas, largura, est_celula, est_celula_pai, est_cabecalho):
+def _tabela(linhas, largura, est_celula, est_celula_pai, est_cabecalho,
+            C, laranja_hex):
     """A planilha de tarefas: `#`, Nome, Dur., Início, Término, %.
 
     A coluna `#` é o número de linha sequencial da grade
@@ -561,7 +599,7 @@ def _tabela(linhas, largura, est_celula, est_celula_pai, est_cabecalho):
 
     for i, ln in enumerate(linhas, start=1):  # +1: linha 0 é o cabeçalho
         estilo_nome = est_celula_pai if ln['is_pai'] else est_celula
-        nome = _nome_com_hierarquia(ln)
+        nome = _nome_com_hierarquia(ln, laranja_hex)
         corpo.append([
             str(ln['numero']),
             Paragraph(nome, estilo_nome),
@@ -574,10 +612,10 @@ def _tabela(linhas, largura, est_celula, est_celula_pai, est_cabecalho):
             # `tr.totalrow` do kit: fundo #eef0f4, negrito, navy. É o único
             # realce de linha que o template tem, e serve à tarefa-pai.
             estilo_extra += [
-                ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#EEF0F4')),
+                ('BACKGROUND', (0, i), (-1, i), C['realce_linha']),
                 ('FONTNAME', (0, i), (0, i), SANS_BOLD),
                 ('FONTNAME', (2, i), (-1, i), SANS_BOLD),
-                ('TEXTCOLOR', (0, i), (-1, i), colors.HexColor(NAVY)),
+                ('TEXTCOLOR', (0, i), (-1, i), C['navy']),
             ]
 
     col_num, col_dur, col_data, col_perc = 10 * mm, 15 * mm, 21 * mm, 14 * mm
@@ -588,13 +626,13 @@ def _tabela(linhas, largura, est_celula, est_celula_pai, est_cabecalho):
                    col_dur, col_data, col_data, col_perc],
     )
     tabela.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(NAVY)),
+        ('BACKGROUND', (0, 0), (-1, 0), C['navy']),
         ('FONTNAME', (0, 1), (-1, -1), SANS),
         ('FONTSIZE', (0, 1), (-1, -1), 9.2),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor(INK)),
+        ('TEXTCOLOR', (0, 1), (-1, -1), C['ink']),
         # `tbody td { border-bottom: 1px solid var(--line) }` — só o fio
         # horizontal, sem grade fechada e sem zebra, como no kit.
-        ('LINEBELOW', (0, 0), (-1, -1), 0.5, colors.HexColor(FIO)),
+        ('LINEBELOW', (0, 0), (-1, -1), 0.5, C['fio']),
         ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
         ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -609,7 +647,7 @@ def _tabela(linhas, largura, est_celula, est_celula_pai, est_cabecalho):
     return tabela
 
 
-def _nome_com_hierarquia(linha: dict) -> str:
+def _nome_com_hierarquia(linha: dict, laranja_hex: str) -> str:
     """Indentação por nível e losango laranja no marco.
 
     A indentação é feita com espaços não-quebráveis dentro do `Paragraph`
@@ -620,7 +658,7 @@ def _nome_com_hierarquia(linha: dict) -> str:
     recuo = '&nbsp;' * (4 * int(linha.get('nivel') or 0))
     nome = _esc(linha['nome'])
     if linha['is_marco']:
-        return f'{recuo}<font color="{LARANJA}">&#9670;</font> {nome}'
+        return f'{recuo}<font color="{laranja_hex}">&#9670;</font> {nome}'
     return f'{recuo}{nome}'
 
 
@@ -674,7 +712,7 @@ def _percentual(valor) -> str:
         return TRACO
 
 
-def _canvas_com_marca(marca: dict, obra: dict):
+def _canvas_com_marca(marca: dict, obra: dict, C):
     """Fábrica do canvas que desenha a faixa de marca e o rodapé.
 
     Subclasse de `canvas.Canvas` acumulando os estados das páginas para que o
@@ -753,7 +791,7 @@ def _canvas_com_marca(marca: dict, obra: dict):
                 texto = self.beginText(
                     margem, topo_conteudo - altura_logo + 3 * mm)
                 texto.setFont(SANS_BOLD, 17)
-                texto.setFillColor(colors.HexColor(NAVY))
+                texto.setFillColor(C['navy'])
                 texto.setCharSpace(1.6)
                 texto.textOut((marca.get('nome') or '').upper()[:26])
                 self.drawText(texto)
@@ -763,13 +801,19 @@ def _canvas_com_marca(marca: dict, obra: dict):
             direita = largura_pagina - margem
             y = topo_conteudo - 8.6
             self.setFont(SANS_BOLD, 8.6)
-            self.setFillColor(colors.HexColor(NAVY))
+            self.setFillColor(C['navy'])
             self.drawRightString(direita, y, (marca.get('nome') or '')[:60])
             self.setFont(SANS, 8)
-            self.setFillColor(colors.HexColor(CINZA))
-            if marca.get('cnpj'):
+            self.setFillColor(C['cinza'])
+            # Segunda linha: razão social e CNPJ juntos, como no papel oficial
+            # ("Angelin Engenharia Ltda. · CNPJ 42.547.087/0001-61"). Sem razão
+            # social cadastrada, sobra o CNPJ sozinho.
+            segunda = ' · '.join(p for p in [
+                marca.get('razao_social'),
+                f"CNPJ {marca['cnpj']}" if marca.get('cnpj') else ''] if p)
+            if segunda:
                 y -= 8 * 1.5
-                self.drawRightString(direita, y, f"CNPJ {marca['cnpj']}")
+                self.drawRightString(direita, y, segunda[:105])
             terceira = ' · '.join(p for p in [marca.get('endereco'),
                                               marca.get('website')] if p)
             if terceira:
@@ -781,9 +825,9 @@ def _canvas_com_marca(marca: dict, obra: dict):
             linha_y = (topo_conteudo - altura_logo - FILETE_DISTANCIA_MM * mm
                        - FILETE_ESPESSURA_PT / 2)
             self.setLineWidth(FILETE_ESPESSURA_PT)
-            self.setStrokeColor(colors.HexColor(LARANJA))
+            self.setStrokeColor(C['laranja'])
             self.line(margem, linha_y, margem + FILETE_LARANJA_MM * mm, linha_y)
-            self.setStrokeColor(colors.HexColor(NAVY))
+            self.setStrokeColor(C['navy'])
             self.line(margem + FILETE_LARANJA_MM * mm, linha_y,
                       largura_pagina - margem, linha_y)
 
@@ -799,12 +843,12 @@ def _canvas_com_marca(marca: dict, obra: dict):
             de 7,6pt em cinza com o nome da empresa em navy negrito.
             """
             # A barra que sangra.
-            self.setFillColor(colors.HexColor(NAVY))
+            self.setFillColor(C['navy'])
             self.rect(0, 0, largura_pagina, FOOTBAR_ALTURA_MM * mm,
                       stroke=0, fill=1)
 
             base_texto = (FOOTBAR_ALTURA_MM + 6) * mm
-            self.setStrokeColor(colors.HexColor(FIO))
+            self.setStrokeColor(C['fio'])
             self.setLineWidth(0.5)
             fio_y = base_texto + 7.6 + 3 * mm
             self.line(margem, fio_y, largura_pagina - margem, fio_y)
@@ -813,11 +857,11 @@ def _canvas_com_marca(marca: dict, obra: dict):
             # `.footer b { color: var(--navy) }` do kit.
             empresa = (marca.get('nome') or '')[:40]
             self.setFont(SANS_BOLD, 7.6)
-            self.setFillColor(colors.HexColor(NAVY))
+            self.setFillColor(C['navy'])
             self.drawString(margem, base_texto, empresa)
             largura_empresa = self.stringWidth(empresa, SANS_BOLD, 7.6)
             self.setFont(SANS, 7.6)
-            self.setFillColor(colors.HexColor(CINZA))
+            self.setFillColor(C['cinza'])
             self.drawString(margem + largura_empresa, base_texto,
                             f" · Cronograma de Obra — {obra.get('nome') or ''}"[:80])
 

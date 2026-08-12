@@ -4351,6 +4351,17 @@ class ConfiguracaoEmpresa(db.Model):
     cor_fundo_app = db.Column(db.String(7), default='#f8fafc')   # Cor de fundo da aplicação
     tema_preset = db.Column(db.String(40), default='azul_profundo')  # Identificador do preset ativo
 
+    # Timbre dos PDFs (migration 286) — logo, dados da empresa e cores, num
+    # JSON versionado e importável pela tela de Configurações. NULL = tenant
+    # nunca importou: `services/timbre_pdf.carregar` cai nos campos soltos
+    # acima e, na falta deles, nos tokens do kit oficial. É o que torna a
+    # coluna aditiva — quem não usa não muda de comportamento.
+    #
+    # Deliberadamente NÃO substitui `cor_primaria`/`cor_secundaria`: aquelas
+    # governam proposta e tema do sistema, e misturar as duas coisas faria
+    # trocar a cor de um PDF mexer na navbar.
+    timbre_pdf = db.Column(db.JSON, nullable=True)
+
     # Cronograma-mpp M10 — flag de rollout da importação de cronograma por
     # tenant. Default FALSE: liga-se por fase (scripts/flag_cronograma_mpp.py).
     cronograma_mpp_ativo = db.Column(db.Boolean, nullable=False, default=False,
