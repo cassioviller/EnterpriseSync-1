@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -24,7 +25,8 @@ from services.alcada_compras import (esta_totalmente_aprovada,
 from services.requisicao_compra import (TransicaoInvalida, proximo_numero,
                                         recalcular_valor, transicionar)
 from utils.autorizacao import (obras_visiveis, pode_comprar_na_obra,
-                               pode_requisitar_na_obra, pode_ver_obra)
+                               pode_receber_na_obra, pode_requisitar_na_obra,
+                               pode_ver_obra)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,16 @@ compras_bp = Blueprint('compras', __name__, url_prefix='/compras')
 
 UPLOAD_FOLDER = os.path.join('static', 'uploads', 'compras')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf', 'xml', 'webp'}
+
+# Fase 4 — os rótulos das quatro situações de `PedidoCompra.situacao_recebimento`.
+# O valor persistido é o do serviço (services/recebimento_pedido); aqui é só
+# como ele aparece na tela.
+SITUACOES_RECEBIMENTO = {
+    'nao_recebido': 'Não recebido',
+    'parcial': 'Recebido parcialmente',
+    'recebido': 'Recebido',
+    'encerrado_com_saldo': 'Encerrado com saldo',
+}
 
 CONDICOES = {
     'a_vista': 'À Vista',
@@ -511,6 +523,7 @@ def index():
         filtro_data_inicio=filtro_data_inicio,
         filtro_data_fim=filtro_data_fim,
         CONDICOES=CONDICOES,
+        SITUACOES_RECEBIMENTO=SITUACOES_RECEBIMENTO,
     )
 
 
@@ -930,6 +943,7 @@ def detalhe(pedido_id):
         todos_recebidos=todos_recebidos,
         fornecedores=fornecedores,
         obras=obras,
+        SITUACOES_RECEBIMENTO=SITUACOES_RECEBIMENTO,
     )
 
 
@@ -949,18 +963,150 @@ def comprovante(pedido_id):
 
 
 # ─────────────────────────────────────────────
-# RECEBIMENTO NO ALMOXARIFADO
+# RECEBIMENTO NA OBRA — Fase 4
+# ─────────────────────────────────────────────
+def _quantidade_do_form(valor):
+    """'30', '30,5' ou '' → Decimal. Vírgula porque o teclado do celular
+    brasileiro entrega vírgula, e recusar isso seria recusar o usuário."""
+    from decimal import Decimal, InvalidOperation
+    texto = (valor or '').strip().replace(',', '.')
+    if not texto:
+        return Decimal('0')
+    try:
+        return Decimal(texto)
+    except InvalidOperation:
+        return Decimal('0')
+
+
+def _num_enxuto(valor):
+    """Decimal('20.000') → '20'; Decimal('20.500') → '20.5'; zero → ''.
+
+    A coluna é `Numeric(12,3)`, então tudo sai com três casas. Preencher o
+    campo do celular com "20.000" faz quem recebe apagar caractere por
+    caractere antes de digitar o número certo.
+    """
+    if not valor:
+        return ''
+    texto = format(Decimal(valor).normalize(), 'f')
+    return texto
+
+
+@compras_bp.route('/<int:pedido_id>/recebimento', methods=['GET', 'POST'])
+@login_required
+def recebimento(pedido_id):
+    """A tela de quem recebe o caminhão no portão da obra.
+
+    Substitui, para pedido do regime novo, o botão que hoje aceita o clique e
+    não faz nada: o estoque desses pedidos já entrou na emissão, então a rota
+    antiga calcula pendente=0 e sai calada. Aqui pedido legado é **recusado
+    com a razão dita** — um no-op silencioso é pior que uma recusa, porque
+    quem clicou acha que registrou.
+
+    GET e POST na mesma rota porque é uma tela só, usada no celular: campo de
+    quantidade por item já preenchido com o que falta, observação, e o par
+    encerrar-saldo + motivo.
+    """
+    from flask import abort
+
+    from services.recebimento_pedido import (RecebimentoInvalido,
+                                             recebido_por_item,
+                                             registrar_recebimento)
+
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    pedido = PedidoCompra.query.filter_by(
+        id=pedido_id, admin_id=admin_id).first_or_404()
+
+    if not pode_receber_na_obra(pedido.obra_id):
+        abort(403)
+
+    if not pedido.exige_atesto:
+        flash('Este pedido é do regime antigo: o estoque dele já entrou na '
+              'emissão da compra, e receber de novo o contaria em dobro. Use '
+              'o botão de recebimento no estoque, na tela do pedido.', 'warning')
+        return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
+    itens = PedidoCompraItem.query.filter_by(pedido_id=pedido_id).all()
+    acumulado = recebido_por_item(pedido)
+    falta = {i.id: max(Decimal('0'), Decimal(str(i.quantidade or 0))
+                       - acumulado.get(i.id, Decimal('0'))) for i in itens}
+
+    if request.method == 'POST':
+        linhas = [(i.id, _quantidade_do_form(request.form.get(f'qtd_{i.id}')))
+                  for i in itens]
+        # Item ausente é item que não veio nesta entrega — não item com zero.
+        linhas = [(item_id, qtd) for item_id, qtd in linhas if qtd != 0]
+
+        data_txt = (request.form.get('data_recebimento') or '').strip()
+        try:
+            data_rec = (datetime.strptime(data_txt, '%Y-%m-%d').date()
+                        if data_txt else date.today())
+        except ValueError:
+            data_rec = date.today()
+
+        try:
+            rec = registrar_recebimento(
+                pedido, current_user, linhas, data_rec,
+                observacao=(request.form.get('observacao') or '').strip() or None,
+                encerra_saldo=bool(request.form.get('encerra_saldo')),
+                motivo=(request.form.get('motivo_encerramento') or '').strip(),
+                permitir_sobre_entrega=bool(
+                    request.form.get('permitir_sobre_entrega')),
+            )
+        except RecebimentoInvalido as e:
+            db.session.rollback()
+            flash(str(e), 'danger')
+            return redirect(url_for('compras.recebimento', pedido_id=pedido_id))
+
+        flash(f'Recebimento {rec.rotulo} registrado. Pedido agora: '
+              f'{SITUACOES_RECEBIMENTO.get(pedido.situacao_recebimento, "—")}.',
+              'success')
+        return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
+    return render_template(
+        'compras/recebimento.html',
+        pedido=pedido,
+        itens=itens,
+        falta={item_id: _num_enxuto(qtd) for item_id, qtd in falta.items()},
+        recebido={item_id: _num_enxuto(qtd)
+                  for item_id, qtd in acumulado.items()},
+        recebimentos=pedido.recebimentos.all(),
+        SITUACOES_RECEBIMENTO=SITUACOES_RECEBIMENTO,
+        hoje=date.today().isoformat(),
+    )
+
+
+# ─────────────────────────────────────────────
+# RECEBIMENTO NO ALMOXARIFADO — rota do regime antigo
 # ─────────────────────────────────────────────
 @compras_bp.route('/receber/<int:pedido_id>', methods=['POST'])
 @login_required
 def receber(pedido_id):
-    """Registra o recebimento físico dos itens de um PedidoCompra no almoxarifado."""
+    """Registra o recebimento físico dos itens de um PedidoCompra no almoxarifado.
+
+    Fase 4 — esta rota é do REGIME ANTIGO e não some: o estoque de pedido
+    legado já entrou na emissão, e mudar isso reescreveria estoque histórico.
+    Pedido com `exige_atesto` recebe pela tela nova (`compras.recebimento`).
+    """
     guard = _check_v2()
     if guard:
         return guard
 
     admin_id = _admin_id()
     pedido = PedidoCompra.query.filter_by(id=pedido_id, admin_id=admin_id).first_or_404()
+
+    # A porta dos fundos da dupla escrita. O botão do detalhe já não aponta
+    # para cá em pedido do regime novo, mas quem tiver a URL ainda pode
+    # postar — e aqui a quantidade lançada é a INTEIRA, a mesma que o atesto
+    # vai lançar quando o caminhão chegar.
+    if pedido.exige_atesto:
+        flash('Este pedido recebe por atesto: o estoque entra pela quantidade '
+              'que chegar em cada entrega, na tela de recebimento.', 'warning')
+        return redirect(url_for('compras.recebimento', pedido_id=pedido_id))
+
     itens = PedidoCompraItem.query.filter_by(pedido_id=pedido_id).all()
     itens_com_catalogo = [i for i in itens if i.almoxarifado_item_id]
 

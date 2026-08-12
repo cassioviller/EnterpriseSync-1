@@ -840,3 +840,200 @@ def test_leitor_nao_exclui_recebimento():
         with pytest.raises(RecebimentoInvalido):
             _excluir(rec, leitor)
         assert len(_entradas(pedido.id)) == 1
+
+
+# ---------------------------------------------------------------------------
+# R6 — a tela de recebimento na obra
+# ---------------------------------------------------------------------------
+#
+# O defeito que esta rodada conserta na interface: hoje o botão "Registrar
+# Recebimento no Estoque" do detalhe aceita o clique em pedido 'normal' e não
+# faz nada — o estoque já entrou na emissão, então a rota antiga calcula
+# pendente=0 e sai. Um no-op silencioso é pior que uma recusa: quem clicou
+# acha que registrou.
+#
+# A tela nova é para o celular de quem está no portão da obra: uma quantidade
+# por item já preenchida com o que falta, observação, e o par
+# encerrar-saldo + motivo.
+
+
+def _flashes(cli):
+    with cli.session_transaction() as s:
+        return ' | '.join(m for _cat, m in s.get('_flashes', []))
+
+
+def _cenario_de_rota(exige_atesto=True, qtd=50):
+    """Devolve os ids (não os objetos): a rota roda em outro app_context."""
+    with app.app_context():
+        admin, obra, pedido, item, almox = _cenario_com_catalogo(
+            qtd, exige_atesto=exige_atesto)
+        return admin.id, obra.id, pedido.id, item.id
+
+
+def _recebimentos_de(pedido_id):
+    from models import RecebimentoPedido
+    return RecebimentoPedido.query.filter_by(pedido_id=pedido_id).all()
+
+
+def test_tela_de_recebimento_abre_para_quem_tem_papel():
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, item_id = _cenario_de_rota()
+
+    resposta = cliente_de(admin_id).get(f'/compras/{pedido_id}/recebimento')
+
+    assert resposta.status_code == 200
+    corpo = resposta.get_data(as_text=True)
+    assert 'Cimento CP-II' in corpo, 'a tela não lista os itens do pedido'
+    assert f'qtd_{item_id}' in corpo, (
+        'sem um campo de quantidade por item não dá para receber parcial')
+
+
+def test_post_da_tela_grava_o_recebimento_e_redireciona():
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, item_id = _cenario_de_rota()
+    cli = cliente_de(admin_id)
+
+    resposta = cli.post(
+        f'/compras/{pedido_id}/recebimento',
+        data={f'qtd_{item_id}': '30', 'data_recebimento': '2026-08-05',
+              'observacao': 'dois sacos rasgados'})
+
+    # A tela reaberta mostra a entrega já registrada e pede só o que falta —
+    # é o bloco que quem recebe a segunda parcela vê primeiro.
+    corpo = cli.get(f'/compras/{pedido_id}/recebimento').get_data(as_text=True)
+    assert 'dois sacos rasgados' in corpo, (
+        'a tela não mostra as entregas já registradas')
+    assert 'value="20"' in corpo, (
+        'o campo não vem preenchido com o que FALTA — quem recebe o resto '
+        'teria de calcular de cabeça')
+
+    assert resposta.status_code == 302, 'POST tem que redirecionar'
+    with app.app_context():
+        recebimentos = _recebimentos_de(pedido_id)
+        assert len(recebimentos) == 1
+        assert float(recebimentos[0].itens[0].quantidade_recebida) == 30.0
+        assert recebimentos[0].observacao == 'dois sacos rasgados'
+        assert len(_entradas(pedido_id)) == 1, 'o atesto pela tela não lançou'
+        from models import PedidoCompra
+        assert db.session.get(
+            PedidoCompra, pedido_id).situacao_recebimento == 'parcial'
+
+
+def test_post_em_pedido_legado_recusa_dizendo_por_que():
+    """O conserto do no-op silencioso.
+
+    Pedido legado teve o estoque lançado na emissão. A tela nova não pode
+    aceitar o clique e ficar quieta — nem lançar de novo. Recusa, e diz por
+    quê e para onde ir.
+    """
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, item_id = _cenario_de_rota(
+        exige_atesto=False)
+    cli = cliente_de(admin_id)
+
+    resposta = cli.post(f'/compras/{pedido_id}/recebimento',
+                        data={f'qtd_{item_id}': '30',
+                              'data_recebimento': '2026-08-05'})
+
+    assert resposta.status_code == 302
+    aviso = _flashes(cli)
+    assert 'emissão' in aviso or 'emissao' in aviso, (
+        f'a recusa tem que explicar que o estoque deste pedido já entrou na '
+        f'emissão. Veio: {aviso!r}')
+    with app.app_context():
+        assert _recebimentos_de(pedido_id) == [], (
+            'a tela gravou recebimento num pedido do regime antigo')
+
+
+def test_leitor_nao_abre_nem_posta_na_tela_de_recebimento():
+    from helpers_tenant import cliente_de
+    admin_id, obra_id, pedido_id, item_id = _cenario_de_rota()
+    with app.app_context():
+        leitor_id = _pessoa_com_papel(admin_id, obra_id, 'LEITOR').id
+
+    cli = cliente_de(leitor_id)
+    assert cli.get(f'/compras/{pedido_id}/recebimento').status_code == 403
+    assert cli.post(f'/compras/{pedido_id}/recebimento',
+                    data={f'qtd_{item_id}': '30',
+                          'data_recebimento': '2026-08-05'}).status_code == 403
+    with app.app_context():
+        assert _recebimentos_de(pedido_id) == []
+
+
+def test_recebimento_vazio_recusa_sem_gravar_documento():
+    """Submeter tudo zerado é engano de dedo, não atesto de nada."""
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, item_id = _cenario_de_rota()
+    cli = cliente_de(admin_id)
+
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_id}': '0', 'data_recebimento': '2026-08-05'})
+
+    assert _flashes(cli), 'a recusa não disse nada ao usuário'
+    with app.app_context():
+        assert _recebimentos_de(pedido_id) == []
+
+
+def test_detalhe_manda_o_pedido_novo_para_a_tela_e_o_legado_para_a_rota_antiga():
+    """O botão tem que saber em que regime o pedido nasceu.
+
+    Um botão só, apontando sempre para a rota antiga, é o defeito atual: em
+    pedido do regime novo ele lançaria estoque que já vai entrar pelo atesto.
+    """
+    from helpers_tenant import cliente_de
+
+    # Os dois pedidos no MESMO tenant: `_cenario_de_rota` abre um tenant novo
+    # a cada chamada, e o detalhe é escopado por `admin_id`.
+    with app.app_context():
+        admin, obra, novo, _item, _almox = _cenario_com_catalogo(
+            50, exige_atesto=True)
+        forn = _fornecedor(admin.id)
+        legado = _pedido(admin.id, obra.id, forn.id)
+        legado.itens[0].almoxarifado_item_id = _item_de_catalogo(admin.id).id
+        db.session.commit()
+        admin_id, novo_id, legado_id = admin.id, novo.id, legado.id
+    cli = cliente_de(admin_id)
+
+    corpo_novo = cli.get(f'/compras/{novo_id}').get_data(as_text=True)
+    assert f'/compras/{novo_id}/recebimento' in corpo_novo, (
+        'o detalhe do pedido do regime novo não oferece a tela de recebimento')
+    assert 'Não recebido' in corpo_novo, (
+        'a situação de recebimento não aparece no detalhe')
+
+    corpo_legado = cli.get(f'/compras/{legado_id}').get_data(as_text=True)
+    assert f'/compras/receber/{legado_id}' in corpo_legado, (
+        'o pedido legado perdeu a rota antiga, que é a única que ele tem')
+    assert f'/compras/{legado_id}/recebimento' not in corpo_legado
+
+
+def test_listagem_mostra_a_situacao_de_recebimento():
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, item_id = _cenario_de_rota()
+    cli = cliente_de(admin_id)
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_id}': '30', 'data_recebimento': '2026-08-05'})
+
+    corpo = cli.get('/compras/').get_data(as_text=True)
+
+    assert 'Recebido parcialmente' in corpo, (
+        'a listagem não mostra a situação de recebimento')
+
+
+def test_rota_antiga_recusa_pedido_do_regime_novo():
+    """A porta dos fundos da dupla escrita.
+
+    O botão do detalhe já não aponta para cá em pedido do regime novo, mas
+    quem tiver a URL ainda pode postar. Se a rota antiga aceitasse, lançaria a
+    quantidade INTEIRA — a mesma que o atesto vai lançar quando o caminhão
+    chegar.
+    """
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, _item = _cenario_de_rota(exige_atesto=True)
+    cli = cliente_de(admin_id)
+
+    cli.post(f'/compras/receber/{pedido_id}')
+
+    with app.app_context():
+        assert _entradas(pedido_id) == [], (
+            'a rota antiga lançou estoque de um pedido que exige atesto')
+    assert 'atesto' in _flashes(cli).lower() or 'recebimento' in _flashes(cli).lower()

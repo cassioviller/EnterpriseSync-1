@@ -1,0 +1,162 @@
+{% extends "base_completo.html" %}
+{% block title %}Receber {{ pedido.numero or '#' ~ pedido.id }}{% endblock %}
+
+{#
+  Fase 4 — a tela de quem recebe o caminhão no portão da obra.
+
+  Escrita para o CELULAR primeiro: a quantidade de cada item já vem
+  preenchida com o que falta, porque o caso comum é "chegou tudo" e ninguém
+  quer digitar no sol. Quem recebeu menos corrige o número e pronto.
+
+  O par encerrar-saldo + motivo fica embaixo, separado: encerrar é dizer "o
+  resto não vem", e o motivo é o que explica isso seis meses depois.
+#}
+
+{% block content %}
+<div class="container py-4" style="max-width: 760px;">
+
+  <div class="d-flex align-items-center mb-4">
+    <a href="{{ url_for('compras.detalhe', pedido_id=pedido.id) }}"
+       class="btn btn-outline-secondary me-3">
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <div class="flex-grow-1">
+      <h1 class="h4 mb-0 fw-bold">
+        Receber {{ pedido.numero or '#' ~ pedido.id }}
+      </h1>
+      <small class="text-muted">
+        {{ pedido.obra.nome if pedido.obra else 'Sem obra' }}
+        · {{ pedido.fornecedor.nome if pedido.fornecedor else '—' }}
+      </small>
+    </div>
+    <span class="badge bg-secondary fs-6">
+      {{ SITUACOES_RECEBIMENTO.get(pedido.situacao_recebimento, '—') }}
+    </span>
+  </div>
+
+  {% if recebimentos %}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold py-3">Entregas já registradas</div>
+    <ul class="list-group list-group-flush">
+      {% for r in recebimentos %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+          <span class="fw-semibold">{{ r.rotulo }}</span>
+          <small class="text-muted ms-2">
+            {{ r.data_recebimento.strftime('%d/%m/%Y') }}
+            · {{ r.recebido_por.nome if r.recebido_por else '—' }}
+          </small>
+          {% if r.observacao %}
+            <div><small class="text-muted">{{ r.observacao }}</small></div>
+          {% endif %}
+          {% if r.encerra_saldo %}
+            <div><small class="text-warning-emphasis">
+              Encerrou o saldo: {{ r.motivo_encerramento }}
+            </small></div>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('compras.recebimento', pedido_id=pedido.id) }}">
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white fw-semibold py-3">O que chegou</div>
+      <div class="card-body">
+        {% for item in itens %}
+        <div class="row align-items-center g-2 {% if not loop.last %}mb-3 pb-3 border-bottom{% endif %}">
+          <div class="col-12 col-sm-7">
+            <div class="fw-semibold">{{ item.descricao }}</div>
+            <small class="text-muted">
+              Pedido: {{ item.quantidade.normalize() }}
+              {%- if recebido.get(item.id) %}
+                · já recebido: {{ recebido.get(item.id) }}
+              {%- endif %}
+              {%- if not item.almoxarifado_item_id %}
+                · <span class="text-secondary">fora do catálogo — não movimenta estoque</span>
+              {%- endif %}
+            </small>
+          </div>
+          <div class="col-12 col-sm-5">
+            <label class="form-label small mb-1" for="qtd_{{ item.id }}">
+              Quantidade recebida agora
+            </label>
+            <input type="text" inputmode="decimal" class="form-control form-control-lg"
+                   id="qtd_{{ item.id }}" name="qtd_{{ item.id }}"
+                   value="{{ falta.get(item.id, '') }}"
+                   placeholder="0">
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-12 col-sm-5">
+            <label class="form-label" for="data_recebimento">Data da entrega</label>
+            {# A data do FATO: o material chega no sábado e alguém lança na segunda. #}
+            <input type="date" class="form-control" id="data_recebimento"
+                   name="data_recebimento" value="{{ hoje }}" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="observacao">
+              Observação <span class="text-muted fw-normal">(opcional)</span>
+            </label>
+            <textarea class="form-control" id="observacao" name="observacao" rows="2"
+                      placeholder="Divergência de quantidade ou de qualidade — ex.: dois sacos vieram rasgados"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" value="1"
+                 id="encerra_saldo" name="encerra_saldo">
+          <label class="form-check-label fw-semibold" for="encerra_saldo">
+            O resto não vem — encerrar o saldo deste pedido
+          </label>
+          <div class="form-text">
+            Fecha o pedido mesmo faltando quantidade. Depois disso, não dá para
+            receber mais nada nele.
+          </div>
+        </div>
+        <label class="form-label small" for="motivo_encerramento">
+          Motivo do encerramento
+        </label>
+        <input type="text" class="form-control" id="motivo_encerramento"
+               name="motivo_encerramento"
+               placeholder="Ex.: fornecedor não entrega o saldo">
+
+        <hr class="my-3">
+
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="1"
+                 id="permitir_sobre_entrega" name="permitir_sobre_entrega">
+          <label class="form-check-label" for="permitir_sobre_entrega">
+            Chegou mais do que foi pedido
+          </label>
+          <div class="form-text">
+            Marque só se veio mais mesmo — sem isso o sistema recusa quantidade
+            acima do pedido.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-grid gap-2 d-sm-flex justify-content-sm-end">
+      <a href="{{ url_for('compras.detalhe', pedido_id=pedido.id) }}"
+         class="btn btn-outline-secondary btn-lg">Cancelar</a>
+      <button type="submit" class="btn btn-success btn-lg">
+        <i class="fas fa-clipboard-check me-2"></i>Registrar recebimento
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
