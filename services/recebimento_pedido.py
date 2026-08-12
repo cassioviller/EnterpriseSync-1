@@ -53,6 +53,11 @@ def _d(valor):
     return Decimal(str(valor or 0))
 
 
+def _num(valor):
+    """Decimal → '50' em vez de '50.000'. Numero para humano ler na mensagem."""
+    return format(_d(valor).normalize(), 'f')
+
+
 def recebido_por_item(pedido):
     """{pedido_item_id: quantidade acumulada} somando TODOS os recebimentos.
 
@@ -154,7 +159,15 @@ def valor_atestado(pedido):
 
 def _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega,
                     encerra_saldo=False):
-    """Quantidades: positivas, de itens DESTE pedido, e sem estourar o pedido."""
+    """Quantidades: positivas, de itens DESTE pedido, e sem estourar o pedido.
+
+    Devolve a lista dos itens que passaram do pedido, quando a sobre-entrega
+    foi liberada — `[(descrição, total, pedido)]`, vazia no caminho comum.
+    Quem chama usa isso para exigir a justificativa e para nomear, no próprio
+    documento, o que veio a mais: a caixa vale para o recebimento inteiro, e
+    sem essa lista um item com 2 a mais serve de senha para outro entrar com
+    450 (achado 10 da revisão de 12/08).
+    """
     from models import PedidoCompraItem
 
     if not linhas and not encerra_saldo:
@@ -165,6 +178,7 @@ def _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega,
     itens = {i.id: i for i in
              PedidoCompraItem.query.filter_by(pedido_id=pedido.id).all()}
     vistos = set()
+    excedentes = []
     for item_id, quantidade in linhas:
         if item_id in vistos:
             raise RecebimentoInvalido(
@@ -201,10 +215,10 @@ def _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega,
                 f'"{item.descricao}": {qtd} não cabe como quantidade '
                 f'recebida — o máximo é {QUANTIDADE_MAXIMA}.')
 
-        if not permitir_sobre_entrega:
-            total = acumulado.get(item_id, Decimal('0')) + qtd
-            pedido_qtd = _d(item.quantidade)
-            if total > pedido_qtd:
+        total = acumulado.get(item_id, Decimal('0')) + qtd
+        pedido_qtd = _d(item.quantidade)
+        if total > pedido_qtd:
+            if not permitir_sobre_entrega:
                 ja = acumulado.get(item_id, Decimal('0'))
                 raise RecebimentoInvalido(
                     f'"{item.descricao}": recebendo {qtd} chega a {total}, '
@@ -212,6 +226,9 @@ def _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega,
                     + (f' ({ja} já recebidos)' if ja else '')
                     + '. Se veio mais mesmo, marque a sobre-entrega e '
                       'justifique.')
+            excedentes.append((item.descricao, total, pedido_qtd))
+
+    return excedentes
 
 
 def descricao_da_saida(pedido, lote_ref):
@@ -419,8 +436,23 @@ def registrar_recebimento(pedido, usuario, linhas, data, observacao=None,
     # o atesto do que NÃO vai chegar, e o motivo (já exigido acima) é o
     # conteúdo do documento. Sem essa porta, quem ouviu do fornecedor que o
     # resto não vem tinha de registrar material que nunca chegou.
-    _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega,
-                    encerra_saldo=encerra_saldo)
+    excedentes = _validar_linhas(pedido, linhas, acumulado,
+                                 permitir_sobre_entrega,
+                                 encerra_saldo=encerra_saldo)
+
+    if excedentes:
+        # A sobre-entrega ganha o mesmo par que o encerramento já tinha:
+        # liberar o bloqueio custa dizer por quê. Sem isto, a caixa marcada
+        # para 2 sacos a mais também deixava passar um 500 digitado por
+        # engano, com o documento em branco.
+        lista = '; '.join(f'{desc} ({_num(total)} de {_num(pedido_qtd)})'
+                          for desc, total, pedido_qtd in excedentes)
+        if not (observacao or '').strip():
+            raise RecebimentoInvalido(
+                f'chegou mais do que foi pedido em: {lista}. Para registrar '
+                f'assim é preciso justificar — escreva na observação o que '
+                f'aconteceu.')
+        observacao = f'{observacao.strip()} [sobre-entrega: {lista}]'
 
     ultima = (RecebimentoPedido.query
               .filter_by(pedido_id=pedido.id)

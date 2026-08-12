@@ -377,10 +377,17 @@ def test_sobre_entrega_recusa_por_padrao():
 
 def test_sobre_entrega_passa_quando_liberada():
     """Mesmo par bloqueio-com-liberação-explícita do `permitir_sobreexecucao`
-    do RDO: chegar mais é legítimo, passar despercebido não é."""
+    do RDO: chegar mais é legítimo, passar despercebido não é.
+
+    A justificativa passou a ser exigida na C7 — o "não passar despercebido"
+    que esta docstring sempre prometeu era, até ali, só o bloqueio removível.
+    Quem cobra a recusa sem justificativa é
+    `test_sobre_entrega_sem_justificativa_recusa`.
+    """
     with app.app_context():
         admin, _obr, pedido, item = _cenario_pedido(50)
-        _receber(pedido, admin, item, 60, permitir_sobre_entrega=True)
+        _receber(pedido, admin, item, 60, permitir_sobre_entrega=True,
+                 observacao='fornecedor entregou a caixa fechada')
         db.session.refresh(pedido)
         assert pedido.situacao_recebimento == 'recebido'
 
@@ -2068,3 +2075,99 @@ def test_tela_encerra_saldo_com_os_campos_zerados():
             PedidoCompra, pedido_id).situacao_recebimento == \
             'encerrado_com_saldo', f'flashes: {_flashes(cli)!r}'
         assert len(_entradas(pedido_id)) == 1
+
+
+# ---------------------------------------------------------------------------
+# C7 — sobre-entrega com justificativa, como o spec prometeu
+# ---------------------------------------------------------------------------
+#
+# Revisão de 12/08, achado 10.
+#
+# `permitir_sobre_entrega` desligava o teto de quantidade do recebimento
+# INTEIRO e não pedia justificativa nenhuma — contra a própria mensagem de
+# erro, que manda "marcar a sobre-entrega e justificar", e contra o spec, que
+# diz "salvo permitir_sobre_entrega com justificativa". Compare com
+# `encerra_saldo`, que recusa sem motivo: a sobre-entrega prometeu o mesmo par
+# bloqueio-com-justificativa e entregou só o bloqueio removível.
+#
+# Na prática: quem marcava a caixa para registrar 2 sacos a mais também
+# deixava passar um 500 digitado por engano no campo de outro item, com
+# `observacao` vazia e nenhuma linha de explicação no documento.
+
+
+def test_sobre_entrega_sem_justificativa_recusa():
+    """O mesmo par de `encerra_saldo`: liberar o bloqueio custa dizer por quê."""
+    from services.recebimento_pedido import RecebimentoInvalido
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+
+        with pytest.raises(RecebimentoInvalido) as e:
+            _receber(pedido, admin, item, 52, permitir_sobre_entrega=True)
+
+        assert 'justif' in str(e.value).lower(), (
+            f'a recusa não pede a justificativa: {e.value}')
+        assert _recebimentos_de(pedido.id) == []
+
+
+def test_sobre_entrega_com_justificativa_passa_e_fica_registrada():
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+
+        rec = _receber(pedido, admin, item, 52, permitir_sobre_entrega=True,
+                       observacao='fornecedor mandou 2 sacos a mais por conta')
+
+        assert rec.observacao.startswith(
+            'fornecedor mandou 2 sacos a mais por conta')
+        assert 'sobre-entrega' in rec.observacao, (
+            'o documento não registra que houve sobre-entrega')
+        assert float(rec.itens[0].quantidade_recebida) == 52.0
+
+
+def test_sobre_entrega_nomeia_os_itens_que_estouraram():
+    """É o que faz o 500 digitado por engano aparecer para quem digitou.
+
+    A caixa vale para o recebimento inteiro — o que é aceitável quando quem
+    marca sabe QUAIS itens passaram do pedido. Sem essa lista, um item com 2 a
+    mais serve de senha para outro entrar com 450.
+    """
+    from services.recebimento_pedido import registrar_recebimento
+    with app.app_context():
+        admin_id, pedido_id, item_a, item_b = _cenario_dois_itens(
+            qtd_a=50, qtd_b=20)
+        from models import PedidoCompra
+        pedido = db.session.get(PedidoCompra, pedido_id)
+        admin = db.session.get(Usuario, admin_id)
+
+        rec = registrar_recebimento(
+            pedido, admin,
+            [(item_a, Decimal('52')), (item_b, Decimal('20'))],
+            date(2026, 8, 5), permitir_sobre_entrega=True,
+            observacao='conferido no portão')
+
+        assert 'Cimento CP-II' in (rec.observacao or ''), (
+            f'o documento não registra QUAL item veio a mais: '
+            f'{rec.observacao!r}')
+        assert 'Areia' not in (rec.observacao or ''), (
+            'o item que veio na quantidade certa foi listado como sobre-entrega')
+
+
+def test_sobre_entrega_nao_marcada_continua_recusando():
+    """O caminho comum não muda: sem a caixa, o teto vale."""
+    from services.recebimento_pedido import RecebimentoInvalido
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+
+        with pytest.raises(RecebimentoInvalido):
+            _receber(pedido, admin, item, 52)
+
+
+def test_tela_tem_campo_de_justificativa_da_sobre_entrega():
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, _item_id = _cenario_de_rota()
+
+    corpo = cliente_de(admin_id).get(
+        f'/compras/{pedido_id}/recebimento').get_data(as_text=True)
+
+    assert 'permitir_sobre_entrega' in corpo
+    assert 'observacao' in corpo, (
+        'a tela marca a sobre-entrega e não oferece onde justificar')

@@ -246,17 +246,17 @@ pede justificativa nenhuma — contra a própria mensagem de erro que manda "mar
 sobre-entrega e justificar", e contra o spec. Compare com `encerra_saldo`, que recusa sem
 motivo.
 
-- [ ] **Step 1 (red):**
+- [x] **Step 1 (red):**
   - sobre-entrega marcada **sem** justificativa → recusa, no molde da recusa do
     encerramento sem motivo;
   - sobre-entrega marcada **com** justificativa → grava, e a justificativa fica na
     `observacao` do recebimento;
   - a mensagem de sucesso (ou o próprio erro, quando houver) **nomeia os itens** que
     passaram do pedido — é o que faz o 500 digitado por engano aparecer para quem digitou.
-- [ ] **Step 2:** a validação no serviço e o campo de justificativa na tela, aparecendo
+- [x] **Step 2:** a validação no serviço e o campo de justificativa na tela, aparecendo
   junto da caixa, como o par motivo/encerramento já faz.
-- [ ] **Step 3 (green):** verdes.
-- [ ] **Step 4:** commit — `fix(compras): sobre-entrega exige justificativa e nomeia o que estourou`
+- [x] **Step 3 (green):** verdes.
+- [x] **Step 4:** commit — `fix(compras): sobre-entrega exige justificativa e nomeia o que estourou`
 
 ## C8 — A tela para de mentir
 
