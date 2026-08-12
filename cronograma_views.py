@@ -8,7 +8,8 @@ import logging
 from datetime import date, datetime
 from functools import wraps
 
-from flask import Blueprint, jsonify, redirect, render_template, request, send_file, url_for, flash
+from flask import (Blueprint, abort, jsonify, redirect, render_template,
+                   request, send_file, url_for, flash)
 from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException
 
@@ -49,6 +50,7 @@ from utils.cronograma_engine import (
     atualizar_percentual_tarefa,
     sincronizar_percentuais_obra,
     ordenar_arvore_visual,
+    progresso_geral_cliente,
 )
 
 logger = logging.getLogger(__name__)
@@ -552,17 +554,16 @@ def cronograma_obra(obra_id: int):
         # média simples em Jinja (`perc_total`) — a quinta fórmula de
         # progresso do sistema, escondida numa expressão de template. O
         # conjunto de tarefas aqui é o plano do CLIENTE (`is_cliente=True`),
-        # que o motor não cobre; então a média sai daqui, em Python, com a
-        # mesma regra do motor: só FOLHAS, ponderadas por duração.
-        _pais_cliente = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id}
-        _folhas = [t for t in tarefas if t.id not in _pais_cliente]
-        _peso_total = sum(float(t.duracao_dias or 1) for t in _folhas)
-        if _peso_total > 0:
-            progresso_geral_header = round(sum(
-                float(t.percentual_concluido or 0) * float(t.duracao_dias or 1)
-                for t in _folhas) / _peso_total, 1)
-        else:
-            progresso_geral_header = 0.0
+        # que o motor não cobre; então a média sai do motor, com a mesma
+        # regra dele: só FOLHAS, ponderadas por duração.
+        #
+        # A fórmula morava AQUI, em Python solto, até o PDF do cronograma
+        # precisar do mesmo número (`services/cronograma_pdf.py`). Duas
+        # cópias da mesma média teriam sido a sexta fórmula de progresso do
+        # sistema, então ela virou `progresso_geral_cliente` no motor — que
+        # é onde o cabeçalho de `utils/cronograma_engine.py` sempre disse
+        # que fórmula de progresso mora.
+        progresso_geral_header = progresso_geral_cliente(tarefas)
     else:
         progresso_geral_header = calcular_progresso_geral_obra_v2(
             obra_id, hoje, admin_id)['progresso_geral_pct']
@@ -4215,4 +4216,54 @@ def fisico_financeiro_xlsx(obra_id: int):
         buf, as_attachment=True,
         download_name=f'cronograma_ff_obra_{obra_id}.xlsx',
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EXPORTAÇÃO EM PDF — a planilha de tarefas no papel timbrado da empresa
+# ─────────────────────────────────────────────────────────────────────────────
+
+@cronograma_bp.route('/obra/<int:obra_id>/export.pdf')
+@login_required
+def export_pdf(obra_id: int):
+    """Cronograma da obra em PDF, no layout dos documentos da empresa.
+
+    Espelha o modo da TELA: com `?cliente=1` exporta a cópia-cliente, sem a
+    querystring exporta o cronograma interno. É o que garante que o papel não
+    diga algo diferente do que a pessoa que clicou tinha na frente.
+
+    Spec: `docs/superpowers/specs/2026-08-12-cronograma-pdf-layout-veks-design.md`.
+
+    Guard que o export de físico-financeiro ao lado NÃO tem: `pode_ver_obra`
+    → 404. Com `escopo_obra_ativo` desligada (o default) `papel_na_obra`
+    devolve GESTOR para todo usuário do tenant e ele é transparente; com ela
+    ligada, um usuário sem vínculo deixa de baixar o cronograma de uma obra
+    que não é dele. 404 e não 403 é a convenção já travada por
+    `tests/test_cronograma_permissoes.py` — a existência de uma obra fora do
+    alcance não vaza.
+    """
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    import io
+    from utils.autorizacao import pode_ver_obra
+    from services.cronograma_pdf import (
+        montar_linhas_cronograma, montar_marca_tenant, exportar_cronograma_pdf,
+        nome_arquivo,
+    )
+
+    admin_id = _admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    if not pode_ver_obra(obra_id):
+        abort(404)
+
+    cliente_mode = _modo_cliente()
+    dados = montar_linhas_cronograma(obra.id, admin_id, cliente=cliente_mode)
+    pdf = exportar_cronograma_pdf(dados, montar_marca_tenant(admin_id))
+
+    return send_file(
+        io.BytesIO(pdf), as_attachment=True,
+        download_name=nome_arquivo(dados),
+        mimetype='application/pdf',
     )
