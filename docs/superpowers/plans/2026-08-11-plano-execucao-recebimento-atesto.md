@@ -119,7 +119,7 @@ do legado depende de R2. R7 fecha.
 
 O conserto da dupla escrita. É o passo de maior risco do plano: mexe em almoxarifado.
 
-- [ ] **Step 1 (red):** os testes que definem a virada:
+- [x] **Step 1 (red):** os testes que definem a virada:
   - pedido com `exige_atesto=True` → a **emissão não cria nenhum**
     `AlmoxarifadoMovimento` (hoje cria: é a regressão que impede a dupla escrita de
     voltar);
@@ -129,15 +129,21 @@ O conserto da dupla escrita. É o passo de maior risco do plano: mexe em almoxar
     `almoxarifado_movimento_id` fica `NULL`;
   - pedido com `exige_atesto=False` → **tudo como hoje**, movimento a movimento, na
     emissão e na rota `/receber` antiga.
-- [ ] **Step 2:** em `_gerar_entrada_almoxarifado` (ou nos dois chamadores — decidir na
+- [x] **Step 2:** em `_gerar_entrada_almoxarifado` (ou nos dois chamadores — decidir na
   hora, pelo que ficar mais legível), pular a geração quando `pedido.exige_atesto`.
-- [ ] **Step 3:** gerar movimento + lote FIFO dentro de `registrar_recebimento`, para
+  **Decidido: dentro de `_gerar_entrada_almoxarifado`** — é onde a escrita acontece, e
+  um terceiro chamador nascer no futuro não reabre a dupla escrita por esquecimento.
+- [x] **Step 3:** gerar movimento + lote FIFO dentro de `registrar_recebimento`, para
   cada linha com `almoxarifado_item_id`, com `pedido_compra_id` preenchido (a dedup do
   handler `material_entrada` do EventManager depende disso). Gravar o id do movimento de
   volta na linha do recebimento.
-- [ ] **Step 4 (green):** os quatro verdes, com atenção especial ao quarto — ele é o que
-  garante que nenhum tenant sem a flag foi afetado.
-- [ ] **Step 5:** commit — `fix(compras): o estoque passa a nascer do atesto, nao da emissao do pedido`
+- [x] **Step 4 (green):** os quatro verdes, com atenção especial ao quarto — ele é o que
+  garante que nenhum tenant sem a flag foi afetado. **Um quinto teste entrou fora do
+  plano**: `registrar_recebimento` num pedido legado grava o documento e **não** lança
+  estoque — é a dupla escrita com o sinal trocado, e a condição que a impede não estava
+  coberta por teste nenhum. Mutação de sanidade: trocar a condição por `True` mata só
+  esse teste.
+- [x] **Step 5:** commit — `fix(compras): o estoque passa a nascer do atesto, nao da emissao do pedido`
 
 ## R5 — Exclusão do último recebimento, com estorno
 
