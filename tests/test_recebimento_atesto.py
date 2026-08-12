@@ -631,7 +631,12 @@ def test_atesto_gera_entrada_com_a_quantidade_recebida():
         lote = AlmoxarifadoEstoque.query.filter_by(
             entrada_movimento_id=mov.id).first()
         assert lote is not None, 'entrada sem lote FIFO não sai do estoque'
-        assert float(lote.quantidade_disponivel) == 30.0
+        assert float(lote.quantidade_inicial) == 30.0
+        # O disponível é zero porque o pedido tem obra, e material que chega
+        # na obra é reconhecido como consumido no ato — a saída pareada da C2.
+        # Quem cuida disso é
+        # `test_atesto_com_obra_gera_a_saida_de_consumo_pareada`.
+        assert float(lote.quantidade_disponivel) == 0.0
 
         linha = RecebimentoPedidoItem.query.filter_by(
             recebimento_id=rec.id, pedido_item_id=item.id).first()
@@ -1488,3 +1493,207 @@ def test_quem_tem_papel_continua_vendo_o_botao():
         f'/compras/{pedido_id}').get_data(as_text=True)
 
     assert f'/compras/{pedido_id}/recebimento' in corpo
+
+
+# ---------------------------------------------------------------------------
+# C2 — a SAÍDA de consumo volta, no momento certo
+# ---------------------------------------------------------------------------
+#
+# Revisão de 12/08, achados 1 e 11. O achado mais grave da revisão, e o mais
+# silencioso: o guard de emissão devolve `[]`, e os dois chamadores derivam a
+# SAÍDA pareada de `movs_entrada` — que passou a vir vazia. O regime novo só
+# gerava ENTRADA.
+#
+# Efeito num tenant com a flag ligada: material comprado para a obra, que
+# antes era reconhecido como consumido no ato (lote CONSUMIDO, disponível 0),
+# passa a ficar DISPONIVEL para sempre. O almoxarifado exibe saldo de material
+# que fisicamente já foi para a obra, e alguém pode dar saída do mesmo cimento
+# uma segunda vez — consumo em dobro.
+#
+# O gate original não pegou porque o teste da emissão afirmava `entradas == []`
+# e nunca olhou a saída. O teste de paridade abaixo é o que faltava: com e sem
+# a flag, o conjunto final de movimentos tem de ser o mesmo. Só o instante muda.
+
+def _saidas(pedido_id):
+    from models import AlmoxarifadoMovimento
+    return (AlmoxarifadoMovimento.query
+            .filter_by(pedido_compra_id=pedido_id, tipo_movimento='SAIDA')
+            .all())
+
+
+def _retrato_dos_movimentos(pedido_id):
+    """O que existe no almoxarifado por causa deste pedido, sem o instante.
+
+    É o retrato que tem de ser igual nos dois regimes: tipo, quantidade,
+    status e disponível do lote. Data e observação ficam de fora de propósito
+    — é exatamente o que a fase mudou.
+    """
+    from models import AlmoxarifadoEstoque, AlmoxarifadoMovimento
+    retrato = []
+    movimentos = (AlmoxarifadoMovimento.query
+                  .filter_by(pedido_compra_id=pedido_id)
+                  .order_by(AlmoxarifadoMovimento.tipo_movimento,
+                            AlmoxarifadoMovimento.quantidade)
+                  .all())
+    for mov in movimentos:
+        lote = AlmoxarifadoEstoque.query.filter_by(
+            entrada_movimento_id=mov.id).first()
+        retrato.append((
+            mov.tipo_movimento,
+            float(mov.quantidade),
+            lote.status if lote else None,
+            float(lote.quantidade_disponivel) if lote else None,
+        ))
+    return sorted(retrato, key=lambda t: (t[0], t[1]))
+
+
+def test_atesto_com_obra_gera_a_saida_de_consumo_pareada():
+    """O material chegou na obra: entra e é consumido, como na emissão era.
+
+    Sem a saída, o lote fica DISPONIVEL para sempre e o mesmo cimento pode
+    sair uma segunda vez pela tela do almoxarifado.
+    """
+    from models import AlmoxarifadoEstoque
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+
+        _receber(pedido, admin, item, 30)
+
+        entradas = _entradas(pedido.id)
+        saidas = _saidas(pedido.id)
+        assert len(entradas) == 1 and float(entradas[0].quantidade) == 30.0
+        assert len(saidas) == 1, (
+            'o atesto lançou a ENTRADA e não lançou a SAÍDA de consumo que a '
+            'emissão lançava — o lote fica disponível para sempre')
+        assert float(saidas[0].quantidade) == 30.0
+        lote = AlmoxarifadoEstoque.query.filter_by(
+            entrada_movimento_id=entradas[0].id).first()
+        assert lote.status == 'CONSUMIDO'
+        assert float(lote.quantidade_disponivel) == 0.0
+
+
+def test_atesto_sem_obra_deixa_o_material_em_estoque():
+    """Sem obra não há consumo a reconhecer — o material fica na prateleira.
+
+    É o comportamento do regime antigo (`processar_compra_normal` só gera
+    saída quando há obra), e é o caso que prova que a correção não saiu
+    lançando saída para tudo.
+    """
+    from models import AlmoxarifadoEstoque
+    with app.app_context():
+        admin, pedido, item = _pedido_sem_obra()
+
+        _receber(pedido, admin, item, 10)
+
+        assert len(_entradas(pedido.id)) == 1
+        assert _saidas(pedido.id) == [], (
+            'o atesto consumiu material de um pedido sem obra — não há centro '
+            'de custo para consumir contra')
+        lote = AlmoxarifadoEstoque.query.filter_by(
+            entrada_movimento_id=_entradas(pedido.id)[0].id).first()
+        assert lote.status == 'DISPONIVEL'
+
+
+def test_atesto_de_faturamento_direto_gera_a_saida_do_cliente():
+    """`aprovacao_cliente`: o material é do cliente, e sai como faturamento direto."""
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+        pedido.tipo_compra = 'aprovacao_cliente'
+        pedido.status_aprovacao_cliente = 'APROVADO'
+        db.session.commit()
+
+        _receber(pedido, admin, item, 50)
+
+        saidas = _saidas(pedido.id)
+        assert len(saidas) == 1, 'a saída de faturamento direto sumiu'
+        assert 'faturamento' in (saidas[0].observacao or '').lower(), (
+            f'a saída não diz que é faturamento direto: '
+            f'{saidas[0].observacao!r}')
+
+
+def test_a_saida_do_atesto_carrega_pedido_obra_e_tenant():
+    """`pedido_compra_id` é o que a dedup do EventManager usa; os outros dois
+    são o isolamento multi-tenant e o centro de custo."""
+    with app.app_context():
+        admin, obra, pedido, item, _almox = _cenario_com_catalogo(50)
+
+        _receber(pedido, admin, item, 30)
+
+        saida = _saidas(pedido.id)[0]
+        assert saida.pedido_compra_id == pedido.id
+        assert saida.obra_id == obra.id
+        assert saida.admin_id == admin.id
+
+
+def test_paridade_de_movimentos_entre_os_dois_regimes():
+    """O teste que faltava ao gate original.
+
+    Mesmo pedido, mesma obra, mesmos itens. Num tenant a emissão lança; no
+    outro o atesto lança. Ao fim do ciclo, o que existe no almoxarifado tem
+    de ser o MESMO — só o instante muda. É esta a promessa da fase inteira, e
+    ela não estava sob teste: o teste da emissão afirmava `entradas == []` e
+    parava aí.
+    """
+    with app.app_context():
+        legado_admin, _o1, legado, _i1, _a1 = _cenario_com_catalogo(
+            50, exige_atesto=False)
+        from compras_views import processar_compra_normal
+        processar_compra_normal(legado, _itens_validos(legado),
+                                legado_admin.id, legado_admin.id)
+        db.session.commit()
+        retrato_legado = _retrato_dos_movimentos(legado.id)
+
+        novo_admin, _o2, novo, item, _a2 = _cenario_com_catalogo(50)
+        processar_compra_normal(novo, _itens_validos(novo),
+                                novo_admin.id, novo_admin.id)
+        db.session.commit()
+        _receber(novo, novo_admin, item, 50)
+        retrato_novo = _retrato_dos_movimentos(novo.id)
+
+    assert retrato_novo == retrato_legado, (
+        f'os dois regimes divergem no que deixam no almoxarifado.\n'
+        f'  legado: {retrato_legado}\n'
+        f'  novo:   {retrato_novo}')
+
+
+def test_movimentos_do_atesto_usam_a_data_do_recebimento():
+    """O caminhão chegou sábado e foi lançado na segunda — o fato é sábado.
+
+    É o cenário que o docstring de `RecebimentoPedido.data_recebimento` diz
+    que a coluna existe para cobrir. Sem propagar, `data_movimento` cai no
+    default `utcnow` e o relatório de entradas por período do almoxarifado
+    conta o material no mês errado.
+    """
+    from models import AlmoxarifadoMovimento
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+
+        _receber(pedido, admin, item, 30, data=date(2026, 7, 31))
+
+        movimentos = AlmoxarifadoMovimento.query.filter_by(
+            pedido_compra_id=pedido.id).all()
+        assert movimentos, 'nenhum movimento gerado'
+        for mov in movimentos:
+            assert mov.data_movimento.date() == date(2026, 7, 31), (
+                f'{mov.tipo_movimento} ficou com a data do registro '
+                f'({mov.data_movimento}) em vez da data da entrega')
+
+
+def test_linha_do_recebimento_guarda_a_saida_que_gerou():
+    """Sem guardar o id da saída, o estorno da exclusão não sabe o que desfazer.
+
+    É a mesma razão de `almoxarifado_movimento_id` existir para a entrada: o
+    estorno não pode adivinhar qual movimento era dele.
+    """
+    from models import RecebimentoPedidoItem
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+
+        rec = _receber(pedido, admin, item, 30)
+
+        linha = RecebimentoPedidoItem.query.filter_by(
+            recebimento_id=rec.id).first()
+        assert linha.almoxarifado_saida_movimento_id is not None
+        assert (linha.almoxarifado_saida_movimento_id
+                == _saidas(pedido.id)[0].id)
+

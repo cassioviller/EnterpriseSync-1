@@ -205,30 +205,70 @@ def _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega):
                       'justifique.')
 
 
-def _lancar_no_estoque(pedido, recebimento, linha, item, usuario_id):
-    """ENTRADA + lote FIFO da quantidade que ESTA linha atestou.
+def descricao_da_saida(pedido, lote_ref):
+    """O texto da SAÍDA pareada, ou None quando não há saída a gerar.
 
-    O espelho de `compras_views._gerar_entrada_almoxarifado`, com a diferença
-    que é a razão desta fase existir: a quantidade é a RECEBIDA, não a pedida,
-    e o momento é o da chegada, não o da emissão.
+    Espelha, palavra por palavra, as duas chamadas de
+    `compras_views._gerar_saida_almoxarifado`:
+
+    | Pedido               | Emissão (regime antigo)   | Atesto (regime novo) |
+    |----------------------|---------------------------|----------------------|
+    | normal COM obra      | "Consumo direto na obra"  | idem                 |
+    | normal SEM obra      | só entrada (fica em estoque) | idem              |
+    | `aprovacao_cliente`  | "Consumo faturamento direto" | idem              |
+
+    Está aqui, e não embutido no lançamento, porque é a REGRA — e a regra
+    tinha de ser lida junto da tabela para se conferir que espelha mesmo.
+    """
+    if pedido.tipo_compra == 'aprovacao_cliente':
+        return f'Consumo faturamento direto — compra {lote_ref}'
+    if pedido.obra_id:
+        return f'Consumo direto na obra — compra {lote_ref}'
+    return None
+
+
+def _lancar_no_estoque(pedido, recebimento, linha, item, usuario_id):
+    """ENTRADA + lote FIFO da quantidade que ESTA linha atestou, e a SAÍDA pareada.
+
+    O espelho de `compras_views._gerar_entrada_almoxarifado` + `_gerar_saida_
+    almoxarifado`, com a diferença que é a razão desta fase existir: a
+    quantidade é a RECEBIDA, não a pedida, e o momento é o da chegada, não o
+    da emissão. ⚠️ Os dois lados são a MESMA regra em dois lugares: mexer em
+    um pede conferir o outro, e o teste de paridade
+    (`test_paridade_de_movimentos_entre_os_dois_regimes`) é quem cobra isso.
+
+    A saída existe porque material comprado para obra é reconhecido como
+    consumido no ato — era assim na emissão e continua sendo. Sem ela o lote
+    fica DISPONIVEL para sempre e o mesmo material pode sair uma segunda vez
+    pela tela do almoxarifado (achado 1 da revisão de 12/08).
+
+    `data_movimento` recebe a data do RECEBIMENTO, não a do registro: o
+    caminhão que chega no sábado e é lançado na segunda pertence ao sábado, e
+    é para isso que `RecebimentoPedido.data_recebimento` existe.
 
     Item de texto livre não chega aqui — sem `almoxarifado_item_id` não há o
-    que movimentar, e a linha do recebimento fica com
-    `almoxarifado_movimento_id` NULL de propósito.
+    que movimentar, e a linha do recebimento fica com os dois ids NULL de
+    propósito.
 
     `pedido_compra_id` é preenchido porque o handler `material_entrada` do
     EventManager dedup por ele: sem isso o custo do material entra duas vezes.
     """
+    from datetime import datetime, time
+
     from models import AlmoxarifadoEstoque, AlmoxarifadoMovimento, db
 
     lote_ref = f'{pedido.numero or f"PC-{pedido.id}"}/{recebimento.sequencia}'
     quantidade = _d(linha.quantidade_recebida)
+    quando = recebimento.data_recebimento
+    if not isinstance(quando, datetime):
+        quando = datetime.combine(quando, time.min)
 
     mov = AlmoxarifadoMovimento(
         item_id=item.almoxarifado_item_id,
         tipo_movimento='ENTRADA',
         quantidade=quantidade,
         valor_unitario=item.preco_unitario,
+        data_movimento=quando,
         nota_fiscal=pedido.numero,
         observacao=f'Recebimento {recebimento.rotulo}: {item.descricao[:100]}',
         estoque_id=None,
@@ -260,6 +300,31 @@ def _lancar_no_estoque(pedido, recebimento, linha, item, usuario_id):
     mov.estoque_id = estoque.id
 
     linha.almoxarifado_movimento_id = mov.id
+
+    descricao = descricao_da_saida(pedido, lote_ref)
+    if descricao is None:
+        return mov
+
+    estoque.quantidade_disponivel = 0
+    estoque.status = 'CONSUMIDO'
+    saida = AlmoxarifadoMovimento(
+        item_id=item.almoxarifado_item_id,
+        tipo_movimento='SAIDA',
+        quantidade=quantidade,
+        valor_unitario=item.preco_unitario,
+        data_movimento=quando,
+        funcionario_id=None,
+        obra_id=pedido.obra_id,
+        observacao=descricao,
+        estoque_id=estoque.id,
+        lote=estoque.lote,
+        admin_id=pedido.admin_id,
+        usuario_id=usuario_id,
+        pedido_compra_id=pedido.id,
+    )
+    db.session.add(saida)
+    db.session.flush()
+    linha.almoxarifado_saida_movimento_id = saida.id
     return mov
 
 
@@ -373,17 +438,32 @@ def _lote_do_movimento(movimento_id):
         entrada_movimento_id=movimento_id).first()
 
 
-def _ja_teve_saida(lote):
-    """O material deste lote já saiu da prateleira?
+def _ja_teve_saida(lote, tem_saida_propria=False):
+    """O material deste lote já saiu da prateleira — por MÃO DE TERCEIRO?
 
-    A regra é o disponível ter caído abaixo do que entrou. É o que TODO
+    A regra normal é o disponível ter caído abaixo do que entrou. É o que TODO
     caminho de saída faz (views/almoxarifado/movimentos.py e o consumo direto
     de compras_views._gerar_saida_almoxarifado, que zera o disponível e marca
     CONSUMIDO): baixar `quantidade_disponivel` é o efeito comum a todos, e
     status é consequência dele — no zero vira CONSUMIDO.
+
+    `tem_saida_propria` muda a pergunta, e é a razão de este parâmetro
+    existir (C2): desde que o atesto passou a gerar a SAÍDA pareada, o lote de
+    pedido com obra nasce CONSUMIDO no mesmo instante em que nasce. Comparar
+    disponível com inicial acusaria a nós mesmos, e nenhuma exclusão de
+    recebimento passaria mais.
+
+    O que denuncia terceiro, nesse caso, é o TAMANHO do lote ter mudado:
+    `views/almoxarifado/movimentos.py:637` faz `lote.quantidade =
+    lote.quantidade_disponivel` ao consumir, enquanto a saída pareada mexe só
+    no disponível. E a rigor terceiro nenhum consegue consumir um lote com
+    disponível zero — a checagem da tela de saída barra antes. Isto aqui é o
+    cinto além do suspensório.
     """
     inicial = _d(lote.quantidade_inicial if lote.quantidade_inicial is not None
                  else lote.quantidade)
+    if tem_saida_propria:
+        return _d(lote.quantidade) < inicial
     return _d(lote.quantidade_disponivel) < inicial
 
 
@@ -440,22 +520,34 @@ def excluir_recebimento(recebimento, usuario):
         if mov is None:
             continue
         lote = _lote_do_movimento(mov.id)
-        if lote is not None and _ja_teve_saida(lote):
+        # A saída pareada que ESTE recebimento gerou (C2) é desfeita junto: é
+        # nossa, e desfazer a entrada sem ela deixaria uma saída apontando
+        # para um lote que deixou de existir.
+        saida = (db.session.get(AlmoxarifadoMovimento,
+                                linha.almoxarifado_saida_movimento_id)
+                 if linha.almoxarifado_saida_movimento_id else None)
+        if lote is not None and _ja_teve_saida(lote,
+                                               tem_saida_propria=saida is not None):
             nome = getattr(mov.item, 'nome', None) or linha.pedido_item.descricao
             raise RecebimentoInvalido(
                 f'"{nome}" deste recebimento já teve saída do almoxarifado — '
                 f'o material foi consumido e a entrada não pode ser desfeita. '
                 f'Registre a devolução ao fornecedor em vez de excluir.')
-        a_estornar.append((linha, mov, lote))
+        a_estornar.append((linha, mov, lote, saida))
 
     rotulo = recebimento.rotulo
-    for linha, mov, lote in a_estornar:
-        # A ordem importa: `estoque_id` no movimento e `entrada_movimento_id`
-        # no lote apontam um para o outro. Soltar o vínculo antes de apagar
+    for linha, mov, lote, saida in a_estornar:
+        # A ordem importa: `estoque_id` nos movimentos e `entrada_movimento_id`
+        # no lote apontam um para o outro. Soltar os vínculos antes de apagar
         # evita que o banco recuse por FK.
         linha.almoxarifado_movimento_id = None
+        linha.almoxarifado_saida_movimento_id = None
         mov.estoque_id = None
+        if saida is not None:
+            saida.estoque_id = None
         db.session.flush()
+        if saida is not None:
+            db.session.delete(saida)
         if lote is not None:
             db.session.delete(lote)
         db.session.delete(mov)

@@ -73,7 +73,7 @@ saída para o usuário.
 **Fecha os achados 2, 3 e 4.** Três sintomas, uma função: `_quantidade_do_form` em
 `compras_views.py` transforma erro de digitação em silêncio.
 
-- [ ] **Step 1 (red):** testes de unidade do parser e de rota:
+- [x] **Step 1 (red):** testes de unidade do parser e de rota:
   - `"3O"`, `"30 sacos"`, `"30.5.0"` → **recusa com mensagem** nomeando o item, e
     **nada é gravado** (hoje: vira `Decimal('0')`, é filtrado da lista, e o recebimento
     é gravado sem aquele item, com flash verde);
@@ -82,19 +82,19 @@ saída para o usuário.
   - `POST` com `qtd_<id>=nan` e `=infinity` → mensagem de regra, **não** HTTP 500
     (hoje: `InvalidOperation` não capturada em `_validar_linhas`, sessão sem rollback);
   - campo vazio continua significando "não veio nesta entrega".
-- [ ] **Step 2:** parser estrito em `compras_views._quantidade_do_form`, devolvendo
+- [x] **Step 2:** parser estrito em `compras_views._quantidade_do_form`, devolvendo
   `(quantidade, erro)` em vez de engolir: entrada não vazia e não interpretável vira
   erro nomeado, nunca zero. Aceita vírgula decimal e ponto de milhar; recusa NaN/inf
   explicitamente (`Decimal.is_finite()`).
-- [ ] **Step 3:** o campo em `templates/compras/recebimento.html` vira
+- [x] **Step 3:** o campo em `templates/compras/recebimento.html` vira
   `type="number" step="0.001" min="0"`. É o que tira a ambiguidade na origem: o
   navegador entrega valor canônico e o teclado do celular continua numérico.
-- [ ] **Step 4 (defesa em profundidade):** `_validar_linhas` em
+- [x] **Step 4 (defesa em profundidade):** `_validar_linhas` em
   `services/recebimento_pedido.py` recusa quantidade não finita **antes** de comparar
   com zero. O serviço é o chokepoint; ele não pode depender de a rota ter limpado o dado.
-- [ ] **Step 5 (green + mutação):** verdes. Mutação: fazer o parser devolver `0` no
+- [x] **Step 5 (green + mutação):** verdes. Mutação: fazer o parser devolver `0` no
   lugar do erro e confirmar que o teste do `"3O"` **mata** a mutação.
-- [ ] **Step 6:** commit — `fix(compras): quantidade recebida invalida recusa em vez de sumir`
+- [x] **Step 6:** commit — `fix(compras): quantidade recebida invalida recusa em vez de sumir`
 
 ## C2 — A SAÍDA de consumo volta, no momento certo
 
@@ -110,7 +110,7 @@ A regra de espelhamento, tirada dos dois chamadores atuais:
 | Normal **sem** obra | só ENTRADA (fica em estoque) | idem |
 | `aprovacao_cliente` | ENTRADA + SAÍDA "Consumo faturamento direto" | idem |
 
-- [ ] **Step 1 (red):** os testes que definem a virada:
+- [x] **Step 1 (red):** os testes que definem a virada:
   - pedido **com obra**, atesto de 30 de 50 → ENTRADA de 30 **e** SAÍDA de 30, lote
     `CONSUMIDO` com `quantidade_disponivel` 0 (hoje: só a ENTRADA, lote `DISPONIVEL`);
   - pedido **sem obra** → só ENTRADA, lote `DISPONIVEL` — o caso que deve continuar
@@ -123,24 +123,24 @@ A regra de espelhamento, tirada dos dois chamadores atuais:
     este o teste que faltava, e é ele que fecha o achado.
   - `data_movimento` da ENTRADA **e** da SAÍDA = `recebimento.data_recebimento`, não a
     data do registro (achado 11: caminhão de sábado lançado na segunda cai em agosto).
-- [ ] **Step 2:** coluna `recebimento_pedido_item.almoxarifado_saida_movimento_id`
+- [x] **Step 2:** coluna `recebimento_pedido_item.almoxarifado_saida_movimento_id`
   (FK, nullable) + `migration_285_saida_do_atesto` em `migrations.py`. ⚠️ Conferir
   `migration_history` no dev **antes** de fixar o 285 — é a lição registrada na B6.1 e a
   última do repositório é a 284. Sem backfill: recebimento gravado antes desta correção
   não tem saída para apontar, e `NULL` descreve exatamente isso.
-- [ ] **Step 3:** `_lancar_no_estoque` passa a gerar o par conforme a tabela acima,
+- [x] **Step 3:** `_lancar_no_estoque` passa a gerar o par conforme a tabela acima,
   gravando o id da saída na linha do recebimento e propagando `data_recebimento` para
   `data_movimento` dos dois movimentos.
-- [ ] **Step 4:** deixar `_gerar_saida_almoxarifado` (compras_views) e o novo caminho
+- [x] **Step 4:** deixar `_gerar_saida_almoxarifado` (compras_views) e o novo caminho
   com a mesma forma de saída — mesma descrição, mesmo `lote`, mesmo `estoque_id`. Se der
   para o serviço reusar a função da view sem importar meia view, reusar; se não der,
   **um comentário em cada lado apontando para o outro**, porque são a mesma regra em dois
   lugares e a próxima pessoa precisa saber disso.
-- [ ] **Step 5 (green + mutação):** verdes. Mutação: gerar a saída também para pedido sem
+- [x] **Step 5 (green + mutação):** verdes. Mutação: gerar a saída também para pedido sem
   obra e confirmar que o segundo teste **mata** a mutação.
-- [ ] **Step 6:** atualizar a seção "Como fica" do spec — o regime novo passa a gerar o
+- [x] **Step 6:** atualizar a seção "Como fica" do spec — o regime novo passa a gerar o
   par, e o spec hoje descreve só a ENTRADA.
-- [ ] **Step 7:** commit — `fix(compras): o atesto gera a saida de consumo que a emissao gerava`
+- [x] **Step 7:** commit — `fix(compras): o atesto gera a saida de consumo que a emissao gerava`
 
 ## C3 — A exclusão volta a ser possível, e a do pedido para de mentir
 
@@ -199,20 +199,20 @@ regime novo qualquer papel de obra atesta antes, e nada reverte se o cliente rec
 
 **Fecha os achados 6 e 15.** Dois lados da mesma pergunta — quem pode receber?
 
-- [ ] **Step 1 (red):**
+- [x] **Step 1 (red):**
   - pedido **sem obra** no regime novo: ADMIN do tenant atesta (hoje: 403, inclusive
     para o dono do tenant, porque `papel_de_usuario_na_obra(u, None)` devolve `None`);
   - `LEITOR` do tenant, no mesmo pedido sem obra, **continua** recusado;
   - pedido **com** obra: nada muda — o eixo de obra continua mandando;
   - o detalhe de um pedido do regime novo **não** mostra o botão "Registrar Recebimento"
     para quem a rota recusaria (hoje: mostra, e o clique dá 403 cru).
-- [ ] **Step 2:** `usuario_pode_receber_na_obra` com `obra_id is None` passa a decidir
+- [x] **Step 2:** `usuario_pode_receber_na_obra` com `obra_id is None` passa a decidir
   pelo papel no tenant. A regra fica em `utils/autorizacao.py`, junto das outras — não
   na rota, senão o serviço diverge dela.
-- [ ] **Step 3:** o detalhe passa a consultar a permissão antes de renderizar o botão,
+- [x] **Step 3:** o detalhe passa a consultar a permissão antes de renderizar o botão,
   como os outros botões de compras já fazem.
-- [ ] **Step 4 (green):** verdes.
-- [ ] **Step 5:** commit — `fix(compras): pedido sem obra tem quem atesta, e o botao respeita o papel`
+- [x] **Step 4 (green):** verdes.
+- [x] **Step 5:** commit — `fix(compras): pedido sem obra tem quem atesta, e o botao respeita o papel`
 
 ## C6 — "O resto não vem" sem inventar quantidade
 

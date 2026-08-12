@@ -5801,6 +5801,16 @@ class RecebimentoPedidoItem(db.Model):
     tornar o estorno possível sem adivinhação quando alguém exclui o
     recebimento. Item de texto livre fica NULL — tem atesto, não tem movimento,
     porque não está no catálogo do almoxarifado.
+
+    `almoxarifado_saida_movimento_id` guarda a SAÍDA pareada, quando ela
+    existe: material comprado para uma obra é reconhecido como consumido no
+    ato de chegar (era assim na emissão, e continua sendo — só mudou o
+    instante). Pedido sem obra não tem saída, e a coluna fica NULL.
+
+    Guardar o id em vez de deduzir por convenção é o que permite ao estorno
+    distinguir "a saída que este recebimento gerou" de "alguém consumiu o
+    lote depois" — as duas apontam para o mesmo lote, e só uma pode ser
+    desfeita.
     """
     __tablename__ = 'recebimento_pedido_item'
     __table_args__ = (
@@ -5824,11 +5834,18 @@ class RecebimentoPedidoItem(db.Model):
         db.Integer,
         db.ForeignKey('almoxarifado_movimento.id', ondelete='SET NULL'),
         nullable=True)
+    almoxarifado_saida_movimento_id = db.Column(
+        db.Integer,
+        db.ForeignKey('almoxarifado_movimento.id', ondelete='SET NULL'),
+        nullable=True)
 
     pedido_item = db.relationship('PedidoCompraItem',
                                   foreign_keys=[pedido_item_id])
     almoxarifado_movimento = db.relationship(
         'AlmoxarifadoMovimento', foreign_keys=[almoxarifado_movimento_id])
+    almoxarifado_saida = db.relationship(
+        'AlmoxarifadoMovimento',
+        foreign_keys=[almoxarifado_saida_movimento_id])
 
     def __repr__(self):
         return (f'<RecebimentoPedidoItem rec={self.recebimento_id} '

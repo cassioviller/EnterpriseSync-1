@@ -6274,6 +6274,37 @@ def _migration_284_flag_recebimento_atesto():
                 "recebimento é por tenant).")
 
 
+def _migration_285_saida_do_atesto():
+    """Fase 4 / C2 — `recebimento_pedido_item.almoxarifado_saida_movimento_id`.
+
+    A correção do achado 1 da revisão de 12/08: o regime novo gerava só a
+    ENTRADA, porque o guard de emissão devolve `[]` e os dois chamadores
+    derivavam a SAÍDA pareada dessa lista. Material comprado para obra ficava
+    DISPONIVEL para sempre, quando antes era reconhecido como consumido no
+    ato.
+
+    Com a saída voltando a existir, o estorno da exclusão de recebimento
+    precisa saber QUAL saída era dele: a que ele gerou e a que alguém lançou
+    depois apontam para o mesmo lote, e só a primeira pode ser desfeita.
+    Guardar o id resolve isso sem convenção frágil.
+
+    Sem backfill: recebimento gravado antes desta correção não tem saída para
+    apontar, e NULL descreve exatamente isso.
+
+    Alocação: 285. Conferido em `migration_history` no dev em 12/08 — a última
+    aplicada é a 284.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE recebimento_pedido_item ADD COLUMN IF NOT EXISTS "
+            "almoxarifado_saida_movimento_id INTEGER "
+            "REFERENCES almoxarifado_movimento(id) ON DELETE SET NULL"))
+    logger.info("[Migration 285] recebimento_pedido_item."
+                "almoxarifado_saida_movimento_id criada (a saída pareada do "
+                "atesto, para o estorno saber o que desfazer).")
+
+
 def _migration_282_backfill_dropdown_crm():
     """D-CRM.1 — o backfill que a 174 pulou: grupo de dropdown para TODO
     tenant com dado nas tabelas legadas `crm_*`.
@@ -6632,6 +6663,7 @@ def executar_migracoes():
             (282, "CRM C1 / D-CRM.1 — backfill dos dropdowns: cria o grupo que a 173 pulou e copia as opções legadas crm_* que a 174 não alcançou (JOIN sem grupo não casa)", _migration_282_backfill_dropdown_crm),
             (283, "Fase 4 — recebimento_pedido + recebimento_pedido_item; pedido_compra.exige_atesto (regime carimbado na linha) e situacao_recebimento", _migration_283_recebimento_atesto),
             (284, "Fase 4 — configuracao_empresa.recebimento_atesto_ativo: a virada do recebimento é por tenant (default FALSE)", _migration_284_flag_recebimento_atesto),
+            (285, "Fase 4/C2 — recebimento_pedido_item.almoxarifado_saida_movimento_id: a saída de consumo pareada do atesto, para o estorno saber o que desfazer", _migration_285_saida_do_atesto),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
