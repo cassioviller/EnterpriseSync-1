@@ -184,28 +184,38 @@ O conserto da dupla escrita. É o passo de maior risco do plano: mexe em almoxar
 
 ## R7 — Consistência e o gancho da fase financeira
 
-- [ ] **Step 1 (red):** `valor_atestado(pedido)` = Σ (quantidade recebida × preço
+- [x] **Step 1 (red):** `valor_atestado(pedido)` = Σ (quantidade recebida × preço
   unitário), incluindo item de texto livre e ignorando o saldo não entregue; o script de
   consistência acha drift quando alguém escreve `situacao_recebimento` na marra.
-- [ ] **Step 2:** `valor_atestado` no serviço.
-- [ ] **Step 3:** `scripts/verificar_consistencia_recebimento.py`, no formato de
+- [x] **Step 2:** `valor_atestado` no serviço.
+- [x] **Step 3:** `scripts/verificar_consistencia_recebimento.py`, no formato de
   `scripts/verificar_consistencia_progresso.py`: compara o persistido com
-  `situacao_para`, `--json`, exit 0 consistente / 1 drift / 2 erro de uso.
-- [ ] **Step 4 (green):** verdes.
-- [ ] **Step 5:** commit — `feat(compras): valor atestado e sensor de drift da situacao de recebimento`
+  `situacao_para`, `--json`, exit 0 consistente / 1 drift / 2 erro de uso. **Varre só
+  pedido do regime novo** — pedido legado nasce `nao_recebido` e nunca é atualizado, e
+  um sensor que grita sempre não é lido nunca. Tem teste dedicado.
+- [x] **Step 4 (green):** verdes.
+- [x] **Step 5:** commit — `feat(compras): valor atestado e sensor de drift da situacao de recebimento`
 
 ---
 
 ## Gate final
 
-- [ ] `tests/test_recebimento_atesto.py` inteiro verde.
-- [ ] Suítes vizinhas sem regressão: `-k "compra or almoxarifado or requisicao"`.
-- [ ] Num tenant de dev com a flag **desligada**: emitir pedido, conferir por `psql` que
-  o estoque entrou na emissão exatamente como antes.
-- [ ] No mesmo tenant com a flag **ligada**: emitir, receber parcial, receber o resto,
-  encerrar saldo — conferindo os movimentos e a situação a cada passo.
-- [ ] `scripts/verificar_consistencia_recebimento.py` sem drift nas obras de dev.
-- [ ] Runbook curto no fim do spec: como ligar a flag num tenant e o que conferir depois.
+- [x] `tests/test_recebimento_atesto.py` inteiro verde — **51 testes**.
+- [x] Suítes vizinhas sem regressão: `-k "compra or almoxarifado or requisicao"` — 90
+  verdes. (Os testes de browser/Playwright dão erro de ambiente por falta de navegador
+  neste host, antes e depois da fase.)
+- [x] Num tenant de dev com a flag **desligada**: emitir pedido, conferir por SQL que o
+  estoque entrou na emissão exatamente como antes — `ENTRADA` de 50, lote `PC-…`.
+- [x] No mesmo tenant com a flag **ligada**: emitir (zero movimentos), receber parcial
+  (30 → `ENTRADA` 30, lote `PC-…/1`, `parcial`), receber o resto (20 → lote `PC-…/2`,
+  `recebido`), encerrar saldo (48 de 50 → `encerrado_com_saldo`). Conferido por SQL cru
+  a cada passo, mais `valor_atestado` em R$ 975 e R$ 1.625.
+- [x] Ligar e **desligar** a flag de volta não mexeu no regime de nenhum pedido já
+  criado — a razão de carimbar na linha, conferida de ponta a ponta.
+- [x] `scripts/verificar_consistencia_recebimento.py` sem drift nas obras de dev
+  (admins 1, 6793, 3510 — exit 0).
+- [x] Runbook no fim do spec: como ligar a flag num tenant, a tabela do que conferir
+  depois, e o que desligar faz (e não faz).
 
 ## Riscos
 

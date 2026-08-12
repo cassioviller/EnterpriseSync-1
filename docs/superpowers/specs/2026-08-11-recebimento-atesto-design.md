@@ -274,6 +274,52 @@ repositório é a 282.
 
 ---
 
+## Runbook — ligar a flag num tenant
+
+A flag é por tenant e o regime é carimbado **no pedido**, na criação. Ligar não mexe em
+nada do que já existe: os pedidos de ontem continuam sendo pedidos de ontem.
+
+```bash
+# 1. Conferir onde o tenant está hoje
+python scripts/flag_recebimento_atesto.py <admin_id>
+
+# 2. Ligar. Recusa tenant sem nenhum AlmoxarifadoItem cadastrado — ligar ali
+#    criaria pedido que ninguém consegue receber. Use --forcar só sabendo disso.
+python scripts/flag_recebimento_atesto.py <admin_id> --ligar
+
+# 3. Emitir um pedido de teste e conferir que o estoque NÃO entrou na emissão
+#    (o antes/depois da virada, num pedido só)
+psql "$DATABASE_URL" -c "
+  SELECT p.numero, p.exige_atesto, p.situacao_recebimento,
+         count(m.id) AS movimentos
+  FROM pedido_compra p
+  LEFT JOIN almoxarifado_movimento m
+         ON m.pedido_compra_id = p.id AND m.tipo_movimento = 'ENTRADA'
+  WHERE p.admin_id = <admin_id>
+  GROUP BY p.id ORDER BY p.id DESC LIMIT 5;"
+```
+
+**O que conferir depois de ligar**, em ordem:
+
+| Passo | Esperado |
+|---|---|
+| Emitir pedido novo | `exige_atesto = true`, `situacao_recebimento = 'nao_recebido'`, **zero** movimentos |
+| Abrir o pedido | O botão leva para `/compras/<id>/recebimento`, não para o POST antigo |
+| Receber parcial (30 de 50) | Um `ENTRADA` de 30, lote `PC-.../1`, situação `parcial` |
+| Receber o resto (20) | Segundo `ENTRADA` de 20, lote `PC-.../2`, situação `recebido` |
+| Pedido emitido **antes** de ligar | Continua `exige_atesto = false` e recebendo pela rota antiga |
+| `verificar_consistencia_recebimento.py <admin_id>` | Exit 0, sem drift |
+
+**Desligar** (`--desligar`) só afeta pedido que nascer daí em diante. Os que já
+carimbaram `exige_atesto = true` continuam recebendo por atesto — é intencional:
+desfazer o regime de um pedido em curso deixaria o estoque dele sem dono, com metade
+lançada pelo atesto e o resto por lugar nenhum.
+
+**Se algo ficar estranho**, o primeiro comando é o sensor: ele compara a situação
+persistida com a derivada dos recebimentos e nomeia os pedidos divergentes.
+
+---
+
 ## Fora de escopo
 
 Nota fiscal e o vínculo dela com o pedido; bloqueio do contas a pagar pela tríade;
