@@ -1381,3 +1381,110 @@ def test_quantidade_absurda_recusa_em_vez_de_estourar_no_banco():
     assert _flashes(cli), 'recusou calado'
     with app.app_context():
         assert _recebimentos_de(pedido_id) == []
+
+
+# ---------------------------------------------------------------------------
+# C5 — ninguém fica sem caminho: pedido sem obra, e botão que não engana
+# ---------------------------------------------------------------------------
+#
+# Revisão de 12/08, achados 6 e 15. Dois lados da mesma pergunta: quem pode
+# receber?
+#
+# Pedido SEM obra é caso legítimo — `compras_views.nova_post` aceita `obra_id`
+# vazio de propósito, e material de escritório é a razão. Mas
+# `papel_de_usuario_na_obra(u, None)` faz `db.session.get(Obra, None)`, que
+# devolve None, e o papel sai None: 403 para todo mundo, inclusive para o
+# ADMIN dono do tenant. Com o regime novo esse pedido também não recebe
+# estoque na emissão — ou seja, o material não entrava em lugar nenhum, e a
+# única explicação que o usuário via era um 403 cru.
+#
+# Do outro lado, o botão do detalhe só olhava `pedido.exige_atesto`: aparecia
+# verde para quem a rota ia recusar.
+
+
+def _pedido_sem_obra():
+    """Pedido de material de escritório: sem obra, no regime novo."""
+    admin = _admin()
+    forn = _fornecedor(admin.id)
+    pedido = _pedido(admin.id, None, forn.id,
+                     itens=(('Papel A4', 10, 25.00),))
+    almox = _item_de_catalogo(admin.id, 'Papel A4')
+    pedido.exige_atesto = True
+    item = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).first()
+    item.almoxarifado_item_id = almox.id
+    db.session.commit()
+    return admin, pedido, item
+
+
+def test_admin_atesta_pedido_sem_obra():
+    """Sem obra não há eixo de obra para aplicar — quem decide é o tenant."""
+    with app.app_context():
+        admin, pedido, item = _pedido_sem_obra()
+
+        rec = _receber(pedido, admin, item, 10)
+
+        assert rec is not None
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'recebido'
+        assert len(_entradas(pedido.id)) == 1, (
+            'o material do pedido sem obra não entrou em lugar nenhum: não na '
+            'emissão (regime novo) e não no atesto (403)')
+
+
+def test_funcionario_sem_vinculo_nao_atesta_pedido_sem_obra_com_escopo_ligado():
+    """Com o eixo de obra em vigor, não há vínculo que autorize um pedido sem obra.
+
+    A permissividade de "sem obra" não pode ser maior que a de "com obra":
+    seria uma porta lateral para quem o escopo existe para estreitar.
+    """
+    from scripts.flag_escopo_obra import definir_flag as _escopo
+    from services.recebimento_pedido import (RecebimentoInvalido,
+                                             registrar_recebimento)
+    with app.app_context():
+        admin, pedido, item = _pedido_sem_obra()
+        _escopo(admin.id, True)
+        suf = uuid.uuid4().hex[:8]
+        funcionario = Usuario(
+            username=f'sf_{suf}', email=f'sf_{suf}@test.local', nome=f'F {suf}',
+            password_hash=generate_password_hash('Senha@2026'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            versao_sistema='v2', admin_id=admin.id)
+        db.session.add(funcionario)
+        db.session.commit()
+
+        with pytest.raises(RecebimentoInvalido):
+            registrar_recebimento(pedido, funcionario, [(item.id, Decimal('10'))],
+                                  date(2026, 8, 5))
+
+
+def test_botao_de_recebimento_nao_aparece_para_quem_a_rota_recusaria():
+    """Botão verde que dá 403 é pior que botão ausente.
+
+    Os outros botões de compras já consultam a permissão antes de renderizar;
+    este só olhava o regime do pedido.
+    """
+    from helpers_tenant import cliente_de
+    admin_id, obra_id, pedido_id, _item_id = _cenario_de_rota()
+    with app.app_context():
+        leitor_id = _pessoa_com_papel(admin_id, obra_id, 'LEITOR').id
+
+    corpo = cliente_de(leitor_id).get(
+        f'/compras/{pedido_id}').get_data(as_text=True)
+
+    # A âncora é o link, não a frase: "Registrar Recebimento" também aparece
+    # num parágrafo explicativo da mesma tela.
+    assert f'/compras/{pedido_id}/recebimento' not in corpo, (
+        'o detalhe ofereceu ao LEITOR um botão que a rota responde com 403')
+
+
+def test_quem_tem_papel_continua_vendo_o_botao():
+    """O contrapeso do teste acima: esconder de todo mundo também é defeito."""
+    from helpers_tenant import cliente_de
+    admin_id, obra_id, pedido_id, _item_id = _cenario_de_rota()
+    with app.app_context():
+        gestor_id = _pessoa_com_papel(admin_id, obra_id, 'GESTOR').id
+
+    corpo = cliente_de(gestor_id).get(
+        f'/compras/{pedido_id}').get_data(as_text=True)
+
+    assert f'/compras/{pedido_id}/recebimento' in corpo

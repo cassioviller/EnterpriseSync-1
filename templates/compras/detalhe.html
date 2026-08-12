@@ -30,7 +30,7 @@
                                 pedido.situacao_recebimento, 'light text-dark border') }} fs-6 px-3 py-2">
         {{ SITUACOES_RECEBIMENTO.get(pedido.situacao_recebimento, '—') }}
       </span>
-      {% if pedido.situacao_recebimento not in ('recebido', 'encerrado_com_saldo') %}
+      {% if pode_receber and pedido.situacao_recebimento not in ('recebido', 'encerrado_com_saldo') %}
         <a href="{{ url_for('compras.recebimento', pedido_id=pedido.id) }}"
            class="btn btn-success">
           <i class="fas fa-clipboard-check me-2"></i>Registrar Recebimento

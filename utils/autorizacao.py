@@ -231,13 +231,62 @@ def usuario_pode_receber_na_obra(usuario, obra_id):
 
     É esta que o serviço chama (`services/recebimento_pedido`), para poder
     rodar fora de um request. `pode_receber_na_obra` é a casca de sessão.
+
+    `obra_id` None é pedido SEM obra — material de escritório, caso legítimo
+    que `compras_views.nova_post` aceita de propósito. Aí não há eixo de obra
+    para aplicar, e quem decide é o tenant (ver `_pode_receber_sem_obra`).
     """
+    if obra_id is None:
+        return _pode_receber_sem_obra(usuario)
+
     papel = papel_de_usuario_na_obra(usuario, obra_id)
     if papel is None:
         return False
     if usuario.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
         return True
     return papel in PAPEIS_QUE_RECEBEM
+
+
+def _tenant_de(usuario):
+    """O `admin_id` pelo qual este usuário responde, ou None.
+
+    ADMIN responde por si; funcionário responde pelo seu admin. Mesma regra
+    que `papel_de_usuario_na_obra` deriva quando o tenant não vem explícito —
+    extraída porque a decisão de "sem obra" precisa dela sem precisar de obra.
+    """
+    if usuario is None or not getattr(usuario, 'id', None):
+        return None
+    if usuario.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
+        return usuario.id
+    return getattr(usuario, 'admin_id', None)
+
+
+def _pode_receber_sem_obra(usuario):
+    """Atestar pedido SEM obra — não há vínculo de obra a consultar. Fase 4/C5.
+
+    Antes desta função, `usuario_pode_receber_na_obra(u, None)` caía em
+    `db.session.get(Obra, None)` → None → papel None → recusa para todo mundo,
+    inclusive para o ADMIN dono do tenant. Como o regime novo também não lança
+    estoque na emissão, o material do pedido sem obra não entrava em lugar
+    nenhum — e a única explicação que o usuário via era um 403.
+
+    A regra segue a do eixo de obra, que só pode ESTREITAR:
+
+    * ADMIN/SUPER_ADMIN do tenant atestam — já enxergam tudo por definição;
+    * com `escopo_obra_ativo` DESLIGADA, qualquer usuário do tenant atesta —
+      é o comportamento pré-Fase 1, permissivo, que a flag existe para
+      preservar;
+    * com a flag LIGADA, mais ninguém: sem obra não há vínculo em
+      `usuario_obra` que autorize, e inventar uma permissão aqui abriria uma
+      porta lateral mais larga que a da obra — exatamente o que o escopo
+      existe para fechar.
+    """
+    tenant = _tenant_de(usuario)
+    if tenant is None:
+        return False
+    if usuario.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
+        return True
+    return not _escopo_ativo(tenant)
 
 
 def pode_receber_na_obra(obra_id):

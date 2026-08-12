@@ -944,6 +944,10 @@ def detalhe(pedido_id):
         fornecedores=fornecedores,
         obras=obras,
         SITUACOES_RECEBIMENTO=SITUACOES_RECEBIMENTO,
+        # A permissão é consultada AQUI, e não no template: botão verde que
+        # responde 403 é pior que botão ausente, e é assim que os outros
+        # botões desta tela já se comportam.
+        pode_receber=pode_receber_na_obra(pedido.obra_id),
     )
 
 
