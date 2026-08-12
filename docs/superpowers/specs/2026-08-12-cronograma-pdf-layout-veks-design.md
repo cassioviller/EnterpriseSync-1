@@ -51,7 +51,7 @@ depois é uma linha de `registerFont` — não vale carregar esse peso agora.
 | Para quem é o PDF | Cliente — documento de acompanhamento |
 | Qual cronograma alimenta | **O da tela aberta**: `?cliente=1` exporta a cópia-cliente, sem querystring exporta o interno |
 | Gantt ou tabela | **Só a tabela** — a "Planilha de tarefas" do Project, não o gráfico |
-| Colunas | EDT, Nome da tarefa, Duração, Início, Término, % concluído |
+| Colunas | `#` (número de linha, como na grade), Nome da tarefa, Duração, Início, Término, % concluído |
 | Página | A4 retrato; linhas quebram para a página seguinte com o cabeçalho da tabela repetido |
 | Onde fica o botão | Só na tela do cronograma, atrás de `@login_required`. **Sem** rota no portal do cliente |
 | Marca | A forma do docx é o padrão de todos os tenants; logo, nome, CNPJ e endereço vêm de `ConfiguracaoEmpresa` |
@@ -106,10 +106,10 @@ desenho. Não sabe que existe PDF. Devolve:
   'obra': {'nome': ..., 'cliente': ..., 'data_inicio': date|None,
            'data_fim': date|None, 'progresso_geral': float},
   'linhas': [
-     {'edt': '1',   'nivel': 0, 'nome': 'Fundação',  'duracao_dias': 33,
+     {'numero': 1, 'nivel': 0, 'nome': 'Fundação',  'duracao_dias': 33,
       'data_inicio': date, 'data_fim': date, 'percentual': 100.0,
       'is_pai': True,  'is_marco': False},
-     {'edt': '1.1', 'nivel': 1, 'nome': 'Escavação', ...},
+     {'numero': 2, 'nivel': 1, 'nome': 'Escavação', ...},
   ],
 }
 ```
@@ -127,13 +127,27 @@ que a torna testável sem obra nenhuma: um dict na entrada, bytes na saída.
 corrompida ou ausente cai no nome da empresa em serifada e registra em log, sem derrubar
 o download.
 
-### A EDT sai da árvore, não do `wbs_codigo`
+### A numeração é a `#` da tela — sequencial, não hierárquica
 
-`TarefaCronograma.wbs_codigo` existe, mas só é preenchido nas tarefas que vieram de
-importação `.mpp` (migration 208). Numa obra com tarefas criadas na tela a numeração
-sairia furada — algumas com código, outras em branco. A EDT é derivada da posição na
-árvore na hora da exportação (1, 1.1, 1.2, 2, …), a partir do `nivel_map` que
-`ordenar_arvore_visual` já devolve. Determinística e sempre completa.
+A coluna é o **número de linha sequencial** (1, 2, 3, …) na ordem visual da árvore, igual
+à coluna `#` da grade (`templates/obras/cronograma.html:189`) e igual à coluna ID do
+Project. Não é EDT hierárquica (1, 1.1, 1.2) e não é `wbs_codigo`.
+
+Três razões, na ordem em que pesam:
+
+1. **É a numeração que o sistema já usa.** A coluna `Pred.` da grade referencia tarefas
+   por esse número ("ID da tarefa predecessora",
+   `templates/obras/cronograma.html:194`), e `ordenar_arvore_visual` é descrita no próprio
+   docstring como "FONTE ÚNICA da numeração visual de linhas". Um EDT hierárquico no PDF
+   seria uma segunda numeração da mesma coisa, que não bateria com a tela nem com as
+   predecessoras.
+2. **`wbs_codigo` é parcial.** Só é preenchido nas tarefas vindas de importação `.mpp`
+   (migration 208); numa obra com tarefas criadas na tela, a numeração sairia furada —
+   algumas com código, outras em branco.
+3. A hierarquia não se perde: ela continua legível pela **indentação** do nome e pelo
+   negrito das tarefas-pai.
+
+O cabeçalho da coluna no PDF é `#`, como na tela.
 
 ### A correção de rota: a sexta fórmula de progresso que não vai nascer
 
@@ -157,20 +171,67 @@ papel com tela é o que garante isso.
 Fora dessa extração, nada de refactor: o Gantt em HTML, o editor v2 e o portal do cliente
 não são tocados.
 
-### A assimetria da linha-raiz, que o PDF copia em vez de corrigir
+### A linha-raiz, e qual das duas respostas da tela o PDF segue
 
-A view faz uma coisa a mais no modo interno e não faz no modo cliente: depois de calcular
-o progresso geral, ela sobrescreve o percentual de **toda linha sem `tarefa_pai_id`** com
-esse número (`cronograma_views.py:570-573`, comentada como "alinha a linha raiz ao mesmo
-número no array do front"). No modo cliente esse laço não roda — a linha-raiz da grade
-mantém o rollup hierárquico dela.
+Correção de rumo feita durante a implementação. Este spec dizia, na primeira versão, que a
+sobrescrita da linha-raiz pelo progresso geral acontecia só no modo interno, e mandava o
+PDF copiar essa assimetria. Ler o template desmentiu: **a tela tem dois lugares que
+respondem isso, e eles discordam no modo cliente.**
 
-O PDF reproduz a assimetria **exatamente como está**, porque o critério deste spec é
-papel-igual-a-tela e não papel-mais-certo-que-tela. Se essa diferença for um defeito, ela
-é um defeito da tela, e consertá-la é outra rodada, com o número do card mudando à vista
-de todos. Aqui ela fica registrada para não ser "corrigida" por engano na
-implementação — o que faria o teste de paridade quebrar sem que ninguém entendesse por
-quê.
+| Onde | Regra | Vale em que modo |
+|---|---|---|
+| Grade HTML — `templates/obras/cronograma.html:220` e `:397` | linha sem `tarefa_pai_id` mostra `progresso_geral_header` sempre que ele não é `None` | **nos dois** (depois da p4 ele nunca é `None`) |
+| Array `tarefas_dict`, que alimenta as barras do Gantt — `cronograma_views.py`, branch `else` | mesma sobrescrita | **só no interno** |
+
+No modo cliente, então, a célula da tabela mostra o progresso geral enquanto a barra ao
+lado mostra o rollup hierárquico da raiz. É uma inconsistência da tela, não da exportação.
+
+**O PDF é uma tabela, então o referente é a grade:** a linha-raiz recebe o progresso geral
+nos dois modos, sem `if cliente`. O que muda entre os modos é apenas a *origem* do número
+(`progresso_geral_cliente` × `calcular_progresso_geral_obra_v2`), não a regra da linha.
+
+Alinhar a barra do Gantt à célula da grade é outra rodada — o número muda à vista de todos
+na tela, e não escondido dentro de uma exportação. Fica registrado aqui para que a
+discordância não seja "descoberta" de novo como se fosse defeito do PDF.
+
+### O sync do modo cliente destrói dado — e por isso a exportação não o chama
+
+Achado durante a implementação, num teste que passou verde e não devia. É defeito
+**pré-existente**, e não desta fase.
+
+`sincronizar_percentuais_obra(obra_id, admin_id, cliente=True)` promete no próprio
+docstring:
+
+> "Tarefas-cliente NÃO recebem sync do RDO (RDO aponta no cronograma interno apenas),
+> então neste modo a função apenas recalcula bottom-up dos pais a partir dos filhos."
+
+Não é o que ela faz. O laço do RDO roda igual sobre as tarefas-cliente; como a cópia-
+cliente nunca tem apontamento, cai em `if r is None: tarefa.percentual_concluido = 0.0`
+(`utils/cronograma_engine.py:551-552`) e a função **comita**. E `cronograma_obra` a chama
+com `cliente=cliente_mode` — num **GET**. Ou seja: abrir a tela do cronograma do cliente
+zera, em disco, o percentual de todas as folhas do plano combinado com ele.
+
+É o mesmo estrago que o portal já contorna: `portal_obras_views.py:196` explica que as
+folhas da cópia-cliente "ficariam congeladas (ex.: 0% mesmo com o serviço concluído)" e
+por isso o portal casa cada tarefa-cliente com a interna pelo caminho na árvore. O "0%
+congelado" é este commit.
+
+**O que esta fase faz:** nada de escrita. No modo cliente o serviço lê o percentual como
+está e agrega os pais com `rollup_realizado` (`utils/cronograma_engine.py:1010`) — a mesma
+fórmula do M06 §4.1, em memória, e com ordenação por profundidade real da árvore, melhor
+que a heurística por `ordem` que o sync usa. No modo interno o sync continua sendo
+chamado: ali ele é legítimo, o valor é derivado do RDO e o recálculo converge.
+
+**Consequência aceita:** aberta a tela do cronograma-cliente, ela zera as folhas e passa a
+mostrar 0 onde o PDF mostra o valor gravado. Nesse caso o papel fica *mais* certo que a
+tela. Entre espelhar uma tela que destrói dado e não escrever, não escrever ganha — e o
+critério papel-igual-a-tela vale para formatação e regra de exibição, não para replicar
+uma escrita indevida.
+
+**O que fica para outra rodada:** consertar `sincronizar_percentuais_obra` para o modo
+cliente fazer só o rollup, como o docstring diz. É mudança de comportamento de tela e de
+dado gravado, com pergunta aberta (recuperar o percentual perdido de quem já abriu a tela?
+o portal deve parar de casar por caminho?) — não cabe de carona numa exportação.
 
 ---
 
@@ -224,16 +285,23 @@ dela), levando `?cliente=1` quando `modo_cliente`.
 
 **Camada de dados** (sem PDF):
 
-* EDT correta numa árvore de três níveis, e ordem idêntica a `ordenar_arvore_visual`;
+* numeração sequencial 1..N na ordem de `ordenar_arvore_visual`, numa árvore de três
+  níveis — o mesmo número que a grade mostra na coluna `#`;
 * marco entra sem duração e sem percentual;
 * tarefa arquivada fica fora;
 * modo cliente lê só `is_cliente=True` e não vaza tarefa interna — e o inverso;
-* **o guarda central:** o percentual de cada linha e o progresso geral do PDF batem com o
-  que `cronograma_obra` entrega ao template, nos dois modos. É o teste que impede papel e
-  tela de divergirem, e é ele que trava a extração de `progresso_geral_cliente`;
-* a assimetria da linha-raiz, explicitamente: no modo interno a raiz sai com o progresso
-  geral, no modo cliente sai com o rollup dela. Dois casos, para que ninguém "arrume" um
-  dos lados sem ver o outro quebrar.
+* **o guarda central:** o percentual de cada linha do PDF bate com o percentual da célula
+  correspondente na **grade renderizada** da tela (`GET /cronograma/obra/<id>`) —
+  comparação contra o HTML de verdade, não contra as funções que o PDF também chama, que
+  seria circular. É o teste que impede papel e tela de divergirem, e é ele que trava a
+  extração de `progresso_geral_cliente`. Ele carrega um anti-vácuo explícito: se todos os
+  percentuais vierem zerados, falha — foi o que revelou que a fixture precisava de
+  apontamento de RDO de verdade, porque o sync zera folha sem apontamento;
+* **a exportação não escreve** no modo cliente: percentual gravado conferido antes e depois
+  do download, e o rollup dos pais feito em memória. É o guarda contra alguém "unificar" os
+  dois modos chamando o sync e apagar o plano do cliente;
+* a linha-raiz sai com o progresso geral **nos dois modos**, e o número bate com o card
+  "Progresso Geral" da tela.
 
 **Camada de arquivo:**
 

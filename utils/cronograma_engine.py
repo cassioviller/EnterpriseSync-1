@@ -968,6 +968,45 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date,
     }
 
 
+def progresso_geral_cliente(tarefas: list) -> float:
+    """Progresso geral do cronograma do CLIENTE (`is_cliente=True`): média
+    das FOLHAS ponderada por duração.
+
+    Existe porque o motor não cobre a cópia-cliente —
+    `calcular_progresso_geral_obra_v2` filtra `is_cliente=False` de propósito
+    (a cópia é uma foto tirada por `gerar_cronograma_cliente`, não um plano
+    que o RDO alimenta). O número do header do modo cliente precisava sair de
+    algum lugar, e saía de dentro da view (`cronograma_views.py`, branch
+    `if cliente_mode`), em Python solto.
+
+    Trazido para cá quando o PDF do cronograma passou a precisar do MESMO
+    número: copiá-lo para o serviço de exportação teria criado a **sexta**
+    fórmula de progresso do sistema. O cabeçalho deste módulo é explícito —
+    "views nunca implementam fórmula — consomem este módulo" — e aquela
+    média era a exceção que sobrou. A quinta, que vivia numa expressão Jinja
+    em `templates/obras/cronograma.html`, dava peso igual a uma tarefa de 1
+    dia e a uma de 40 e contava pai junto com filha.
+
+    A regra, idêntica à que a view aplicava: FOLHA é toda tarefa que não é
+    pai de ninguém DENTRO da lista recebida (e não `tarefa_pai_id is None`,
+    que selecionaria o oposto); peso é `duracao_dias` com 1 de piso, para que
+    tarefa de duração 0 ou nula não zere o peso do agregado.
+
+    `tarefas` são objetos `TarefaCronograma` (ou qualquer coisa com `id`,
+    `tarefa_pai_id`, `duracao_dias` e `percentual_concluido`) — já filtrados
+    e ordenados pelo chamador. Lista vazia devolve 0.0, não erro: obra sem
+    cronograma-cliente é situação normal, não excepcional.
+    """
+    pais = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id}
+    folhas = [t for t in tarefas if t.id not in pais]
+    peso_total = sum(float(t.duracao_dias or 1) for t in folhas)
+    if peso_total <= 0:
+        return 0.0
+    soma = sum(float(t.percentual_concluido or 0) * float(t.duracao_dias or 1)
+               for t in folhas)
+    return round(soma / peso_total, 1)
+
+
 def rollup_realizado(itens: list) -> dict:
     """Percentual realizado dos PAIS: média ponderada pela duração das
     filhas, de baixo para cima (mesma fórmula do recálculo/sync — um só
