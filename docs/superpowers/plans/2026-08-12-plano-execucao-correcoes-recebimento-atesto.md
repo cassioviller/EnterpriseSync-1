@@ -300,30 +300,40 @@ constrói `PedidoCompra` sem carimbar, e o teste passa verde.
 
 ## Gate final
 
-- [ ] `tests/test_recebimento_atesto.py` inteiro verde, com a contagem nova de testes
-      registrada aqui (eram 51).
-- [ ] Suítes vizinhas sem regressão: `-k "compra or almoxarifado or requisicao"` — eram
-      90 verdes. (Playwright continua dando erro de ambiente por falta de navegador neste
-      host, antes e depois.)
-- [ ] **A paridade, conferida por SQL cru num tenant de dev**: mesmo pedido, mesma obra,
-      mesmos itens, emitido e recebido com a flag **desligada** e depois com a flag
-      **ligada** → o conjunto final de movimentos (ENTRADA, SAÍDA, lote, status) é o
-      mesmo, só muda o instante. É o gate que faltava na fase original.
-- [ ] Ciclo completo com a flag ligada: emitir (zero movimentos) → receber parcial → o
-      par ENTRADA+SAÍDA com `data_movimento` = data do recebimento → **excluir o
-      recebimento pela tela** e ver os dois movimentos e o lote sumirem → receber de novo
-      → encerrar saldo sem informar quantidade.
-- [ ] Pedido **sem obra** com a flag ligada: ADMIN atesta, o lote fica `DISPONIVEL`,
-      `LEITOR` é recusado.
-- [ ] Pedido `aprovacao_cliente`: atesto recusado antes do aceite, aceito depois.
-- [ ] Tentativa de excluir um pedido com recebimento gravado → recusa; nenhum movimento
-      órfão no banco.
-- [ ] `scripts/verificar_consistencia_recebimento.py` sem drift nas obras de dev
-      (admins 1, 6793, 3510 — exit 0), incluindo um pedido encerrado sem item recebido.
-- [ ] Spec atualizado onde este plano o mudou: a seção "Como fica" (C2) e a ordem das
-      perguntas de `situacao_para` (C6).
-- [ ] Uma releitura do runbook do spec: ele manda conferir "um `ENTRADA` de 30" depois do
-      recebimento parcial, e a partir de C2 a resposta certa passa a ser o par.
+- [x] `tests/test_recebimento_atesto.py` inteiro verde — **110 testes** (eram 51).
+- [x] Suítes vizinhas sem regressão: `-k "compra or almoxarifado or requisicao"` — **90
+      verdes**, a mesma linha de base de antes. (Playwright continua dando erro de
+      ambiente por falta de navegador neste host, antes e depois: 14 errors.)
+- [x] **A paridade, conferida por SQL cru num tenant de dev**: mesmo pedido, mesma obra,
+      mesmos itens, emitido com a flag **desligada** e depois com a flag **ligada** →
+      `[('ENTRADA', 50, 'CONSUMIDO', 0), ('SAIDA', 50, …)]` nos dois. Era o gate que
+      faltava na fase original.
+- [x] Ciclo completo com a flag ligada: emitir (zero movimentos) → receber parcial (par
+      ENTRADA+SAÍDA de 30, lote `PC-…/1` `CONSUMIDO`, `data_movimento` = data da entrega,
+      `valor_atestado` R$ 975) → excluir o recebimento (os dois movimentos e o lote
+      somem, situação volta a `nao_recebido`) → receber de novo → encerrar saldo **sem
+      informar quantidade** (`encerrado_com_saldo`, sem estoque novo).
+- [x] Pedido **sem obra** com a flag ligada: ADMIN atesta e o lote fica `DISPONIVEL`;
+      funcionário sem vínculo é recusado com o escopo de obra ligado.
+- [x] Pedido `aprovacao_cliente`: atesto recusado antes do aceite (nada lançado), par
+      ENTRADA+SAÍDA de faturamento direto depois dele.
+- [x] Tentativa de excluir um pedido com recebimento gravado → recusa. **Zero movimentos
+      órfãos no banco** — os dois que existiam em dev eram resíduo do próprio teste
+      vermelho da C3 (criados 08:14 e 08:15, antes do commit do guard às 08:16: a prova
+      de que o achado 7 era real), e foram limpos.
+- [x] `scripts/verificar_consistencia_recebimento.py` sem drift nas obras de dev
+      (admins 1, 6793, 3510 — exit 0 nos três).
+- [x] Spec atualizado onde este plano o mudou: fluxo e "Como fica" (C2), modelo de dados
+      e decisões de modelagem (C2), derivação da situação (C6) e dois casos de borda.
+- [x] Runbook do spec relido: a linha que mandava conferir "um `ENTRADA` de 30" agora
+      manda conferir o par, e ganhou a conferência da data do movimento.
+
+**Como o gate foi conferido.** Por um script descartável que cria tenants novos (uuid),
+roda o ciclo pela aplicação e lê o resultado com `SELECT` — não pela ORM, que é a mesma
+camada sob teste. Ele **não foi versionado de propósito**: um script que CRIA dado não
+pertence a `scripts/`, onde alguém poderia apontá-lo para produção. O que ele confere
+está descrito acima, item por item, e o mesmo terreno está coberto por
+`tests/test_recebimento_atesto.py`, que roda contra o mesmo Postgres.
 
 ## Riscos
 
