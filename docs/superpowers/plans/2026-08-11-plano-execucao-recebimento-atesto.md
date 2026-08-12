@@ -147,13 +147,20 @@ O conserto da dupla escrita. É o passo de maior risco do plano: mexe em almoxar
 
 ## R5 — Exclusão do último recebimento, com estorno
 
-- [ ] **Step 1 (red):** excluir o último recebimento estorna os movimentos que ele gerou
+- [x] **Step 1 (red):** excluir o último recebimento estorna os movimentos que ele gerou
   e recalcula a situação; excluir um que **não** é o último → recusa; excluir quando o
-  lote gerado já teve saída → recusa, dizendo qual item já foi consumido.
-- [ ] **Step 2:** `excluir_recebimento(recebimento, usuario)` no mesmo serviço. O
-  estorno usa `almoxarifado_movimento_id` — é para isso que a coluna existe.
-- [ ] **Step 3 (green):** verdes.
-- [ ] **Step 4:** commit — `feat(compras): excluir o ultimo recebimento estorna o estoque que ele gerou`
+  lote gerado já teve saída → recusa, dizendo qual item já foi consumido. **Mais dois
+  fora do plano**: excluir o único recebimento devolve o pedido a `nao_recebido`, e
+  `LEITOR` não exclui — excluir é escrita sobre o mesmo fato que atestar, e a checagem
+  de papel não estaria coberta por teste nenhum.
+- [x] **Step 2:** `excluir_recebimento(recebimento, usuario)` no mesmo serviço. O
+  estorno usa `almoxarifado_movimento_id` — é para isso que a coluna existe. Valida
+  tudo **antes** de apagar qualquer coisa: recusa que já estornou metade dos movimentos
+  deixaria o estoque pior do que encontrou.
+- [x] **Step 3 (green):** verdes. Mutação de sanidade, as duas cirúrgicas: desligar o
+  "só o último" mata só o teste da sequência; `_ja_teve_saida` fixo em `False` mata só o
+  do lote consumido.
+- [x] **Step 4:** commit — `feat(compras): excluir o ultimo recebimento estorna o estoque que ele gerou`
 
 ## R6 — Tela de recebimento
 
