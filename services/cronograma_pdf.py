@@ -18,10 +18,23 @@ assimetria da linha-raiz descrita em `_percentual_da_linha`. Um número aqui
 que não bata com a tela é defeito deste módulo, mesmo que esteja "mais
 certo" — é o que `tests/test_cronograma_pdf.py` trava.
 
-O layout vem de `layout veks.docx`: navy `#1E2A4C`, laranja `#E8620E`,
-cinzas `#5A6472`/`#8A93A3`, preenchimento `#F4F6F9`, fio `#C9CED6`, título
-serifado, cabeçalho com logo e rodapé com `pág. X/Y`. A forma é a mesma para
-todo tenant; a marca sai de `ConfiguracaoEmpresa`.
+O layout vem do **kit oficial** (`veks_layout_pdf`: `template_veks.html` +
+`gerar_pdf.py`), que descreve o papel da casa em CSS e o gera via Chromium.
+Este módulo porta esse layout para reportlab — mesmas medidas, mesmas cores,
+mesma escala tipográfica — porque gerar no servidor com Chromium exigiria o
+navegador na imagem de produção (que hoje não o tem; os testes de Playwright
+neste host falham justamente por isso).
+
+Tokens do kit, honrados aqui: `--navy #16294a`, `--navy2 #1e3a5f` (rótulos),
+`--orange #e8611a`, `--line #d8dde5`, corpo em Helvetica e **títulos em
+serifa** (Georgia, com 'DejaVu Serif' como alternativa — é a que o próprio
+render do kit embutiu, e está versionada em `static/fonts/`).
+
+A regra 1 do README do kit — "cada página tem cabeçalho, `.footer` e
+`.footbar` próprios" — aqui é o `canvasmaker`: ele desenha o filete de duas
+cores no topo e a barra navy no pé de TODA página, e a `LongTable` cuida da
+quebra. A forma é a mesma para todo tenant; a marca sai de
+`ConfiguracaoEmpresa`.
 """
 
 from __future__ import annotations
@@ -36,23 +49,75 @@ from datetime import date
 
 logger = logging.getLogger(__name__)
 
-# ── Paleta do layout (layout veks.docx) ──────────────────────────────────────
-NAVY = '#1E2A4C'
-LARANJA = '#E8620E'
-CINZA_TEXTO = '#5A6472'
-CINZA_FRACO = '#8A93A3'
-PREENCHIMENTO = '#F4F6F9'
-FIO = '#C9CED6'
+# ── Tokens do kit oficial (template_veks.html, bloco :root) ──────────────────
+NAVY = '#16294A'          # --navy: azul-marinho institucional
+NAVY_ROTULO = '#1E3A5F'   # --navy2: azul dos rótulos da grade
+LARANJA = '#E8611A'       # --orange: laranja VEKS
+FIO = '#D8DDE5'           # --line: bordas e filetes
+CINZA = '#6B7280'         # --gray
+INK = '#26303D'           # cor do corpo de texto (body)
+PREENCHIMENTO = '#F1F3F7'
 BRANCO = '#FFFFFF'
 
-# Georgia (a serifada do docx) não existe no servidor e não há TTF versionado
-# no repositório. `Times-Roman` vem embutida na reportlab — serifada, sem
-# risco de licença nem de deploy. Trocar por uma TTF é uma linha de
-# `registerFont` no dia em que a diferença incomodar.
-SERIFADA = 'Times-Roman'
-SERIFADA_BOLD = 'Times-Bold'
+# Geometria da página, em mm, direto do CSS do kit:
+#   .page { padding: 11mm 13mm 0 13mm }
+#   .header img { height: 13mm; margin-left: -2mm }
+#   .rule { height: 2.6pt; margin-top: 4mm }  .rule .o { width: 34mm }
+#   .footer { bottom: 0; left: 13mm; padding: 3mm 0 6mm }
+#   .footbar { height: 2mm; width: 210mm; background: var(--navy) }
+MARGEM_LATERAL_MM = 13
+PADDING_TOPO_MM = 11
+LOGO_ALTURA_MM = 13
+LOGO_RECUO_MM = -2
+FILETE_ESPESSURA_PT = 2.6
+FILETE_DISTANCIA_MM = 4     # do rodapé do cabeçalho até o filete
+FILETE_LARANJA_MM = 34
+FOOTBAR_ALTURA_MM = 2
+
 SANS = 'Helvetica'
 SANS_BOLD = 'Helvetica-Bold'
+# Preenchidos por `_registrar_serifada()`: o kit pede Georgia com 'DejaVu
+# Serif' como alternativa, e foi a DejaVu que o render oficial embutiu.
+SERIFADA = 'Times-Roman'
+SERIFADA_BOLD = 'Times-Bold'
+_serifada_resolvida = False
+
+
+def _registrar_serifada() -> None:
+    """Registra a DejaVu Serif versionada em `static/fonts/`, uma vez.
+
+    O kit declara `font-family: Georgia, 'DejaVu Serif', serif` nos títulos, e
+    o PDF de exemplo dele embute justamente a DejaVu Serif — então é ela, e não
+    a Times, que reproduz o papel oficial.
+
+    A fonte é versionada no repositório em vez de instalada por `apt`
+    (`fonts-dejavu-core`) de propósito: a imagem de produção
+    (`python:3.11-slim`) instala `libfontconfig1` mas nenhuma família de
+    fontes, e um PDF que muda de tipografia entre dev e produção é o tipo de
+    diferença que ninguém percebe até o cliente receber o arquivo.
+
+    Falha de registro cai em `Times-Roman` e segue: título com serifa
+    diferente é ruim, download que não acontece é pior.
+    """
+    global SERIFADA, SERIFADA_BOLD, _serifada_resolvida
+    if _serifada_resolvida:
+        return
+    _serifada_resolvida = True
+    import os
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    base = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), 'static', 'fonts')
+    try:
+        pdfmetrics.registerFont(TTFont(
+            'DejaVuSerif', os.path.join(base, 'DejaVuSerif.ttf')))
+        pdfmetrics.registerFont(TTFont(
+            'DejaVuSerif-Bold', os.path.join(base, 'DejaVuSerif-Bold.ttf')))
+        SERIFADA, SERIFADA_BOLD = 'DejaVuSerif', 'DejaVuSerif-Bold'
+    except Exception as e:
+        logger.warning('[CRONOGRAMA-PDF] serifada do kit indisponível, '
+                       'usando Times: %s', e)
 
 TRACO = '—'  # travessão: data ausente, duração de marco, percentual de marco
 
@@ -297,12 +362,18 @@ def exportar_cronograma_pdf(dados: dict, marca: dict) -> bytes:
     obra = dados['obra']
     linhas = dados['linhas']
 
+    _registrar_serifada()
+
     buf = io.BytesIO()
-    margem = 18 * mm
-    # O topo abre espaço para a faixa de marca, desenhada pelo canvas em
-    # todas as páginas; o rodapé, para o fio e a paginação.
-    topo = 34 * mm
-    base = 16 * mm
+    margem = MARGEM_LATERAL_MM * mm
+    # Geometria do kit, somada de cima para baixo: padding do topo (11mm) +
+    # altura da logo (13mm) + distância até o filete (4mm) + o filete (2,6pt).
+    # É onde o cabeçalho termina, e portanto onde o conteúdo pode começar.
+    topo = ((PADDING_TOPO_MM + LOGO_ALTURA_MM + FILETE_DISTANCIA_MM) * mm
+            + FILETE_ESPESSURA_PT)
+    # E de baixo para cima: barra navy (2mm) + padding do rodapé (6mm) + a
+    # linha de texto (7,6pt) + o respiro acima dela (3mm).
+    base = (FOOTBAR_ALTURA_MM + 6 + 3) * mm + 7.6
 
     doc = BaseDocTemplate(
         buf, pagesize=A4,
@@ -317,28 +388,55 @@ def exportar_cronograma_pdf(dados: dict, marca: dict) -> bytes:
                   topPadding=0, bottomPadding=0)
     doc.addPageTemplates([PageTemplate(id='padrao', frames=[frame])])
 
-    est_titulo = ParagraphStyle('titulo', fontName=SERIFADA_BOLD, fontSize=15,
-                                leading=18, textColor=colors.HexColor(NAVY),
-                                spaceAfter=1)
-    est_obra = ParagraphStyle('obra', fontName=SERIFADA, fontSize=11,
-                              leading=14, textColor=colors.HexColor(NAVY))
-    est_meta = ParagraphStyle('meta', fontName=SANS, fontSize=7.5, leading=10,
-                              textColor=colors.HexColor(CINZA_TEXTO))
-    est_celula = ParagraphStyle('celula', fontName=SANS, fontSize=7.5,
-                                leading=9.5,
-                                textColor=colors.HexColor('#22272F'))
+    # Escala tipográfica do kit. `letter-spacing` do CSS vem em px; 1px a 96dpi
+    # equivale a 0,75pt, e é essa a conversão usada nos `charSpace`.
+    #
+    #   .tag  -> 8pt bold, ls 2.6px, laranja, caps
+    #   h1    -> serifa, PESO NORMAL, 21pt, lh 1.18, navy
+    #   .lead -> 9.6pt, #4b5563
+    #   .lbl  -> 7.2pt bold, ls 1.6px, navy2, caps
+    #   thead -> 7.6pt, ls 1.4px, caps, branco, alinhado à ESQUERDA
+    #   tbody -> 9.2pt, lh 1.45
+    est_etiqueta = ParagraphStyle('etiqueta', fontName=SANS_BOLD, fontSize=8,
+                                  leading=11, charSpace=2.6 * 0.75,
+                                  textColor=colors.HexColor(LARANJA),
+                                  spaceAfter=2.5 * mm)
+    est_titulo = ParagraphStyle('titulo', fontName=SERIFADA, fontSize=21,
+                                leading=21 * 1.18,
+                                textColor=colors.HexColor(NAVY))
+    est_lead = ParagraphStyle('lead', fontName=SANS, fontSize=9.6,
+                              leading=9.6 * 1.45, spaceBefore=2.5 * mm,
+                              textColor=colors.HexColor('#4B5563'))
+    est_rotulo = ParagraphStyle('rotulo', fontName=SANS_BOLD, fontSize=7.2,
+                                leading=10, charSpace=1.6 * 0.75,
+                                textColor=colors.HexColor(NAVY_ROTULO),
+                                spaceAfter=1.4 * mm)
+    est_valor = ParagraphStyle('valor', fontName=SANS, fontSize=9.4,
+                               leading=9.4 * 1.35,
+                               textColor=colors.HexColor(INK))
+    est_cabecalho = ParagraphStyle('cab', fontName=SANS_BOLD, fontSize=7.6,
+                                   leading=10.5, charSpace=1.4 * 0.75,
+                                   textColor=colors.HexColor(BRANCO))
+    est_celula = ParagraphStyle('celula', fontName=SANS, fontSize=9.2,
+                                leading=9.2 * 1.45,
+                                textColor=colors.HexColor(INK))
     est_celula_pai = ParagraphStyle('celula_pai', parent=est_celula,
                                     fontName=SANS_BOLD,
                                     textColor=colors.HexColor(NAVY))
-    est_vazio = ParagraphStyle('vazio', fontName=SANS, fontSize=9, leading=13,
-                               textColor=colors.HexColor(CINZA_TEXTO))
+    est_vazio = ParagraphStyle('vazio', fontName=SANS, fontSize=9.4,
+                               leading=13, textColor=colors.HexColor(CINZA))
 
     historia = [
-        Paragraph('Cronograma da Obra', est_titulo),
-        Paragraph(_titulo_da_obra(obra), est_obra),
-        Spacer(1, 5 * mm),
-        _faixa_metadados(obra, est_meta, doc.width),
-        Spacer(1, 4 * mm),
+        # O `margin-top: 8mm` da `.tag` precisa ser um espaçador explícito: o
+        # reportlab descarta `spaceBefore` do PRIMEIRO flowable de um frame
+        # (`_atTop`), e sem isto a etiqueta encosta no filete.
+        Spacer(1, 8 * mm),
+        Paragraph(_etiqueta(obra), est_etiqueta),
+        Paragraph('Cronograma Físico', est_titulo),
+        Paragraph(_lead(obra), est_lead),
+        Spacer(1, 4.5 * mm),
+        _grade_informacoes(obra, est_rotulo, est_valor, doc.width),
+        Spacer(1, 6.5 * mm),
     ]
 
     if not linhas:
@@ -348,7 +446,8 @@ def exportar_cronograma_pdf(dados: dict, marca: dict) -> bytes:
         historia.append(Paragraph(
             'Nenhuma tarefa cadastrada neste cronograma.', est_vazio))
     else:
-        historia.append(_tabela(linhas, doc.width, est_celula, est_celula_pai))
+        historia.append(_tabela(linhas, doc.width, est_celula, est_celula_pai,
+                                est_cabecalho))
 
     doc.build(historia, canvasmaker=_canvas_com_marca(marca, obra))
     return buf.getvalue()
@@ -367,15 +466,40 @@ def _esc(texto) -> str:
     return escape(str(texto or ''))
 
 
-def _titulo_da_obra(obra: dict) -> str:
+def _etiqueta(obra: dict) -> str:
+    """`.tag` do kit: laranja, caixa-alta espaçada, nomeando o documento e a
+    obra — no template, `CRONOGRAMA DE OBRA · {{NOME_DA_OBRA}}`."""
+    partes = ['CRONOGRAMA DE OBRA']
+    if obra.get('modo_cliente'):
+        partes.append('VISÃO DO CLIENTE')
+    if obra.get('nome'):
+        partes.append(_esc(obra['nome'].upper()))
+    return ' · '.join(partes)
+
+
+def _lead(obra: dict) -> str:
+    """`.lead` do kit: a frase cinza abaixo do título."""
+    partes = []
     if obra.get('codigo'):
-        return f"{_esc(obra['nome'])} · {_esc(obra['codigo'])}"
-    return _esc(obra['nome'])
+        partes.append(f"Obra {_esc(obra['codigo'])}")
+    if obra.get('data_inicio') and obra.get('data_fim'):
+        partes.append(f"planejamento de {_data(obra['data_inicio'])} "
+                      f"a {_data(obra['data_fim'])}")
+    partes.append(f"progresso geral de {_percentual(obra.get('progresso_geral'))}")
+    return ' · '.join(partes) + '.'
 
 
-def _faixa_metadados(obra: dict, estilo, largura):
-    """Faixa cinza-clara com cliente, período, progresso e emissão."""
+def _grade_informacoes(obra: dict, est_rotulo, est_valor, largura):
+    """`.grid` do kit: caixa de fio fino, DUAS colunas, rótulo em caixa-alta
+    espaçada sobre o valor.
+
+    O CSS é explícito na estrutura: `grid-template-columns: 1fr 1fr`, célula
+    com `padding: 2.5mm 4mm`, borda à direita nas ímpares e sem borda inferior
+    nas duas últimas. A faixa de quatro células numa linha só, que este módulo
+    tinha antes, era invenção minha — não existe no kit.
+    """
     from reportlab.lib import colors
+    from reportlab.lib.units import mm
     from reportlab.platypus import Paragraph, Table, TableStyle
 
     periodo = TRACO
@@ -384,43 +508,54 @@ def _faixa_metadados(obra: dict, estilo, largura):
                    f"{_data(obra['data_fim'])}")
 
     itens = [
-        ('Cliente', obra.get('cliente') or TRACO),
-        ('Período', periodo),
-        ('Progresso geral', f"{_percentual(obra.get('progresso_geral'))}"),
-        ('Emitido em', _data(date.today())),
+        ('CLIENTE', obra.get('cliente') or TRACO),
+        ('OBRA', obra.get('nome') or TRACO),
+        ('PERÍODO PLANEJADO', periodo),
+        ('PROGRESSO GERAL', _percentual(obra.get('progresso_geral'))),
+        ('DATA DE EMISSÃO', _data(date.today())),
+        ('VISÃO', 'Cronograma do cliente' if obra.get('modo_cliente')
+         else 'Cronograma interno da obra'),
     ]
-    if obra.get('modo_cliente'):
-        itens.insert(1, ('Visão', 'Cronograma do cliente'))
 
-    celulas = [Paragraph(f'<b>{rotulo}</b><br/>{_esc(valor)}', estilo)
-               for rotulo, valor in itens]
-    tabela = Table([celulas], colWidths=[largura / len(celulas)] * len(celulas))
+    def _celula(item):
+        rotulo, valor = item
+        return [Paragraph(rotulo, est_rotulo), Paragraph(_esc(valor), est_valor)]
+
+    corpo = [[_celula(itens[i]), _celula(itens[i + 1])]
+             for i in range(0, len(itens), 2)]
+
+    tabela = Table(corpo, colWidths=[largura / 2, largura / 2])
     tabela.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(PREENCHIMENTO)),
-        ('BOX', (0, 0), (-1, -1), 0.3, colors.HexColor(FIO)),
-        ('INNERGRID', (0, 0), (-1, -1), 0.3, colors.HexColor(FIO)),
-        ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor(FIO)),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor(FIO)),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4 * mm),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4 * mm),
+        ('TOPPADDING', (0, 0), (-1, -1), 2.5 * mm),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5 * mm),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     return tabela
 
 
-def _tabela(linhas, largura, est_celula, est_celula_pai):
+def _tabela(linhas, largura, est_celula, est_celula_pai, est_cabecalho):
     """A planilha de tarefas: `#`, Nome, Dur., Início, Término, %.
 
     A coluna `#` é o número de linha sequencial da grade
     (`templates/obras/cronograma.html:189`) — a mesma numeração que a coluna
     `Pred.` referencia. Não é EDT hierárquica: a hierarquia aparece pela
     indentação do nome e pelo negrito da tarefa-pai.
+
+    Traços do kit (`thead th` e `tbody td` do template): cabeçalho navy com
+    texto branco em caixa-alta espaçada de 7,6pt, alinhado à ESQUERDA, com
+    `padding: 2.2mm 3.5mm`; corpo em 9,2pt com `border-bottom` no fio e
+    alinhamento vertical ao topo. O kit não usa zebra — a separação é o fio.
     """
     from reportlab.lib import colors
     from reportlab.lib.units import mm
     from reportlab.platypus import LongTable, Paragraph, TableStyle
 
-    cabecalho = ['#', 'Nome da Tarefa', 'Dur.', 'Início', 'Término', '%']
+    cabecalho = [Paragraph(t, est_cabecalho) for t in
+                 ('#', 'NOME DA TAREFA', 'DUR.', 'INÍCIO', 'TÉRMINO', '%')]
     corpo = [cabecalho]
     estilo_extra = []
 
@@ -436,36 +571,40 @@ def _tabela(linhas, largura, est_celula, est_celula_pai):
             _percentual_celula(ln),
         ])
         if ln['is_pai']:
+            # `tr.totalrow` do kit: fundo #eef0f4, negrito, navy. É o único
+            # realce de linha que o template tem, e serve à tarefa-pai.
             estilo_extra += [
-                ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#EDEFF4')),
+                ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#EEF0F4')),
                 ('FONTNAME', (0, i), (0, i), SANS_BOLD),
                 ('FONTNAME', (2, i), (-1, i), SANS_BOLD),
                 ('TEXTCOLOR', (0, i), (-1, i), colors.HexColor(NAVY)),
             ]
 
+    col_num, col_dur, col_data, col_perc = 10 * mm, 15 * mm, 21 * mm, 14 * mm
     tabela = LongTable(
         corpo, repeatRows=1,
-        colWidths=[9 * mm, largura - 9 * mm - 13 * mm - 20 * mm - 20 * mm - 13 * mm,
-                   13 * mm, 20 * mm, 20 * mm, 13 * mm],
+        colWidths=[col_num,
+                   largura - col_num - col_dur - 2 * col_data - col_perc,
+                   col_dur, col_data, col_data, col_perc],
     )
     tabela.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(NAVY)),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor(BRANCO)),
-        ('FONTNAME', (0, 0), (-1, 0), SANS_BOLD),
-        ('FONTSIZE', (0, 0), (-1, 0), 7.5),
         ('FONTNAME', (0, 1), (-1, -1), SANS),
-        ('FONTSIZE', (0, 1), (-1, -1), 7.5),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#22272F')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1),
-         [colors.white, colors.HexColor(PREENCHIMENTO)]),
-        ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor(FIO)),
+        ('FONTSIZE', (0, 1), (-1, -1), 9.2),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor(INK)),
+        # `tbody td { border-bottom: 1px solid var(--line) }` — só o fio
+        # horizontal, sem grade fechada e sem zebra, como no kit.
+        ('LINEBELOW', (0, 0), (-1, -1), 0.5, colors.HexColor(FIO)),
         ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
         ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        # `thead th { padding: 2.2mm 3.5mm }` e `tbody td { 2.3mm 3.5mm }`.
+        ('LEFTPADDING', (0, 0), (-1, -1), 3.5 * mm),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3.5 * mm),
+        ('TOPPADDING', (0, 0), (-1, 0), 2.2 * mm),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 2.2 * mm),
+        ('TOPPADDING', (0, 1), (-1, -1), 2.3 * mm),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 2.3 * mm),
     ] + estilo_extra))
     return tabela
 
@@ -550,7 +689,7 @@ def _canvas_com_marca(marca: dict, obra: dict):
     from reportlab.pdfgen import canvas as canvas_mod
 
     largura_pagina, altura_pagina = A4
-    margem = 18 * mm
+    margem = MARGEM_LATERAL_MM * mm
     logo_bytes = marca.get('logo')
 
     class CanvasComMarca(canvas_mod.Canvas):
@@ -572,63 +711,120 @@ def _canvas_com_marca(marca: dict, obra: dict):
             super().save()
 
         def _desenhar_marca(self):
-            y_base = altura_pagina - margem
+            """`.header` + `.rule` do kit, em toda página (regra 1 do README).
+
+            O topo da logo fica no `padding` de 11mm; ela tem 13mm de altura e
+            recua 2mm para a esquerda (`margin-left: -2mm`), o que faz o
+            wordmark encostar na margem óptica em vez de parecer deslocado.
+            """
+            topo_conteudo = altura_pagina - PADDING_TOPO_MM * mm
+            altura_logo = LOGO_ALTURA_MM * mm
+            x_logo = margem + LOGO_RECUO_MM * mm
             desenhou_logo = False
             if logo_bytes:
                 try:
                     img = ImageReader(io.BytesIO(logo_bytes))
                     lg, ag = img.getSize()
-                    altura = 12 * mm
-                    largura = altura * (lg / ag) if ag else altura
+                    largura = altura_logo * (lg / ag) if ag else altura_logo
                     # Logo muito larga (wordmark alongado) é limitada pela
                     # largura para não invadir o bloco de dados da empresa.
-                    max_largura = 55 * mm
+                    max_largura = 62 * mm
+                    altura = altura_logo
                     if largura > max_largura:
                         largura = max_largura
                         altura = largura * (ag / lg) if lg else altura
-                    self.drawImage(img, margem, y_base - altura,
-                                   width=largura, height=altura,
-                                   mask='auto')
+                    self.drawImage(img, x_logo, topo_conteudo - altura,
+                                   width=largura, height=altura, mask='auto')
                     desenhou_logo = True
                 except Exception as e:  # imagem ilegível não derruba o PDF
                     logger.warning('[CRONOGRAMA-PDF] logo não pôde ser '
                                    'desenhada: %s', e)
             if not desenhou_logo:
-                self.setFont(SERIFADA_BOLD, 15)
-                self.setFillColor(colors.HexColor(NAVY))
-                self.drawString(margem, y_base - 11, marca.get('nome') or '')
+                # Sem logo cadastrada, o nome da empresa ocupa o lugar dela —
+                # em caixa-alta espaçada, no navy, para preencher a faixa em
+                # vez de virar um texto miúdo perdido no canto (foi o que o
+                # primeiro export real mostrou, e o sintoma era cadastro
+                # vazio, não layout).
+                # `setCharSpace` NÃO existe no Canvas — só no objeto de texto
+                # (`beginText`). Chamá-lo no canvas levanta AttributeError e
+                # derruba o download inteiro; foi o que os testes pegaram, num
+                # caminho que o meu teste manual nunca tocou porque lá havia
+                # logo cadastrada.
+                texto = self.beginText(
+                    margem, topo_conteudo - altura_logo + 3 * mm)
+                texto.setFont(SANS_BOLD, 17)
+                texto.setFillColor(colors.HexColor(NAVY))
+                texto.setCharSpace(1.6)
+                texto.textOut((marca.get('nome') or '').upper()[:26])
+                self.drawText(texto)
 
-            # Bloco de identificação, alinhado à direita
-            self.setFont(SANS, 7)
-            self.setFillColor(colors.HexColor(CINZA_TEXTO))
+            # `.header .hright`: três linhas à direita, 8pt cinza com
+            # `line-height: 1.5`, e a primeira em negrito navy a 8,6pt.
             direita = largura_pagina - margem
-            partes = [marca.get('nome') or '']
+            y = topo_conteudo - 8.6
+            self.setFont(SANS_BOLD, 8.6)
+            self.setFillColor(colors.HexColor(NAVY))
+            self.drawRightString(direita, y, (marca.get('nome') or '')[:60])
+            self.setFont(SANS, 8)
+            self.setFillColor(colors.HexColor(CINZA))
             if marca.get('cnpj'):
-                partes.append(f"CNPJ {marca['cnpj']}")
-            segunda = ' · '.join(p for p in [marca.get('endereco'),
-                                             marca.get('website')] if p)
-            y = y_base - 3
-            self.drawRightString(direita, y, ' · '.join(p for p in partes if p))
-            if segunda:
-                self.drawRightString(direita, y - 8.5, segunda[:110])
+                y -= 8 * 1.5
+                self.drawRightString(direita, y, f"CNPJ {marca['cnpj']}")
+            terceira = ' · '.join(p for p in [marca.get('endereco'),
+                                              marca.get('website')] if p)
+            if terceira:
+                y -= 8 * 1.5
+                self.drawRightString(direita, y, terceira[:105])
 
-            # Fio abaixo da faixa
-            self.setStrokeColor(colors.HexColor(FIO))
-            self.setLineWidth(0.5)
-            linha_y = altura_pagina - margem - 15 * mm
-            self.line(margem, linha_y, largura_pagina - margem, linha_y)
+            # `.rule`: filete de 2,6pt a 4mm do cabeçalho — 34mm em laranja e
+            # o resto em navy. É a assinatura da folha, e o que faltava aqui.
+            linha_y = (topo_conteudo - altura_logo - FILETE_DISTANCIA_MM * mm
+                       - FILETE_ESPESSURA_PT / 2)
+            self.setLineWidth(FILETE_ESPESSURA_PT)
+            self.setStrokeColor(colors.HexColor(LARANJA))
+            self.line(margem, linha_y, margem + FILETE_LARANJA_MM * mm, linha_y)
+            self.setStrokeColor(colors.HexColor(NAVY))
+            self.line(margem + FILETE_LARANJA_MM * mm, linha_y,
+                      largura_pagina - margem, linha_y)
 
         def _desenhar_rodape(self, total: int):
-            y = 11 * mm
+            """`.footer` + `.footbar` do kit.
+
+            A `.footbar` é uma barra navy de 2mm colada no pé da página, de
+            borda a borda (`left: 0; width: 210mm`) — ela SANGRA, e é por isso
+            que não respeita a margem lateral. Era o elemento que faltava, e o
+            que fazia a margem inferior parecer errada.
+
+            Acima dela: `padding: 3mm 0 6mm`, fio superior no `--line`, texto
+            de 7,6pt em cinza com o nome da empresa em navy negrito.
+            """
+            # A barra que sangra.
+            self.setFillColor(colors.HexColor(NAVY))
+            self.rect(0, 0, largura_pagina, FOOTBAR_ALTURA_MM * mm,
+                      stroke=0, fill=1)
+
+            base_texto = (FOOTBAR_ALTURA_MM + 6) * mm
             self.setStrokeColor(colors.HexColor(FIO))
             self.setLineWidth(0.5)
-            self.line(margem, y + 5, largura_pagina - margem, y + 5)
-            self.setFont(SANS, 7.5)
-            self.setFillColor(colors.HexColor(CINZA_FRACO))
-            esquerda = (f"{marca.get('nome') or ''} · Cronograma — "
-                        f"{obra.get('nome') or ''}")
-            self.drawString(margem, y - 3, esquerda[:95])
-            self.drawRightString(largura_pagina - margem, y - 3,
-                                 f'pág. {self._pageNumber}/{total}')
+            fio_y = base_texto + 7.6 + 3 * mm
+            self.line(margem, fio_y, largura_pagina - margem, fio_y)
+
+            # Esquerda: empresa em navy negrito, resto em cinza — como o
+            # `.footer b { color: var(--navy) }` do kit.
+            empresa = (marca.get('nome') or '')[:40]
+            self.setFont(SANS_BOLD, 7.6)
+            self.setFillColor(colors.HexColor(NAVY))
+            self.drawString(margem, base_texto, empresa)
+            largura_empresa = self.stringWidth(empresa, SANS_BOLD, 7.6)
+            self.setFont(SANS, 7.6)
+            self.setFillColor(colors.HexColor(CINZA))
+            self.drawString(margem + largura_empresa, base_texto,
+                            f" · Cronograma de Obra — {obra.get('nome') or ''}"[:80])
+
+            # Direita: cliente e a paginação, na ordem do kit.
+            partes = [p for p in [obra.get('cliente'),
+                                  f'pág. {self._pageNumber}/{total}'] if p]
+            self.drawRightString(largura_pagina - margem, base_texto,
+                                 ' · '.join(partes)[:80])
 
     return CanvasComMarca
