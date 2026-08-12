@@ -84,7 +84,13 @@
             <label class="form-label small mb-1" for="qtd_{{ item.id }}">
               Quantidade recebida agora
             </label>
-            <input type="text" inputmode="decimal" class="form-control form-control-lg"
+            {# `type="number"` tira a ambiguidade do ponto na origem: o
+               navegador entrega valor canônico, o teclado do celular continua
+               numérico, e a validação nativa barra o que não for número antes
+               de o formulário sair. O servidor continua conferindo — quem
+               posta por fora do navegador não passa por nada disso. #}
+            <input type="number" step="0.001" min="0" inputmode="decimal"
+                   class="form-control form-control-lg"
                    id="qtd_{{ item.id }}" name="qtd_{{ item.id }}"
                    value="{{ falta.get(item.id, '') }}"
                    placeholder="0">

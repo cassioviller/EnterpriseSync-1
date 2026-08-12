@@ -966,16 +966,105 @@ def comprovante(pedido_id):
 # RECEBIMENTO NA OBRA — Fase 4
 # ─────────────────────────────────────────────
 def _quantidade_do_form(valor):
-    """'30', '30,5' ou '' → Decimal. Vírgula porque o teclado do celular
-    brasileiro entrega vírgula, e recusar isso seria recusar o usuário."""
+    """Texto do formulário → `(Decimal, erro)`. Erro é mensagem para humano.
+
+    Devolve o erro em vez de engolir. A versão anterior transformava tudo o
+    que não entendia em `Decimal('0')` — e zero, nesta tela, significa "item
+    que não veio nesta entrega". Um "3O" digitado com a letra O sumia da
+    entrega, o recebimento era gravado sem aquele item, e o flash saía verde:
+    quem estava no portão ia embora achando que tinha atestado o cimento.
+
+    A vírgula é decimal, porque é o que o teclado brasileiro entrega. O ponto
+    é decimal quando não pode ser milhar, milhar quando não pode ser decimal,
+    e **recusado quando pode ser os dois**: "1.500" tanto vale mil e
+    quinhentos quanto um e meio, e escolher errado entre eles erra por 1000×
+    sem ninguém ver. Entre duas leituras dessas, perguntar é a única resposta
+    honesta.
+
+    Campo vazio continua sendo ausência, não erro: `(Decimal('0'), None)`.
+    """
     from decimal import Decimal, InvalidOperation
-    texto = (valor or '').strip().replace(',', '.')
+
+    texto = (valor or '').strip()
     if not texto:
-        return Decimal('0')
+        return Decimal('0'), None
+
+    bruto = texto.replace(' ', '').replace(' ', '')
+    tem_virgula = ',' in bruto
+    tem_ponto = '.' in bruto
+
+    ilegivel = (Decimal('0'), (
+        f'não deu para ler "{texto}" como quantidade. Digite só o número, '
+        f'com vírgula no decimal (ex.: 30,5).'))
+
+    if tem_virgula and tem_ponto:
+        # "1.500,25" — com a vírgula presente, o ponto só pode ser milhar.
+        inteiro, _, decimais = bruto.partition(',')
+        if not _milhar_bem_formado(inteiro):
+            return ilegivel
+        normalizado = f'{inteiro.replace(".", "")}.{decimais}'
+    elif tem_virgula:
+        normalizado = bruto.replace(',', '.')
+    elif tem_ponto:
+        grupos = bruto.split('.')
+        if len(grupos) > 2:
+            # "1.500.000" é milhar; "30.5.0" não é número nenhum, e lê-lo
+            # como 3050 seria a mesma adivinhação que este parser existe
+            # para não fazer.
+            if not _milhar_bem_formado(bruto):
+                return ilegivel
+            normalizado = bruto.replace('.', '')
+        elif len(grupos[1]) == 3 and grupos[0].lstrip('+-').isdigit():
+            # O caso ambíguo, e o único que recusamos por ambiguidade.
+            milhar = _num_pt(bruto.replace('.', ''))
+            decimal_ = _num_pt(bruto)
+            return Decimal('0'), (
+                f'"{texto}" pode ser {milhar} ou {decimal_}, e a diferença é '
+                f'de mil vezes. Escreva {milhar} ou {decimal_} para não '
+                f'restar dúvida.')
+        else:
+            normalizado = bruto
+    else:
+        normalizado = bruto
+
     try:
-        return Decimal(texto)
+        quantidade = Decimal(normalizado)
     except InvalidOperation:
-        return Decimal('0')
+        return Decimal('0'), (
+            f'não deu para ler "{texto}" como quantidade. Digite só o número, '
+            f'com vírgula no decimal (ex.: 30,5).')
+
+    if not quantidade.is_finite():
+        # `Decimal('nan')` e `Decimal('inf')` não levantam no construtor, e
+        # comparar NaN com zero levanta `InvalidOperation` lá adiante.
+        return Decimal('0'), (
+            f'"{texto}" não é uma quantidade. Digite só o número, com vírgula '
+            f'no decimal (ex.: 30,5).')
+
+    return quantidade, None
+
+
+def _milhar_bem_formado(inteiro):
+    """"1.500.000" sim, "30.5.0" não — os grupos depois do primeiro têm 3 dígitos.
+
+    É o que separa milhar de digitação embolada. Sem esta checagem, "30.5.0"
+    vira 3050 calado, que é o mesmo defeito que o parser existe para não ter.
+    """
+    grupos = inteiro.split('.')
+    if len(grupos) < 2:
+        return bool(grupos[0]) and grupos[0].lstrip('+-').isdigit()
+    cabeca = grupos[0].lstrip('+-')
+    return (cabeca.isdigit() and 1 <= len(cabeca) <= 3
+            and all(g.isdigit() and len(g) == 3 for g in grupos[1:]))
+
+
+def _num_pt(valor):
+    """Decimal ou texto numérico → '1500' / '1,5', no formato de quem lê."""
+    from decimal import Decimal, InvalidOperation
+    try:
+        return format(Decimal(str(valor)).normalize(), 'f').replace('.', ',')
+    except InvalidOperation:
+        return str(valor)
 
 
 def _num_enxuto(valor):
@@ -1035,10 +1124,20 @@ def recebimento(pedido_id):
                        - acumulado.get(i.id, Decimal('0'))) for i in itens}
 
     if request.method == 'POST':
-        linhas = [(i.id, _quantidade_do_form(request.form.get(f'qtd_{i.id}')))
-                  for i in itens]
-        # Item ausente é item que não veio nesta entrega — não item com zero.
-        linhas = [(item_id, qtd) for item_id, qtd in linhas if qtd != 0]
+        linhas = []
+        ilegiveis = []
+        for i in itens:
+            qtd, erro = _quantidade_do_form(request.form.get(f'qtd_{i.id}'))
+            if erro:
+                ilegiveis.append(f'"{i.descricao}": {erro}')
+            elif qtd != 0:
+                # Item ausente é item que não veio nesta entrega — e agora é
+                # só isso: quantidade ilegível não vira mais zero e some.
+                linhas.append((i.id, qtd))
+
+        if ilegiveis:
+            flash(' '.join(ilegiveis), 'danger')
+            return redirect(url_for('compras.recebimento', pedido_id=pedido_id))
 
         data_txt = (request.form.get('data_recebimento') or '').strip()
         try:

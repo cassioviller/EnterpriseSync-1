@@ -1151,3 +1151,233 @@ def test_sensor_devolve_exit_1_no_drift_e_2_no_erro_de_uso():
         db.session.commit()
     assert main([str(admin_id)]) == 1
     assert main(['999999999']) == 2
+
+
+# ---------------------------------------------------------------------------
+# C1 — o que o conferente digita é o que fica gravado
+# ---------------------------------------------------------------------------
+#
+# Revisão de 12/08, achados 2, 3 e 4. Três sintomas de uma função só:
+# `_quantidade_do_form` transformava erro de digitação em silêncio. Texto
+# ilegível virava `Decimal('0')`, a rota filtrava zero como "item que não veio"
+# e o recebimento era gravado sem aquele item — com flash verde. Quem digitou
+# ia embora achando que tinha atestado.
+#
+# O ponto de milhar brasileiro ("1.500") era lido como decimal e dividia a
+# quantidade por mil, silenciosamente, até o `valor_atestado` da fase
+# financeira. E `Decimal('nan')` passava o filtro para estourar
+# `InvalidOperation` dentro do serviço, virando 500 sem rollback.
+
+
+def _cenario_dois_itens(qtd_a=50, qtd_b=20):
+    """Pedido de DOIS itens de catálogo — é preciso mais de um para provar que
+    o item ilegível some enquanto o outro é gravado."""
+    admin = _admin()
+    obra = _obra(admin.id)
+    forn = _fornecedor(admin.id)
+    pedido = _pedido(admin.id, obra.id, forn.id,
+                     itens=(('Cimento CP-II', qtd_a, 32.50),
+                            ('Areia média', qtd_b, 90.00)))
+    pedido.exige_atesto = True
+    itens = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).order_by(
+        PedidoCompraItem.id).all()
+    for item in itens:
+        item.almoxarifado_item_id = _item_de_catalogo(admin.id,
+                                                      item.descricao).id
+    db.session.commit()
+    return admin.id, pedido.id, itens[0].id, itens[1].id
+
+
+@pytest.mark.parametrize('digitado', ['3O', '30 sacos', '30.5.0', 'trinta'])
+def test_quantidade_ilegivel_recusa_em_vez_de_sumir(digitado):
+    """O item ilegível não pode desaparecer da entrega em silêncio.
+
+    Este é o defeito com a pior forma de todos: some sem erro, e o flash é
+    verde. Quem recebeu no portão acredita que atestou o cimento.
+    """
+    from helpers_tenant import cliente_de
+    with app.app_context():
+        admin_id, pedido_id, item_a, item_b = _cenario_dois_itens()
+    cli = cliente_de(admin_id)
+
+    resposta = cli.post(f'/compras/{pedido_id}/recebimento',
+                        data={f'qtd_{item_a}': digitado, f'qtd_{item_b}': '10',
+                              'data_recebimento': '2026-08-05'})
+
+    assert resposta.status_code == 302
+    aviso = _flashes(cli)
+    assert 'Cimento CP-II' in aviso, (
+        f'a recusa tem que nomear o item que não deu para ler. Veio: {aviso!r}')
+    with app.app_context():
+        assert _recebimentos_de(pedido_id) == [], (
+            f'{digitado!r} virou zero e o recebimento foi gravado sem o '
+            f'cimento — com o outro item dentro, e sem aviso nenhum')
+
+
+def test_ponto_de_milhar_ambiguo_recusa_em_vez_de_dividir_por_mil():
+    """"1.500" tanto vale mil e quinhentos quanto um e meio — e errar custa 1000×.
+
+    O `.replace(',', '.')` original convertia o separador decimal brasileiro e
+    deixava o ponto de milhar intacto, que o `Decimal` então lia como decimal:
+    o saldo do pedido ficava fantasma e o `valor_atestado` saía mil vezes
+    menor, sem nenhum erro na tela.
+
+    Adivinhar de novo, para o outro lado, seria o mesmo defeito com o sinal
+    trocado. Entre duas leituras que diferem por mil, a resposta certa é
+    perguntar — e a mensagem tem que mostrar as duas.
+    """
+    from helpers_tenant import cliente_de
+    with app.app_context():
+        admin_id, pedido_id, item_a, _item_b = _cenario_dois_itens(qtd_a=2000)
+    cli = cliente_de(admin_id)
+
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_a}': '1.500', 'data_recebimento': '2026-08-05'})
+
+    aviso = _flashes(cli)
+    assert '1500' in aviso and '1,5' in aviso, (
+        f'a recusa tem que mostrar as duas leituras possíveis. Veio: {aviso!r}')
+    with app.app_context():
+        assert _recebimentos_de(pedido_id) == [], (
+            '"1.500" foi gravado sem perguntar qual das duas leituras era')
+
+
+@pytest.mark.parametrize('digitado,esperado', [
+    ('30,5', 30.5),        # o teclado brasileiro — o caminho comum
+    ('30.5', 30.5),        # o que `type="number"` entrega
+    ('30', 30.0),
+    ('1.500,25', 1500.25),  # com a vírgula presente, o ponto é milhar sem dúvida
+    ('1.500.000', 1500000.0),
+    ('30.25', 30.25),      # dois decimais não formam grupo de milhar
+])
+def test_formatos_que_ja_funcionavam_continuam_valendo(digitado, esperado):
+    """A vírgula do teclado brasileiro é o caminho comum — não pode regredir.
+
+    O pedido é grande de propósito: o que está sob teste é a leitura do
+    número, e um teto de quantidade estourando aqui esconderia isso.
+    """
+    from helpers_tenant import cliente_de
+    with app.app_context():
+        admin_id, pedido_id, item_a, _item_b = _cenario_dois_itens(
+            qtd_a=2_000_000)
+    cli = cliente_de(admin_id)
+
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_a}': digitado, 'data_recebimento': '2026-08-05'})
+
+    with app.app_context():
+        recebimentos = _recebimentos_de(pedido_id)
+        assert len(recebimentos) == 1, f'não gravou {digitado!r}: {_flashes(cli)!r}'
+        assert float(recebimentos[0].itens[0].quantidade_recebida) == esperado
+
+
+@pytest.mark.parametrize('digitado', ['nan', 'NaN', 'infinity', '-inf', '1e999'])
+def test_quantidade_nao_finita_recusa_sem_estourar(digitado):
+    """`Decimal('nan')` não levanta no construtor — e passava o filtro do zero.
+
+    Chegava em `_validar_linhas`, onde `qtd <= 0` levanta `InvalidOperation`,
+    que a rota não captura: 500 com a sessão sem rollback, em vez da mensagem
+    de regra.
+    """
+    from helpers_tenant import cliente_de
+    with app.app_context():
+        admin_id, pedido_id, item_a, _item_b = _cenario_dois_itens()
+    cli = cliente_de(admin_id)
+
+    resposta = cli.post(f'/compras/{pedido_id}/recebimento',
+                        data={f'qtd_{item_a}': digitado,
+                              'data_recebimento': '2026-08-05'})
+
+    assert resposta.status_code == 302, (
+        f'{digitado!r} devolveu {resposta.status_code} em vez de recusar com '
+        f'mensagem de regra')
+    assert _flashes(cli), 'recusou calado'
+    with app.app_context():
+        assert _recebimentos_de(pedido_id) == []
+
+
+def test_campo_vazio_continua_sendo_item_que_nao_veio():
+    """Vazio é ausência, não erro: o item simplesmente não veio nesta entrega."""
+    from helpers_tenant import cliente_de
+    with app.app_context():
+        admin_id, pedido_id, item_a, item_b = _cenario_dois_itens()
+    cli = cliente_de(admin_id)
+
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_a}': '30', f'qtd_{item_b}': '',
+                   'data_recebimento': '2026-08-05'})
+
+    with app.app_context():
+        recebimentos = _recebimentos_de(pedido_id)
+        assert len(recebimentos) == 1, f'não gravou: {_flashes(cli)!r}'
+        assert recebimentos[0].itens.count() == 1, (
+            'o campo vazio virou uma linha de recebimento')
+        assert recebimentos[0].itens[0].pedido_item_id == item_a
+
+
+def test_servico_recusa_quantidade_nao_finita_por_conta_propria():
+    """O serviço é o chokepoint: não pode depender de a rota ter limpado o dado.
+
+    Quem chamar `registrar_recebimento` de um CLI, de um job ou de um teste
+    passa por esta validação e não por `_quantidade_do_form`.
+    """
+    from services.recebimento_pedido import (RecebimentoInvalido,
+                                             registrar_recebimento)
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+        with pytest.raises(RecebimentoInvalido):
+            registrar_recebimento(pedido, admin, [(item.id, Decimal('NaN'))],
+                                  date(2026, 8, 5))
+        with pytest.raises(RecebimentoInvalido):
+            registrar_recebimento(pedido, admin, [(item.id, Decimal('Infinity'))],
+                                  date(2026, 8, 5))
+        assert _recebimentos_de(pedido.id) == []
+
+
+def test_campo_de_quantidade_e_numerico_na_tela():
+    """`type="number"` é o que tira a ambiguidade do ponto na origem.
+
+    O navegador entrega valor canônico e o teclado do celular continua
+    numérico. Com `type="text"` o servidor tinha de adivinhar o que "1.500"
+    queria dizer — e adivinhava errado.
+    """
+    from helpers_tenant import cliente_de
+    with app.app_context():
+        admin_id, pedido_id, item_a, _item_b = _cenario_dois_itens()
+
+    corpo = cliente_de(admin_id).get(
+        f'/compras/{pedido_id}/recebimento').get_data(as_text=True)
+
+    import re
+    campo = re.search(rf'<input[^>]*name="qtd_{item_a}"[^>]*>', corpo)
+    if campo is None:
+        campo = re.search(rf'<input[^>]*id="qtd_{item_a}"[^>]*>', corpo)
+    assert campo, 'campo de quantidade não encontrado na tela'
+    assert 'type="number"' in campo.group(0), (
+        f'o campo ainda é texto livre: {campo.group(0)!r}')
+
+
+def test_quantidade_absurda_recusa_em_vez_de_estourar_no_banco():
+    """`1e999` é finito, passa o parser — e não cabe em `Numeric(12,3)`.
+
+    Com a sobre-entrega marcada não há teto de pedido para barrar antes, e o
+    valor chega ao banco como DataError: 500 em vez de mensagem de regra. O
+    limite da coluna é uma regra como outra qualquer, e quem a conhece é o
+    serviço.
+    """
+    from helpers_tenant import cliente_de
+    with app.app_context():
+        admin_id, pedido_id, item_a, _item_b = _cenario_dois_itens()
+    cli = cliente_de(admin_id)
+
+    resposta = cli.post(f'/compras/{pedido_id}/recebimento',
+                        data={f'qtd_{item_a}': '1e999',
+                              'permitir_sobre_entrega': 'on',
+                              'observacao': 'veio muito mais',
+                              'data_recebimento': '2026-08-05'})
+
+    assert resposta.status_code == 302, (
+        f'quantidade absurda devolveu {resposta.status_code} em vez de recusar')
+    assert _flashes(cli), 'recusou calado'
+    with app.app_context():
+        assert _recebimentos_de(pedido_id) == []

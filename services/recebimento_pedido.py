@@ -13,6 +13,11 @@ from decimal import Decimal
 logger = logging.getLogger('recebimento_pedido')
 
 # As quatro situações de `PedidoCompra.situacao_recebimento`.
+# O que cabe em `recebimento_pedido_item.quantidade_recebida`, que é
+# `Numeric(12,3)`. Passar disso é DataError no flush, não regra de negócio —
+# e quem recebe caminhão merece a mensagem, não a página de erro.
+QUANTIDADE_MAXIMA = Decimal('999999999.999')
+
 NAO_RECEBIDO = 'nao_recebido'
 PARCIAL = 'parcial'
 RECEBIDO = 'recebido'
@@ -164,10 +169,28 @@ def _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega):
                 f'o item {item_id} não é deste pedido.')
 
         qtd = _d(quantidade)
+        if not qtd.is_finite():
+            # `Decimal('nan')` não levanta no construtor e sobrevive ao filtro
+            # do zero da rota; comparar NaN com zero, três linhas abaixo,
+            # levanta `InvalidOperation` — que vira 500 com a sessão sem
+            # rollback em vez de mensagem de regra. O serviço é o chokepoint:
+            # não pode depender de a rota ter limpado o dado.
+            raise RecebimentoInvalido(
+                f'"{item.descricao}": {quantidade} não é uma quantidade.')
+
         if qtd <= 0:
             raise RecebimentoInvalido(
                 f'"{item.descricao}": a quantidade recebida tem de ser maior '
                 f'que zero. Devolução não é recebimento negativo.')
+
+        if qtd > QUANTIDADE_MAXIMA:
+            # O teto da coluna `Numeric(12,3)` é uma regra como as outras, e
+            # quem a conhece é este serviço. Sem isto, `1e999` com a
+            # sobre-entrega marcada passa por todas as validações e vira
+            # DataError no flush — 500 em vez de mensagem.
+            raise RecebimentoInvalido(
+                f'"{item.descricao}": {qtd} não cabe como quantidade '
+                f'recebida — o máximo é {QUANTIDADE_MAXIMA}.')
 
         if not permitir_sobre_entrega:
             total = acumulado.get(item_id, Decimal('0')) + qtd
