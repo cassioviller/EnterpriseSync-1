@@ -55,6 +55,20 @@
             </small></div>
           {% endif %}
         </div>
+        {# Só o último pode ser desfeito: a sequência não tem buraco, e furar
+           o meio faria "PC-1234/2" passar a apontar para outro fato. O
+           serviço recusa de qualquer jeito — o botão só não promete o que
+           não pode cumprir. #}
+        {% if loop.last %}
+        <form method="POST" class="ms-2"
+              action="{{ url_for('compras.excluir_recebimento',
+                                 pedido_id=pedido.id, recebimento_id=r.id) }}">
+          <button type="submit" class="btn btn-sm btn-outline-danger"
+                  onclick="return confirm('Excluir o recebimento {{ r.rotulo }}? O estoque que ele gerou será estornado.')">
+            <i class="fas fa-rotate-left me-1"></i>Excluir
+          </button>
+        </form>
+        {% endif %}
       </li>
       {% endfor %}
     </ul>

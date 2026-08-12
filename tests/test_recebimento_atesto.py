@@ -1697,3 +1697,173 @@ def test_linha_do_recebimento_guarda_a_saida_que_gerou():
         assert (linha.almoxarifado_saida_movimento_id
                 == _saidas(pedido.id)[0].id)
 
+
+
+# ---------------------------------------------------------------------------
+# C3 — a exclusão chega ao usuário, e a do pedido para de mentir
+# ---------------------------------------------------------------------------
+#
+# Revisão de 12/08, achados 7 e 12.
+#
+# `excluir_recebimento` existe desde a R5, é testado, e o docstring dele diz —
+# corretamente — que errar a quantidade é o erro mais comum de quem recebe
+# caminhão no portão. Só que nenhuma rota e nenhum botão o chamavam: o caminho
+# de correção não chegava a quem precisa dele. Quem digitasse 500 em vez de 50
+# só conseguia consertar por acesso direto ao banco.
+#
+# Do outro lado, `compras.excluir` apagava o pedido sem olhar a situação de
+# recebimento. O cascade levava a trilha de atesto junto (quem recebeu, quando,
+# com que observação), enquanto ENTRADA, SAÍDA e lote sobreviviam com
+# `pedido_compra_id` NULL — estoque sem documento que explique de onde veio, e
+# todos os guards de `excluir_recebimento` contornados por aquela porta.
+
+
+def test_excluir_recebimento_desfaz_o_par_inteiro():
+    """A saída pareada da C2 vai junto: desfazer meia coisa é pior que não desfazer."""
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(50)
+        rec = _receber(pedido, admin, item, 30)
+        assert len(_saidas(pedido.id)) == 1, 'sanidade'
+
+        _excluir(rec, admin)
+
+        assert _entradas(pedido.id) == []
+        assert _saidas(pedido.id) == [], (
+            'a ENTRADA foi estornada e a SAÍDA ficou — apontando para um lote '
+            'que deixou de existir')
+
+
+def test_rota_de_exclusao_apaga_o_ultimo_recebimento():
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, item_id = _cenario_de_rota()
+    cli = cliente_de(admin_id)
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_id}': '30', 'data_recebimento': '2026-08-05'})
+    with app.app_context():
+        rec_id = _recebimentos_de(pedido_id)[0].id
+
+    resposta = cli.post(
+        f'/compras/{pedido_id}/recebimento/{rec_id}/excluir')
+
+    assert resposta.status_code == 302
+    with app.app_context():
+        assert _recebimentos_de(pedido_id) == []
+        assert _entradas(pedido_id) == []
+        from models import PedidoCompra
+        assert db.session.get(
+            PedidoCompra, pedido_id).situacao_recebimento == 'nao_recebido'
+
+
+def test_leitor_nao_exclui_recebimento_pela_rota():
+    from helpers_tenant import cliente_de
+    admin_id, obra_id, pedido_id, item_id = _cenario_de_rota()
+    cli = cliente_de(admin_id)
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_id}': '30', 'data_recebimento': '2026-08-05'})
+    with app.app_context():
+        rec_id = _recebimentos_de(pedido_id)[0].id
+        leitor_id = _pessoa_com_papel(admin_id, obra_id, 'LEITOR').id
+
+    resposta = cliente_de(leitor_id).post(
+        f'/compras/{pedido_id}/recebimento/{rec_id}/excluir')
+
+    assert resposta.status_code == 403
+    with app.app_context():
+        assert len(_recebimentos_de(pedido_id)) == 1
+
+
+def test_rota_de_exclusao_repassa_a_recusa_do_servico():
+    """A regra vive no serviço; a rota mostra a mensagem dele, sem reescrever."""
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, item_id = _cenario_de_rota()
+    cli = cliente_de(admin_id)
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_id}': '20', 'data_recebimento': '2026-08-05'})
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_id}': '10', 'data_recebimento': '2026-08-06'})
+    with app.app_context():
+        primeiro = _recebimentos_de(pedido_id)[0]
+        primeiro_id, rotulo = primeiro.id, primeiro.rotulo
+
+    cli.post(f'/compras/{pedido_id}/recebimento/{primeiro_id}/excluir')
+
+    aviso = _flashes(cli)
+    assert 'último' in aviso, (
+        f'a recusa do serviço não chegou ao usuário. Veio: {aviso!r}')
+    with app.app_context():
+        assert len(_recebimentos_de(pedido_id)) == 2, (
+            f'{rotulo} foi apagado do meio da sequência')
+
+
+def test_a_tela_de_recebimento_abre_com_o_pedido_ja_recebido():
+    """Senão o caminho de correção fica inalcançável.
+
+    O botão do detalhe some quando a situação é `recebido`, e a tela é o único
+    lugar onde a exclusão existe: quem errou a quantidade e fechou o pedido
+    ficaria sem por onde voltar.
+    """
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, item_id = _cenario_de_rota()
+    cli = cliente_de(admin_id)
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_id}': '50', 'data_recebimento': '2026-08-05'})
+
+    resposta = cli.get(f'/compras/{pedido_id}/recebimento')
+
+    assert resposta.status_code == 200
+    corpo = resposta.get_data(as_text=True)
+    assert 'excluir' in corpo.lower(), (
+        'a tela do pedido já recebido não oferece o desfazer')
+
+
+def test_detalhe_leva_aos_recebimentos_mesmo_com_o_pedido_fechado():
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, item_id = _cenario_de_rota()
+    cli = cliente_de(admin_id)
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_id}': '50', 'data_recebimento': '2026-08-05'})
+
+    corpo = cli.get(f'/compras/{pedido_id}').get_data(as_text=True)
+
+    assert f'/compras/{pedido_id}/recebimento' in corpo, (
+        'com o pedido fechado, o detalhe não leva mais à tela de recebimentos '
+        '— e é lá que mora o desfazer')
+
+
+def test_excluir_pedido_com_recebimento_recusa():
+    """O cascade levaria a trilha de atesto e deixaria o estoque órfão.
+
+    `almoxarifado_movimento.pedido_compra_id` é ON DELETE SET NULL: os
+    movimentos sobrevivem sem nada que explique de onde vieram, enquanto
+    `recebimento_pedido` some por CASCADE. Todos os guards de
+    `excluir_recebimento` ficariam contornados por esta porta.
+    """
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, item_id = _cenario_de_rota()
+    cli = cliente_de(admin_id)
+    cli.post(f'/compras/{pedido_id}/recebimento',
+             data={f'qtd_{item_id}': '30', 'data_recebimento': '2026-08-05'})
+
+    cli.post(f'/compras/excluir/{pedido_id}')
+
+    aviso = _flashes(cli)
+    assert 'recebimento' in aviso.lower(), (
+        f'a recusa não explicou que existe recebimento gravado. Veio: {aviso!r}')
+    with app.app_context():
+        from models import PedidoCompra
+        assert db.session.get(PedidoCompra, pedido_id) is not None, (
+            'o pedido foi excluído com recebimento gravado')
+        assert len(_recebimentos_de(pedido_id)) == 1
+        assert len(_entradas(pedido_id)) == 1
+
+
+def test_excluir_pedido_sem_recebimento_continua_funcionando():
+    """O contrapeso: o guard não pode transformar exclusão em impossível."""
+    from helpers_tenant import cliente_de
+    admin_id, _obra_id, pedido_id, _item_id = _cenario_de_rota()
+
+    cliente_de(admin_id).post(f'/compras/excluir/{pedido_id}')
+
+    with app.app_context():
+        from models import PedidoCompra
+        assert db.session.get(PedidoCompra, pedido_id) is None

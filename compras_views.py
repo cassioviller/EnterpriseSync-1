@@ -1182,6 +1182,56 @@ def recebimento(pedido_id):
     )
 
 
+@compras_bp.route('/<int:pedido_id>/recebimento/<int:recebimento_id>/excluir',
+                  methods=['POST'])
+@login_required
+def excluir_recebimento(pedido_id, recebimento_id):
+    """Desfaz o ÚLTIMO recebimento do pedido, estornando o estoque que gerou.
+
+    O serviço existe desde a R5 e não tinha por onde ser chamado: errar a
+    quantidade é o erro mais comum de quem recebe caminhão no portão, e a
+    única correção possível era acesso direto ao banco.
+
+    Toda a regra (só o último, só enquanto o material estiver na prateleira,
+    quem pode) vive em `services.recebimento_pedido.excluir_recebimento`. Esta
+    rota só resolve o pedido, checa o tenant e mostra a mensagem que vier.
+    """
+    from flask import abort
+
+    from models import RecebimentoPedido
+    from services.recebimento_pedido import RecebimentoInvalido
+    from services.recebimento_pedido import \
+        excluir_recebimento as servico_excluir
+
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    pedido = PedidoCompra.query.filter_by(
+        id=pedido_id, admin_id=admin_id).first_or_404()
+
+    if not pode_receber_na_obra(pedido.obra_id):
+        abort(403)
+
+    recebimento = RecebimentoPedido.query.filter_by(
+        id=recebimento_id, pedido_id=pedido.id, admin_id=admin_id).first_or_404()
+    rotulo = recebimento.rotulo
+
+    try:
+        servico_excluir(recebimento, current_user)
+    except RecebimentoInvalido as e:
+        db.session.rollback()
+        flash(str(e), 'danger')
+        return redirect(url_for('compras.recebimento', pedido_id=pedido_id))
+
+    flash(f'Recebimento {rotulo} excluído, e o estoque que ele gerou foi '
+          f'estornado. Pedido agora: '
+          f'{SITUACOES_RECEBIMENTO.get(pedido.situacao_recebimento, "—")}.',
+          'success')
+    return redirect(url_for('compras.recebimento', pedido_id=pedido_id))
+
+
 # ─────────────────────────────────────────────
 # RECEBIMENTO NO ALMOXARIFADO — rota do regime antigo
 # ─────────────────────────────────────────────
@@ -1391,6 +1441,23 @@ def excluir(pedido_id):
 
     admin_id = _admin_id()
     pedido = PedidoCompra.query.filter_by(id=pedido_id, admin_id=admin_id).first_or_404()
+
+    # Pedido com atesto gravado não é excluído por aqui. O cascade levaria a
+    # trilha de recebimento junto (quem recebeu, quando, com que observação —
+    # o controle compensatório pela ausência de segregação de funções),
+    # enquanto ENTRADA, SAÍDA e lote sobreviveriam com `pedido_compra_id`
+    # NULL, por ON DELETE SET NULL: estoque sem documento que explique de onde
+    # veio. E todos os guards de `excluir_recebimento` — só o último, só
+    # enquanto o material estiver na prateleira — ficariam contornados por
+    # esta porta.
+    quantos = pedido.recebimentos.count()
+    if quantos:
+        flash(f'Este pedido tem {quantos} recebimento(s) registrado(s), e o '
+              f'estoque que eles geraram está no almoxarifado. Exclua os '
+              f'recebimentos primeiro, do último para o primeiro — o estorno '
+              f'acontece lá, com as conferências que ele faz.', 'danger')
+        return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
     try:
         # Remover GestaoCustoPai vinculados (criados via filho origem_tabela=pedido_compra)
         filhos = GestaoCustoFilho.query.filter_by(

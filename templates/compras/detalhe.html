@@ -30,11 +30,22 @@
                                 pedido.situacao_recebimento, 'light text-dark border') }} fs-6 px-3 py-2">
         {{ SITUACOES_RECEBIMENTO.get(pedido.situacao_recebimento, '—') }}
       </span>
-      {% if pode_receber and pedido.situacao_recebimento not in ('recebido', 'encerrado_com_saldo') %}
-        <a href="{{ url_for('compras.recebimento', pedido_id=pedido.id) }}"
-           class="btn btn-success">
-          <i class="fas fa-clipboard-check me-2"></i>Registrar Recebimento
-        </a>
+      {% if pode_receber %}
+        {% if pedido.situacao_recebimento not in ('recebido', 'encerrado_com_saldo') %}
+          <a href="{{ url_for('compras.recebimento', pedido_id=pedido.id) }}"
+             class="btn btn-success">
+            <i class="fas fa-clipboard-check me-2"></i>Registrar Recebimento
+          </a>
+        {% else %}
+          {# Com o pedido fechado não há o que receber, mas a tela continua
+             sendo o único lugar onde o desfazer existe. Sem este link, quem
+             errou a quantidade e fechou o pedido ficaria sem por onde
+             voltar. #}
+          <a href="{{ url_for('compras.recebimento', pedido_id=pedido.id) }}"
+             class="btn btn-outline-secondary">
+            <i class="fas fa-clipboard-list me-2"></i>Ver recebimentos
+          </a>
+        {% endif %}
       {% endif %}
     </div>
     {% elif tem_itens_almox %}

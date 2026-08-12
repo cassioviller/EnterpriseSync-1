@@ -148,7 +148,7 @@ A regra de espelhamento, tirada dos dois chamadores atuais:
 e o guard `_ja_teve_saida` passaria a bloquear **toda** exclusão de recebimento — a
 correção de C2 quebra a R5 se esta rodada não vier junto.
 
-- [ ] **Step 1 (red):**
+- [x] **Step 1 (red):**
   - excluir um recebimento que gerou o par ENTRADA+SAÍDA → os **dois** movimentos somem,
     o lote some, e a situação recalcula (hoje, depois de C2: recusa dizendo que o
     material já teve saída — falso, a saída é dele mesmo);
@@ -160,21 +160,21 @@ correção de C2 quebra a R5 se esta rodada não vier junto.
     recebimentos existem e que é preciso excluí-los primeiro (hoje: apaga a trilha de
     atesto por cascade e deixa ENTRADA, SAÍDA e lote órfãos, com `pedido_compra_id` NULL
     por `ON DELETE SET NULL`).
-- [ ] **Step 2:** `_ja_teve_saida` passa a ignorar a saída pareada do próprio
+- [x] **Step 2:** `_ja_teve_saida` passa a ignorar a saída pareada do próprio
   recebimento (é para isso que a coluna de C2 existe), e o estorno apaga a saída e
   devolve o lote a `DISPONIVEL` **antes** de avaliar o guard. Validar tudo antes de
   apagar qualquer coisa continua valendo.
-- [ ] **Step 3:** rota `POST /compras/<pedido_id>/recebimento/<recebimento_id>/excluir`
+- [x] **Step 3:** rota `POST /compras/<pedido_id>/recebimento/<recebimento_id>/excluir`
   chamando `excluir_recebimento`, e o botão no detalhe do pedido, com confirmação,
   listando o rótulo (`PC-1234/2`). Sem rota, o serviço da R5 é código morto — e o
   docstring dele diz, corretamente, que errar a quantidade é o erro mais comum de quem
   recebe caminhão no portão.
-- [ ] **Step 4:** guard na rota `compras.excluir`: pedido com `situacao_recebimento`
+- [x] **Step 4:** guard na rota `compras.excluir`: pedido com `situacao_recebimento`
   diferente de `nao_recebido` recusa. Todos os guards de `excluir_recebimento` ficam
   contornados por aquela porta hoje.
-- [ ] **Step 5 (green + mutação):** verdes. Mutação: remover o guard da rota `excluir` e
+- [x] **Step 5 (green + mutação):** verdes. Mutação: remover o guard da rota `excluir` e
   confirmar que o teste do pedido com recebimento **mata** a mutação.
-- [ ] **Step 6:** commit — `feat(compras): excluir recebimento pela tela, e o pedido para de apagar a trilha`
+- [x] **Step 6:** commit — `feat(compras): excluir recebimento pela tela, e o pedido para de apagar a trilha`
 
 ## C4 — Não se atesta o que o cliente ainda não aprovou
 
