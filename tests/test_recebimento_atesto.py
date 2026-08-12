@@ -256,25 +256,56 @@ def test_todo_ponto_que_cria_pedido_carimba_o_regime():
     aquele caminho, e ninguém descobre até o estoque não bater.
 
     Mesmo formato do teste de fonte em tests/test_p4_formula_unica_progresso.py.
-    Se um terceiro ponto de criação nascer, este teste exige que ele decida
-    sobre o regime em vez de herdar o default por descuido.
+    Se um ponto de criação novo nascer, este teste exige que ele decida sobre
+    o regime em vez de herdar o default por descuido.
+
+    ⚠️ C9 (12/08): este teste varria só `compras_views.py` e afirmava proteger
+    contra "um terceiro ponto de criação" — que já existia, em `views/obras.py`,
+    sem carimbo nenhum, com o teste verde. Agora varre o repositório inteiro, e
+    por `ast` em vez de regex: `PedidoCompra(` seguido de fecha-parênteses na
+    coluna certa era uma aposta sobre formatação, não uma leitura do código.
     """
-    import re
+    import ast
 
-    caminho = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'compras_views.py')
-    with open(caminho, encoding='utf-8') as f:
-        fonte = f.read()
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ignorados = {'tests', '.pythonlibs', 'archive', 'node_modules',
+                 '__pycache__', '.git', 'backups', 'attached_assets',
+                 'migrations_backup', '.local', 'obra_kabod'}
 
-    # Cada construção de PedidoCompra e o que vem até o fecha-parênteses.
-    construcoes = re.findall(r'PedidoCompra\((.*?)\n\s*\)', fonte, re.DOTALL)
+    construcoes = []
+    sem_carimbo = []
+    for pasta, subpastas, arquivos in os.walk(raiz):
+        subpastas[:] = [d for d in subpastas if d not in ignorados]
+        for nome in arquivos:
+            if not nome.endswith('.py'):
+                continue
+            caminho = os.path.join(pasta, nome)
+            try:
+                with open(caminho, encoding='utf-8') as f:
+                    arvore = ast.parse(f.read(), filename=caminho)
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            for no in ast.walk(arvore):
+                if not isinstance(no, ast.Call):
+                    continue
+                alvo = no.func
+                nome_chamado = getattr(alvo, 'id', None) or getattr(
+                    alvo, 'attr', None)
+                if nome_chamado != 'PedidoCompra':
+                    continue
+                onde = f'{os.path.relpath(caminho, raiz)}:{no.lineno}'
+                construcoes.append(onde)
+                if not any(kw.arg == 'exige_atesto' for kw in no.keywords):
+                    sem_carimbo.append(onde)
+
     assert construcoes, 'nenhuma construção de PedidoCompra encontrada'
-    sem_carimbo = [c for c in construcoes if 'exige_atesto' not in c]
     assert not sem_carimbo, (
         f'{len(sem_carimbo)} de {len(construcoes)} construções de PedidoCompra '
-        f'não carimbam `exige_atesto`. Um pedido sem carimbo cai no regime '
-        f'antigo por default e o estoque volta a entrar na emissão sem aviso.')
+        f'não carimbam `exige_atesto`, e um pedido sem carimbo cai no regime '
+        f'antigo por default — o estoque volta a entrar na emissão para aquele '
+        f'caminho, sem aviso. Decida o regime: `regime_do_tenant(admin_id)` '
+        f'para pedido de usuário, `False` explícito para dado histórico ou de '
+        f'demonstração.\n  ' + '\n  '.join(sem_carimbo))
 
 
 def test_guard_recusa_ligar_sem_almoxarifado():

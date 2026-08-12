@@ -2975,6 +2975,16 @@ def nova_compra_obra(obra_id):
             arquivo.save(os.path.join(upload_dir, safe_name))
             anexo_url = f"/static/uploads/pedidos_compra/{safe_name}"
 
+        # Fase 4 — o terceiro ponto de criação de PedidoCompra, e o que o
+        # teste-guarda da R2 não via porque varria só `compras_views.py`. O
+        # regime é decidido aqui, como nos outros dois: pedido que nasce com a
+        # flag ligada só recebe estoque por atesto. Os itens desta tela não
+        # têm vínculo com o catálogo do almoxarifado, então na prática o atesto
+        # deles é só documento — mas é o documento que a fase financeira vai
+        # usar para pagar o que chegou (`valor_atestado`), e herdar o default
+        # por descuido deixaria essas compras de fora dele.
+        from services.recebimento_pedido import regime_do_tenant
+
         pedido = PedidoCompra(
             fornecedor_id=fornecedor_id,
             obra_id=obra_id,
@@ -2984,6 +2994,7 @@ def nova_compra_obra(obra_id):
             valor_total=valor_total,
             status_aprovacao_cliente='PENDENTE',
             anexo_url=anexo_url,
+            exige_atesto=regime_do_tenant(admin_id),
             admin_id=admin_id,
         )
         db.session.add(pedido)

@@ -283,18 +283,18 @@ motivo.
 sobre o regime". O terceiro ponto **já existe**: `views/obras.py` (`nova_compra_obra`)
 constrói `PedidoCompra` sem carimbar, e o teste passa verde.
 
-- [ ] **Step 1 (red):** o teste passa a varrer **todo** `.py` do repositório (excluindo
+- [x] **Step 1 (red):** o teste passa a varrer **todo** `.py` do repositório (excluindo
   `tests/`, `.pythonlibs/`, `archive/`) e falha nomeando arquivo e linha de cada
   construção sem carimbo. Rodar e **ver vermelho em `views/obras.py`** — se ficar verde,
   a varredura está errada, não o código.
-- [ ] **Step 2:** carimbar o regime em `views/obras.py`, via `regime_do_tenant(admin_id)`,
+- [x] **Step 2:** carimbar o regime em `views/obras.py`, via `regime_do_tenant(admin_id)`,
   como os outros dois pontos fazem. ⚠️ Esse caminho **nunca** gerou movimento de estoque
   (os itens que ele cria não têm `almoxarifado_item_id`): carimbar `exige_atesto=True` ali
   dá ao pedido um documento de recebimento e um `valor_atestado` utilizável pela fase
   financeira, sem mudar nada no almoxarifado. Confirmar isso por teste antes de assumir.
-- [ ] **Step 3 (green):** verde, e a mensagem de falha do teste tem de ser legível o
+- [x] **Step 3 (green):** verde, e a mensagem de falha do teste tem de ser legível o
   bastante para quem criar o quarto ponto entender o que fazer.
-- [ ] **Step 4:** commit — `test(compras): o guarda do carimbo de regime varre o repositorio inteiro`
+- [x] **Step 4:** commit — `test(compras): o guarda do carimbo de regime varre o repositorio inteiro`
 
 ---
 
