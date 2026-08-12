@@ -154,6 +154,64 @@ def _validar_linhas(pedido, linhas, acumulado, permitir_sobre_entrega):
                       'justifique.')
 
 
+def _lancar_no_estoque(pedido, recebimento, linha, item, usuario_id):
+    """ENTRADA + lote FIFO da quantidade que ESTA linha atestou.
+
+    O espelho de `compras_views._gerar_entrada_almoxarifado`, com a diferença
+    que é a razão desta fase existir: a quantidade é a RECEBIDA, não a pedida,
+    e o momento é o da chegada, não o da emissão.
+
+    Item de texto livre não chega aqui — sem `almoxarifado_item_id` não há o
+    que movimentar, e a linha do recebimento fica com
+    `almoxarifado_movimento_id` NULL de propósito.
+
+    `pedido_compra_id` é preenchido porque o handler `material_entrada` do
+    EventManager dedup por ele: sem isso o custo do material entra duas vezes.
+    """
+    from models import AlmoxarifadoEstoque, AlmoxarifadoMovimento, db
+
+    lote_ref = f'{pedido.numero or f"PC-{pedido.id}"}/{recebimento.sequencia}'
+    quantidade = _d(linha.quantidade_recebida)
+
+    mov = AlmoxarifadoMovimento(
+        item_id=item.almoxarifado_item_id,
+        tipo_movimento='ENTRADA',
+        quantidade=quantidade,
+        valor_unitario=item.preco_unitario,
+        nota_fiscal=pedido.numero,
+        observacao=f'Recebimento {recebimento.rotulo}: {item.descricao[:100]}',
+        estoque_id=None,
+        fornecedor_id=pedido.fornecedor_id,
+        admin_id=pedido.admin_id,
+        usuario_id=usuario_id,
+        obra_id=pedido.obra_id,
+        pedido_compra_id=pedido.id,
+    )
+    db.session.add(mov)
+    db.session.flush()
+
+    estoque = AlmoxarifadoEstoque(
+        item_id=item.almoxarifado_item_id,
+        quantidade=quantidade,
+        quantidade_inicial=quantidade,
+        quantidade_disponivel=quantidade,
+        entrada_movimento_id=mov.id,
+        valor_unitario=item.preco_unitario,
+        status='DISPONIVEL',
+        # O lote carrega a sequência do recebimento: duas entregas do mesmo
+        # pedido são dois lotes distinguíveis na prateleira e no estorno.
+        lote=lote_ref[:50],
+        obra_id=pedido.obra_id,
+        admin_id=pedido.admin_id,
+    )
+    db.session.add(estoque)
+    db.session.flush()
+    mov.estoque_id = estoque.id
+
+    linha.almoxarifado_movimento_id = mov.id
+    return mov
+
+
 def registrar_recebimento(pedido, usuario, linhas, data, observacao=None,
                           encerra_saldo=False, motivo=None,
                           permitir_sobre_entrega=False):
@@ -167,10 +225,13 @@ def registrar_recebimento(pedido, usuario, linhas, data, observacao=None,
     mensagem para humano quando alguma regra não bate; nada é gravado nesse
     caso.
 
-    NÃO gera movimento de estoque nesta rodada — isso entra na R4, e é o que
-    faz o estoque passar a nascer do atesto em vez da emissão do pedido.
+    É AQUI que o estoque entra, para pedido do regime novo: cada linha de
+    item de catálogo gera ENTRADA + lote FIFO com a quantidade recebida. A
+    emissão do pedido, que fazia isso antes, não faz mais
+    (compras_views._gerar_entrada_almoxarifado).
     """
-    from models import RecebimentoPedido, RecebimentoPedidoItem, db
+    from models import (PedidoCompraItem, RecebimentoPedido,
+                        RecebimentoPedidoItem, db)
     from utils.autorizacao import usuario_pode_receber_na_obra
 
     linhas = list(linhas or [])
@@ -219,19 +280,37 @@ def registrar_recebimento(pedido, usuario, linhas, data, observacao=None,
     db.session.add(recebimento)
     db.session.flush()
 
+    itens = {i.id: i for i in
+             PedidoCompraItem.query.filter_by(pedido_id=pedido.id).all()}
+    gravadas = []
     for item_id, quantidade in linhas:
-        db.session.add(RecebimentoPedidoItem(
+        registro = RecebimentoPedidoItem(
             recebimento_id=recebimento.id,
             admin_id=pedido.admin_id,
             pedido_item_id=item_id,
             quantidade_recebida=_d(quantidade),
-        ))
+        )
+        db.session.add(registro)
+        gravadas.append((registro, itens[item_id]))
     db.session.flush()
+
+    # O estoque nasce daqui — e SÓ no regime novo. Para pedido legado
+    # (`exige_atesto=False`) a entrada já aconteceu na emissão; lançar de novo
+    # aqui seria a dupla escrita que esta fase existe para consertar, com o
+    # sinal trocado. A recusa explícita desses pedidos na tela é da R6.
+    movimentos = 0
+    if pedido.exige_atesto:
+        for registro, item in gravadas:
+            if item.almoxarifado_item_id:
+                _lancar_no_estoque(pedido, recebimento, registro, item,
+                                   usuario.id)
+                movimentos += 1
+        db.session.flush()
 
     pedido.situacao_recebimento = situacao_para(pedido)
     db.session.commit()
 
-    logger.info('recebimento %s: %s itens por usuario=%s — pedido agora %s',
-                recebimento.rotulo, len(linhas), usuario.id,
-                pedido.situacao_recebimento)
+    logger.info('recebimento %s: %s itens (%s no estoque) por usuario=%s — '
+                'pedido agora %s', recebimento.rotulo, len(linhas), movimentos,
+                usuario.id, pedido.situacao_recebimento)
     return recebimento

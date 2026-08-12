@@ -110,7 +110,22 @@ def _gerar_entrada_almoxarifado(pedido, itens_validos, admin_id, usuario_id):
 
     NÃO commita — o chamador é responsável pelo commit/rollback.
     Retorna lista de tuplas (movimento, estoque) criadas.
+
+    Fase 4 — pedido com `exige_atesto` NÃO passa por aqui: o estoque dele
+    nasce do atesto (services/recebimento_pedido.registrar_recebimento), com a
+    quantidade que fisicamente chegou. Emitir não é receber; o caminhão ainda
+    nem saiu quando esta função rodaria.
+
+    O guard mora AQUI, e não nos dois chamadores, porque é aqui que a escrita
+    acontece: um terceiro chamador nascer no futuro não reabre a dupla
+    escrita por esquecimento. Ver o spec, seção "Como fica".
     """
+    if getattr(pedido, 'exige_atesto', False):
+        logger.info(
+            f"[emissão] pedido={pedido.id} exige atesto — estoque não entra "
+            f"agora, entra no recebimento")
+        return []
+
     itens_catalogo = [(desc, qtd, preco, almox_id, subtotal)
                       for desc, qtd, preco, almox_id, subtotal in itens_validos
                       if almox_id]

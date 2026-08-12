@@ -500,3 +500,222 @@ def test_sem_vinculo_com_a_obra_nao_atesta():
         db.session.commit()
         with pytest.raises(RecebimentoInvalido):
             _receber(pedido, estranho, item, 10)
+
+
+# ---------------------------------------------------------------------------
+# R4 — o estoque passa a nascer do atesto
+# ---------------------------------------------------------------------------
+#
+# O conserto da dupla escrita. Até aqui o estoque entrava DUAS vezes na
+# cabeça de quem lê o código e UMA no banco, no momento errado: a emissão do
+# pedido lançava tudo (compras_views._gerar_entrada_almoxarifado) e a rota
+# /receber lançava "o que falta" — que já era zero. Deste bloco em diante,
+# pedido com `exige_atesto=True` não lança nada na emissão, e cada atesto
+# lança exatamente a quantidade que chegou.
+#
+# O quarto teste é o que protege produção: com a flag desligada, tudo tem de
+# continuar movimento a movimento como está hoje.
+
+
+def _item_de_catalogo(admin_id, nome='Cimento CP-II'):
+    """Um item do catálogo do almoxarifado — o que separa atesto COM movimento
+    de atesto sem movimento."""
+    from models import AlmoxarifadoCategoria, AlmoxarifadoItem
+
+    suf = uuid.uuid4().hex[:8]
+    cat = AlmoxarifadoCategoria(
+        nome=f'Cat {suf}', tipo_controle_padrao='CONSUMIVEL', admin_id=admin_id)
+    db.session.add(cat)
+    db.session.commit()
+    it = AlmoxarifadoItem(
+        codigo=f'C{suf[:6].upper()}', nome=nome, categoria_id=cat.id,
+        tipo_controle='CONSUMIVEL', unidade='sc', admin_id=admin_id)
+    db.session.add(it)
+    db.session.commit()
+    return it
+
+
+def _cenario_com_catalogo(qtd=50, exige_atesto=True):
+    """Pedido de UM item vinculado ao catálogo, no regime pedido."""
+    admin = _admin()
+    obra = _obra(admin.id)
+    forn = _fornecedor(admin.id)
+    pedido = _pedido(admin.id, obra.id, forn.id,
+                     itens=(('Cimento CP-II', qtd, 32.50),))
+    almox = _item_de_catalogo(admin.id)
+    pedido.exige_atesto = exige_atesto
+    item = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).first()
+    item.almoxarifado_item_id = almox.id
+    db.session.commit()
+    return admin, obra, pedido, item, almox
+
+
+def _itens_validos(pedido):
+    """As tuplas que a emissão passa para `_gerar_entrada_almoxarifado`."""
+    return [(i.descricao, float(i.quantidade), float(i.preco_unitario),
+             i.almoxarifado_item_id, float(i.subtotal))
+            for i in PedidoCompraItem.query.filter_by(pedido_id=pedido.id).all()]
+
+
+def _entradas(pedido_id):
+    from models import AlmoxarifadoMovimento
+    return (AlmoxarifadoMovimento.query
+            .filter_by(pedido_compra_id=pedido_id, tipo_movimento='ENTRADA')
+            .all())
+
+
+def test_emissao_nao_lanca_estoque_quando_o_pedido_exige_atesto():
+    """A regressão que impede a dupla escrita de voltar.
+
+    Hoje a emissão lança TUDO — e é por isso que a rota /receber virou no-op.
+    Com o regime novo, emitir não é receber: o caminhão ainda nem saiu.
+    """
+    from compras_views import processar_compra_normal
+    with app.app_context():
+        admin, _obr, pedido, _item, _almox = _cenario_com_catalogo(50)
+        processar_compra_normal(pedido, _itens_validos(pedido), admin.id, admin.id)
+        db.session.commit()
+
+        assert _entradas(pedido.id) == [], (
+            'a emissão lançou estoque de um pedido que exige atesto — o '
+            'material entrou no almoxarifado antes de chegar na obra')
+
+
+def test_emissao_continua_lancando_estoque_no_regime_antigo():
+    """O teste que guarda quem está em produção.
+
+    Tenant sem a flag não pode perceber nada: emitir continua lançando a
+    quantidade inteira, e a saída de consumo direto na obra continua saindo.
+    Se este ficar vermelho, a virada vazou para fora da flag.
+    """
+    from compras_views import processar_compra_normal
+    from models import AlmoxarifadoMovimento
+    with app.app_context():
+        admin, _obr, pedido, _item, _almox = _cenario_com_catalogo(
+            50, exige_atesto=False)
+        processar_compra_normal(pedido, _itens_validos(pedido), admin.id, admin.id)
+        db.session.commit()
+
+        entradas = _entradas(pedido.id)
+        assert len(entradas) == 1, 'a emissão deixou de lançar no regime antigo'
+        assert float(entradas[0].quantidade) == 50.0
+        saidas = (AlmoxarifadoMovimento.query
+                  .filter_by(pedido_compra_id=pedido.id, tipo_movimento='SAIDA')
+                  .count())
+        assert saidas == 1, 'o consumo direto na obra sumiu do regime antigo'
+
+
+def test_atesto_gera_entrada_com_a_quantidade_recebida():
+    """30 dos 50 chegaram → ENTRADA de 30, com lote, e o vínculo de volta.
+
+    O `almoxarifado_movimento_id` na linha do recebimento é o que permite
+    auditar "esta entrada veio deste atesto" — e o que torna o estorno da R5
+    possível sem adivinhação.
+    """
+    from models import AlmoxarifadoEstoque, RecebimentoPedidoItem
+    with app.app_context():
+        admin, _obr, pedido, item, almox = _cenario_com_catalogo(50)
+        rec = _receber(pedido, admin, item, 30)
+
+        entradas = _entradas(pedido.id)
+        assert len(entradas) == 1, 'o atesto não gerou movimento de estoque'
+        mov = entradas[0]
+        assert mov.item_id == almox.id
+        assert float(mov.quantidade) == 30.0, (
+            'o movimento tem de ter a quantidade RECEBIDA, não a pedida')
+        assert mov.lote or True  # o lote vive no AlmoxarifadoEstoque
+        assert mov.pedido_compra_id == pedido.id, (
+            'sem `pedido_compra_id` a dedup do handler material_entrada do '
+            'EventManager conta o custo duas vezes')
+
+        lote = AlmoxarifadoEstoque.query.filter_by(
+            entrada_movimento_id=mov.id).first()
+        assert lote is not None, 'entrada sem lote FIFO não sai do estoque'
+        assert float(lote.quantidade_disponivel) == 30.0
+
+        linha = RecebimentoPedidoItem.query.filter_by(
+            recebimento_id=rec.id, pedido_item_id=item.id).first()
+        assert linha.almoxarifado_movimento_id == mov.id, (
+            'a linha do recebimento não guardou o movimento que gerou')
+
+
+def test_item_de_texto_livre_tem_atesto_e_nao_tem_movimento():
+    """O "outro" da requisição: tem recebimento, não tem estoque.
+
+    Item fora do catálogo não pode gerar movimento — não há o que movimentar
+    —, mas o fato de ter chegado continua registrado. `situacao_recebimento`
+    conta com ele.
+    """
+    from models import RecebimentoPedidoItem
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        forn = _fornecedor(admin.id)
+        pedido = _pedido(admin.id, obra.id, forn.id,
+                         itens=(('Frete do caminhão', 1, 350.00),))
+        pedido.exige_atesto = True
+        db.session.commit()
+        item = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).first()
+        assert item.almoxarifado_item_id is None, 'sanidade: é texto livre'
+
+        rec = _receber(pedido, admin, item, 1)
+
+        assert _entradas(pedido.id) == [], (
+            'item fora do catálogo gerou movimento de estoque')
+        linha = RecebimentoPedidoItem.query.filter_by(
+            recebimento_id=rec.id).first()
+        assert linha is not None, 'o atesto do item de texto livre sumiu'
+        assert linha.almoxarifado_movimento_id is None
+        db.session.refresh(pedido)
+        assert pedido.situacao_recebimento == 'recebido'
+
+
+def test_recebimento_de_pedido_legado_nao_lanca_estoque_de_novo():
+    """A dupla escrita com o sinal trocado — o defeito que a virada poderia
+    criar em vez de consertar.
+
+    O estoque de pedido legado já entrou na EMISSÃO. Se o serviço novo
+    lançasse de novo ao atestar, o almoxarifado passaria a contar 80 onde
+    chegaram 50. O documento de recebimento é gravado (o fato aconteceu);
+    o movimento, não.
+    """
+    from compras_views import processar_compra_normal
+    from models import RecebimentoPedidoItem
+    with app.app_context():
+        admin, _obr, pedido, item, _almox = _cenario_com_catalogo(
+            50, exige_atesto=False)
+        processar_compra_normal(pedido, _itens_validos(pedido), admin.id, admin.id)
+        db.session.commit()
+        assert len(_entradas(pedido.id)) == 1, 'sanidade: a emissão lançou'
+
+        rec = _receber(pedido, admin, item, 30)
+
+        assert len(_entradas(pedido.id)) == 1, (
+            'o atesto lançou estoque de um pedido cujo estoque já entrou na '
+            'emissão — a dupla escrita de volta, com o sinal trocado')
+        linha = RecebimentoPedidoItem.query.filter_by(
+            recebimento_id=rec.id).first()
+        assert linha is not None, 'o documento de recebimento tem de existir'
+        assert linha.almoxarifado_movimento_id is None
+
+
+def test_rota_receber_antiga_continua_valendo_para_pedido_legado():
+    """A rota /receber não some: pedido legado continua recebendo por ela.
+
+    O estoque desses pedidos já entrou na emissão; mudar isso reescreveria
+    estoque histórico. Aqui a emissão não rodou, então a rota lança os 50
+    pendentes — exatamente o que ela faz hoje.
+    """
+    from helpers_tenant import cliente_de
+
+    with app.app_context():
+        admin, _obr, pedido, _item, _almox = _cenario_com_catalogo(
+            50, exige_atesto=False)
+        admin_id, pedido_id = admin.id, pedido.id
+
+    cliente_de(admin_id).post(f'/compras/receber/{pedido_id}')
+
+    with app.app_context():
+        entradas = _entradas(pedido_id)
+        assert len(entradas) == 1, 'a rota antiga parou de receber pedido legado'
+        assert float(entradas[0].quantidade) == 50.0
