@@ -4,7 +4,8 @@
   "fontes": [
    "CRONOGRAMA 12.08.mpp (MS Project — replanejamento de 12/08: mesmas 109 tarefas, 4 ids girados na Fundação do Galpão B, 51 folhas com datas deslocadas, drenagem A/B em 100%)",
    "Planilha de Custos REV01 (custos por etapa — preservados da produção)",
-   "Textos dos RDOs (WhatsApp, export de 12/08) — RDOs de 07 a 11/08 e fonte do % físico desses dias"
+   "Textos dos RDOs (WhatsApp, export de 12/08) — RDOs de 07 a 11/08 e fonte do % físico desses dias",
+   "Complemento do RDO de 11/08 (painelização LSF no galpão VEKS de São José dos Campos/SP): efetivo nominal, produtividade dos painéis P4 e 4 fotos, de cargas/obra-10/"
   ],
   "descricao": "Cronograma físico-financeiro da obra Baias Kabod. A INTERLIGAÇÃO: cada nó da EAP carrega o CRONOGRAMA (datas, %físico do MS Project — agora com split BAIA 01/02) E o CUSTO (Veks + faturamento direto da Planilha1). Tarefas FAZENDA (nivelamento, drenagem) entram só no físico (sem custo), alocadas a Indiretos. Custos/peso preservados da REV01.",
   "como_usar": "Importar como fonte do módulo físico-financeiro. O app distribui o custo de cada etapa ao longo das datas da etapa (linear ou por marcos), gera a Curva S física (avanço ponderado por custo) e financeira, o fluxo de caixa (medições - desembolso - abatimento do fat direto) e os indicadores de avanço físico × financeiro (PV/EV/AC, SPI/CPI).",
@@ -3409,7 +3410,7 @@
    "data": "2026-08-11",
    "clima": "Não informado",
    "precipitacao": "Não informado",
-   "comentario": "Efetivo: 11 colaboradores + Abraão (Encarregado) + 01 operador de maquinário PC + 02 montadores de LSF em São José dos Campos/SP\n\nAtividades executadas:\n• Foi finalizada a escavação das valas de drenagem das baias do Galpão A, concluindo a etapa de escavação dos drenos das baias.\n• Foi iniciado o serviço de carpintaria das laterais internas do Bloco B, preparando as frentes para as próximas etapas de execução.\n• Foi realizada a locação das brocas destinadas à concretagem, conforme posicionamento previsto em projeto.\n• Foram finalizados os reforços das malhas do Bloco A, conforme revisão do projeto estrutural.\n• Foi realizado o recorte e preparo das vigas transversais para continuidade da execução das fundações.\n• Foi realizada a limpeza das valas longitudinais do Bloco B, preparando as fundações para as próximas etapas.\n• Foram retiradas as lonas e as tábuas utilizadas para proteção das calçadas do Bloco B.\n• Foi iniciado o processo de painelização dos elementos em Light Steel Frame (LSF) no galpão da VEKS em São José dos Campos/SP.\n\nObservações:\n• Com a conclusão da escavação dos drenos das baias do Galpão A, foi finalizada a etapa de escavação da drenagem das baias. Entretanto, até o encerramento do expediente, o rachão destinado à execução da primeira camada drenante ainda não havia sido disponibilizado na obra, impossibilitando o avanço imediato dessa etapa.\n• A equipe de montagem do sistema Light Steel Frame permanece mobilizada em São José dos Campos/SP, dando início à painelização dos elementos previstos para a obra.\n• A Eng. Ana Luísa solicitou que a execução das novas brocas de reforço e do concreto magro das vigas transversais fosse realizada previamente ao posicionamento das armações e caixarias, conforme sequência prevista em projeto. Em função da necessidade de otimização da sequência executiva, foi apresentada a metodologia alternativa ao projetista estrutural, que manifestou concordância. Foi elaborado parecer técnico formalizando a compatibilidade da metodologia com o projeto, permanecendo o documento pendente de assinatura do Eng. Calculista/Projetista Estrutural.\n\nPróximas atividades (12/08):\n• Continuidade da carpintaria lateral interna do Bloco B.\n• Continuidade da preparação das vigas transversais e demais elementos das fundações.\n• Continuidade da painelização dos elementos em Light Steel Frame em São José dos Campos/SP.\n• Aguardar a chegada do rachão para início da execução da primeira camada drenante das baias.",
+   "comentario": "Efetivo: 11 colaboradores + Abraão (Encarregado) + 01 operador de maquinário PC + 02 montadores de LSF em São José dos Campos/SP\n\nAtividades executadas:\n• Foi finalizada a escavação das valas de drenagem das baias do Galpão A, concluindo a etapa de escavação dos drenos das baias.\n• Foi iniciado o serviço de carpintaria das laterais internas do Bloco B, preparando as frentes para as próximas etapas de execução.\n• Foi realizada a locação das brocas destinadas à concretagem, conforme posicionamento previsto em projeto.\n• Foram finalizados os reforços das malhas do Bloco A, conforme revisão do projeto estrutural.\n• Foi realizado o recorte e preparo das vigas transversais para continuidade da execução das fundações.\n• Foi realizada a limpeza das valas longitudinais do Bloco B, preparando as fundações para as próximas etapas.\n• Foram retiradas as lonas e as tábuas utilizadas para proteção das calçadas do Bloco B.\n• Foi iniciado o processo de painelização dos elementos em Light Steel Frame (LSF) no galpão da VEKS em São José dos Campos/SP.\n\nObservações:\n• Com a conclusão da escavação dos drenos das baias do Galpão A, foi finalizada a etapa de escavação da drenagem das baias. Entretanto, até o encerramento do expediente, o rachão destinado à execução da primeira camada drenante ainda não havia sido disponibilizado na obra, impossibilitando o avanço imediato dessa etapa.\n• A equipe de montagem do sistema Light Steel Frame permanece mobilizada em São José dos Campos/SP, dando início à painelização dos elementos previstos para a obra.\n• A Eng. Ana Luísa solicitou que a execução das novas brocas de reforço e do concreto magro das vigas transversais fosse realizada previamente ao posicionamento das armações e caixarias, conforme sequência prevista em projeto. Em função da necessidade de otimização da sequência executiva, foi apresentada a metodologia alternativa ao projetista estrutural, que manifestou concordância. Foi elaborado parecer técnico formalizando a compatibilidade da metodologia com o projeto, permanecendo o documento pendente de assinatura do Eng. Calculista/Projetista Estrutural.\n\nPainelização LSF — galpão VEKS, São José dos Campos/SP:\nEfetivo:\n• Roger\n• Evandro (período da tarde)\n\nProdutividade:\n• Foram produzidos os painéis P4 das identificações 05, 03, 01, 02, 13 e 17 — 6 painéis de 87,5 kg cada, totalizando 525 kg.\n\nPróximas atividades (12/08):\n• Continuidade da carpintaria lateral interna do Bloco B.\n• Continuidade da preparação das vigas transversais e demais elementos das fundações.\n• Continuidade da painelização dos elementos em Light Steel Frame em São José dos Campos/SP.\n• Aguardar a chegada do rachão para início da execução da primeira camada drenante das baias.",
    "mao_de_obra": 0,
    "apontamentos": [
     {
@@ -3441,6 +3442,22 @@
     {
      "arquivo": "5.jpg",
      "legenda": ""
+    },
+    {
+     "arquivo": "6.jpg",
+     "legenda": "Painéis P4 produzidos e identificados (05, 03, 01, 02, 13 e 17) — galpão VEKS, São José dos Campos/SP"
+    },
+    {
+     "arquivo": "7.jpg",
+     "legenda": "Painéis P4 estocados após a produção — galpão VEKS, São José dos Campos/SP"
+    },
+    {
+     "arquivo": "8.jpg",
+     "legenda": "Perfis de LSF cortados e posicionados para a montagem do painel"
+    },
+    {
+     "arquivo": "9.jpg",
+     "legenda": "Área de produção da painelização no galpão VEKS, São José dos Campos/SP"
     }
    ]
   }

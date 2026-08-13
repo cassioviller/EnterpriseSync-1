@@ -54,6 +54,12 @@ ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.pdf'}
 # vazado sem atrapalhar a obra em curso. Ver decisão D4 do plano da Fase 3.
 PRAZO_TOKEN_DIAS = 180
 
+# Paginação dos RDOs no portal: bloco inicial e teto por página (ver
+# `portal_obra`). O teto existe porque cada linha traz o thumbnail base64 da
+# primeira foto do RDO.
+RDOS_POR_PAGINA = 20
+RDOS_LIMITE_MAX = 500
+
 
 def _ensure_upload_folder():
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -303,11 +309,30 @@ def portal_obra(token: str):
         .all()
     )
 
+    # RDOs: a página abre com um bloco de RDOS_POR_PAGINA e cresce por cliques
+    # em "ver mais" (`?rdos=<limite>`). O limite era fixo em 20 e o corte era
+    # MUDO — na Baia (42 RDOs) o cliente via de 17/07 pra frente e o contador
+    # do hero dizia "20", como se a obra começasse ali. Agora o total vem de um
+    # COUNT separado (o hero mostra o real) e o rodapé da seção diz o que está
+    # mostrando de quanto. Teto de RDOS_LIMITE_MAX porque a linha carrega o
+    # thumbnail base64 da 1ª foto: obra longa pediria a página inteira de uma
+    # vez se o parâmetro viesse cru da URL.
+    rdos_total = (
+        RDO.query
+        .filter_by(obra_id=obra.id, admin_id=admin_id, status='Finalizado')
+        .count()
+    )
+    try:
+        rdos_limite = int(request.args.get('rdos') or RDOS_POR_PAGINA)
+    except (TypeError, ValueError):
+        rdos_limite = RDOS_POR_PAGINA
+    rdos_limite = max(RDOS_POR_PAGINA, min(rdos_limite, RDOS_LIMITE_MAX))
+
     rdos = (
         RDO.query
         .filter_by(obra_id=obra.id, admin_id=admin_id, status='Finalizado')
         .order_by(RDO.data_relatorio.desc())
-        .limit(20)
+        .limit(rdos_limite)
         .all()
     )
 
@@ -457,6 +482,9 @@ def portal_obra(token: str):
         compras_pendentes=compras_pendentes,
         compras_resolvidas=compras_resolvidas,
         rdos=rdos,
+        rdos_total=rdos_total,
+        rdos_limite=rdos_limite,
+        rdos_proximo_limite=min(rdos_limite + RDOS_POR_PAGINA, RDOS_LIMITE_MAX),
         medicoes=medicoes,
         medicao_contas=medicao_contas,
         nome_empresa=nome_empresa,
