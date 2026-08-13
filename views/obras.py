@@ -1,7 +1,7 @@
 from flask import render_template, request, redirect, url_for, flash, jsonify, abort
 from werkzeug.exceptions import HTTPException
 from flask_login import login_required, current_user
-from models import db, TipoUsuario, Funcionario, Obra, Cliente, RDO, Servico, ServicoObraReal, RDOServicoSubatividade, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao, RelatorioCompraMapa, ConfiguracaoEmpresa
+from models import db, TipoUsuario, Funcionario, Obra, Cliente, RDO, Servico, ServicoObraReal, RDOServicoSubatividade, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao, RelatorioCompraMapa
 from auth import admin_required
 from utils.autorizacao import obra_required, obras_visiveis
 from utils.tenant import get_tenant_admin_id
@@ -3513,9 +3513,10 @@ def editar_mapa_v2(obra_id, mapa_id):
                 from services.mapa_relatorio_pdf import gerar_relatorio_compra_pdf
                 from sqlalchemy.exc import IntegrityError
 
-                config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
-                nome_empresa = config.nome_empresa if config else ''
-
+                # Sem o nome da construtora: este PDF nasce para ser publicado
+                # no PORTAL DO CLIENTE, e lá o documento não leva a marca de
+                # quem executa a obra. `gerar_relatorio_compra_pdf` já trata
+                # `nome_empresa=""` omitindo o subtítulo.
                 rel = None
                 proxima_versao = None
                 for tentativa in range(5):
@@ -3528,7 +3529,6 @@ def editar_mapa_v2(obra_id, mapa_id):
                     proxima_versao = (ultima.versao + 1) if ultima else 1
                     meta = gerar_relatorio_compra_pdf(
                         mapa=mapa, obra=obra, versao=proxima_versao,
-                        nome_empresa=nome_empresa,
                     )
                     rel = RelatorioCompraMapa(
                         mapa_id=mapa.id, obra_id=obra.id, admin_id=admin_id,

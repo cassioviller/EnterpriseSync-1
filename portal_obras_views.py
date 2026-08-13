@@ -1165,7 +1165,7 @@ def _hash_abreviado(valor: str) -> str:
 # ── As telas ─────────────────────────────────────────────────────────────────
 
 def _voltar_a_secao_ciencia(token: str, rdo_id: int):
-    """A seção "Ciência do cliente" no fim da leitura — onde o ato mora."""
+    """A seção "Ciência dos responsáveis" no fim da leitura — onde o ato mora."""
     return redirect(url_for('portal_obras.portal_rdo_detalhe',
                             token=token, rdo_id=rdo_id,
                             _anchor='ciencia-cliente'))
@@ -1404,7 +1404,7 @@ def ciencia_trocar_senha(token: str, rdo_id: int):
                       {'signatario_id': signatario.id})
     db.session.commit()
 
-    flash('Senha salva. Marque seu nome na seção "Ciência do cliente" e '
+    flash('Senha salva. Marque seu nome na seção "Ciência dos responsáveis" e '
           'confirme com a senha nova.', 'success')
     return _voltar_a_secao_ciencia(token, rdo_id)
 

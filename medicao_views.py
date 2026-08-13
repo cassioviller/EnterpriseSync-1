@@ -535,7 +535,8 @@ def portal_pdf_extrato(medicao_id):
         abort(404)
 
     from services.medicao_service import gerar_pdf_extrato_medicao
-    buf = gerar_pdf_extrato_medicao(medicao_id, medicao.admin_id)
+    # Sem a marca da construtora: este é o download do PORTAL DO CLIENTE.
+    buf = gerar_pdf_extrato_medicao(medicao_id, medicao.admin_id, com_marca=False)
     if not buf:
         abort(404)
 

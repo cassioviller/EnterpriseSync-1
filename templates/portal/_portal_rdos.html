@@ -42,7 +42,7 @@
                     {% set pl = ciencia_por_rdo.get(r.id) if ciencia_por_rdo else None %}
                     {% if pl and pl.total %}
                     <span class="rdo-ciencia {{ 'ok' if pl.completo else '' }}"
-                          title="Ciência do cliente: {{ pl.assinados }} de {{ pl.total }} responsáveis">
+                          title="Ciência dos responsáveis: {{ pl.assinados }} de {{ pl.total }}">
                         <i class="fas {{ 'fa-circle-check' if pl.completo else 'fa-file-signature' }}"></i>
                         {{ pl.assinados }}/{{ pl.total }}
                     </span>

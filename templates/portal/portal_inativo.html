@@ -66,7 +66,8 @@
         está pausado neste momento.
     </p>
     <p class="inativo-texto">
-        Entre em contato com {{ nome_empresa or 'a construtora' }} para retomar
+        {# Sem o nome da construtora, como no resto do portal. #}
+        Entre em contato com a construtora para retomar
         o acesso ou tirar dúvidas sobre o andamento.
     </p>
     {% if obra.data_inicio %}
