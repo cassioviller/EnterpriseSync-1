@@ -2,14 +2,14 @@
  "_meta": {
   "gerado_em": "2026-06-26",
   "fontes": [
-   "CRONOGRAMA BAIAS 10.08.mpp (MS Project — cronograma físico revisado, 109 tarefas c/ split Galpão A/B e as tarefas do reforço estrutural de 30/07)",
+   "CRONOGRAMA 12.08.mpp (MS Project — replanejamento de 12/08: mesmas 109 tarefas, 4 ids girados na Fundação do Galpão B, 51 folhas com datas deslocadas, drenagem A/B em 100%)",
    "Planilha de Custos REV01 (custos por etapa — preservados da produção)",
-   "Textos dos RDOs (WhatsApp) — fonte do % físico dos dias 28/07 e 04 a 06/08"
+   "Textos dos RDOs (WhatsApp, export de 12/08) — RDOs de 07 a 11/08 e fonte do % físico desses dias"
   ],
   "descricao": "Cronograma físico-financeiro da obra Baias Kabod. A INTERLIGAÇÃO: cada nó da EAP carrega o CRONOGRAMA (datas, %físico do MS Project — agora com split BAIA 01/02) E o CUSTO (Veks + faturamento direto da Planilha1). Tarefas FAZENDA (nivelamento, drenagem) entram só no físico (sem custo), alocadas a Indiretos. Custos/peso preservados da REV01.",
   "como_usar": "Importar como fonte do módulo físico-financeiro. O app distribui o custo de cada etapa ao longo das datas da etapa (linear ou por marcos), gera a Curva S física (avanço ponderado por custo) e financeira, o fluxo de caixa (medições - desembolso - abatimento do fat direto) e os indicadores de avanço físico × financeiro (PV/EV/AC, SPI/CPI).",
-  "cronograma_atualizado_em": "2026-08-10",
-  "obs_cronograma": "Reconstruído do CRONOGRAMA BAIAS 10.08.mpp no formato do app (1 raiz, nesting por nível; eap mapeia tarefas->etapas de custo). Entram as tarefas da revisão estrutural de 30/07 (brocas de reforço, blocos de coroamento, laje das vigas transversais, caixaria das calçadas como tarefa própria) e a inversão de precedência da reunião de 05/08 (valas de drenagem antes das concretagens). Fim do cronograma: 08/10 -> 19/10. Apontamentos remapeados por caminho hierárquico; o % dos dias que estavam vazios foi estimado do texto do RDO, não do MS Project. Contrato, custos, medições, fluxo e resumo preservados da produção."
+  "cronograma_atualizado_em": "2026-08-12",
+  "obs_cronograma": "Reconstruído do CRONOGRAMA 12.08.mpp no formato do app (1 raiz, nesting por nível; eap mapeia tarefas->etapas de custo). Revisão NÃO estrutural: as 109 tarefas e a hierarquia são as mesmas do 10.08; mudaram as datas (51 folhas, fim 19/10 -> 20/10), o físico das duas tarefas de drenagem e os ids de 4 tarefas da Fundação do Galpão B, que giraram (22->21, 23->22, 24->23, 21->24). Apontamentos e regras do parser remapeados por caminho hierárquico. Entram os RDOs de 07 a 11/08, que dão o dia real dos fechamentos que o 10.08 tinha antecipado para 06/08. Contrato, custos, medições, fluxo e resumo preservados da produção."
  },
  "obra": {
   "nome": "Baias Kabod",
@@ -25,7 +25,7 @@
   "valor_venda": 1505613.76,
   "data_inicio": "2026-06-08",
   "data_fim_contratual": "2026-10-05",
-  "data_fim_cronograma": "2026-10-19",
+  "data_fim_cronograma": "2026-10-20",
   "prazo_dias": 123,
   "multa_moratoria": {
    "pct_dia": 0.03,
@@ -136,7 +136,7 @@
    "grupo": "Baias",
    "cronograma": {
     "inicio": "2026-06-30",
-    "fim": "2026-09-01",
+    "fim": "2026-09-02",
     "pct_fisico": 0,
     "tarefas_mpp": [
      11,
@@ -149,7 +149,7 @@
      20,
      21,
      22,
-     23,
+     24,
      25,
      26,
      27,
@@ -220,7 +220,7 @@
    "grupo": "Baias",
    "cronograma": {
     "inicio": "2026-07-14",
-    "fim": "2026-09-11",
+    "fim": "2026-09-14",
     "pct_fisico": 0,
     "tarefas_mpp": [
      34,
@@ -259,7 +259,7 @@
    "grupo": "Baias",
    "cronograma": {
     "inicio": "2026-08-10",
-    "fim": "2026-09-09",
+    "fim": "2026-09-10",
     "pct_fisico": 0,
     "tarefas_mpp": [
      42,
@@ -293,8 +293,8 @@
    "nome": "Cobertura (Shingle)",
    "grupo": "Baias",
    "cronograma": {
-    "inicio": "2026-08-31",
-    "fim": "2026-09-16",
+    "inicio": "2026-09-01",
+    "fim": "2026-09-18",
     "pct_fisico": 0,
     "tarefas_mpp": [
      38,
@@ -321,8 +321,8 @@
    "nome": "Fechamentos (plaqueamento)",
    "grupo": "Baias",
    "cronograma": {
-    "inicio": "2026-09-03",
-    "fim": "2026-10-07",
+    "inicio": "2026-09-07",
+    "fim": "2026-10-08",
     "pct_fisico": 0,
     "tarefas_mpp": [
      48,
@@ -363,8 +363,8 @@
    "nome": "Pintura / Stain",
    "grupo": "Baias",
    "cronograma": {
-    "inicio": "2026-09-07",
-    "fim": "2026-10-05",
+    "inicio": "2026-09-08",
+    "fim": "2026-10-06",
     "pct_fisico": 0,
     "tarefas_mpp": [
      39,
@@ -403,8 +403,8 @@
    "nome": "Pedra moledo",
    "grupo": "Baias",
    "cronograma": {
-    "inicio": "2026-08-28",
-    "fim": "2026-10-15",
+    "inicio": "2026-08-31",
+    "fim": "2026-10-16",
     "pct_fisico": 0,
     "tarefas_mpp": [
      32,
@@ -434,7 +434,7 @@
    "grupo": "Baias",
    "cronograma": {
     "inicio": "2026-08-17",
-    "fim": "2026-10-14",
+    "fim": "2026-10-15",
     "pct_fisico": 0,
     "tarefas_mpp": [
      57,
@@ -463,8 +463,8 @@
    "nome": "Elétrica",
    "grupo": "Baias",
    "cronograma": {
-    "inicio": "2026-08-27",
-    "fim": "2026-09-30",
+    "inicio": "2026-08-31",
+    "fim": "2026-10-01",
     "pct_fisico": 0,
     "tarefas_mpp": [
      46,
@@ -501,7 +501,7 @@
    "grupo": "Baias",
    "cronograma": {
     "inicio": "2026-07-08",
-    "fim": "2026-09-16",
+    "fim": "2026-09-17",
     "pct_fisico": 0,
     "tarefas_mpp": [
      16,
@@ -536,7 +536,7 @@
    "grupo": "Transversal",
    "cronograma": {
     "inicio": "2026-06-08",
-    "fim": "2026-10-19",
+    "fim": "2026-10-20",
     "pct_fisico": 0,
     "tarefas_mpp": [],
     "transversal": true
@@ -666,8 +666,8 @@
    "nivel": 1,
    "nome": "Obra Itu - Baias Fazenda Santa Mônica",
    "inicio": "2026-06-08",
-   "fim": "2026-10-19",
-   "dias": 96.0,
+   "fim": "2026-10-20",
+   "dias": 97.0,
    "pct_fisico": 0,
    "predecessoras": [],
    "resumo": true
@@ -754,8 +754,8 @@
    "nivel": 2,
    "nome": "Baias",
    "inicio": "2026-06-30",
-   "fim": "2026-10-15",
-   "dias": 78.0,
+   "fim": "2026-10-16",
+   "dias": 79.0,
    "pct_fisico": 0,
    "predecessoras": [],
    "resumo": true
@@ -765,8 +765,8 @@
    "nivel": 3,
    "nome": "Galpão B",
    "inicio": "2026-06-30",
-   "fim": "2026-10-15",
-   "dias": 78.0,
+   "fim": "2026-10-16",
+   "dias": 79.0,
    "pct_fisico": 0,
    "predecessoras": [],
    "resumo": true
@@ -776,8 +776,8 @@
    "nivel": 4,
    "nome": "Fundação",
    "inicio": "2026-06-30",
-   "fim": "2026-09-01",
-   "dias": 46.0,
+   "fim": "2026-09-02",
+   "dias": 47.0,
    "pct_fisico": 0,
    "predecessoras": [],
    "resumo": true
@@ -907,17 +907,6 @@
   {
    "id": 21,
    "nivel": 5,
-   "nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base",
-   "inicio": "2026-07-20",
-   "fim": "2026-08-07",
-   "dias": 15.0,
-   "pct_fisico": 0,
-   "predecessoras": [],
-   "resumo": false
-  },
-  {
-   "id": 22,
-   "nivel": 5,
    "nome": "Escavação de novas valas e brocas das vigas transversais",
    "inicio": "2026-08-05",
    "fim": "2026-08-06",
@@ -929,7 +918,7 @@
    "resumo": false
   },
   {
-   "id": 23,
+   "id": 22,
    "nivel": 5,
    "nome": "Execução de armação de ferragem da nova fundação, caixaria e posicionamento da armação nas valas",
    "inicio": "2026-08-05",
@@ -942,7 +931,7 @@
    "resumo": false
   },
   {
-   "id": 24,
+   "id": 23,
    "nivel": 5,
    "nome": "Fazenda: Escavação das Valas de Drenagem e Preenchimento 1ª Camada de Material Drenante",
    "inicio": "2026-08-08",
@@ -953,24 +942,33 @@
    "resumo": false
   },
   {
+   "id": 24,
+   "nivel": 5,
+   "nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base",
+   "inicio": "2026-07-20",
+   "fim": "2026-08-07",
+   "dias": 15.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
    "id": 25,
    "nivel": 5,
    "nome": "Aplicação Concreto Magro nas novas vigas e concretagem das brocas novas",
-   "inicio": "2026-08-12",
-   "fim": "2026-08-12",
+   "inicio": "2026-08-13",
+   "fim": "2026-08-13",
    "dias": 1.0,
    "pct_fisico": 0,
-   "predecessoras": [
-    24
-   ],
+   "predecessoras": [],
    "resumo": false
   },
   {
    "id": 26,
    "nivel": 5,
    "nome": "Passagem Conduítes Calçada",
-   "inicio": "2026-08-14",
-   "fim": "2026-08-14",
+   "inicio": "2026-08-18",
+   "fim": "2026-08-18",
    "dias": 1.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -983,11 +981,11 @@
    "nivel": 5,
    "nome": "Execução de Caixaria e Posicionamento da Armação das Vigas Transversais",
    "inicio": "2026-08-11",
-   "fim": "2026-08-14",
-   "dias": 4.0,
+   "fim": "2026-08-18",
+   "dias": 6.0,
    "pct_fisico": 0,
    "predecessoras": [
-    23
+    22
    ],
    "resumo": false
   },
@@ -995,8 +993,8 @@
    "id": 28,
    "nivel": 5,
    "nome": "Execução de Concretagem Vigas e Calçadas",
-   "inicio": "2026-08-17",
-   "fim": "2026-08-17",
+   "inicio": "2026-08-19",
+   "fim": "2026-08-19",
    "dias": 1.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1008,8 +1006,8 @@
    "id": 29,
    "nivel": 5,
    "nome": "Execução de Acabamento da Calçada",
-   "inicio": "2026-08-17",
-   "fim": "2026-08-17",
+   "inicio": "2026-08-19",
+   "fim": "2026-08-19",
    "dias": 1.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1021,8 +1019,8 @@
    "id": 30,
    "nivel": 5,
    "nome": "Içamento dos Pilares de Madeira",
-   "inicio": "2026-08-17",
-   "fim": "2026-08-17",
+   "inicio": "2026-08-19",
+   "fim": "2026-08-19",
    "dias": 1.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1034,8 +1032,8 @@
    "id": 31,
    "nivel": 5,
    "nome": "Execução Bloco de Alvenaria em volto das Toras",
-   "inicio": "2026-08-25",
-   "fim": "2026-08-27",
+   "inicio": "2026-08-26",
+   "fim": "2026-08-28",
    "dias": 3.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1047,8 +1045,8 @@
    "id": 32,
    "nivel": 5,
    "nome": "Assentamento Pedra Moledo",
-   "inicio": "2026-08-28",
-   "fim": "2026-09-01",
+   "inicio": "2026-08-31",
+   "fim": "2026-09-02",
    "dias": 3.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1061,8 +1059,8 @@
    "nivel": 4,
    "nome": "Cobertura",
    "inicio": "2026-07-14",
-   "fim": "2026-09-18",
-   "dias": 49.0,
+   "fim": "2026-09-22",
+   "dias": 51.0,
    "pct_fisico": 0,
    "predecessoras": [],
    "resumo": true
@@ -1082,8 +1080,8 @@
    "id": 35,
    "nivel": 5,
    "nome": "Execução de Pilares Metálicos",
-   "inicio": "2026-08-18",
-   "fim": "2026-08-26",
+   "inicio": "2026-08-20",
+   "fim": "2026-08-28",
    "dias": 7.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1095,8 +1093,8 @@
    "id": 36,
    "nivel": 5,
    "nome": "Fabricação de Aço para Telhados",
-   "inicio": "2026-08-17",
-   "fim": "2026-08-25",
+   "inicio": "2026-08-19",
+   "fim": "2026-08-27",
    "dias": 7.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1108,8 +1106,8 @@
    "id": 37,
    "nivel": 5,
    "nome": "Execução de Estrutura Metálica para Telhado",
-   "inicio": "2026-08-26",
-   "fim": "2026-09-03",
+   "inicio": "2026-08-28",
+   "fim": "2026-09-07",
    "dias": 7.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1121,8 +1119,8 @@
    "id": 38,
    "nivel": 5,
    "nome": "Execução Telhado Shingle",
-   "inicio": "2026-09-01",
-   "fim": "2026-09-16",
+   "inicio": "2026-09-03",
+   "fim": "2026-09-18",
    "dias": 12.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1134,8 +1132,8 @@
    "id": 39,
    "nivel": 5,
    "nome": "Pintura Estrutura do Telhado",
-   "inicio": "2026-09-08",
-   "fim": "2026-09-17",
+   "inicio": "2026-09-10",
+   "fim": "2026-09-21",
    "dias": 8.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1147,8 +1145,8 @@
    "id": 40,
    "nivel": 5,
    "nome": "Fazenda: Preenchimento 2ª Camada Material Drenante",
-   "inicio": "2026-09-16",
-   "fim": "2026-09-18",
+   "inicio": "2026-09-18",
+   "fim": "2026-09-22",
    "dias": 3.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1161,8 +1159,8 @@
    "nivel": 4,
    "nome": "Execução Estrutura Em LSF para Baias",
    "inicio": "2026-08-11",
-   "fim": "2026-09-02",
-   "dias": 17.0,
+   "fim": "2026-09-04",
+   "dias": 19.0,
    "pct_fisico": 0,
    "predecessoras": [],
    "resumo": true
@@ -1182,8 +1180,8 @@
    "id": 43,
    "nivel": 5,
    "nome": "Verticalização de LSF",
-   "inicio": "2026-08-24",
-   "fim": "2026-09-02",
+   "inicio": "2026-08-26",
+   "fim": "2026-09-04",
    "dias": 8.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1195,8 +1193,8 @@
    "id": 44,
    "nivel": 4,
    "nome": "Montagem Infra Elétrica e Hidráulica",
-   "inicio": "2026-08-27",
-   "fim": "2026-09-02",
+   "inicio": "2026-08-31",
+   "fim": "2026-09-04",
    "dias": 5.0,
    "pct_fisico": 0,
    "predecessoras": [],
@@ -1206,8 +1204,8 @@
    "id": 45,
    "nivel": 5,
    "nome": "Instalação Infra Hidráulica",
-   "inicio": "2026-08-27",
-   "fim": "2026-09-02",
+   "inicio": "2026-08-31",
+   "fim": "2026-09-04",
    "dias": 5.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1219,8 +1217,8 @@
    "id": 46,
    "nivel": 5,
    "nome": "Instalação Infra Elétrica",
-   "inicio": "2026-08-27",
-   "fim": "2026-09-02",
+   "inicio": "2026-08-31",
+   "fim": "2026-09-04",
    "dias": 5.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1232,9 +1230,9 @@
    "id": 47,
    "nivel": 4,
    "nome": "Plaqueamento",
-   "inicio": "2026-09-03",
-   "fim": "2026-10-15",
-   "dias": 31.0,
+   "inicio": "2026-09-07",
+   "fim": "2026-10-16",
+   "dias": 30.0,
    "pct_fisico": 0,
    "predecessoras": [],
    "resumo": true
@@ -1243,8 +1241,8 @@
    "id": 48,
    "nivel": 5,
    "nome": "Plaqueamento Madeira Externa",
-   "inicio": "2026-09-03",
-   "fim": "2026-09-16",
+   "inicio": "2026-09-07",
+   "fim": "2026-09-18",
    "dias": 10.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1256,8 +1254,8 @@
    "id": 49,
    "nivel": 5,
    "nome": "Plaqueamento Cimenticia Interno",
-   "inicio": "2026-09-03",
-   "fim": "2026-09-14",
+   "inicio": "2026-09-07",
+   "fim": "2026-09-16",
    "dias": 8.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1269,8 +1267,8 @@
    "id": 50,
    "nivel": 5,
    "nome": "Aplicação Basecoat",
-   "inicio": "2026-09-10",
-   "fim": "2026-09-21",
+   "inicio": "2026-09-14",
+   "fim": "2026-09-23",
    "dias": 8.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1282,8 +1280,8 @@
    "id": 51,
    "nivel": 5,
    "nome": "Pintura com Stain das Madeiras Pinus",
-   "inicio": "2026-09-10",
-   "fim": "2026-09-21",
+   "inicio": "2026-09-14",
+   "fim": "2026-09-23",
    "dias": 8.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1295,8 +1293,8 @@
    "id": 52,
    "nivel": 5,
    "nome": "Aplicação de Resina Sobre Pedra Moledo",
-   "inicio": "2026-10-06",
-   "fim": "2026-10-15",
+   "inicio": "2026-10-07",
+   "fim": "2026-10-16",
    "dias": 8.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1308,8 +1306,8 @@
    "id": 53,
    "nivel": 4,
    "nome": "Elétrica",
-   "inicio": "2026-09-03",
-   "fim": "2026-09-16",
+   "inicio": "2026-09-07",
+   "fim": "2026-09-18",
    "dias": 10.0,
    "pct_fisico": 0,
    "predecessoras": [],
@@ -1319,8 +1317,8 @@
    "id": 54,
    "nivel": 5,
    "nome": "Execução 1 Ponto de Iluminação por Baia",
-   "inicio": "2026-09-03",
-   "fim": "2026-09-09",
+   "inicio": "2026-09-07",
+   "fim": "2026-09-11",
    "dias": 5.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1332,8 +1330,8 @@
    "id": 55,
    "nivel": 5,
    "nome": "Execução 1 Ponto de Elétrica em Cada Pilar",
-   "inicio": "2026-09-10",
-   "fim": "2026-09-16",
+   "inicio": "2026-09-14",
+   "fim": "2026-09-18",
    "dias": 5.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1381,8 +1379,8 @@
    "nivel": 3,
    "nome": "Galpão A",
    "inicio": "2026-07-01",
-   "fim": "2026-10-15",
-   "dias": 77.0,
+   "fim": "2026-10-16",
+   "dias": 78.0,
    "pct_fisico": 0,
    "predecessoras": [],
    "resumo": true
@@ -1392,8 +1390,8 @@
    "nivel": 4,
    "nome": "Fundação",
    "inicio": "2026-07-01",
-   "fim": "2026-09-04",
-   "dias": 48.0,
+   "fim": "2026-09-07",
+   "dias": 49.0,
    "pct_fisico": 0,
    "predecessoras": [],
    "resumo": true
@@ -1501,7 +1499,7 @@
    "dias": 2.0,
    "pct_fisico": 0,
    "predecessoras": [
-    22
+    21
    ],
    "resumo": false
   },
@@ -1514,7 +1512,7 @@
    "dias": 5.0,
    "pct_fisico": 0,
    "predecessoras": [
-    23
+    22
    ],
    "resumo": false
   },
@@ -1522,8 +1520,8 @@
    "id": 71,
    "nivel": 5,
    "nome": "Aplicação Concreto Magro nas novas vigas e concretagem das brocas novas",
-   "inicio": "2026-08-12",
-   "fim": "2026-08-12",
+   "inicio": "2026-08-13",
+   "fim": "2026-08-13",
    "dias": 1.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1540,7 +1538,7 @@
    "dias": 3.0,
    "pct_fisico": 0,
    "predecessoras": [
-    24
+    23
    ],
    "resumo": false
   },
@@ -1549,8 +1547,8 @@
    "nivel": 5,
    "nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base",
    "inicio": "2026-08-17",
-   "fim": "2026-08-21",
-   "dias": 5.0,
+   "fim": "2026-08-24",
+   "dias": 6.0,
    "pct_fisico": 0,
    "predecessoras": [
     72
@@ -1561,8 +1559,8 @@
    "id": 74,
    "nivel": 5,
    "nome": "Passagem Conduítes Calçada",
-   "inicio": "2026-08-21",
-   "fim": "2026-08-21",
+   "inicio": "2026-08-24",
+   "fim": "2026-08-24",
    "dias": 1.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1574,8 +1572,8 @@
    "id": 75,
    "nivel": 5,
    "nome": "Execução de Concretagem Vigas, Calçadas e Sapatas",
-   "inicio": "2026-08-24",
-   "fim": "2026-08-24",
+   "inicio": "2026-08-25",
+   "fim": "2026-08-25",
    "dias": 1.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1587,8 +1585,8 @@
    "id": 76,
    "nivel": 5,
    "nome": "Execução de Acabamento da Calçada",
-   "inicio": "2026-08-24",
-   "fim": "2026-08-24",
+   "inicio": "2026-08-25",
+   "fim": "2026-08-25",
    "dias": 1.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1600,8 +1598,8 @@
    "id": 77,
    "nivel": 5,
    "nome": "Içamento dos Pilares de Madeira",
-   "inicio": "2026-08-24",
-   "fim": "2026-08-24",
+   "inicio": "2026-08-25",
+   "fim": "2026-08-25",
    "dias": 1.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1613,8 +1611,8 @@
    "id": 78,
    "nivel": 5,
    "nome": "Execução Bloco de Alvenaria em volto das Toras",
-   "inicio": "2026-08-28",
-   "fim": "2026-09-01",
+   "inicio": "2026-08-31",
+   "fim": "2026-09-02",
    "dias": 3.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1626,8 +1624,8 @@
    "id": 79,
    "nivel": 5,
    "nome": "Assentamento Pedra Moledo",
-   "inicio": "2026-09-02",
-   "fim": "2026-09-04",
+   "inicio": "2026-09-03",
+   "fim": "2026-09-07",
    "dias": 3.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1663,8 +1661,8 @@
    "id": 82,
    "nivel": 5,
    "nome": "Execução de Pilares Metálicos",
-   "inicio": "2026-08-25",
-   "fim": "2026-09-02",
+   "inicio": "2026-08-26",
+   "fim": "2026-09-03",
    "dias": 7.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1676,8 +1674,8 @@
    "id": 83,
    "nivel": 5,
    "nome": "Fabricação de Aço para Telhados",
-   "inicio": "2026-08-25",
-   "fim": "2026-09-02",
+   "inicio": "2026-08-26",
+   "fim": "2026-09-03",
    "dias": 7.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1689,8 +1687,8 @@
    "id": 84,
    "nivel": 5,
    "nome": "Execução de Estrutura Metálica para Telhado",
-   "inicio": "2026-09-03",
-   "fim": "2026-09-11",
+   "inicio": "2026-09-04",
+   "fim": "2026-09-14",
    "dias": 7.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1702,8 +1700,8 @@
    "id": 85,
    "nivel": 5,
    "nome": "Execução Telhado Shingle",
-   "inicio": "2026-08-31",
-   "fim": "2026-09-15",
+   "inicio": "2026-09-01",
+   "fim": "2026-09-16",
    "dias": 12.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1715,8 +1713,8 @@
    "id": 86,
    "nivel": 5,
    "nome": "Pintura Estrutura do Telhado",
-   "inicio": "2026-09-07",
-   "fim": "2026-09-16",
+   "inicio": "2026-09-08",
+   "fim": "2026-09-17",
    "dias": 8.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1728,8 +1726,8 @@
    "id": 87,
    "nivel": 5,
    "nome": "Fazenda: Preenchimento 2ª Camada Material Drenante",
-   "inicio": "2026-09-15",
-   "fim": "2026-09-17",
+   "inicio": "2026-09-16",
+   "fim": "2026-09-18",
    "dias": 3.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1742,8 +1740,8 @@
    "nivel": 4,
    "nome": "Execução Estrutura Em LSF para Baias",
    "inicio": "2026-08-10",
-   "fim": "2026-09-09",
-   "dias": 23.0,
+   "fim": "2026-09-10",
+   "dias": 24.0,
    "pct_fisico": 0,
    "predecessoras": [],
    "resumo": true
@@ -1765,8 +1763,8 @@
    "id": 90,
    "nivel": 5,
    "nome": "Verticalização de LSF",
-   "inicio": "2026-08-31",
-   "fim": "2026-09-09",
+   "inicio": "2026-09-01",
+   "fim": "2026-09-10",
    "dias": 8.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1778,8 +1776,8 @@
    "id": 91,
    "nivel": 4,
    "nome": "Montagem Infra Elétrica e Hidráulica",
-   "inicio": "2026-09-10",
-   "fim": "2026-09-16",
+   "inicio": "2026-09-11",
+   "fim": "2026-09-17",
    "dias": 5.0,
    "pct_fisico": 0,
    "predecessoras": [],
@@ -1789,8 +1787,8 @@
    "id": 92,
    "nivel": 5,
    "nome": "Instalação Infra Hidráulica",
-   "inicio": "2026-09-10",
-   "fim": "2026-09-16",
+   "inicio": "2026-09-11",
+   "fim": "2026-09-17",
    "dias": 5.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1802,8 +1800,8 @@
    "id": 93,
    "nivel": 5,
    "nome": "Instalação Infra Elétrica",
-   "inicio": "2026-09-10",
-   "fim": "2026-09-16",
+   "inicio": "2026-09-11",
+   "fim": "2026-09-17",
    "dias": 5.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1815,8 +1813,8 @@
    "id": 94,
    "nivel": 4,
    "nome": "Plaqueamento",
-   "inicio": "2026-09-17",
-   "fim": "2026-10-15",
+   "inicio": "2026-09-18",
+   "fim": "2026-10-16",
    "dias": 21.0,
    "pct_fisico": 0,
    "predecessoras": [],
@@ -1826,8 +1824,8 @@
    "id": 95,
    "nivel": 5,
    "nome": "Plaqueamento Madeira Externa",
-   "inicio": "2026-09-17",
-   "fim": "2026-09-30",
+   "inicio": "2026-09-18",
+   "fim": "2026-10-01",
    "dias": 10.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1839,8 +1837,8 @@
    "id": 96,
    "nivel": 5,
    "nome": "Plaqueamento Cimenticia Interno",
-   "inicio": "2026-09-17",
-   "fim": "2026-09-28",
+   "inicio": "2026-09-18",
+   "fim": "2026-09-29",
    "dias": 8.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1852,8 +1850,8 @@
    "id": 97,
    "nivel": 5,
    "nome": "Aplicação Basecoat",
-   "inicio": "2026-09-24",
-   "fim": "2026-10-07",
+   "inicio": "2026-09-25",
+   "fim": "2026-10-08",
    "dias": 10.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1865,8 +1863,8 @@
    "id": 98,
    "nivel": 5,
    "nome": "Pintura com Stain das Madeiras Pinus",
-   "inicio": "2026-09-24",
-   "fim": "2026-10-05",
+   "inicio": "2026-09-25",
+   "fim": "2026-10-06",
    "dias": 8.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1878,8 +1876,8 @@
    "id": 99,
    "nivel": 5,
    "nome": "Aplicação de Resina Sobre Pedra Moledo",
-   "inicio": "2026-10-06",
-   "fim": "2026-10-15",
+   "inicio": "2026-10-07",
+   "fim": "2026-10-16",
    "dias": 8.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1891,8 +1889,8 @@
    "id": 100,
    "nivel": 4,
    "nome": "Elétrica",
-   "inicio": "2026-09-17",
-   "fim": "2026-09-30",
+   "inicio": "2026-09-18",
+   "fim": "2026-10-01",
    "dias": 10.0,
    "pct_fisico": 0,
    "predecessoras": [],
@@ -1902,8 +1900,8 @@
    "id": 101,
    "nivel": 5,
    "nome": "Execução 1 Ponto de Iluminação por Baia",
-   "inicio": "2026-09-17",
-   "fim": "2026-09-23",
+   "inicio": "2026-09-18",
+   "fim": "2026-09-24",
    "dias": 5.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1915,8 +1913,8 @@
    "id": 102,
    "nivel": 5,
    "nome": "Execução 1 Ponto de Elétrica em Cada Pilar",
-   "inicio": "2026-09-24",
-   "fim": "2026-09-30",
+   "inicio": "2026-09-25",
+   "fim": "2026-10-01",
    "dias": 5.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1929,8 +1927,8 @@
    "nivel": 4,
    "nome": "Execução Portão das Baias",
    "inicio": "2026-08-17",
-   "fim": "2026-10-14",
-   "dias": 43.0,
+   "fim": "2026-10-15",
+   "dias": 44.0,
    "pct_fisico": 0,
    "predecessoras": [],
    "resumo": true
@@ -1952,8 +1950,8 @@
    "id": 105,
    "nivel": 5,
    "nome": "Instalação dos Portões",
-   "inicio": "2026-10-01",
-   "fim": "2026-10-14",
+   "inicio": "2026-10-02",
+   "fim": "2026-10-15",
    "dias": 10.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1965,8 +1963,8 @@
    "id": 106,
    "nivel": 2,
    "nome": "Desmobilização",
-   "inicio": "2026-10-16",
-   "fim": "2026-10-19",
+   "inicio": "2026-10-19",
+   "fim": "2026-10-20",
    "dias": 2.0,
    "pct_fisico": 0,
    "predecessoras": [],
@@ -1976,8 +1974,8 @@
    "id": 107,
    "nivel": 3,
    "nome": "Limpeza Geral",
-   "inicio": "2026-10-16",
-   "fim": "2026-10-16",
+   "inicio": "2026-10-19",
+   "fim": "2026-10-19",
    "dias": 1.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -1989,8 +1987,8 @@
    "id": 108,
    "nivel": 3,
    "nome": "Desmobilização",
-   "inicio": "2026-10-19",
-   "fim": "2026-10-19",
+   "inicio": "2026-10-20",
+   "fim": "2026-10-20",
    "dias": 1.0,
    "pct_fisico": 0,
    "predecessoras": [
@@ -2868,7 +2866,7 @@
      "pct": 100
     },
     {
-     "tarefa_mpp": 21,
+     "tarefa_mpp": 24,
      "pct": 30
     }
    ]
@@ -2911,7 +2909,7 @@
    ],
    "apontamentos": [
     {
-     "tarefa_mpp": 21,
+     "tarefa_mpp": 24,
      "pct": 45
     }
    ]
@@ -2954,7 +2952,7 @@
      "pct": 33
     },
     {
-     "tarefa_mpp": 21,
+     "tarefa_mpp": 24,
      "pct": 50
     }
    ]
@@ -2981,7 +2979,7 @@
    ],
    "apontamentos": [
     {
-     "tarefa_mpp": 21,
+     "tarefa_mpp": 24,
      "pct": 55
     },
     {
@@ -3020,7 +3018,7 @@
    ],
    "apontamentos": [
     {
-     "tarefa_mpp": 21,
+     "tarefa_mpp": 24,
      "pct": 60
     },
     {
@@ -3055,7 +3053,7 @@
    ],
    "apontamentos": [
     {
-     "tarefa_mpp": 21,
+     "tarefa_mpp": 24,
      "pct": 65
     },
     {
@@ -3098,7 +3096,7 @@
    ],
    "apontamentos": [
     {
-     "tarefa_mpp": 21,
+     "tarefa_mpp": 24,
      "pct": 70
     }
    ]
@@ -3149,7 +3147,7 @@
      "pct": 100
     },
     {
-     "tarefa_mpp": 23,
+     "tarefa_mpp": 22,
      "pct": 30
     },
     {
@@ -3157,7 +3155,7 @@
      "pct": 30
     },
     {
-     "tarefa_mpp": 21,
+     "tarefa_mpp": 24,
      "pct": 80
     }
    ]
@@ -3204,15 +3202,15 @@
    ],
    "apontamentos": [
     {
-     "tarefa_mpp": 22,
+     "tarefa_mpp": 21,
      "pct": 50
     },
     {
-     "tarefa_mpp": 23,
+     "tarefa_mpp": 22,
      "pct": 60
     },
     {
-     "tarefa_mpp": 21,
+     "tarefa_mpp": 24,
      "pct": 90
     },
     {
@@ -3251,28 +3249,198 @@
    ],
    "apontamentos": [
     {
-     "tarefa_mpp": 22,
-     "pct": 100
+     "tarefa_mpp": 21,
+     "pct": 75
     },
     {
-     "tarefa_mpp": 23,
+     "tarefa_mpp": 22,
+     "pct": 85
+    },
+    {
+     "tarefa_mpp": 24,
      "pct": 100
+    }
+   ]
+  },
+  {
+   "data": "2026-08-07",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 09 colaboradores + 01 operador de maquinário\n\nAtividades executadas:\n• Foi concluída a escavação das valas destinadas às novas lajes de reforço do Galpão A e dada continuidade à perfuração das novas brocas previstas na revisão do projeto estrutural.\n• Foi dada continuidade à execução da armação dos reforços das vigas transversais, conforme projeto estrutural revisado.\n\nObservações:\n• Em alinhamento com a Eng. Ana Luísa, da Fort Gerenciadora, ficou definido que serão executados rebaixos de aproximadamente 20 cm na área interna de todas as baias dos Galpões A e B, como preparação para as etapas subsequentes da obra.\n• Os serviços de rebaixamento estão programados para serem executados durante o sábado e domingo (08 e 09/08). Considerando que a equipe da Fazenda não estará trabalhando durante o final de semana, a Kabod disponibilizará 02 colaboradores para acompanhamento dos serviços, visando garantir o correto desenvolvimento das atividades e o atendimento às condições previamente alinhadas.\n• Foram cobertas as calçadas do Galpão B com lona, a fim de proteger o fundo da armação da terra proveniente da escavação do centro das baias.\n\nPróximas atividades (08/08):\n• Início dos serviços de rebaixamento de aproximadamente 20 cm da área interna das baias dos Galpões A e B.\n• Acompanhamento dos serviços de rebaixamento pela equipe da Kabod.\n• Continuidade da perfuração das novas brocas e execução dos reforços estruturais, conforme programação.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 69,
+     "pct": 75
     },
     {
      "tarefa_mpp": 21,
      "pct": 100
     },
     {
+     "tarefa_mpp": 22,
+     "pct": 95
+    },
+    {
+     "tarefa_mpp": 70,
+     "pct": 60
+    }
+   ],
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Colocação de tampões nas brocas e limpeza das valas"
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Execução de cobertura da armação das calçadas do Galpão B com lona, para não cair terra com o serviço do final de semana."
+    },
+    {
+     "arquivo": "3.jpg",
+     "legenda": "Execução de cobertura da armação das calçadas do Galpão B com lona, para não cair terra com o serviço do final de semana."
+    },
+    {
+     "arquivo": "4.jpg",
+     "legenda": "Execução de armação do reforço das vigas transversais"
+    },
+    {
+     "arquivo": "5.jpg",
+     "legenda": "Execução de armação do reforço das vigas transversais"
+    }
+   ]
+  },
+  {
+   "data": "2026-08-08",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 02 colaboradores + 01 operador de perfuratriz + 01 operador de PC\n\nAtividades executadas:\n• Foi concluída a perfuração das brocas restantes do Galpão A, dando continuidade à execução das fundações previstas na revisão do projeto estrutural.\n• Foi iniciado o rebaixamento de aproximadamente 20 cm do nível interno das baias do Galpão B, conforme programação definida para preparação das áreas para as próximas etapas da obra.\n\nObservações:\n• O equipamento tipo PC foi disponibilizado na obra às 10h00, dando início aos serviços de escavação e rebaixamento do solo.\n• Os serviços de rebaixamento foram acompanhados pelos 02 colaboradores da Kabod, visando garantir que a execução ocorresse conforme as condições previamente estabelecidas.\n\nPróximas atividades (09/08):\n• Finalização do rebaixamento de aproximadamente 20 cm do nível interno das baias do Galpão B.\n• Início do rebaixamento de aproximadamente 20 cm do nível interno das baias do Galpão A.\n• Continuidade das atividades de fundação e preparação das frentes de serviço conforme cronograma revisado.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 69,
+     "pct": 100
+    }
+   ],
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Execução de escavação para Rebaixo dos 20cm do nível das baias do Galpão B."
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Execução de escavação para Rebaixo dos 20cm do nível das baias do Galpão B."
+    }
+   ]
+  },
+  {
+   "data": "2026-08-09",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 02 colaboradores + 01 operador de PC\n\nAtividades executadas:\n• Foi concluído o rebaixamento de aproximadamente 20 cm do nível interno de todas as baias do Galpão A, conforme programação definida para preparação das áreas para as próximas etapas da obra.\n\nObservações:\n• Os serviços de rebaixamento do nível interno das baias foram realizados conforme a programação estabelecida, dando continuidade à preparação dos Galpões A e B para execução das etapas subsequentes de drenagem e fundação.\n\nPróximas atividades (10/08):\n• Início da escavação das valas de drenagem das baias do Galpão B, com profundidade prevista de aproximadamente 1,00 m, conforme projeto.\n• Finalização das armações dos reforços das vigas transversais do Galpão A.",
+   "mao_de_obra": 0,
+   "apontamentos": [],
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Execução do Rebaixo de 20cm do Galpão A"
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Execução do Rebaixo de 20cm do Galpão A"
+    },
+    {
+     "arquivo": "3.jpg",
+     "legenda": "Galpão B já com os 20cm rebaixados"
+    },
+    {
+     "arquivo": "4.jpg",
+     "legenda": "Galpão B já com os 20cm rebaixados"
+    }
+   ]
+  },
+  {
+   "data": "2026-08-10",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 07 colaboradores + 01 operador de PC\n\nAtividades executadas:\n• Foi executada a escavação das valas de drenagem das baias do Galpão B, com profundidade aproximada de 1,00 m, conforme projeto.\n• Foi finalizada a armação dos reforços das vigas transversais do Galpão A, conforme revisão do projeto estrutural.\n\nObservações:\n• Foi recebido no galpão, em São José dos Campos/SP, o material destinado à execução do sistema Light Steel Frame (LSF), que será utilizado para a montagem dos componentes previstos para a obra.\n\nPróximas atividades (11/08):\n• Finalização da escavação das valas de drenagem das baias.\n• Início da execução da carpintaria lateral interna do Bloco B.\n• Locação das brocas para preparação da concretagem.\n• Finalização dos perfis tipo U de reforço das malhas do Bloco A.\n• Recorte e preparação das vigas transversais.\n• Limpeza das valas longitudinais do Bloco B.\n• Retirada da lona e das tábuas utilizadas para proteção das calçadas do Bloco B.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
      "tarefa_mpp": 70,
      "pct": 100
     },
     {
-     "tarefa_mpp": 69,
+     "tarefa_mpp": 23,
+     "pct": 50
+    },
+    {
+     "tarefa_mpp": 22,
+     "pct": 100
+    }
+   ],
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Execução de armação do reforço das vigas transversais do Galpão A"
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Execução de armação do reforço das vigas transversais do Galpão A"
+    },
+    {
+     "arquivo": "3.jpg",
+     "legenda": "Execução de escavação de vala de drenagem do Galpão B"
+    },
+    {
+     "arquivo": "4.jpg",
+     "legenda": "Execução de escavação de vala de drenagem do Galpão B"
+    },
+    {
+     "arquivo": "5.jpg",
+     "legenda": "Marcação para escavação de vala de drenagem do Galpão B"
+    },
+    {
+     "arquivo": "6.jpg",
+     "legenda": "Detalhe no projeto da altura da drenagem"
+    }
+   ]
+  },
+  {
+   "data": "2026-08-11",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 11 colaboradores + Abraão (Encarregado) + 01 operador de maquinário PC + 02 montadores de LSF em São José dos Campos/SP\n\nAtividades executadas:\n• Foi finalizada a escavação das valas de drenagem das baias do Galpão A, concluindo a etapa de escavação dos drenos das baias.\n• Foi iniciado o serviço de carpintaria das laterais internas do Bloco B, preparando as frentes para as próximas etapas de execução.\n• Foi realizada a locação das brocas destinadas à concretagem, conforme posicionamento previsto em projeto.\n• Foram finalizados os reforços das malhas do Bloco A, conforme revisão do projeto estrutural.\n• Foi realizado o recorte e preparo das vigas transversais para continuidade da execução das fundações.\n• Foi realizada a limpeza das valas longitudinais do Bloco B, preparando as fundações para as próximas etapas.\n• Foram retiradas as lonas e as tábuas utilizadas para proteção das calçadas do Bloco B.\n• Foi iniciado o processo de painelização dos elementos em Light Steel Frame (LSF) no galpão da VEKS em São José dos Campos/SP.\n\nObservações:\n• Com a conclusão da escavação dos drenos das baias do Galpão A, foi finalizada a etapa de escavação da drenagem das baias. Entretanto, até o encerramento do expediente, o rachão destinado à execução da primeira camada drenante ainda não havia sido disponibilizado na obra, impossibilitando o avanço imediato dessa etapa.\n• A equipe de montagem do sistema Light Steel Frame permanece mobilizada em São José dos Campos/SP, dando início à painelização dos elementos previstos para a obra.\n• A Eng. Ana Luísa solicitou que a execução das novas brocas de reforço e do concreto magro das vigas transversais fosse realizada previamente ao posicionamento das armações e caixarias, conforme sequência prevista em projeto. Em função da necessidade de otimização da sequência executiva, foi apresentada a metodologia alternativa ao projetista estrutural, que manifestou concordância. Foi elaborado parecer técnico formalizando a compatibilidade da metodologia com o projeto, permanecendo o documento pendente de assinatura do Eng. Calculista/Projetista Estrutural.\n\nPróximas atividades (12/08):\n• Continuidade da carpintaria lateral interna do Bloco B.\n• Continuidade da preparação das vigas transversais e demais elementos das fundações.\n• Continuidade da painelização dos elementos em Light Steel Frame em São José dos Campos/SP.\n• Aguardar a chegada do rachão para início da execução da primeira camada drenante das baias.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 72,
      "pct": 100
     },
     {
-     "tarefa_mpp": 24,
-     "pct": 50
+     "tarefa_mpp": 23,
+     "pct": 100
+    }
+   ],
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Execução de escavação das valas de drenagem do Galpão A"
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Execução de escavação das valas de drenagem do Galpão A"
+    },
+    {
+     "arquivo": "3.jpg",
+     "legenda": "Execução de caixaria das vigas longitudinais do Galpão B"
+    },
+    {
+     "arquivo": "4.jpg",
+     "legenda": "Execução de caixaria das vigas longitudinais do Galpão B"
+    },
+    {
+     "arquivo": "5.jpg",
+     "legenda": ""
     }
    ]
   }
