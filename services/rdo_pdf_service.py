@@ -353,7 +353,11 @@ class _Footer:
         canv.line(15 * mm, y + 6, w - 15 * mm, y + 6)
         canv.setFont('Helvetica', 7)
         canv.setFillColor(MUTED)
-        canv.drawString(15 * mm, y, f"{self.empresa_nome}  ·  {self.rdo_numero}  ·  Emitido em {self.gerado_em}")
+        # `empresa_nome` vazio é o recibo do portal do cliente, que não leva a
+        # marca da construtora — sem o filtro sobraria um " · " órfão na frente.
+        partes = [p for p in (self.empresa_nome, self.rdo_numero,
+                              f"Emitido em {self.gerado_em}") if p]
+        canv.drawString(15 * mm, y, "  ·  ".join(partes))
         canv.drawRightString(w - 15 * mm, y, f"Página {doc.page}")
         canv.restoreState()
 

@@ -1335,6 +1335,27 @@ def ciencia_recibo(token: str, rdo_id: int):
     })
 
 
+@portal_obras_bp.route('/manual-ciencia.pdf')
+@login_required
+def manual_ciencia_pdf():
+    """O manual que a construtora manda ao cliente junto com o convite.
+
+    Rota da CONSTRUTORA (login_required), não do portal: quem baixa é quem
+    vai enviar. Sem obra na URL de propósito — o conteúdo não depende de obra
+    nem de tenant, então um PDF serve todas elas e não vence quando o link
+    muda. O link e a senha vão na mensagem do convite, que já os traz.
+    """
+    from flask import Response
+
+    from services.manual_ciencia_pdf import gerar_manual_ciencia
+
+    pdf = gerar_manual_ciencia()
+    return Response(pdf, mimetype='application/pdf', headers={
+        'Content-Disposition':
+            'attachment; filename="manual-portal-assinatura-rdo.pdf"',
+    })
+
+
 @portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>/ciencia/senha')
 def ciencia_definir_senha(token: str, rdo_id: int):
     """A tela de definir senha — primeiro acesso ou troca voluntária."""
