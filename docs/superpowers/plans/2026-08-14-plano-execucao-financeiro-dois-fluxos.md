@@ -83,22 +83,22 @@ ninguém consegue pagar, adiantamento que não some da lista).
 
 ## F2 — Flag por tenant e o carimbo do fluxo
 
-- [ ] **Step 1 (red):** testes:
+- [x] **Step 1 (red):** testes:
   - `scripts/flag_financeiro_dois_fluxos.py --ligar` **recusa** tenant sem
     `recebimento_atesto_ativo` — é a dependência dura do spec, e a guarda mora no script
     porque quem mexe por SQL direto não tem nenhuma;
   - com a flag ligada, pedido emitido como adiantamento nasce `fluxo_pagamento='adiantamento'`;
   - com a flag **desligada**, o mesmo POST nasce `'faturado'` e a tela não oferece a escolha;
   - ligar e desligar a flag **não mexe** no regime de pedido já emitido.
-- [ ] **Step 2:** `scripts/flag_financeiro_dois_fluxos.py`, no formato de
+- [x] **Step 2:** `scripts/flag_financeiro_dois_fluxos.py`, no formato de
   `scripts/flag_recebimento_atesto.py` — `--ligar`, `--desligar`, `--forcar`, e a listagem
   do estado atual quando chamado sem ação.
-- [ ] **Step 3:** `fluxo_do_tenant(admin_id)` em `services/financeiro_compra.py`, espelhando
+- [x] **Step 3:** `fluxo_do_tenant(admin_id)` em `services/financeiro_compra.py`, espelhando
   `regime_do_tenant`. Carimbar na criação do pedido nos **mesmos dois pontos** que a Fase 1
   carimbou `exige_atesto` — e se aparecer um terceiro, é achado, não detalhe: pare e
   registre antes de seguir.
-- [ ] **Step 4 (green):** os quatro verdes.
-- [ ] **Step 5:** commit — `feat(financeiro): flag dois-fluxos por tenant e o carimbo do fluxo no pedido`
+- [x] **Step 4 (green):** os quatro verdes.
+- [x] **Step 5:** commit — `feat(financeiro): flag dois-fluxos por tenant e o carimbo do fluxo no pedido`
 
 ## F3 — O serviço: conta bloqueada, nota, liberação
 

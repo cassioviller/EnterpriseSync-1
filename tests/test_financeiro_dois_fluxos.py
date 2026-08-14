@@ -196,3 +196,169 @@ def test_flag_e_tolerancia_nascem_na_configuracao():
     cols = {c.name for c in ConfiguracaoEmpresa.__table__.columns}
     assert 'financeiro_dois_fluxos_ativo' in cols
     assert 'tolerancia_divergencia_nf_pct' in cols
+
+
+# ---------------------------------------------------------------------------
+# F2 — a flag por tenant e o carimbo do fluxo
+# ---------------------------------------------------------------------------
+
+def _cfg_tenant(admin_id, **flags):
+    """Cria/atualiza a ConfiguracaoEmpresa do tenant com as flags pedidas."""
+    from models import ConfiguracaoEmpresa
+    cfg = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+    if cfg is None:
+        cfg = ConfiguracaoEmpresa(admin_id=admin_id,
+                                  nome_empresa=f'Tenant {admin_id}')
+        db.session.add(cfg)
+    for k, v in flags.items():
+        setattr(cfg, k, v)
+    db.session.commit()
+    return cfg
+
+
+def test_ligar_recusa_tenant_sem_recebimento_atesto():
+    """A dependência dura do spec, e ela mora no SCRIPT.
+
+    Sem `recebimento_atesto_ativo` não existe a perna do atesto na tríade: a
+    conta nasceria bloqueada sem caminho nenhum para liberar. Quem mexe por SQL
+    direto não tem essa guarda — por isso ela tem de estar aqui, e não só na
+    tela.
+    """
+    from scripts.flag_financeiro_dois_fluxos import pode_ligar
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id, recebimento_atesto_ativo=False)
+
+        ok, motivo = pode_ligar(adm.id)
+        assert ok is False
+        assert 'atesto' in motivo.lower(), (
+            'o motivo é lido por humano: tem de nomear o que falta')
+
+        _cfg_tenant(adm.id, recebimento_atesto_ativo=True)
+        ok, _ = pode_ligar(adm.id)
+        assert ok is True
+
+
+def test_fluxo_do_tenant_segue_a_flag():
+    """O que um pedido que nascer AGORA neste tenant seria."""
+    from services.financeiro_compra import fluxo_do_tenant
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id, recebimento_atesto_ativo=True,
+                financeiro_dois_fluxos_ativo=False)
+        assert fluxo_do_tenant(adm.id) is False
+
+        _cfg_tenant(adm.id, financeiro_dois_fluxos_ativo=True)
+        assert fluxo_do_tenant(adm.id) is True
+
+
+def test_fluxo_do_tenant_falha_fechada():
+    """Falha FECHADA para o comportamento ANTIGO.
+
+    Numa flag que muda o momento em que a obrigação financeira nasce, o modo de
+    falha seguro é o que já estava rodando ontem. Mesmo contrato de
+    `recebimento_atesto_ativo`.
+    """
+    from services.financeiro_compra import fluxo_do_tenant
+    with app.app_context():
+        assert fluxo_do_tenant(None) is False
+        assert fluxo_do_tenant(0) is False
+        assert fluxo_do_tenant(10**9) is False   # tenant que não existe
+
+
+def test_desligar_a_flag_nao_reescreve_pedido_ja_emitido():
+    """O regime é carimbado na LINHA — desligar não reescreve o passado.
+
+    Mesmo raciocínio de `exige_atesto` da Fase 1: um pedido que nasceu no
+    Fluxo B continua sendo do Fluxo B, senão ligar e desligar a flag
+    reinterpretaria adiantamento já pago como compra faturada.
+    """
+    from scripts.flag_financeiro_dois_fluxos import definir_flag
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        forn = _fornecedor(adm.id)
+        _cfg_tenant(adm.id, recebimento_atesto_ativo=True,
+                financeiro_dois_fluxos_ativo=True)
+
+        ped = _pedido(adm.id, obra.id, forn.id)
+        ped.fluxo_pagamento = 'adiantamento'
+        db.session.commit()
+
+        definir_flag(adm.id, False)
+        db.session.refresh(ped)
+        assert ped.fluxo_pagamento == 'adiantamento'
+
+
+def test_definir_flag_cria_a_configuracao_que_nao_existe():
+    """Tenant que nunca abriu a tela de configurações não tem a linha, e
+    `nome_empresa` é NOT NULL — estourar aqui seria transformar o rollout num
+    chamado de suporte."""
+    from models import ConfiguracaoEmpresa
+    from scripts.flag_financeiro_dois_fluxos import definir_flag
+    with app.app_context():
+        adm = _admin()
+        assert ConfiguracaoEmpresa.query.filter_by(admin_id=adm.id).first() is None
+
+        definir_flag(adm.id, True)
+        cfg = ConfiguracaoEmpresa.query.filter_by(admin_id=adm.id).first()
+        assert cfg is not None and cfg.financeiro_dois_fluxos_ativo is True
+
+
+def test_todo_ponto_que_cria_pedido_carimba_o_fluxo():
+    """Guarda de fonte: nenhum `PedidoCompra(...)` sem `fluxo_pagamento`.
+
+    Irmão direto de `test_todo_ponto_que_cria_pedido_carimba_o_regime`
+    (tests/test_recebimento_atesto.py), e existe pela lição que aquele aprendeu
+    na C9: ele varria só `compras_views.py` e afirmava proteger contra "um
+    terceiro ponto de criação" — que já existia, em `views/obras.py`, sem
+    carimbo nenhum, com o teste verde.
+
+    Um pedido criado sem carimbo cai em `faturado` pelo default da coluna.
+    Silenciosamente: aquele caminho passa a prometer a tríade sem nunca ter
+    decidido sobre ela, e ninguém descobre até uma conta ficar bloqueada sem
+    explicação. Por `ast` e não regex, pelo mesmo motivo de lá — formatação não
+    é contrato.
+
+    Fica na F2 (e não na F7, com o guarda de `ContaPagar`) porque é o carimbo
+    desta etapa que ele protege.
+    """
+    import ast
+
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ignorados = {'tests', '.pythonlibs', 'archive', 'node_modules',
+                 '__pycache__', '.git', 'backups', 'attached_assets',
+                 'migrations_backup', '.local', 'obra_kabod'}
+
+    construcoes, sem_carimbo = [], []
+    for pasta, subpastas, arquivos in os.walk(raiz):
+        subpastas[:] = [d for d in subpastas if d not in ignorados]
+        for nome in arquivos:
+            if not nome.endswith('.py'):
+                continue
+            caminho = os.path.join(pasta, nome)
+            try:
+                with open(caminho, encoding='utf-8') as f:
+                    arvore = ast.parse(f.read(), filename=caminho)
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            for no in ast.walk(arvore):
+                if not isinstance(no, ast.Call):
+                    continue
+                alvo = no.func
+                chamado = getattr(alvo, 'id', None) or getattr(alvo, 'attr', None)
+                if chamado != 'PedidoCompra':
+                    continue
+                onde = f'{os.path.relpath(caminho, raiz)}:{no.lineno}'
+                construcoes.append(onde)
+                if not any(kw.arg == 'fluxo_pagamento' for kw in no.keywords):
+                    sem_carimbo.append(onde)
+
+    assert construcoes, 'nenhuma construção de PedidoCompra encontrada'
+    assert not sem_carimbo, (
+        f'{len(sem_carimbo)} de {len(construcoes)} construções de PedidoCompra '
+        f'não carimbam `fluxo_pagamento`, e um pedido sem carimbo cai em '
+        f'`faturado` pelo default da coluna — sem ninguém ter decidido. Use '
+        f'`fluxo_do_pedido_novo(admin_id, escolha)` para pedido de usuário, ou '
+        f"`'faturado'` explícito para dado histórico ou de demonstração.\n  "
+        + '\n  '.join(sem_carimbo))

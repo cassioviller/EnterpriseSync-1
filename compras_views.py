@@ -83,6 +83,20 @@ def _regime_recebimento(admin_id):
     return regime_do_tenant(admin_id)
 
 
+def _fluxo_pagamento(admin_id, escolha=None):
+    """O FLUXO de pagamento a carimbar num pedido que nasce agora.
+
+    Irmã de `_regime_recebimento` acima, e pelo mesmo motivo: os dois pontos que
+    criam `PedidoCompra` neste arquivo chamam uma função só, para que a regra não
+    possa divergir entre eles.
+
+    Fora do regime de dois fluxos devolve sempre `faturado` — inclusive se o POST
+    trouxer 'adiantamento'. Ver services/financeiro_compra.fluxo_do_pedido_novo.
+    """
+    from services.financeiro_compra import fluxo_do_pedido_novo
+    return fluxo_do_pedido_novo(admin_id, escolha)
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # HELPERS DE PROCESSAMENTO — dois fluxos de compra
 # ═════════════════════════════════════════════════════════════════════════════
@@ -798,6 +812,12 @@ def nova_post():
             # Fase 4 — o regime é carimbado no nascimento e não muda depois,
             # nem se a flag do tenant for desligada (services/recebimento_pedido).
             exige_atesto=_regime_recebimento(admin_id),
+            # Fase 2 do ciclo de compras — mesmo contrato: o FLUXO de pagamento
+            # é carimbado aqui e nunca reconsultado. Fora do regime novo a
+            # escolha do formulário é ignorada (services/financeiro_compra), o
+            # que impede um POST forjado de abrir um fluxo que o tenant não ligou.
+            fluxo_pagamento=_fluxo_pagamento(
+                admin_id, (request.form.get('fluxo_pagamento') or '').strip() or None),
         )
         db.session.add(pedido)
         db.session.flush()
@@ -2100,6 +2120,11 @@ def requisicao_emitir_pedido(requisicao_id):
             requisicao_id=requisicao.id,
             # Fase 4 — idem ao POST avulso: mesma função, mesmo carimbo.
             exige_atesto=_regime_recebimento(admin_id),
+            # Fase 2 do ciclo de compras — idem. A escolha do fluxo vem do
+            # formulário de emissão do pedido, não da requisição: quem requisita
+            # pede material, quem emite negocia a forma de pagar.
+            fluxo_pagamento=_fluxo_pagamento(
+                admin_id, (request.form.get('fluxo_pagamento') or '').strip() or None),
         )
         db.session.add(pedido)
         db.session.flush()

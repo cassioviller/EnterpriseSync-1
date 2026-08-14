@@ -1946,6 +1946,10 @@ def _seed():
         # estoque entrando na emissão. O carimbo é explícito porque o
         # teste-guarda cobra uma DECISÃO, não o default da coluna.
         exige_atesto=False,
+        # Fase 2 do ciclo de compras: mesma razao — compra de
+        # demonstracao e faturada, e o carimbo e explicito porque o
+        # teste-guarda cobra uma DECISAO, nao o default da coluna.
+        fluxo_pagamento='faturado',
     )
     db.session.add(pedido); db.session.flush()
     db.session.add_all([
@@ -1995,6 +1999,10 @@ def _seed():
         observacoes="Alvenaria fase 1 — blocos cerâmicos, areia e cimento.",
         tipo_compra="normal",
         exige_atesto=False,
+        # Fase 2 do ciclo de compras: mesma razao — compra de
+        # demonstracao e faturada, e o carimbo e explicito porque o
+        # teste-guarda cobra uma DECISAO, nao o default da coluna.
+        fluxo_pagamento='faturado',
     )
     db.session.add(pedido_bv2); db.session.flush()
     db.session.add_all([
@@ -2039,6 +2047,10 @@ def _seed():
         observacoes="Contrapiso — cimento e areia. Pagamento 30 dias.",
         tipo_compra="normal",
         exige_atesto=False,
+        # Fase 2 do ciclo de compras: mesma razao — compra de
+        # demonstracao e faturada, e o carimbo e explicito porque o
+        # teste-guarda cobra uma DECISAO, nao o default da coluna.
+        fluxo_pagamento='faturado',
     )
     db.session.add(pedido_bv3); db.session.flush()
     db.session.add_all([
@@ -2078,6 +2090,10 @@ def _seed():
         observacoes="Complemento final — blocos cerâmicos, areia e cimento (fase de fechamento).",
         tipo_compra="normal",
         exige_atesto=False,
+        # Fase 2 do ciclo de compras: mesma razao — compra de
+        # demonstracao e faturada, e o carimbo e explicito porque o
+        # teste-guarda cobra uma DECISAO, nao o default da coluna.
+        fluxo_pagamento='faturado',
     )
     db.session.add(pedido_bv4); db.session.flush()
     db.session.add_all([
@@ -3040,6 +3056,10 @@ def _seed():
         observacoes="Alvenaria Pinheiros — 1ª entrega blocos, cimento e areia.",
         tipo_compra="normal",
         exige_atesto=False,
+        # Fase 2 do ciclo de compras: mesma razao — compra de
+        # demonstracao e faturada, e o carimbo e explicito porque o
+        # teste-guarda cobra uma DECISAO, nao o default da coluna.
+        fluxo_pagamento='faturado',
     )
     db.session.add(pedido_pin5); db.session.flush()
     db.session.add_all([
@@ -3084,6 +3104,10 @@ def _seed():
         observacoes="Alvenaria Pinheiros 2ª entrega — blocos, cimento e areia.",
         tipo_compra="normal",
         exige_atesto=False,
+        # Fase 2 do ciclo de compras: mesma razao — compra de
+        # demonstracao e faturada, e o carimbo e explicito porque o
+        # teste-guarda cobra uma DECISAO, nao o default da coluna.
+        fluxo_pagamento='faturado',
     )
     db.session.add(pedido_pin6); db.session.flush()
     db.session.add_all([
@@ -3128,6 +3152,10 @@ def _seed():
         observacoes="Contrapiso Pinheiros — cimento e areia. Pagamento 60 dias.",
         tipo_compra="normal",
         exige_atesto=False,
+        # Fase 2 do ciclo de compras: mesma razao — compra de
+        # demonstracao e faturada, e o carimbo e explicito porque o
+        # teste-guarda cobra uma DECISAO, nao o default da coluna.
+        fluxo_pagamento='faturado',
     )
     db.session.add(pedido_pin7); db.session.flush()
     db.session.add_all([
@@ -3168,6 +3196,10 @@ def _seed():
         observacoes="Pintura Pinheiros — tinta acrílica 18L e massa corrida 25kg.",
         tipo_compra="normal",
         exige_atesto=False,
+        # Fase 2 do ciclo de compras: mesma razao — compra de
+        # demonstracao e faturada, e o carimbo e explicito porque o
+        # teste-guarda cobra uma DECISAO, nao o default da coluna.
+        fluxo_pagamento='faturado',
     )
     db.session.add(pedido_pin8); db.session.flush()
     db.session.add_all([
@@ -3205,6 +3237,10 @@ def _seed():
         observacoes="Acabamento Pinheiros — massa corrida complemento e cimento.",
         tipo_compra="normal",
         exige_atesto=False,
+        # Fase 2 do ciclo de compras: mesma razao — compra de
+        # demonstracao e faturada, e o carimbo e explicito porque o
+        # teste-guarda cobra uma DECISAO, nao o default da coluna.
+        fluxo_pagamento='faturado',
     )
     db.session.add(pedido_pin9); db.session.flush()
     db.session.add_all([
@@ -3244,6 +3280,10 @@ def _seed():
         observacoes="Estrutura final Pinheiros — blocos, areia e cimento. Pagamento 30 dias.",
         tipo_compra="normal",
         exige_atesto=False,
+        # Fase 2 do ciclo de compras: mesma razao — compra de
+        # demonstracao e faturada, e o carimbo e explicito porque o
+        # teste-guarda cobra uma DECISAO, nao o default da coluna.
+        fluxo_pagamento='faturado',
     )
     db.session.add(pedido_pin10); db.session.flush()
     db.session.add_all([
