@@ -130,10 +130,33 @@ porque baixa manual sem material é exatamente o buraco que a lista existe para 
 
 ### `FechamentoPagamento` ganha efeito
 
-Três colunas: `fechado_por_id`, `fechado_em`, `reaberto_por_id` — a trilha que falta. E a
-regra: no regime novo, **`pagar_conta` exige que a conta esteja num fechamento
-`FECHADO`**. Quem monta o lote (lança) e quem fecha o lote (libera) não podem ser a mesma
-pessoa, mesmo padrão da Fase 3.
+**Quatro** colunas: `criado_por_id`, `fechado_por_id`, `fechado_em`, `reaberto_por_id`.
+
+> 📌 **Corrigido em 14/08, durante a F5.** Este spec listava só três, esquecendo
+> `criado_por_id` — e sem ela "quem monta não fecha" não é regra, é frase: dá para saber
+> quem fechou e não há com quem comparar. Entrou pela **migration 296** (296 e não 290,
+> porque 290-295 é faixa reservada da Fase 8 e 300-307 da Fase 9).
+
+**Fechar o lote é o ato que libera.** Quem monta o lote e quem o fecha não podem ser a
+mesma pessoa — invariante, não configuração, mesmo padrão da Fase 3.
+
+> 📌 **Desvio deliberado, decidido na F5.** Este spec dizia que no regime novo
+> `pagar_conta` exigiria a conta num fechamento `FECHADO`. **Não foi feito assim.**
+> `pagar_conta` tem UMA porta: `situacao_liberacao`. Duas guardas no mesmo ponto
+> recusariam o mesmo pagamento por dois motivos diferentes e dobrariam as formas de o
+> usuário ficar preso, sem acrescentar controle nenhum — fechar o lote é justamente o que
+> muda a situação para `liberada`. O estado mora num lugar só; o fechamento é quem o move.
+
+Duas concessões de robustez, ambas para que a regra sobreviva ao uso real:
+
+- **A segregação só é exigida quando os dois lados são conhecidos.** Lote anterior à 296
+  não tem autor registrado; exigir com um lado ausente travaria todo lote histórico, e o
+  efeito prático seria o time desligar a regra. Regra que atrapalha sem proteger é regra
+  que morre — e inventar um autor seria forjar autoria, o mesmo defeito que o detector da
+  Fase 5 pega em RDO assinado sem trilha.
+- **Conta sem a tríade fechada é pulada no fechamento, não estoura.** Um lote de dez
+  contas não pode falhar inteiro porque uma delas está sem nota. O que fica de fora
+  continua bloqueado, e o sensor de consistência o nomeia.
 
 ---
 
@@ -297,6 +320,57 @@ E o **teste-guarda** no formato da C9 da Fase 1: varre o repositório inteiro at
 O teste tem de carregar essa lista **por escrito**, para que a próxima criação em caminho
 de compra apareça como falha em vez de passar despercebida. É o que a C9 provou valer: ela
 revelou um quarto ponto de carimbo de regime que ninguém sabia que existia.
+
+---
+
+## Runbook — ligar a flag num tenant
+
+```bash
+# 0. Onde o tenant está hoje. O regime de recebimento é PRÉ-REQUISITO DURO —
+#    sem ele a conta do Fluxo A nasce bloqueada sem caminho para liberar.
+python scripts/flag_recebimento_atesto.py <ID>
+python scripts/flag_financeiro_dois_fluxos.py <ID>
+
+# 1. Ligar. Recusa tenant sem recebimento_atesto_ativo; --forcar existe, mas
+#    leia o motivo antes de usá-lo.
+python scripts/flag_financeiro_dois_fluxos.py <ID> --ligar
+
+# 2. O ciclo completo numa obra piloto, com TRÊS pessoas diferentes:
+#    quem emite o pedido, quem monta o lote, quem fecha o lote.
+#    Conferir, em ordem:
+#      a) emitir  -> ContaPagar nasce situacao_liberacao='bloqueada'
+#      b) pagar   -> RECUSA, nomeando a perna que falta
+#      c) atestar -> valor_atestado > 0
+#      d) lançar nota
+#      e) montar o lote e pedir a OUTRA pessoa que feche
+#      f) o valor da conta caiu para o atestado, com a diferença na observação
+#      g) pagar   -> passa
+
+# 3. O sensor, depois do piloto e depois em cada rodada:
+python scripts/verificar_consistencia_financeiro.py <ID>
+```
+
+| O que conferir | Onde | O que significa se estiver errado |
+|---|---|---|
+| `situacao_liberacao` da conta nova | `conta_pagar` | `liberada` no Fluxo A = o carimbo do fluxo não pegou |
+| `fluxo_pagamento` do pedido novo | `pedido_compra` | `faturado` num pedido de adiantamento = a tela não mandou a escolha |
+| `fechado_por_id` do lote | `fechamento_pagamento` | NULL = alguém fechou por SQL, e a segregação não valeu |
+| Saída do sensor | script acima | qualquer linha = escrita por fora do serviço |
+
+### Rollback
+
+```bash
+python scripts/flag_financeiro_dois_fluxos.py <ID> --desligar
+```
+
+Pedido novo volta a nascer `faturado` e a conta nova volta a nascer `liberada`,
+no mesmo minuto. **Mas as contas que já nasceram bloqueadas continuam
+bloqueadas** — o regime é carimbado na linha, e desligar a flag não reescreve o
+passado. Libere-as pela tela (fechando o lote) antes de considerar o rollback
+completo; o sensor lista quais são.
+
+O adiantamento já registrado também não some: ele é a prova de que houve
+dinheiro adiantado, e some só quando o atesto chegar.
 
 ---
 

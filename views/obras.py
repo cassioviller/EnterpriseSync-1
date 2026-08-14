@@ -2984,6 +2984,7 @@ def nova_compra_obra(obra_id):
         # usar para pagar o que chegou (`valor_atestado`), e herdar o default
         # por descuido deixaria essas compras de fora dele.
         from services.recebimento_pedido import regime_do_tenant
+        from services.financeiro_compra import fluxo_do_pedido_novo
 
         pedido = PedidoCompra(
             fornecedor_id=fornecedor_id,
@@ -2995,6 +2996,12 @@ def nova_compra_obra(obra_id):
             status_aprovacao_cliente='PENDENTE',
             anexo_url=anexo_url,
             exige_atesto=regime_do_tenant(admin_id),
+            # Fase 2 do ciclo de compras — este caminho não oferece escolha de
+            # fluxo ao usuário, então o pedido nasce `faturado` mesmo com o
+            # regime novo ligado. Explícito e não por default de coluna: é o
+            # que o teste-guarda cobra, e é o que faz um caminho novo ter de
+            # DECIDIR em vez de herdar por descuido.
+            fluxo_pagamento=fluxo_do_pedido_novo(admin_id),
             admin_id=admin_id,
         )
         db.session.add(pedido)

@@ -6337,6 +6337,192 @@ def _migration_286_timbre_pdf():
                 "(timbre dos PDFs por tenant, importável por JSON).")
 
 
+def _migration_287_nota_e_adiantamento():
+    """Fase 2 do ciclo de compras — as duas tabelas novas do financeiro.
+
+    `nota_fiscal_pedido` é a nota que autoriza o pagamento, e NÃO é a
+    `NotaFiscal` legada (models.py:2640): aquela exige `chave_acesso` NOT NULL
+    e UNIQUE global e se liga a `MovimentacaoEstoque`. Aqui a chave é
+    **nullable** de propósito — metade das compras de obra chega com recibo ou
+    nota de serviço, e exigir os 44 dígitos para poder pagar transformaria a
+    tríade numa trava contornada por fora do sistema.
+
+    `adiantamento_fornecedor` é o outro lado do Fluxo B: o adiantamento já é
+    uma `ContaPagar`; o que falta é a pendência de ENTREGA, que é o que sustenta
+    a lista "pago, aguardando entrega".
+
+    `conta_pagar_id` é ON DELETE SET NULL e não CASCADE: se a conta sumir, a
+    prova de que houve dinheiro adiantado NÃO some junto.
+
+    Alocação: 287. Conferido em `migration_history` do dev em 14/08 — a última
+    aplicada é a 286, e as faixas 290-295 (Fase 8) e 300-307 (Fase 9) ficam
+    intactas. Sem backfill: não há linha histórica que estas tabelas descrevam.
+
+    Idempotente: IF NOT EXISTS em tudo.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text("""
+            CREATE TABLE IF NOT EXISTS nota_fiscal_pedido (
+                id SERIAL PRIMARY KEY,
+                pedido_id INTEGER NOT NULL
+                    REFERENCES pedido_compra(id) ON DELETE CASCADE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                fornecedor_id INTEGER NOT NULL REFERENCES fornecedor(id),
+                numero VARCHAR(20) NOT NULL,
+                serie VARCHAR(5) NOT NULL DEFAULT '1',
+                chave_acesso VARCHAR(44),
+                valor_total NUMERIC(15, 2) NOT NULL,
+                data_emissao DATE NOT NULL,
+                data_vencimento DATE,
+                arquivo_path VARCHAR(500),
+                lancada_por_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP,
+                CONSTRAINT uq_nota_pedido_admin_forn_numero_serie
+                    UNIQUE (admin_id, fornecedor_id, numero, serie)
+            )"""))
+        conn.execute(sa_text(
+            "CREATE INDEX IF NOT EXISTS ix_nota_fiscal_pedido_pedido "
+            "ON nota_fiscal_pedido (pedido_id)"))
+        conn.execute(sa_text(
+            "CREATE INDEX IF NOT EXISTS ix_nota_fiscal_pedido_admin "
+            "ON nota_fiscal_pedido (admin_id)"))
+
+        conn.execute(sa_text("""
+            CREATE TABLE IF NOT EXISTS adiantamento_fornecedor (
+                id SERIAL PRIMARY KEY,
+                pedido_id INTEGER NOT NULL
+                    REFERENCES pedido_compra(id) ON DELETE CASCADE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                conta_pagar_id INTEGER
+                    REFERENCES conta_pagar(id) ON DELETE SET NULL,
+                valor NUMERIC(15, 2) NOT NULL,
+                data_prevista_entrega DATE,
+                observacao TEXT,
+                baixado_em TIMESTAMP,
+                baixado_por_id INTEGER REFERENCES usuario(id),
+                created_at TIMESTAMP
+            )"""))
+        conn.execute(sa_text(
+            "CREATE INDEX IF NOT EXISTS ix_adiantamento_pedido "
+            "ON adiantamento_fornecedor (pedido_id)"))
+        conn.execute(sa_text(
+            "CREATE INDEX IF NOT EXISTS ix_adiantamento_admin_pendente "
+            "ON adiantamento_fornecedor (admin_id, baixado_em)"))
+
+    logger.info("[Migration 287] nota_fiscal_pedido + adiantamento_fornecedor "
+                "criadas (Fase 2 — a obrigação passa a nascer do que chegou).")
+
+
+def _migration_288_regime_e_liberacao():
+    """Fase 2 — o regime do pedido, a liberação da conta e a trilha do lote.
+
+    **Todo default aqui descreve exatamente o registro histórico**, e isso não é
+    detalhe: `fluxo_pagamento='faturado'` porque o pedido antigo nasceu com a
+    obrigação criada na emissão; `situacao_liberacao='liberada'` porque toda
+    conta que já existe é pagável hoje. Um default 'bloqueada' trancaria o
+    parque inteiro no dia do deploy — e ninguém pediu isso.
+
+    As três colunas de `fechamento_pagamento` são o que faltava para a
+    segregação existir: a tabela já era a liberação em lote, mas sem saber quem
+    fechou não há como aplicar "quem montou o lote não o fecha".
+
+    Alocação: 288. Sem backfill, pela razão dos defaults acima.
+    Idempotente: IF NOT EXISTS em tudo.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE pedido_compra ADD COLUMN IF NOT EXISTS "
+            "fluxo_pagamento VARCHAR(16) NOT NULL DEFAULT 'faturado'"))
+
+        conn.execute(sa_text(
+            "ALTER TABLE conta_pagar ADD COLUMN IF NOT EXISTS "
+            "situacao_liberacao VARCHAR(16) NOT NULL DEFAULT 'liberada'"))
+        conn.execute(sa_text(
+            "ALTER TABLE conta_pagar ADD COLUMN IF NOT EXISTS "
+            "liberada_por_id INTEGER REFERENCES usuario(id)"))
+        conn.execute(sa_text(
+            "ALTER TABLE conta_pagar ADD COLUMN IF NOT EXISTS "
+            "liberada_em TIMESTAMP"))
+
+        conn.execute(sa_text(
+            "ALTER TABLE fechamento_pagamento ADD COLUMN IF NOT EXISTS "
+            "fechado_por_id INTEGER REFERENCES usuario(id)"))
+        conn.execute(sa_text(
+            "ALTER TABLE fechamento_pagamento ADD COLUMN IF NOT EXISTS "
+            "fechado_em TIMESTAMP"))
+        conn.execute(sa_text(
+            "ALTER TABLE fechamento_pagamento ADD COLUMN IF NOT EXISTS "
+            "reaberto_por_id INTEGER REFERENCES usuario(id)"))
+
+    logger.info("[Migration 288] pedido_compra.fluxo_pagamento, "
+                "conta_pagar.situacao_liberacao (+ quem/quando liberou) e a "
+                "trilha do fechamento criadas.")
+
+
+def _migration_289_flag_e_tolerancia():
+    """Fase 2 — `financeiro_dois_fluxos_ativo` e a tolerância da D1.
+
+    Irmã de `compras_governanca_ativa` (246) e `recebimento_atesto_ativo` (284):
+    a virada é POR TENANT, porque muda o momento em que a obrigação financeira
+    nasce, e isso não se faz no parque num deploy.
+
+    Default FALSE — ninguém vira sozinho. Quem liga é
+    scripts/flag_financeiro_dois_fluxos.py, que RECUSA tenant sem
+    `recebimento_atesto_ativo`: sem atesto não há a terceira perna da tríade, e
+    a conta nasceria bloqueada sem caminho para liberar.
+
+    `tolerancia_divergencia_nf_pct` semeada em 2,00% é a RECOMENDAÇÃO do spec
+    (decisão D1), não decisão do negócio. É coluna e não constante justamente
+    para poder ser trocada por UPDATE, sem deploy.
+
+    Alocação: 289. Idempotente: IF NOT EXISTS.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+            "financeiro_dois_fluxos_ativo BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(sa_text(
+            "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+            "tolerancia_divergencia_nf_pct NUMERIC(5,2) NOT NULL DEFAULT 2.00"))
+    logger.info("[Migration 289] configuracao_empresa.financeiro_dois_fluxos_"
+                "ativo (default FALSE) e tolerancia_divergencia_nf_pct (2,00%) "
+                "criadas.")
+
+
+
+def _migration_296_fechamento_criado_por():
+    """Fase 2 / F5 — `fechamento_pagamento.criado_por_id`.
+
+    Faltou no desenho da F1 e o buraco só apareceu ao escrever a F5: as três
+    colunas de trilha diziam quem FECHOU e quem REABRIU o lote, e nenhuma dizia
+    quem o MONTOU. Sem esse lado, "quem monta não fecha" não é uma regra — é uma
+    frase, porque não há com quem comparar `fechado_por_id`.
+
+    Nullable de propósito: lote que já existe não tem autor registrado, e
+    inventar um seria forjar autoria — exatamente o defeito que o detector da
+    Fase 5 pega em RDO assinado sem trilha. A consequência está escrita no
+    serviço: a segregação só é EXIGIDA quando os dois lados são conhecidos.
+
+    Alocação: **296**, e não 290. A faixa 290-295 é reservada da Fase 8 e
+    300-307 da Fase 9; mexer em faixa reservada é o que a renumeração 270→277
+    existiu para evitar, e aquela renumeração armou o fantasma que ainda está
+    no histórico. Conferido em `migration_history` do dev em 14/08: a maior
+    aplicada é a 289 e nada entre 290 e 307 foi aplicado.
+
+    Idempotente: IF NOT EXISTS.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE fechamento_pagamento ADD COLUMN IF NOT EXISTS "
+            "criado_por_id INTEGER REFERENCES usuario(id)"))
+    logger.info("[Migration 296] fechamento_pagamento.criado_por_id criada "
+                "(o outro lado da segregacao: quem montou o lote).")
+
+
 def _migration_282_backfill_dropdown_crm():
     """D-CRM.1 — o backfill que a 174 pulou: grupo de dropdown para TODO
     tenant com dado nas tabelas legadas `crm_*`.
@@ -6697,6 +6883,10 @@ def executar_migracoes():
             (284, "Fase 4 — configuracao_empresa.recebimento_atesto_ativo: a virada do recebimento é por tenant (default FALSE)", _migration_284_flag_recebimento_atesto),
             (285, "Fase 4/C2 — recebimento_pedido_item.almoxarifado_saida_movimento_id: a saída de consumo pareada do atesto, para o estorno saber o que desfazer", _migration_285_saida_do_atesto),
             (286, "Timbre dos PDFs — configuracao_empresa.timbre_pdf (JSONB): logo, dados da empresa e cores num JSON importável pela tela", _migration_286_timbre_pdf),
+            (287, "Fase 2 do ciclo de compras — nota_fiscal_pedido (chave_acesso NULLABLE, ao contrário da NotaFiscal legada) + adiantamento_fornecedor", _migration_287_nota_e_adiantamento),
+            (288, "Fase 2 — pedido_compra.fluxo_pagamento; conta_pagar.situacao_liberacao/liberada_por_id/liberada_em; trilha de quem fechou e reabriu o lote", _migration_288_regime_e_liberacao),
+            (289, "Fase 2 — configuracao_empresa.financeiro_dois_fluxos_ativo (default FALSE) + tolerancia_divergencia_nf_pct (2,00%, decisão D1 editável)", _migration_289_flag_e_tolerancia),
+            (296, "Fase 2/F5 — fechamento_pagamento.criado_por_id: quem MONTOU o lote, sem o qual a segregacao \"quem monta nao fecha\" nao e verificavel. 290-295 e faixa da Fase 8; 300-307 da Fase 9", _migration_296_fechamento_criado_por),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

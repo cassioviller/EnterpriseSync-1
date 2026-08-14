@@ -501,6 +501,18 @@ def registrar_recebimento(pedido, usuario, linhas, data, observacao=None,
         db.session.flush()
 
     pedido.situacao_recebimento = situacao_para(pedido)
+
+    # Fase 2 do ciclo de compras — o atesto é quem baixa a pendência de
+    # ENTREGA do Fluxo B. A chamada mora aqui, e a lógica do adiantamento mora
+    # lá: uma dependência, num sentido só. Pôr a regra de adiantamento dentro
+    # deste serviço faria o recebimento saber de financeiro, e o financeiro
+    # saber de recebimento — e aí não há chokepoint nenhum, há dois módulos
+    # emaranhados.
+    #
+    # Pedido do Fluxo A não tem pendência e a chamada é no-op.
+    from services.financeiro_compra import baixar_adiantamentos
+    baixar_adiantamentos(pedido, usuario=usuario)
+
     db.session.commit()
 
     logger.info('recebimento %s: %s itens (%s no estoque) por usuario=%s — '

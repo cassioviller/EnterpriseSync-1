@@ -1826,8 +1826,20 @@ def test_rota_de_exclusao_repassa_a_recusa_do_servico():
     cli.post(f'/compras/{pedido_id}/recebimento/{primeiro_id}/excluir')
 
     aviso = _flashes(cli)
+    # A mensagem carrega o ESTADO junto de propósito. Em 14/08 este teste falhou
+    # de forma intermitente (~metade das vezes) na seleção larga do gate, e
+    # passou em toda seleção menor — e com só os flashes no assert não dava para
+    # distinguir as duas causas possíveis: o segundo POST não ter gravado (aí
+    # sobra 1 recebimento e excluir passa a ser legítimo) ou a PRIMEIRA porta de
+    # `excluir_recebimento` ter recusado por permissão, cuja mensagem não contém
+    # "último". Sem contar os recebimentos, as duas dão o mesmo sintoma.
+    with app.app_context():
+        quantos = len(_recebimentos_de(pedido_id))
     assert 'último' in aviso, (
-        f'a recusa do serviço não chegou ao usuário. Veio: {aviso!r}')
+        f'a recusa do serviço não chegou ao usuário. Veio: {aviso!r}. '
+        f'O pedido tem {quantos} recebimento(s) — se for 1, o segundo POST não '
+        f'gravou e a exclusão foi legítima; se for 2, a recusa veio por outra '
+        f'porta (permissão) ou não veio.')
     with app.app_context():
         assert len(_recebimentos_de(pedido_id)) == 2, (
             f'{rotulo} foi apagado do meio da sequência')

@@ -2441,6 +2441,23 @@ class ContaPagar(db.Model):
     parcela_total = db.Column(db.Integer, nullable=True)
     pedido_compra_id = db.Column(db.Integer, db.ForeignKey('pedido_compra.id', use_alter=True, name='fk_cp_pedido_compra'), nullable=True)
     fechamento_id = db.Column(db.Integer, db.ForeignKey('fechamento_pagamento.id', use_alter=True, name='fk_cp_fechamento'), nullable=True)
+    # ── Fase 2 do ciclo de compras, migration 288 ──
+    #
+    # A segregação entre quem LANÇA e quem LIBERA. Até aqui `pagar_conta`
+    # (financeiro_views.py:445) exigia `@login_required` e nada mais: a mesma
+    # pessoa cadastrava o fornecedor, emitia o pedido, criava a conta e dava a
+    # baixa. A Fase 3 tratou disso na COMPRA (solicitante != aprovador como
+    # invariante); no PAGAMENTO não havia nada.
+    #
+    # Default 'liberada' é deliberado e não é frouxidão: toda conta que já
+    # existe, e toda que nascer com a flag desligada, continua pagável como
+    # hoje. Só o regime novo cria conta 'bloqueada'. Um default 'bloqueada'
+    # transformaria o parque inteiro em contas travadas no dia do deploy.
+    situacao_liberacao = db.Column(db.String(16), nullable=False,
+                                   default='liberada', server_default='liberada')
+    liberada_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                                nullable=True)
+    liberada_em = db.Column(db.DateTime, nullable=True)
     # B5.6 / D-B5.6(A), migração 280 — o banco DEBITADO na baixa. Antes disto
     # o débito de `banco.saldo_atual` era irrecuperável (nada persistia qual
     # banco foi) e o estorno virava catraca: devolvia a conta e engolia o
@@ -4396,6 +4413,30 @@ class ConfiguracaoEmpresa(db.Model):
     recebimento_atesto_ativo = db.Column(db.Boolean, nullable=False,
                                          default=False, server_default='false')
 
+    # Fase 2 do ciclo de compras — flag do financeiro em dois fluxos.
+    # Default FALSE: desligada, a ContaPagar continua nascendo na EMISSÃO do
+    # pedido (compras_views.py:305), liberada, sem nota e sem lote — movimento
+    # a movimento como hoje. Ligada, a obrigação do Fluxo A nasce BLOQUEADA e
+    # só libera com a tríade (pedido + nota + atesto).
+    #
+    # `scripts/flag_financeiro_dois_fluxos.py --ligar` RECUSA tenant sem
+    # `recebimento_atesto_ativo`: sem atesto não existe a terceira perna, e a
+    # conta nasceria bloqueada sem caminho para liberar. Mesma classe de
+    # dependência dura que a governança de compras tem do escopo de obra — e a
+    # lição de lá é que a guarda precisa morar no script, porque quem mexe por
+    # SQL direto não tem nenhuma.
+    financeiro_dois_fluxos_ativo = db.Column(db.Boolean, nullable=False,
+                                             default=False,
+                                             server_default='false')
+    # Decisão D1 do spec: a divergência entre a soma das notas e o
+    # `valor_atestado` AVISA acima desta tolerância, e não bloqueia. Dado
+    # editável por tenant, não constante — a pergunta "qual o valor de X?" da
+    # DEVOLUTIVA continua sem resposta do negócio, e ela não pode virar um
+    # `if pct > 2` no meio de uma view.
+    tolerancia_divergencia_nf_pct = db.Column(db.Numeric(5, 2), nullable=False,
+                                              default=2.00,
+                                              server_default='2.00')
+
     # Cronograma editável Fase 1 — motor de agendamento novo
     # (multi-predecessoras via tarefa_vinculo, caminho crítico) mais a grade
     # tipo planilha com menu de botão direito. Nasceu como flag de rollout
@@ -5706,6 +5747,26 @@ class PedidoCompra(db.Model):
                                      default='nao_recebido',
                                      server_default='nao_recebido')
 
+    # ── Fase 2 do ciclo de compras (financeiro em dois fluxos), migration 288 ──
+    #
+    # O REGIME DE PAGAMENTO do pedido, carimbado na criação pelo mesmo
+    # raciocínio de `exige_atesto` logo acima: o mesmo fornecedor vende a prazo
+    # numa semana e exige adiantamento na outra, e a decisão é do comprador no
+    # ato — derivar do cadastro do fornecedor erraria justamente no caso que
+    # importa.
+    #
+    # 'faturado'     = Fluxo A: chega, depois vem a nota, depois se paga. A
+    #                  ContaPagar nasce BLOQUEADA e só libera com a tríade
+    #                  (pedido + nota + atesto).
+    # 'adiantamento' = Fluxo B: paga-se antes de receber. A conta nasce
+    #                  liberada, e o que fica pendente é a ENTREGA — ver
+    #                  `AdiantamentoFornecedor`.
+    #
+    # Default 'faturado' descreve exatamente o pedido histórico: ele nasceu com
+    # a obrigação criada na emissão, sem nota e sem atesto no caminho.
+    fluxo_pagamento = db.Column(db.String(16), nullable=False,
+                                default='faturado', server_default='faturado')
+
 
 class PedidoCompraItem(db.Model):
     """Itens de um pedido de compra V2"""
@@ -5861,6 +5922,134 @@ class RecebimentoPedidoItem(db.Model):
     def __repr__(self):
         return (f'<RecebimentoPedidoItem rec={self.recebimento_id} '
                 f'item={self.pedido_item_id} qtd={self.quantidade_recebida}>')
+
+
+class NotaFiscalPedido(db.Model):
+    """A nota que autoriza o pagamento — Fase 2 do ciclo de compras.
+
+    **Por que não reusa `NotaFiscal` (models.py:2640).** Aquela nasceu para o
+    import de XML do almoxarifado: `chave_acesso` é NOT NULL **e UNIQUE
+    global** — o mesmo campo que `tests/test_arreio_almoxarifado_e_tenant.py`
+    cataloga como vazamento entre tenants — e ela se liga a
+    `MovimentacaoEstoque`, não a `PedidoCompra` nem a `ContaPagar`.
+
+    Herdar aquilo aqui significaria exigir a chave de 44 dígitos para poder
+    pagar. Metade das compras de obra chega com recibo, nota de serviço ou nota
+    sem XML na mão do comprador: a tríade viraria uma trava que o campo aprende
+    a contornar, e trava contornada é pior que trava ausente. Aqui a chave é
+    guardada quando existe e não atrapalha quando não existe.
+
+    **Um pedido tem N notas.** Entrega parcial fatura em partes. A soma das
+    notas é comparada com `valor_atestado(pedido)` (Fase 1) e a divergência
+    AVISA acima da tolerância do tenant — não bloqueia. Frete, arredondamento e
+    tributo por dentro produzem divergência legítima toda semana; bloquear
+    ensinaria o time a lançar nota com o valor do atestado, que é perder a
+    conferência inteira. Decisão D1 do spec.
+    """
+    __tablename__ = 'nota_fiscal_pedido'
+    __table_args__ = (
+        db.UniqueConstraint('admin_id', 'fornecedor_id', 'numero', 'serie',
+                            name='uq_nota_pedido_admin_forn_numero_serie'),
+        db.Index('ix_nota_fiscal_pedido_pedido', 'pedido_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    pedido_id = db.Column(
+        db.Integer, db.ForeignKey('pedido_compra.id', ondelete='CASCADE'),
+        nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                         nullable=False, index=True)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'),
+                              nullable=False)
+
+    numero = db.Column(db.String(20), nullable=False)
+    serie = db.Column(db.String(5), nullable=False, default='1')
+    # NULLABLE de propósito — ver o docstring. Não "consertar" para NOT NULL.
+    chave_acesso = db.Column(db.String(44), nullable=True)
+
+    valor_total = db.Column(db.Numeric(15, 2), nullable=False)
+    data_emissao = db.Column(db.Date, nullable=False)
+    # É esta que passa a dar o vencimento da ContaPagar. Hoje o vencimento é
+    # derivado da data da compra, que é quando alguém preencheu o formulário —
+    # não quando o fornecedor cobra.
+    data_vencimento = db.Column(db.Date, nullable=True)
+    arquivo_path = db.Column(db.String(500), nullable=True)
+
+    # Metade da segregação: quem lançou. A outra metade é quem liberou, e mora
+    # em ContaPagar.liberada_por_id.
+    lancada_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                               nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    pedido = db.relationship('PedidoCompra',
+                             backref=db.backref('notas_fiscais', lazy='dynamic',
+                                                cascade='all, delete-orphan'))
+    fornecedor = db.relationship('Fornecedor', foreign_keys=[fornecedor_id])
+    lancada_por = db.relationship('Usuario', foreign_keys=[lancada_por_id])
+
+    def __repr__(self):
+        return f'<NotaFiscalPedido {self.numero}/{self.serie} ped={self.pedido_id}>'
+
+
+class AdiantamentoFornecedor(db.Model):
+    """O outro lado do Fluxo B: dinheiro que saiu antes do material chegar.
+
+    O adiantamento **é** uma `ContaPagar` — paga-se por ela, ela vai ao fluxo
+    de caixa, ela debita banco pela B5.6. O que esta tabela acrescenta é a
+    ponta que hoje não existe em lugar nenhum: a pendência de ENTREGA.
+
+    Enquanto `baixado_em` for NULL, o pedido aparece na lista "pago, aguardando
+    entrega". Sem essa lista, dinheiro que saiu vira material que ninguém
+    cobra — e o sistema não tem como saber a diferença entre um fornecedor que
+    entregou e um que sumiu com o adiantamento.
+
+    **Só o atesto baixa.** Baixa manual sem material seria exatamente o buraco
+    que a lista existe para tapar. N linhas por pedido: 50% na assinatura e 50%
+    na entrega é o caso comum, não a exceção (decisão D4 do spec).
+    """
+    __tablename__ = 'adiantamento_fornecedor'
+    __table_args__ = (
+        db.Index('ix_adiantamento_pedido', 'pedido_id'),
+        db.Index('ix_adiantamento_admin_pendente', 'admin_id', 'baixado_em'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    pedido_id = db.Column(
+        db.Integer, db.ForeignKey('pedido_compra.id', ondelete='CASCADE'),
+        nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                         nullable=False, index=True)
+    # A obrigação que este adiantamento gerou. SET NULL e não CASCADE: se a
+    # conta for excluída, a pendência de entrega NÃO some junto — ela é o que
+    # prova que houve dinheiro adiantado.
+    conta_pagar_id = db.Column(
+        db.Integer, db.ForeignKey('conta_pagar.id', ondelete='SET NULL'),
+        nullable=True)
+
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
+    data_prevista_entrega = db.Column(db.Date, nullable=True)
+    observacao = db.Column(db.Text, nullable=True)
+
+    baixado_em = db.Column(db.DateTime, nullable=True)
+    baixado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                               nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    pedido = db.relationship(
+        'PedidoCompra',
+        backref=db.backref('adiantamentos', lazy='dynamic',
+                           cascade='all, delete-orphan'))
+    conta_pagar = db.relationship('ContaPagar', foreign_keys=[conta_pagar_id])
+    baixado_por = db.relationship('Usuario', foreign_keys=[baixado_por_id])
+
+    @property
+    def pendente(self) -> bool:
+        return self.baixado_em is None
+
+    def __repr__(self):
+        estado = 'pendente' if self.pendente else 'baixado'
+        return (f'<AdiantamentoFornecedor ped={self.pedido_id} '
+                f'{self.valor} {estado}>')
 
 
 class RequisicaoCompra(db.Model):
@@ -9069,6 +9258,28 @@ class FechamentoPagamento(db.Model):
     total_selecionado = db.Column(db.Numeric(15, 2), default=0)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # ── Fase 2 do ciclo de compras, migration 288 ──
+    #
+    # Esta tabela já era a liberação em lote — sem o efeito. `pagar_conta` não
+    # consultava o fechamento em ponta nenhuma, `FECHADO` não autorizava nada e
+    # `reabrir` desfazia sem deixar rastro. A UI do rito existia; o rito, não.
+    #
+    # Estas três colunas são o que faltava para a regra "quem montou o lote não
+    # o fecha" ser verificável — sem saber quem fechou, não há segregação, só
+    # aparência de segregação.
+    fechado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                               nullable=True)
+    fechado_em = db.Column(db.DateTime, nullable=True)
+    reaberto_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                                nullable=True)
+    # Migration 296 — quem MONTOU o lote. Faltava no desenho da F1, e sem ela a
+    # regra "quem monta não fecha" é inverificável: dá para saber quem fechou e
+    # não com quem comparar. Nullable porque lote histórico não tem autor
+    # registrado — e é por isso que a segregação só vale quando os DOIS lados
+    # são conhecidos (ver services/financeiro_compra.fechar_lote).
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                              nullable=True)
 
     contas = db.relationship('ContaPagar', foreign_keys='ContaPagar.fechamento_id',
                              backref='fechamento', lazy='dynamic')

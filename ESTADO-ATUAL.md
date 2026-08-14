@@ -364,7 +364,7 @@ em produção e levar o número de "EM EXECUÇÃO sem gestor" ao Cássio (em dev
 | # | O quê | Por que trava |
 |---|---|---|
 | 1 | ~~Rotacionar `SESSION_SECRET` e a senha do Postgres~~ | 🔴 **Decisão do Cássio, 03/08: NÃO rotacionar.** Sai da lista de pendências — não voltar a recomendar. O que fica registrado abaixo é só o contorno do risco aceito |
-| 2 | **`gh auth login`** (só a API do GitHub) | 🔬 03/08: **`git push` funciona** — `origin/main == 63cc1c13`, conferido em `ls-remote`. O que falta é a API: `gh auth status` → "not logged into any GitHub hosts", `GH_TOKEN`/`GITHUB_TOKEN` ausentes. Sem ela não se abre PR nem se busca branch de triagem, e **não há como conferir se o CI rodou verde** sobre os dez pacotes. Refazer o login é interativo — só o humano consegue |
+| 2 | **`gh auth login`** (a API do GitHub **e agora o `git push`**) | 🔬 03/08 dizia "`git push` funciona — o que falta é só a API". **Isso envelheceu.** 🔬 14/08: `git push origin main` **falha** — `remote: Invalid username or token. Password authentication is not supported for Git operations` / `fatal: Authentication failed`. `gh auth status` segue "not logged into any GitHub hosts" e `GH_TOKEN`/`GITHUB_TOKEN` continuam ausentes. Consequência: **8 commits em `main` existem só na máquina de dev**, incluindo o merge da Fase 1 do ciclo de compras (23 commits de trabalho que estavam presos numa branch desde 12/08). Refazer o login é interativo — só o humano consegue |
 | 3 | **Criar o volume persistente** no painel | Vale para `/var/backups/sige` (dumps) **e** para os uploads. O pré-requisito de código caiu em 23/07: a armadilha nº 2 (descasamento do `UPLOADS_PATH`) está corrigida — montar o volume e definir a variável já é seguro |
 
 > 📖 **O contorno do risco aceito no item 1.** O código não tem fallback fixo:
@@ -590,6 +590,71 @@ acima (o gate que estava INCONCLUSIVO) e cobre de quebra o commit
 `e782f70` (aborto de boot), que nunca tinha visto banco vivo. Após o
 gate, o branch foi **mergeado em `main`** (fast-forward, 23/07).
 
+## ✅ Ciclo de compras — Fases 1 e 2, em 14/08
+
+> ⚠️ **Não confundir com a numeração do núcleo.** O pedido do Cássio ("ciclo
+> completo de compras, da solicitação no campo até o lançamento no fluxo de
+> caixa") foi decomposto em **cinco fases próprias**, com spec cada uma. A
+> "Fase 3" do núcleo (compras com governança, acima) é a **seção 1** desse
+> pedido — a requisição. As duas contagens coexistem e já causaram confusão.
+
+**Ordem acordada:** recebimento/atesto → financeiro em dois fluxos → alçadas →
+status unificado → relatórios. Recebimento veio primeiro porque é a fundação:
+sem atesto não existe a tríade do Fluxo A nem a baixa do adiantamento do Fluxo B.
+
+| # | Fase | Estado |
+|---|---|---|
+| 1 | Recebimento e atesto | ✅ **mesclada em `main` em 14/08** (`9c997bf8`) |
+| 2 | Financeiro em dois fluxos | ✅ **F1-F7 completas**, em `feat/financeiro-dois-fluxos` |
+| 3 | Alçadas (as 4 condições, anti-fracionamento, emergência 48h, corte de 3 cotações) | ⬜ sem spec |
+| 4 | Status unificado (régua de 9 etapas) | ⬜ sem spec |
+| 5 | Relatórios (os 5) | ⬜ sem spec |
+
+**Fase 1** entregou o conserto de uma dupla escrita: havia **dois** pontos dando
+entrada de estoque para o mesmo pedido, e o material que chegava na obra não era
+registrado em lugar nenhum. Agora o estoque nasce do atesto. 23 commits (R1-R7 +
+as correções C1-C9 da revisão de 12/08), migrations **283/284/285**, flag
+`recebimento_atesto_ativo` (nasce OFF). 🔬 14/08: 110 testes verdes.
+
+**Fase 2** fez a obrigação nascer do que chegou. Até aqui `compras_views.py:305`
+criava a `ContaPagar` **na emissão do pedido** — sem material, sem nota, sem
+conferente — e o `valor_atestado` que a Fase 1 produziu não era lido por
+ninguém. Migrations **287/288/289 e 296**, flag `financeiro_dois_fluxos_ativo`
+(nasce OFF, e o `--ligar` **recusa tenant sem `recebimento_atesto_ativo`**).
+🔬 14/08: 35 testes da fase verdes; gate de ciclo em dev com 24 conferências por
+SQL cru, zero falhas.
+
+> 📖 **Duas decisões que divergem do spec e estão registradas nele.**
+> (1) `pagar_conta` ficou com **uma** porta (`situacao_liberacao`), não duas: o
+> spec previa exigir também lote `FECHADO`, mas duas guardas no mesmo ponto
+> recusariam o mesmo pagamento por dois motivos e dobrariam as formas de o
+> usuário travar — fechar o lote é justamente o que muda a situação para
+> `liberada`. (2) A segregação "quem monta o lote não o fecha" só é **exigida
+> quando os dois lados são conhecidos**: lote anterior à migration 296 não tem
+> `criado_por_id`, e exigir com um lado ausente travaria todo lote histórico.
+
+> ⚠️ **Armadilhas para quem retomar o ciclo de compras.**
+> (1) As duas flags são **encadeadas**: `financeiro_dois_fluxos_ativo` depende de
+> `recebimento_atesto_ativo`, que por sua vez convive com
+> `compras_governanca_ativa` (que depende de `escopo_obra_ativo`). Ligar fora de
+> ordem produz conta bloqueada sem caminho para liberar.
+> (2) **Nenhuma delas está ligada em tenant real** — 🔬 14/08, no banco de dev:
+> `compras_governanca_ativa` ON em 250 tenants, **todos fixture `@test.local`**.
+> (3) O regime é **carimbado na linha** (`exige_atesto`, `fluxo_pagamento`):
+> desligar a flag não reescreve pedido já emitido, de propósito.
+> (4) Migration **296 e não 290** — 290-295 é faixa da Fase 8, 300-307 da Fase 9.
+
+> 🔴 **Falha intermitente não explicada, aberta em 14/08.**
+> `test_recebimento_atesto.py::test_rota_de_exclusao_repassa_a_recusa_do_servico`
+> falha em ~metade das corridas da **seleção larga** do gate e passa em toda
+> seleção menor (isolado; Fase 1 + Fase 2 = 141 passed; b5/b6 + Fase 1 = 140
+> passed). Quatro corridas idênticas deram falha/passa/falha/passa. **A causa
+> raiz não foi determinada.** O assert do teste passou a carregar o número de
+> recebimentos do pedido justamente para que a próxima ocorrência distinga as
+> duas hipóteses — segundo POST não gravou, ou a primeira porta de
+> `excluir_recebimento` recusou por permissão — que hoje dão o mesmo sintoma.
+
+
 ## O plano aprovado
 
 | Fase | Conteúdo | Estado | Plano |
@@ -612,7 +677,12 @@ Todos em `docs/superpowers/plans/2026-07-21-*`. Faixas de migration reservadas
 sem colisão: 214-216 (F1), 220-221 (F1.5), 230-232 (F2), 240-247 (F3),
 250-254 (F4), 260-264 (F5), **271-276 (F6 — ver abaixo, era 270-276)**,
 280-283 (F7), 290-295 (F8), 300-307 (F9). A **Fase 0.6 usou 217-219**, fora de
-todas as faixas. 📖 03/08: **maior registrada em `migrations.py` é a 278**.
+todas as faixas. ~~📖 03/08: **maior registrada em `migrations.py` é a 278**.~~
+📖 14/08: a maior é a **296**. O ciclo de compras consumiu, fora de faixa
+reservada: **283-285** (Fase 1 — recebimento e atesto), **286** (timbre dos
+PDFs), **287-289** e **296** (Fase 2 — financeiro em dois fluxos). A 296 pulou
+o vão 290-295 de propósito: é faixa da Fase 8. 🔬 14/08: `migration_history` do
+dev bate com o código — nada entre 290 e 307 foi aplicado.
 
 > 🔴 **O número 270 está QUEIMADO — a Fase 6 começa em 271.** 🔬 03/08: a
 > mesma migração do editor v2 está gravada `success` sob **dois números** no

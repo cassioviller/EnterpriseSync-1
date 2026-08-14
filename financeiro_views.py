@@ -488,6 +488,38 @@ def pagar_conta(conta_id):
         flash(_msg, 'warning')
         return redirect(url_for('financeiro.listar_contas_pagar'))
 
+    # ── Fase 2 do ciclo de compras — a tríade barra a baixa ──────────────
+    #
+    # Conta `bloqueada` é conta de compra do Fluxo A cuja tríade ainda não
+    # fechou: falta a nota, falta o atesto, ou faltam as duas. Fora do regime
+    # novo NENHUMA conta é bloqueada (default 'liberada'), então este bloco é
+    # inerte para quem não ligou a flag — é o que o teste de paridade mede.
+    #
+    # A mensagem NOMEIA a perna que falta, e isso não é cortesia: recusar sem
+    # dizer o que falta é o que faz o usuário procurar o caminho de fora do
+    # sistema. `pernas_faltantes` é a mesma função que a tela consome.
+    #
+    # ⚠️ Fica AQUI — antes do `if POST` e FORA do try — pelo motivo que a B5.1
+    # documenta acima: `abort()` (ou qualquer levantada) dentro daquele try é
+    # capturado pelo `except Exception` e vira 200 com 'Erro ao registrar
+    # pagamento'. A recusa viraria erro genérico e ninguém saberia da nota.
+    if (getattr(conta, 'situacao_liberacao', 'liberada') == 'bloqueada'
+            and request.method == 'POST'):
+        from models import PedidoCompra
+        from services.financeiro_compra import pernas_faltantes
+        pedido = (db.session.get(PedidoCompra, conta.pedido_compra_id)
+                  if conta.pedido_compra_id else None)
+        faltam = pernas_faltantes(pedido) if pedido else []
+        detalhe = ('; '.join(faltam) if faltam
+                   else 'a liberação ainda não foi registrada')
+        logger.warning(
+            "⚠️ [Fase 2] baixa RECUSADA — ContaPagar %s bloqueada (%s)",
+            conta.id, detalhe)
+        flash(f'Esta conta ainda não foi liberada para pagamento: {detalhe}. '
+              f'Complete a tríade (pedido, nota e atesto) e libere antes de '
+              f'dar baixa.', 'warning')
+        return redirect(url_for('financeiro.listar_contas_pagar'))
+
     if request.method == 'POST':
         try:
             valor_pago = Decimal(request.form.get('valor_pago'))
