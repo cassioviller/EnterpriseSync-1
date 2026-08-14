@@ -6305,6 +6305,38 @@ def _migration_285_saida_do_atesto():
                 "atesto, para o estorno saber o que desfazer).")
 
 
+def _migration_286_timbre_pdf():
+    """`configuracao_empresa.timbre_pdf` — a identidade dos PDFs, em JSON.
+
+    O cabeçalho dos PDFs vinha de dois lugares e nenhum era editável de ponta a
+    ponta: texto e logo de campos soltos desta tabela, e cores de constantes no
+    código, iguais para todo tenant. Esta coluna guarda o JSON versionado que a
+    tela de Configurações importa e exporta (`services/timbre_pdf`).
+
+    NULL = tenant nunca importou, e aí `carregar()` cai nos campos soltos e,
+    na falta deles, nos tokens do kit oficial. É o que torna a coluna aditiva:
+    ninguém muda de comportamento por ela existir.
+
+    Alocação do número: **286**, e não 283. Quando esta migration foi escrita,
+    a faixa 283-285 já estava tomada pela branch `feat/recebimento-atesto`,
+    que ainda não tinha sido mesclada em `main` — conferir antes de fixar é a
+    lição da B6.1, repetida na R1 do plano de compras, e aqui ela apareceu de
+    novo: `main` terminava em 282 e o número "livre" seria 283, que colidiria
+    no dia do merge. (Este merge é aquele dia, e não houve colisão.)
+
+    Idempotente por `IF NOT EXISTS`. `jsonb` e não `json`: o Postgres compara e
+    indexa jsonb, e a diferença de custo na escrita é irrelevante para uma
+    linha por tenant.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+            "timbre_pdf JSONB"))
+    logger.info("[Migration 286] configuracao_empresa.timbre_pdf criada "
+                "(timbre dos PDFs por tenant, importável por JSON).")
+
+
 def _migration_282_backfill_dropdown_crm():
     """D-CRM.1 — o backfill que a 174 pulou: grupo de dropdown para TODO
     tenant com dado nas tabelas legadas `crm_*`.
@@ -6664,6 +6696,7 @@ def executar_migracoes():
             (283, "Fase 4 — recebimento_pedido + recebimento_pedido_item; pedido_compra.exige_atesto (regime carimbado na linha) e situacao_recebimento", _migration_283_recebimento_atesto),
             (284, "Fase 4 — configuracao_empresa.recebimento_atesto_ativo: a virada do recebimento é por tenant (default FALSE)", _migration_284_flag_recebimento_atesto),
             (285, "Fase 4/C2 — recebimento_pedido_item.almoxarifado_saida_movimento_id: a saída de consumo pareada do atesto, para o estorno saber o que desfazer", _migration_285_saida_do_atesto),
+            (286, "Timbre dos PDFs — configuracao_empresa.timbre_pdf (JSONB): logo, dados da empresa e cores num JSON importável pela tela", _migration_286_timbre_pdf),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

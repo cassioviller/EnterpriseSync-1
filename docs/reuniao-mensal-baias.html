@@ -1,0 +1,851 @@
+<title>Pauta Mensal Baias Kabod</title>
+
+<style>
+  :root {
+    --ground: #ECEEEF;
+    --surface: #FBFBFA;
+    --surface-2: #E3E6E7;
+    --ink: #15181B;
+    --ink-2: #4E5A63;
+    --ink-3: #78848C;
+    --rule: #CFD5D8;
+    --rule-soft: #DFE3E5;
+    --accent: #2C5A6B;
+    --hot: #9E3527;
+    --hot-bg: #F2DFDB;
+    --good-ink: #2F5A3E;
+    --good-bg: #DDE7DE;
+    --warn-ink: #7A5C13;
+    --warn-bg: #EFE5C9;
+
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #121517;
+      --surface: #191D20;
+      --surface-2: #232A2E;
+      --ink: #E6EAEC;
+      --ink-2: #9CA8B0;
+      --ink-3: #77848C;
+      --rule: #2C3439;
+      --rule-soft: #232A2E;
+      --accent: #79ADBE;
+      --hot: #E2897A;
+      --hot-bg: #35211D;
+      --good-ink: #92C4A2;
+      --good-bg: #1D2C22;
+      --warn-ink: #D2B25E;
+      --warn-bg: #2E2716;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #121517;
+    --surface: #191D20;
+    --surface-2: #232A2E;
+    --ink: #E6EAEC;
+    --ink-2: #9CA8B0;
+    --ink-3: #77848C;
+    --rule: #2C3439;
+    --rule-soft: #232A2E;
+    --accent: #79ADBE;
+    --hot: #E2897A;
+    --hot-bg: #35211D;
+    --good-ink: #92C4A2;
+    --good-bg: #1D2C22;
+    --warn-ink: #D2B25E;
+    --warn-bg: #2E2716;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 940px; margin: 0 auto; }
+
+  /* ── Cabeçalho ───────────────────────────────────────────── */
+  .top {
+    display: flex; flex-direction: column; gap: 18px;
+    padding: 56px 0 30px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .72rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin: 0;
+  }
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(2.1rem, 6vw, 3.1rem);
+    font-weight: 750; letter-spacing: -.03em; line-height: 1.02;
+    margin: 0; text-wrap: balance;
+  }
+  .dek {
+    font-size: 1.06rem; color: var(--ink-2); margin: 0;
+    max-width: 62ch;
+  }
+
+  .meta {
+    display: grid; gap: 1px;
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    background: var(--rule-soft);
+    border: 1px solid var(--rule-soft);
+    margin-top: 6px;
+  }
+  .meta div { background: var(--surface); padding: 13px 15px; }
+  .meta dt {
+    font-family: var(--mono); font-size: .66rem; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-3); margin: 0 0 3px;
+  }
+  .meta dd {
+    font-family: var(--sans); font-size: 1.02rem; font-weight: 650;
+    letter-spacing: -.01em; margin: 0; font-variant-numeric: tabular-nums;
+  }
+  .meta dd small { font-weight: 450; color: var(--ink-2); font-size: .8rem; }
+
+  /* ── Índice ──────────────────────────────────────────────── */
+  .index {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 22px 0 0; margin: 0 0 8px; list-style: none;
+  }
+  .index a {
+    display: inline-block;
+    font-family: var(--mono); font-size: .74rem; letter-spacing: .04em;
+    text-decoration: none; color: var(--ink-2);
+    border: 1px solid var(--rule); padding: 6px 11px;
+  }
+  .index a:hover, .index a:focus-visible { color: var(--ink); border-color: var(--ink-2); }
+
+  /* ── Seções ──────────────────────────────────────────────── */
+  section { padding-top: 54px; scroll-margin-top: 16px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  h2 {
+    font-family: var(--sans); font-size: 1.62rem; font-weight: 700;
+    letter-spacing: -.022em; margin: 0; text-wrap: balance;
+  }
+  .sec-count {
+    font-family: var(--mono); font-size: .72rem; color: var(--ink-3);
+    letter-spacing: .06em;
+  }
+  .sec-note {
+    color: var(--ink-2); font-size: .97rem; margin: 0 0 22px;
+    max-width: 66ch; border-left: 2px solid var(--accent); padding-left: 14px;
+  }
+
+  .items { display: flex; flex-direction: column; gap: 1px; background: var(--rule-soft);
+           border-top: 1px solid var(--rule-soft); border-bottom: 1px solid var(--rule-soft); }
+  .item {
+    background: var(--surface);
+    display: grid; grid-template-columns: 108px 1fr; gap: 0 22px;
+    padding: 20px 18px;
+  }
+  .stamp {
+    font-family: var(--mono); font-size: .72rem; line-height: 1.5;
+    color: var(--ink-3); letter-spacing: .02em;
+    font-variant-numeric: tabular-nums;
+    display: flex; flex-direction: column; gap: 3px; padding-top: 4px;
+  }
+  .stamp b { color: var(--accent); font-weight: 600; }
+  .item h3 {
+    font-family: var(--sans); font-size: 1.03rem; font-weight: 660;
+    letter-spacing: -.012em; margin: 0 0 6px; line-height: 1.35;
+  }
+  .item p { margin: 0 0 8px; color: var(--ink-2); font-size: .98rem; }
+  .item p:last-child { margin-bottom: 0; }
+  .item strong { color: var(--ink); font-weight: 600; }
+
+  .chip {
+    display: inline-block; font-family: var(--mono); font-size: .64rem;
+    letter-spacing: .09em; text-transform: uppercase; font-weight: 600;
+    padding: 3px 8px; margin-left: 8px; vertical-align: 2px;
+    background: var(--surface-2); color: var(--ink-2);
+  }
+  .chip.hot { background: var(--hot-bg); color: var(--hot); }
+  .chip.warn { background: var(--warn-bg); color: var(--warn-ink); }
+  .chip.good { background: var(--good-bg); color: var(--good-ink); }
+
+  /* ── Linha do tempo do cocho ─────────────────────────────── */
+  .tl {
+    background: var(--surface); border: 1px solid var(--rule-soft);
+    padding: 22px 20px; margin-top: 20px;
+  }
+  .tl h4 {
+    font-family: var(--sans); font-size: .95rem; font-weight: 680;
+    margin: 0 0 4px; letter-spacing: -.01em;
+  }
+  .tl > p { margin: 0 0 16px; color: var(--ink-2); font-size: .92rem; }
+  .tl ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .tl li {
+    display: grid; grid-template-columns: 62px 1fr; gap: 16px;
+    padding: 9px 0 9px 0; border-top: 1px solid var(--rule-soft);
+    font-size: .93rem; color: var(--ink-2);
+  }
+  .tl li:first-child { border-top: 0; }
+  .tl li span {
+    font-family: var(--mono); font-size: .74rem; color: var(--accent);
+    font-variant-numeric: tabular-nums; padding-top: 2px;
+  }
+  .tl li.mark { color: var(--ink); font-weight: 600; }
+  .tl li.mark span { color: var(--hot); }
+  .tl-foot {
+    margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--rule);
+    font-size: .93rem; color: var(--ink-2);
+  }
+
+  /* ── Rodapé ──────────────────────────────────────────────── */
+  .foot {
+    margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--rule);
+    font-size: .87rem; color: var(--ink-3);
+  }
+  .foot code {
+    font-family: var(--mono); font-size: .85em;
+    background: var(--surface-2); padding: 1px 5px; color: var(--ink-2);
+  }
+
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 620px) {
+    body { font-size: 16px; padding: 0 16px 72px; }
+    .item { grid-template-columns: 1fr; gap: 10px; padding: 18px 15px; }
+    .stamp { flex-direction: row; flex-wrap: wrap; gap: 10px; padding-top: 0; }
+    .tl li { grid-template-columns: 1fr; gap: 2px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <p class="eyebrow">Reunião mensal · Veks Engenharia</p>
+    <h1>Baias Kabod</h1>
+    <p class="dek">
+      Pontos levantados a partir dos 42 RDOs da obra, de 22/06 a 11/08. Cada item traz a data
+      do relatório que o sustenta — nada aqui é impressão, tudo tem dia e registro.
+    </p>
+    <dl class="meta">
+      <div><dt>Período</dt><dd>22/06 → 11/08</dd></div>
+      <div><dt>RDOs</dt><dd>42 <small>· 186 fotos</small></dd></div>
+      <div><dt>Fim contratual</dt><dd>05/10/2026</dd></div>
+      <div><dt>Cronograma vigente</dt><dd>20/10/2026 <small>· +15 d</small></dd></div>
+      <div><dt>Contrato</dt><dd>R$ 1.505.613,76</dd></div>
+    </dl>
+  </header>
+
+  <ul class="index">
+    <li><a href="#melhorar">01 Pontos a melhorar</a></li>
+    <li><a href="#visao">02 Visão / Alinhamento</a></li>
+    <li><a href="#quentes">03 Pautas quentes</a></li>
+    <li><a href="#licao">04 Lição aprendida</a></li>
+    <li><a href="#dificuldades">05 Dificuldades</a></li>
+    <li><a href="#campo">06 O que o escritório não vê</a></li>
+  </ul>
+
+  <!-- ═══ 01 ═══════════════════════════════════════════════ -->
+  <section id="melhorar">
+    <div class="sec-head">
+      <h2>Pontos a melhorar</h2>
+      <span class="sec-count">6 itens · o que está na nossa mão</span>
+    </div>
+    <p class="sec-note">
+      Tudo aqui depende só da Veks. São falhas de registro que custam informação — e informação
+      perdida no RDO é argumento perdido quando o pleito chega.
+    </p>
+
+    <div class="items">
+
+      <article class="item">
+        <div class="stamp"><b>42 de 42</b><span>todos os dias</span></div>
+        <div>
+          <h3>O efetivo não entra no sistema, só no texto</h3>
+          <p>
+            Os 42 RDOs têm mão de obra <strong>zerada</strong> no cadastro. O efetivo existe apenas
+            na frase de abertura do relatório — "Efetivo: 05 colaboradores". Sem o dado estruturado
+            não há homem-hora, produtividade por etapa nem custo de mão de obra por frente.
+          </p>
+          <p>
+            E a variação é grande: de <strong>02 pessoas</strong> (04/07, 08 e 09/08) a
+            <strong>11</strong> (11/08). É exatamente o número que ninguém consegue consultar hoje.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>36 de 42</b><span>desde 28/06</span></div>
+        <div>
+          <h3>O clima parou de ser preenchido</h3>
+          <p>
+            36 RDOs estão com clima "Não informado" — o último dia com registro real foi
+            <strong>27/06</strong>. E chuva não é detalhe nesta obra: parou a terraplenagem em
+            23, 24 e 25/06, e em <strong>24/07</strong> foi a causa direta de retrabalho
+            (as valas desestabilizaram e exigiram caixaria de contenção não prevista).
+          </p>
+          <p>Sem clima no relatório, um pleito por dia parado não se prova.</p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>20/07</b><b>09/08</b></div>
+        <div>
+          <h3>Dias trabalhados sem apontamento de avanço</h3>
+          <p>
+            Dois RDOs descrevem serviço executado mas não apontam percentual em nenhuma tarefa —
+            10 sapatas armadas e o enchimento das valas de esgoto em 20/07; o rebaixo de todas as
+            baias do Galpão A em 09/08. Trabalho feito que não aparece na curva física.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>22–29/06</b><span>8 dias</span></div>
+        <div>
+          <h3>O início da obra não tem foto</h3>
+          <p>
+            Os oito primeiros RDOs não têm imagem alguma. Justamente os dias de topografia, chuva e
+            nivelamento dos platôs — a fase que hoje seria a prova do estado do terreno recebido.
+            De 30/06 em diante o registro é forte: <strong>186 fotos</strong> no acumulado.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>17/07</b><b>→ 27/07</b></div>
+        <div>
+          <h3>Prazo dado ao cliente venceu sem cobrança formal</h3>
+          <p>
+            O relatório com os cinco cenários de continuidade foi encaminhado ao Eng. Gustavo em
+            17/07, e o RDO de 27/07 registra que a proposta tinha <strong>validade de 10 dias</strong>.
+            O prazo venceu e a decisão só veio em 27/07 — sem nenhum registro de escalonamento
+            no dia do vencimento.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>10–11/08</b><span>São José</span></div>
+        <div>
+          <h3>A segunda frente entrou como observação</h3>
+          <p>
+            A painelização em LSF começou no galpão de São José dos Campos, mas o RDO trazia só uma
+            linha de observação — sem efetivo nominal nem produtividade. Corrigido no dia 11
+            (Roger e Evandro; 6 painéis P4, 525 kg). <strong>A partir de agora as duas frentes
+            fecham no mesmo relatório.</strong>
+          </p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ═══ 02 ═══════════════════════════════════════════════ -->
+  <section id="visao">
+    <div class="sec-head">
+      <h2>Visão / Alinhamento com integrantes</h2>
+      <span class="sec-count">5 pontos · todo mundo tem que saber</span>
+    </div>
+    <p class="sec-note">
+      O que mudou na obra e precisa estar na cabeça de quem executa — não só de quem acompanha.
+    </p>
+
+    <div class="items">
+
+      <article class="item">
+        <div class="stamp"><b>30/07</b></div>
+        <div>
+          <h3>O projeto do contrato não é mais o projeto vigente</h3>
+          <p>
+            A projetista emitiu a revisão estrutural das fundações no fim do expediente de 30/07,
+            contemplando os cochos em alvenaria. <strong>Quem estiver executando por cópia antiga
+            está executando errado.</strong> Vale conferir prancha por prancha na frente.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>27/07</b><span>40 → 700</span></div>
+        <div>
+          <h3>Não foi mudança de acabamento, foi mudança de estrutura</h3>
+          <p>
+            Com a opção pela alvenaria, a carga do cocho passou de ~40 kg/m linear (estimativa da
+            projetista de LSF) para <strong>~700 kg/m</strong> — 17 vezes mais. Daí vieram 22 brocas
+            novas, o reforço das vigas transversais e as lajes de reforço executadas entre 04 e 11/08.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>desde 10/08</b></div>
+        <div>
+          <h3>Duas frentes, dois endereços</h3>
+          <p>
+            Campo em Itu e painelização LSF no galpão da Veks em São José dos Campos. São equipes,
+            ritmos e riscos diferentes rodando no mesmo cronograma — e a produção da fábrica é hoje
+            o único caminho de avanço quando o campo trava por material ou decisão.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>4 terceiros</b></div>
+        <div>
+          <h3>Quem decide e quem libera não está no nosso organograma</h3>
+          <p>
+            <strong>Grupo Mônica</strong> decide (foi quem definiu o cocho),
+            <strong>Kabod / Eng. Gustavo</strong> intermedia,
+            <strong>Fort / Eng. Ana Luísa</strong> fiscaliza e libera,
+            <strong>AJR</strong> — contratada da Fazenda — executa a terraplenagem.
+            A Veks depende dos quatro para abrir frente, e não gerencia nenhum deles.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>05/10</b><b>→ 20/10</b></div>
+        <div>
+          <h3>O cronograma vigente já passa da data contratual</h3>
+          <p>
+            Contrato termina em 05/10; o cronograma replanejado em 12/08 termina em
+            <strong>20/10 — 15 dias além</strong>. O contrato prevê multa moratória de 0,03% ao dia
+            com teto de 0,3%, ou seja, cerca de <strong>R$ 4.517</strong>, teto que se atinge com
+            10 dias de atraso. Todo pleito de prorrogação precisa estar documentado antes disso.
+          </p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ═══ 03 ═══════════════════════════════════════════════ -->
+  <section id="quentes">
+    <div class="sec-head">
+      <h2>Pautas quentes</h2>
+      <span class="sec-count">7 itens · abertos hoje</span>
+    </div>
+    <p class="sec-note">
+      Pendências que o último RDO ainda registra como não resolvidas. Cada uma precisa sair da
+      reunião com dono e data.
+    </p>
+
+    <div class="items">
+
+      <article class="item">
+        <div class="stamp"><b>11/08</b></div>
+        <div>
+          <h3>Rachão não entregue <span class="chip hot">bloqueio</span></h3>
+          <p>
+            A escavação das valas de drenagem das baias foi <strong>100% concluída</strong> em 11/08 —
+            e a primeira camada drenante não pôde começar porque o rachão não havia sido
+            disponibilizado na obra. Frente pronta parada esperando material.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>11/08</b></div>
+        <div>
+          <h3>Parecer técnico pendente de assinatura <span class="chip warn">em aberto</span></h3>
+          <p>
+            A Eng. Ana Luísa pediu brocas de reforço e concreto magro antes das armações; a Veks
+            propôs sequência alternativa, o projetista concordou e o parecer foi elaborado —
+            mas segue <strong>sem assinatura do calculista</strong>. Executar sem o documento
+            assinado é assumir o risco sozinho.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>29/07</b><b>30/07</b></div>
+        <div>
+          <h3>O pleito da alvenaria nunca foi fechado <span class="chip hot">dinheiro</span></h3>
+          <p>
+            Em 29/07 o RDO registra que os impactos financeiros e de prazo só poderiam ser medidos
+            após a revisão do projeto. A revisão chegou em <strong>30/07</strong> — e nenhum RDO
+            posterior registra o levantamento fechado nem a apresentação ao cliente. As 22 brocas
+            novas e os reforços já foram executados.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>14/07</b><b>15/07</b></div>
+        <div>
+          <h3>Medição pendente travando a cobertura <span class="chip hot">dinheiro</span></h3>
+          <p>
+            Dois RDOs seguidos registram que a medição não paga impedia a compra dos materiais da
+            estrutura metálica da cobertura — e que a fabricação, que deveria correr em paralelo ao
+            campo, não começou por isso. <strong>Confirmar se destravou.</strong>
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>13/07</b></div>
+        <div>
+          <h3>Pagamento das chapas-base <span class="chip warn">verificar</span></h3>
+          <p>
+            Registrado como pendente e necessário para a fabricação dos dispositivos de travamento
+            antes da concretagem das vigas baldrame. A entrega das chapas foi apontada em 17/07 e
+            31/07 — vale confirmar que o pagamento saiu.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>03/08</b></div>
+        <div>
+          <h3>Nova verificação estrutural pedida pela Fort <span class="chip warn">sem retorno</span></h3>
+          <p>
+            A Eng. Ana Luísa pediu nova verificação do projeto de fundação tomando o bezerreiro como
+            referência, para confirmar que as fundações revisadas atendem às novas cargas.
+            Nenhum RDO posterior registra a resposta.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>24/07</b></div>
+        <div>
+          <h3>Estrada de acesso com risco de atolamento <span class="chip warn">sem solução</span></h3>
+          <p>
+            Comunicado à Fort: um trecho da via, mexido pelas obras de estrada da própria Fazenda,
+            ficou instável e oferece risco de atolamento para caminhões de material e equipamento.
+            Sem registro de solução até hoje — e a obra vai entrar em fase de concretagem pesada.
+          </p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ═══ 04 ═══════════════════════════════════════════════ -->
+  <section id="licao">
+    <div class="sec-head">
+      <h2>Lição aprendida</h2>
+      <span class="sec-count">6 lições · 3 boas, 3 caras</span>
+    </div>
+    <p class="sec-note">
+      A obra ensinou mais em 19 dias de indefinição do que em dois meses de execução. Vale
+      transformar pelo menos as três primeiras em procedimento.
+    </p>
+
+    <div class="items">
+
+      <article class="item">
+        <div class="stamp"><b>08/07</b><b>→ 27/07</b></div>
+        <div>
+          <h3>Indefinição do cliente é risco de cronograma e precisa de rito</h3>
+          <p>
+            Dezenove dias entre o primeiro bloqueio e a decisão. Faltou o que nenhum dos lados tinha:
+            um rito com prazo, consequência escrita e escalonamento automático no vencimento.
+            <strong>Proposta: toda pendência de decisão do cliente vira item com data-limite e
+            impacto declarado no próprio RDO.</strong>
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>21–23/07</b></div>
+        <div>
+          <h3>Protótipo antes da decisão pode virar custo perdido</h3>
+          <p>
+            O protótipo de 2,0 m do cocho em LSF foi fabricado (21 e 22/07), recebeu duas demãos de
+            Basecoat e foi transportado e instalado na Fazenda em 23/07. Em 24/07 a reunião de
+            avaliação foi cancelada; em 27/07 o Grupo Mônica escolheu <strong>alvenaria</strong>.
+            Protótipo só depois de reduzir as opções — ou com compromisso de decisão vinculado.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>27/07</b></div>
+        <div>
+          <h3>Traduzir a escolha do cliente em carga antes de oferecer a opção</h3>
+          <p>
+            As duas alternativas foram apresentadas como sistema construtivo. Só depois da escolha
+            apareceu que uma pesa 17× mais que a outra e obriga a refazer a verificação das vigas
+            longitudinais e dos blocos. <strong>Toda opção oferecida ao cliente deveria sair com o
+            número de carga, custo e prazo ao lado.</strong>
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>24/07</b><span class="chip good">acerto</span></div>
+        <div>
+          <h3>Decidir não parar foi a decisão certa</h3>
+          <p>
+            Em reunião interna, a engenharia definiu seguir pelo projeto aprovado em contrato para
+            evitar a paralisação, avaliando retrabalho depois. Manteve 5 a 6 pessoas produzindo
+            durante toda a indefinição — calçadas, esgoto das 22 baias, sapatas dos troncos.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>05/08</b><span class="chip good">padrão</span></div>
+        <div>
+          <h3>Escavar a drenagem antes de concretar</h3>
+          <p>
+            Definido na reunião com Kabod, Fort e Grupo Mônica: a escavação das valas de drenagem
+            passa a vir <strong>antes</strong> da concretagem das vigas baldrame e das calçadas,
+            para eliminar risco de trinca por vibração do equipamento. Regra que merece virar padrão
+            executivo da empresa, não só desta obra.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>03/07</b><b>24/07</b><span class="chip good">acerto</span></div>
+        <div>
+          <h3>O controle técnico funcionou — e é o que sustenta a obra hoje</h3>
+          <p>
+            Rocha na broca B1 aos 1,50 m dos 3,00 m previstos: comunicado ao projetista no mesmo dia
+            e resolvido com furo lateral atingindo os 3 m. Concretagem com slump de 16 cm dentro da
+            faixa (14 ± 2), 6 corpos de prova por caminhão, e o rompimento confirmando o fck já aos
+            7 dias. Isso é o que responde qualquer questionamento de qualidade.
+          </p>
+        </div>
+      </article>
+
+    </div>
+
+    <div class="tl">
+      <h4>O caso do cocho, dia a dia</h4>
+      <p>A sequência que custou 19 dias — vale ler em voz alta na reunião.</p>
+      <ol>
+        <li class="mark"><span>08/07</span>Concreto magro das vigas transversais suspenso: aguarda definição alvenaria × LSF.</li>
+        <li><span>10/07</span>Primeiro registro de impacto em cronograma: sem a decisão, não há posicionamento definitivo das vigas.</li>
+        <li><span>13/07</span>Concretagem da 1ª etapa adiada para 22/07. Avisado ao cliente: há serviço só até 20/07.</li>
+        <li><span>14/07</span>Previsão de entrega recua uma semana, para 13/10.</li>
+        <li><span>17/07</span>Relatório técnico com cinco cenários enviado ao Eng. Gustavo.</li>
+        <li><span>21–23/07</span>Protótipo do cocho em LSF fabricado e instalado na Fazenda.</li>
+        <li><span>24/07</span>Reunião de avaliação cancelada. Engenharia decide seguir pelo projeto aprovado para não parar.</li>
+        <li class="mark"><span>27/07</span>Grupo Mônica define: alvenaria. Carga passa de ~40 para ~700 kg/m linear.</li>
+        <li><span>30/07</span>Projetista emite a revisão estrutural das fundações.</li>
+        <li><span>04–11/08</span>22 brocas novas, reforços das transversais e lajes executados.</li>
+      </ol>
+      <p class="tl-foot">
+        Do bloqueio à decisão: <strong>19 dias</strong>. Da decisão ao projeto revisado: 3 dias.
+        O gargalo não foi técnico.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ 05 ═══════════════════════════════════════════════ -->
+  <section id="dificuldades">
+    <div class="sec-head">
+      <h2>Dificuldades</h2>
+      <span class="sec-count">6 frentes · quase todas externas</span>
+    </div>
+    <p class="sec-note">
+      O padrão salta aos olhos quando se lê os 42 dias em sequência: quase tudo que atrasou esta
+      obra veio de fora do canteiro.
+    </p>
+
+    <div class="items">
+
+      <article class="item">
+        <div class="stamp"><b>23–25/06</b><b>24/07</b></div>
+        <div>
+          <h3>Chuva</h3>
+          <p>
+            Chuva forte impediu a terraplenagem em três dias seguidos de junho — a AJR precisava de
+            cerca de <strong>2 dias de estiagem</strong> para entrar com equipamento, e o terreno
+            seguia saturado em 26/06. Em julho, a chuva voltou como custo: instabilidade nas valas
+            escavadas obrigou a executar caixaria de contenção, com mais material, mais mão de obra
+            e mais prazo.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>03/08</b><b>04/08</b></div>
+        <div>
+          <h3>Um dia inteiro sem energia</h3>
+          <p>
+            Rompimento de cabos causado pela obra das estradas da própria Fazenda deixou o canteiro
+            sem energia o dia todo em 03/08. O fornecimento só voltou às <strong>14h de 04/08</strong>,
+            comprometendo também a manhã seguinte.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>24/06</b><b>30/06</b></div>
+        <div>
+          <h3>Infraestrutura provisória na mão da Fazenda</h3>
+          <p>
+            Energia e água por galpão, containers, caçamba, banheiro químico — tudo dependente de
+            terceiros e cobrado de forma repetida nos relatórios, incluindo substituição de caçamba
+            e higienização do banheiro. Obra que começa sem infra própria começa negociando.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>04/08</b><b>08/08</b></div>
+        <div>
+          <h3>Terceiros fora do nosso controle</h3>
+          <p>
+            A AJR não conseguiu iniciar a escavação das novas brocas e valas na data programada,
+            empurrando para o dia seguinte. No sábado 08/08, o equipamento tipo PC só foi
+            disponibilizado às <strong>10h</strong> — meio turno perdido num dia comprado para
+            recuperar cronograma.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>03/07</b></div>
+        <div>
+          <h3>Geologia</h3>
+          <p>
+            Formação rochosa na broca do bloco B1: a perfuração parou em ~1,50 m dos 3,00 m
+            previstos. Resolvido com furo lateral, mas custou relocação do bloco de coroamento e
+            reforço do aço na borda da viga.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>13/07</b><b>14/07</b><b>15/07</b></div>
+        <div>
+          <h3>Decisão que mora longe do canteiro</h3>
+          <p>
+            Três RDOs seguidos encerram com a mesma frase: permanece pendente o retorno da Fort
+            sobre a cota das chapas-base. A obra parou de avançar naquela frente esperando uma
+            resposta que não dependia de ninguém em campo.
+          </p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ═══ 06 ═══════════════════════════════════════════════ -->
+  <section id="campo">
+    <div class="sec-head">
+      <h2>O que o escritório não vê do campo</h2>
+      <span class="sec-count">7 achados · só aparecem lendo os 42 dias</span>
+    </div>
+    <p class="sec-note">
+      Nenhum destes aparece em curva S, medição ou relatório gerencial. Todos estão no RDO —
+      e é por isso que ele existe.
+    </p>
+
+    <div class="items">
+
+      <article class="item">
+        <div class="stamp"><b>02 a 11</b><span>efetivo</span></div>
+        <div>
+          <h3>O efetivo é elástico, e a média mente</h3>
+          <p>
+            04/07: dois operadores de máquina, mais ninguém. 11/08: onze pessoas, encarregado,
+            operador de PC e dois montadores em São José. <strong>O dia de duas pessoas é dia de
+            frente travada</strong> — e no relatório mensal ele desaparece dentro de uma média.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>27–28/06</b><b>08–09/08</b></div>
+        <div>
+          <h3>Fim de semana trabalhado não aparece em lugar nenhum</h3>
+          <p>
+            Quatro dias de fim de semana com serviço: a terraplenagem do Galpão B em junho e o
+            rebaixo de 20 cm de todas as baias em agosto — este com <strong>dois colaboradores da
+            Kabod acompanhando</strong>, porque a equipe da Fazenda não trabalha no sábado.
+            Esforço que nenhum indicador de produtividade registra.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>01/07</b><b>08/08</b></div>
+        <div>
+          <h3>As paradas curtas somem</h3>
+          <p>
+            Escavação parada das <strong>12h30 às 14h30</strong> a pedido da Fort, para alinhar
+            procedimento executivo. Equipamento liberado só às 10h num sábado. São horas que não
+            entram em lugar nenhum e que, somadas, explicam boa parte da diferença entre o previsto
+            e o realizado.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>24/07</b></div>
+        <div>
+          <h3>Retrabalho que não estava no orçamento</h3>
+          <p>
+            A caixaria de contenção das valas não é etapa de projeto — nasceu da chuva.
+            Consumiu material, mão de obra e prazo, e só existe como uma frase numa observação de
+            RDO. Ninguém vai encontrá-la procurando na planilha de custos.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>01/07</b><b>11/08</b></div>
+        <div>
+          <h3>Quem manda no dia é o material que não chegou</h3>
+          <p>
+            Vergalhão Ø8 mm atrasado em 01/07; rachão ausente em 11/08 com a frente 100% pronta.
+            O planejamento do dia seguinte é reescrito à noite, no campo, e o escritório costuma
+            saber só depois.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>08/07</b><b>→ 27/07</b></div>
+        <div>
+          <h3>A obra gastou energia para não parar — e isso não aparece na curva</h3>
+          <p>
+            Durante os 19 dias de indefinição a equipe continuou produzindo em frentes secundárias:
+            armação das calçadas, infraestrutura de esgoto das 22 baias, sapatas dos troncos,
+            protótipo do cocho. A curva física mostra avanço; ela não mostra que aquele avanço foi
+            <strong>uma manobra para evitar paralisação</strong>.
+          </p>
+        </div>
+      </article>
+
+      <article class="item">
+        <div class="stamp"><b>27/06</b></div>
+        <div>
+          <h3>E o detalhe que só o campo registra</h3>
+          <p>
+            "A equipe trabalhará no domingo para tentar concluir o galpão B; segunda-feira depende
+            do jogo do Brasil." Está no RDO de 27/06. É desse tipo de informação — a que ninguém
+            pediria num relatório gerencial — que sai a leitura real de disponibilidade de equipe.
+          </p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <p class="foot">
+    Levantado a partir dos 42 RDOs da obra Baias Kabod registrados no sistema entre 22/06 e
+    11/08/2026, com as datas de cada relatório citadas como referência. Números de contrato,
+    prazo e multa vêm do cronograma físico-financeiro da obra
+    (<code>cronograma_fisico_financeiro_baias.json</code>).
+  </p>
+
+</div>

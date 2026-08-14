@@ -495,7 +495,14 @@ def recalcular_medicao_obra(obra_id, admin_id):
     }
 
 
-def gerar_pdf_extrato_medicao(medicao_id, admin_id):
+def gerar_pdf_extrato_medicao(medicao_id, admin_id, com_marca=True):
+    """Extrato da medição em PDF.
+
+    `com_marca=False` omite o nome da construtora (subtítulo e rodapé): é o
+    que o PORTAL DO CLIENTE serve, e lá o documento não leva a marca de quem
+    executa a obra. O download interno segue com a marca, que é o documento
+    da própria empresa.
+    """
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
@@ -522,7 +529,8 @@ def gerar_pdf_extrato_medicao(medicao_id, admin_id):
 
     empresa_nome = config.nome_empresa if config else 'Empresa'
     elements.append(Paragraph(f"Extrato de Medição #{medicao.numero:03d}", title_style))
-    elements.append(Paragraph(empresa_nome, subtitle_style))
+    if com_marca:
+        elements.append(Paragraph(empresa_nome, subtitle_style))
     elements.append(Spacer(1, 4*mm))
 
     info_data = [
@@ -598,8 +606,11 @@ def gerar_pdf_extrato_medicao(medicao_id, admin_id):
     elements.append(rt)
 
     elements.append(Spacer(1, 8*mm))
+    rodape = f"Documento gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    if com_marca:
+        rodape += f" — {empresa_nome}"
     elements.append(Paragraph(
-        f"Documento gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')} — {empresa_nome}",
+        rodape,
         ParagraphStyle('Footer', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#999'))
     ))
 

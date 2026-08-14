@@ -1,10 +1,12 @@
 <!-- RDOs ────────────────────────────────────────────────────── -->
 {% if rdos %}
-<section class="section">
+<section class="section" id="rdos">
     <div class="section-head">
         <span class="section-icon"><i class="fas fa-clipboard-list"></i></span>
         <h2 class="section-title">Relatórios diários (RDOs)</h2>
-        <span class="section-counter">{{ rdos|length }}</span>
+        {# Total da obra, não o tamanho da página — o contador dizia "20" numa
+           obra de 42 RDOs e escondia que a lista estava cortada. #}
+        <span class="section-counter">{{ rdos_total if rdos_total is defined else rdos|length }}</span>
     </div>
     <p class="rdo-intro">O dia a dia da sua obra, registrado em fotos e relatos da equipe. Toque em um relatório para ver os detalhes.</p>
     <div class="card-portal">
@@ -42,7 +44,7 @@
                     {% set pl = ciencia_por_rdo.get(r.id) if ciencia_por_rdo else None %}
                     {% if pl and pl.total %}
                     <span class="rdo-ciencia {{ 'ok' if pl.completo else '' }}"
-                          title="Ciência do cliente: {{ pl.assinados }} de {{ pl.total }} responsáveis">
+                          title="Ciência dos responsáveis: {{ pl.assinados }} de {{ pl.total }}">
                         <i class="fas {{ 'fa-circle-check' if pl.completo else 'fa-file-signature' }}"></i>
                         {{ pl.assinados }}/{{ pl.total }}
                     </span>
@@ -55,10 +57,34 @@
             </a>
             {% endfor %}
         </div>
+        {# "Ver mais" por link puro (sem JS): recarrega a página pedindo o
+           próximo bloco e volta pra âncora da seção. #}
+        {% if rdos_total is defined and rdos_total > rdos|length %}
+        <div class="rdo-mais">
+            <span class="rdo-mais-info">Mostrando os {{ rdos|length }} mais recentes de {{ rdos_total }}</span>
+            <a class="rdo-mais-btn"
+               href="{{ url_for('portal_obras.portal_obra', token=obra.token_cliente, rdos=rdos_proximo_limite) }}#rdos">
+                Ver mais <i class="fas fa-chevron-down"></i>
+            </a>
+        </div>
+        {% endif %}
     </div>
 </section>
 
 <style>
+.rdo-mais {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+    padding: 14px 16px; border-top: 1px solid var(--border-soft);
+}
+.rdo-mais-info { font-size: .82rem; color: var(--text-muted); }
+.rdo-mais-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px; border-radius: var(--radius-pill);
+    background: var(--surface-3); color: var(--text);
+    font-size: .85rem; font-weight: 600; text-decoration: none;
+}
+.rdo-mais-btn:hover { background: var(--surface-2, rgba(0,0,0,.02)); }
 .rdo-ciencia {
     display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
     padding: 3px 9px; border-radius: var(--radius-pill);

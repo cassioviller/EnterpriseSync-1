@@ -1,7 +1,186 @@
 # Estado da atualização da obra Baia — físico-financeiro
 
-> Documento de handoff. Última atualização: **2026-08-11**.
+> Documento de handoff. Última atualização: **2026-08-13**.
 > Resume o que foi feito nesta rodada e o que ainda falta.
+
+---
+
+## Rodada 2026-08-13 — o replanejamento de 12/08 e os RDOs de 07 a 11/08
+
+Duas fontes numa passagem só, por `scripts/rebuild_baia_from_1208_mpp.py`:
+o **`CRONOGRAMA 12.08.mpp`** e o export **`Conversa do WhatsApp com 📝 Diário
+de Obras - Veks Engenharia (5).zip`**. Ao contrário da rodada anterior, esta
+revisão **não é estrutural**: as 109 tarefas, a hierarquia e os nomes são os
+mesmos do 10.08. Nada entrou, nada saiu.
+
+| O que mudou | Tamanho |
+|---|---|
+| Datas de folhas replanejadas | **51 tarefas**, deslocadas de 1 a 4 dias |
+| Fim do cronograma | 19/10 → **20/10** (`contrato.data_fim_cronograma`) |
+| Físico no Project | só as **2 tarefas de drenagem** (B: 50→100%, A: 0→100%) |
+| Ids girados | **4**, na Fundação do Galpão B |
+| RDOs | 37 → **42** (entram 07, 08, 09, 10 e 11/08) |
+| Tarefas-folha com físico | 32 → **33** de 88 |
+
+### ⚠️ A armadilha da rodada: 4 ids giraram sem que nada mudasse de nome
+
+Na Fundação do Galpão B os ids **rodaram em ciclo**, com os nomes parados nos
+mesmos lugares da árvore:
+
+| Serviço | id no 10.08 | id no 12.08 |
+|---|---|---|
+| Escavação de novas valas e brocas das vigas transversais | 22 | **21** |
+| Execução de armação de ferragem da nova fundação, caixaria… | 23 | **22** |
+| Fazenda: Escavação das Valas de Drenagem e Preenchimento 1ª Camada | 24 | **23** |
+| Execução de Caixaria, Ferragem das Calçadas, posicionamento… | 21 | **24** |
+
+Comparar os dois `.mpp` **por id** mostra "4 tarefas renomeadas" e esconde o
+resto; o de-para real é por **caminho hierárquico**, e ele casou as 109 sem
+sobra. Isso valeu para os **16 apontamentos** e as **10 regras** do parser que
+apontavam para essa faixa — casar por id levaria a caixaria das calçadas para
+dentro da escavação das valas. **Nenhum apontamento foi perdido nesta rodada.**
+
+O Galpão A não girou: 69, 70, 72 e 73 seguem onde estavam.
+
+### ✅ RESOLVIDO — as datas antecipadas de 06/08 têm agora o dia real
+
+Era a REVISAR nº 2 da rodada passada ("o próximo export do WhatsApp corrige as
+datas sozinho"). Corrigiu:
+
+| Tarefa | Estava | Passou para | O que o RDO diz |
+|---|---|---|---|
+| `69` Novas valas e brocas (A) | 100% em **06/08** | 75% em **07/08** + 100% em **08/08** | 07/08 "concluída a escavação … e dada continuidade à perfuração"; 08/08 "concluída a perfuração das brocas restantes do Galpão A" |
+| `70` Armação da nova fundação (A) | 100% em **06/08** | 100% em **10/08** | "finalizada a armação dos reforços das vigas transversais do Galpão A" |
+| `23` Valas de drenagem (B) | 50% em **06/08** | 50% em **10/08** + 100% em **11/08** | em 06/08 ainda se esperava a liberação do Grupo Mônica; a escavação só saiu em 10/08 |
+
+Sobra **zero antecipação**: todo apontamento do JSON está agora no dia em que
+o diário registra o serviço. E o mesmo acúmulo aconteceu com as tarefas do
+Galpão B que ficaram em 06/08 — ver a seção seguinte.
+
+### ✅ O acúmulo de 06/08 foi desfeito — a curva de agosto foi relida inteira
+
+Enquanto o export terminava em 06/08, aquele era o **único lugar onde dava para
+pendurar um fechamento**, e três tarefas do Galpão B foram para 100% num dia em
+que o diário dizia outra coisa. Com os RDOs até 11/08, o avanço voltou para os
+dias em que aconteceu:
+
+| Tarefa | Estava | Passou a ser | O que o texto de 06/08 realmente diz |
+|---|---|---|---|
+| `21` Novas valas e brocas (B) | **100% em 06/08** | 75% em 06/08 · **100% em 07/08** | "concluída a escavação das valas […] sendo **INICIADA** a perfuração das novas brocas" |
+| `22` Armação da nova fundação (B) | **100% em 06/08** | 85% em 06/08 · 95% em 07/08 · **100% em 10/08** | "armação de reforço de 05 vigas transversais, dando **CONTINUIDADE** às adequações" |
+| `70` Armação da nova fundação (A) | 30% em 04/08 → 100% | ganha **60% em 07/08** | o degrau que faltava entre 04/08 e o fim em 10/08 |
+
+`24` (Caixaria e Ferragem das Calçadas, B) **fica em 100% em 06/08**: ali o
+texto é de fechamento, não de continuidade — *"finalizada a execução da
+caixaria da segunda calçada do Galpão B, concluindo a preparação desta
+etapa"*. Quando o diário fecha, o fechamento é dele.
+
+O bullet de 07/08 *"foi dada continuidade à execução da armação dos reforços
+das vigas transversais"* **não nomeia o galpão** — foi lido como valendo para
+os dois, e por isso alimenta `22` (B, 95%) e `70` (A, 60%) no mesmo dia.
+
+### A curva de agosto, como ficou
+
+Mesma divisão de fontes decidida em 11/08 — **forma pelo texto do RDO,
+fechamento pelo Project**:
+
+| Dia | Tarefa | Valor | De onde vem |
+|---|---|---|---|
+| 06/08 | `21` Novas valas e brocas (B) | 75% | texto: escavação concluída, perfuração iniciada |
+| 06/08 | `22` Armação da nova fundação (B) | 85% | texto: mais 05 vigas transversais armadas |
+| 06/08 | `24` Caixaria/Ferragem Calçadas (B) | 100% | texto: "finalizada […] concluindo a preparação desta etapa" |
+| 07/08 | `21` | 100% | texto: continuidade da perfuração — em 08/08 só restavam as do Galpão A |
+| 07/08 | `22` | 95% | texto: continuidade da armação dos reforços |
+| 07/08 | `70` Armação da nova fundação (A) | 60% | mesmo bullet, do lado do Galpão A |
+| 07/08 | `69` Novas valas e brocas (A) | 75% | texto: escavação concluída, perfuração iniciada |
+| 08/08 | `69` | 100% | texto: "concluída a perfuração das brocas restantes" · = Project |
+| 09/08 | — | — | só rebaixamento das baias, que **não tem tarefa** (ver abaixo) |
+| 10/08 | `22` | **100%** | **Project** — depois de 07/08 o diário só fala do Galpão A; 10/08 é o fim da janela |
+| 10/08 | `70` | 100% | texto: "finalizada a armação dos reforços do Galpão A" · = Project |
+| 10/08 | `23` Valas de drenagem (B) | 50% | texto: escavação executada, ~1,00 m de profundidade |
+| 11/08 | `23` | **100%** | **Project** — ⚠️ ver REVISAR nº 1 |
+| 11/08 | `72` Valas de drenagem (A) | **100%** | **Project** (texto sustentava 50%) — ⚠️ idem |
+
+Nenhuma tarefa retrocede em nenhum dia, e todas fecham na data em que o
+Project as encerra.
+
+**Três coisas para você conferir:**
+
+1. **As duas tarefas de drenagem fecham em 100% e o RDO diz que metade não
+   começou.** O nome delas é "Escavação das Valas de Drenagem **e
+   Preenchimento 1ª Camada de Material Drenante**", e o RDO de 11/08 é
+   explícito: *"até o encerramento do expediente, o rachão destinado à
+   execução da primeira camada drenante ainda não havia sido disponibilizado
+   na obra"*. O 100% entrou porque **o Project é a autoridade de fechamento**
+   (sua decisão de 11/08), mas quem precisa de correção aqui é a coluna
+   %concluído do `.mpp` — é o mesmo tipo de divergência do item 3 da rodada
+   passada, só que no sentido contrário. **Avise o engenheiro.** Se preferir
+   que o JSON fique nos 50% que o texto sustenta, é uma linha em
+   `FECHAMENTO_PROJECT` no script.
+2. **A janela da drenagem do Galpão A (`72`) é 12–14/08 no Project, mas o RDO
+   de 11/08 já a dá por escavada.** Aqui o `.mpp` é que está atrasado, não o
+   diário — o apontamento ficou em 11/08, que é o dia real. Não é antecipação.
+3. **O rebaixamento de ~20 cm do interior das baias não existe no
+   cronograma.** Foi definido em 07/08 com a Eng. Ana Luísa (Fort
+   Gerenciadora), executado em 08 e 09/08 nos dois galpões, e **não tem tarefa
+   em nenhuma versão do `.mpp`** — é escopo novo, posterior à revisão de
+   30/07. Por isso **09/08 é RDO sem físico**. Pedir a inclusão na próxima
+   revisão do cronograma.
+
+### O que os RDOs novos relatam e o cronograma ainda não comporta
+
+- **Rebaixamento de ~20 cm das baias (A e B)** — sem tarefa, ver REVISAR nº 3.
+- **Painelização de LSF em São José dos Campos/SP**, que o RDO de 11/08 dá por
+  **iniciada**: a tarefa existe (`42`, Galpão B, janela 11–17/08) mas está em
+  **0%** no `.mpp` de 12.08. Divergência no sentido "o diário sabe mais".
+  Nenhum % foi lançado — não há número no texto e inventar um seria adivinhar.
+  **Confirmar o avanço com o engenheiro.**
+- Os serviços de preparação de 11/08 — carpintaria das laterais internas do
+  Bloco B, locação das brocas para concretagem, recorte e preparo das vigas
+  transversais, limpeza das valas longitudinais, retirada das lonas de
+  proteção das calçadas — são preparo para as tarefas `25`/`71` (concreto
+  magro e concretagem das brocas, 13/08) e `27` (caixaria e armação das vigas
+  transversais, 11–18/08), **todas em 0% no Project**. Sem % inventado.
+- **`45` e `92` (Instalação Infra Hidráulica, B e A)** seguem sendo a única
+  divergência JSON × Project: 100% no RDO, 0% no `.mpp`. Confirmadas em 11/08
+  a favor do JSON — **a coluna %concluído do `.mpp` continua sem a correção**,
+  três revisões depois. Cobrar do engenheiro.
+
+### Um detalhe do parecer técnico de 11/08
+
+O RDO de 11/08 registra que a Eng. Ana Luísa pediu a inversão da sequência
+executiva (brocas de reforço e concreto magro **antes** do posicionamento das
+armações e caixarias), que a metodologia alternativa foi aceita pelo
+projetista estrutural e que **o parecer técnico segue pendente de assinatura
+do Eng. Calculista**. É documento contratual em aberto: nada a fazer no JSON,
+mas convém acompanhar.
+
+### Como aplicar
+
+```bash
+# 1) regenerar (já feito — refaça se editar o de-para do script)
+python scripts/rebuild_baia_from_1208_mpp.py
+
+# 2) reimport em produção, FORA do gunicorn (docs/deploy-checklist-easypanel.md)
+SIGE_ENABLE_DEMO_SEED=false python scripts/seed_fisico_financeiro_baias.py <admin>
+```
+
+As mesmas travas do reimport destrutivo descritas na rodada anterior
+continuam valendo — leia o bloco vermelho abaixo antes de rodar o passo 2.
+
+### Dados no repositório
+
+| Arquivo | O que mudou |
+|---|---|
+| `cronograma_fisico_financeiro_baias.json` | canônico regenerado (109 tarefas, 42 RDOs, fim 20/10) |
+| `docs/rdo/regras_apontamento_baia.json` | 10 regras reapontadas para os ids girados |
+| `fotos_rdos/2026-08-07` … `2026-08-11` | 22 fotos novas (21 com legenda; 1 de 11/08 veio sem) |
+| `scripts/rebuild_baia_from_1208_mpp.py` | script desta rodada |
+| `tests/test_migracao_baias_equivalencia.py` | 37 → 42 RDOs; o upload passa a usar o `CRONOGRAMA 12.08.mpp` |
+
+Custos, medições, fluxo de caixa, resumo e contrato (fora a data de fim) vêm
+intactos da produção. `2026-07-20` e `2026-08-09` são os dois únicos RDOs sem
+físico.
 
 ---
 

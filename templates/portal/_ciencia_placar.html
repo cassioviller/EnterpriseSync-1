@@ -1,5 +1,5 @@
 {# Fase 9a / redesenho 29-07, emendado no mesmo dia a pedido do usuário — a
-   seção "Ciência do cliente" é o placar E o lugar do ato: cada responsável
+   seção "Ciência dos responsáveis" é o placar E o lugar do ato: cada responsável
    pendente tem um CHECKBOX ao lado do nome; marcá-lo abre a confirmação de
    senha ali mesmo. A identidade é a linha (não há mais "quem é você?"), e o
    POST continua atômico: identidade + senha + observação numa requisição —
@@ -11,7 +11,7 @@
 <section class="section" id="ciencia-cliente">
     <div class="section-head">
         <span class="section-icon"><i class="fas fa-file-signature"></i></span>
-        <h2 class="section-title">Ciência do cliente</h2>
+        <h2 class="section-title">Ciência dos responsáveis</h2>
         {% if ciencia.total %}
         <span class="ms-auto d-inline-flex align-items-center gap-2">
             <span class="pill {{ 'pill-success' if ciencia.completo else 'pill-neutral' }}">

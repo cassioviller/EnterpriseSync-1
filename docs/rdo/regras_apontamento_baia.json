@@ -181,8 +181,8 @@
         "calçada"
       ],
       "galpao": "B",
-      "tarefa_mpp": 21,
-      "tarefa_nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base (Galpão B)",
+      "tarefa_mpp": 23,
+      "tarefa_nome": "Fazenda: Escavação das Valas de Drenagem e Preenchimento 1ª Camada de Material Drenante (Galpão B)",
       "forma": "pct",
       "observacao": "Nasceu na rodada 30/07, em que 'iniciada/concluída a armação das ferragens das calçadas do Galpão B' (24 e 27/07) caiu como 'bullet sem regra'. Não colide com nivelamento-calcada-b: aquela exige 'solo', esta exige 'ferragens'."
     },
@@ -193,8 +193,8 @@
         "calçada"
       ],
       "galpao": "B",
-      "tarefa_mpp": 21,
-      "tarefa_nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base (Galpão B)",
+      "tarefa_mpp": 23,
+      "tarefa_nome": "Fazenda: Escavação das Valas de Drenagem e Preenchimento 1ª Camada de Material Drenante (Galpão B)",
       "forma": "pct",
       "observacao": "Mesma tarefa 21 pelo outro vocabulário: a montagem in loco aparece como 'malhas inferior e superior' (29/07), sem a palavra 'ferragens'. Decisão de 30/07: pré-montagem e montagem são fases da MESMA tarefa, não duas."
     },
@@ -205,8 +205,8 @@
         "calçada"
       ],
       "galpao": "B",
-      "tarefa_mpp": 21,
-      "tarefa_nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base (Galpão B)",
+      "tarefa_mpp": 23,
+      "tarefa_nome": "Fazenda: Escavação das Valas de Drenagem e Preenchimento 1ª Camada de Material Drenante (Galpão B)",
       "forma": "pct",
       "nao_quando": [
         "malhas"
@@ -242,10 +242,10 @@
         "reforço"
       ],
       "galpao": "B",
-      "tarefa_mpp": 23,
+      "tarefa_mpp": 21,
       "forma": "pct",
       "observacao": "Brocas de reforço, blocos de coroamento e laje das vigas transversais — escopo da revisão de 30/07.",
-      "tarefa_nome": "Execução de armação de ferragem da nova fundação, caixaria e posicionamento da armação nas valas (Galpão B)"
+      "tarefa_nome": "Escavação de novas valas e brocas das vigas transversais (Galpão B)"
     },
     {
       "id": "reforco-fundacao-a",
@@ -264,9 +264,9 @@
         "blocos de coroamento"
       ],
       "galpao": "B",
-      "tarefa_mpp": 23,
+      "tarefa_mpp": 21,
       "forma": "pct",
-      "tarefa_nome": "Execução de armação de ferragem da nova fundação, caixaria e posicionamento da armação nas valas (Galpão B)"
+      "tarefa_nome": "Escavação de novas valas e brocas das vigas transversais (Galpão B)"
     },
     {
       "id": "laje-vigas-transversais-b",
@@ -275,9 +275,9 @@
         "vigas transversais"
       ],
       "galpao": "B",
-      "tarefa_mpp": 23,
+      "tarefa_mpp": 21,
       "forma": "pct",
-      "tarefa_nome": "Execução de armação de ferragem da nova fundação, caixaria e posicionamento da armação nas valas (Galpão B)"
+      "tarefa_nome": "Escavação de novas valas e brocas das vigas transversais (Galpão B)"
     },
     {
       "id": "laje-vigas-transversais-a",
@@ -301,11 +301,11 @@
         "drenagem"
       ],
       "galpao": "B",
-      "tarefa_mpp": 22,
+      "tarefa_mpp": 24,
       "forma": "marco",
       "pct_parcial": 50,
       "observacao": "nao_quando separa das valas de esgoto (infra hidráulica) e das valas de drenagem da Fazenda, que têm tarefa própria.",
-      "tarefa_nome": "Escavação de novas valas e brocas das vigas transversais (Galpão B)"
+      "tarefa_nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base (Galpão B)"
     },
     {
       "id": "escavacao-valas-reforco-a",
@@ -330,10 +330,10 @@
         "brocas"
       ],
       "galpao": "B",
-      "tarefa_mpp": 22,
+      "tarefa_mpp": 24,
       "forma": "marco",
       "pct_parcial": 75,
-      "tarefa_nome": "Escavação de novas valas e brocas das vigas transversais (Galpão B)"
+      "tarefa_nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base (Galpão B)"
     },
     {
       "id": "perfuracao-brocas-reforco-a",
@@ -354,10 +354,10 @@
         "calçada"
       ],
       "galpao": "B",
-      "tarefa_mpp": 21,
+      "tarefa_mpp": 23,
       "forma": "pct",
       "observacao": "A caixaria virou escopo da mesma tarefa da ferragem das calçadas — ver a série reescalada em ESTADO_ATUALIZACAO_BAIA.md.",
-      "tarefa_nome": "Execução de Caixaria, Ferragem das Calçadas, posicionamento da armação nas valas e locação das chapas base (Galpão B)"
+      "tarefa_nome": "Fazenda: Escavação das Valas de Drenagem e Preenchimento 1ª Camada de Material Drenante (Galpão B)"
     },
     {
       "id": "caixaria-calcada-a",
@@ -376,11 +376,11 @@
         "drenagem"
       ],
       "galpao": "B",
-      "tarefa_mpp": 24,
+      "tarefa_mpp": 22,
       "forma": "marco",
       "pct_parcial": 50,
       "observacao": "Reunião de 05/08: a drenagem passou a vir ANTES das concretagens. Tarefa da Fazenda — físico sem custo.",
-      "tarefa_nome": "Fazenda: Escavação das Valas de Drenagem e Preenchimento 1ª Camada de Material Drenante (Galpão B)"
+      "tarefa_nome": "Execução de armação de ferragem da nova fundação, caixaria e posicionamento da armação nas valas (Galpão B)"
     },
     {
       "id": "drenagem-valas-a",
@@ -404,6 +404,9 @@
     "Caixaria (fôrma) das calçadas do Galpão B — iniciada em 04/08, uma calçada em 05/08, segunda calçada finalizada em 06/08. Não existe tarefa de caixaria. A mais próxima é a 23 'Execução de Concretagem das Calçadas e Sapatas Pilares Tronco', ainda em 0%. Decisão de 07/08: NÃO apontar na 23 — nenhum concreto foi lançado, e mostrar avanço numa tarefa de concretagem que não começou infla o físico. Fica no texto do RDO e nas fotos.",
     "ATUALIZAÇÃO 11/08: \"Locação das Chapas Base com Topógrafo\" (17/62 no 06.07) saiu do cronograma revisado — no lugar entrou \"Entrega das Chapas Base\" (17/67), que é fornecimento e não aparece no diário. As regras chapas-base-a/b foram removidas.",
     "ATUALIZAÇÃO 11/08: a armação das sapatas dos pilares de tronco (12 un, 17 e 20/07 no Galpão A) continua sem tarefa — a revisão não trouxe sucessora para a \"Execução Ferragem Calçada, Travamento Chapas Base\" (66) daqueles dias. A regra ferragem-calcada-sapatas-a foi removida e os 2 apontamentos históricos foram descartados no de-para.",
-    "ATUALIZAÇÃO 11/08: o cocho em alvenaria em si segue sem tarefa própria; o que a revisão trouxe foi a \"Revisão do Projeto Fundação e LSF - Execução de Cocho em Alvenaria\" (19), que é a tarefa do PROJETO, não da execução."
+    "ATUALIZAÇÃO 11/08: o cocho em alvenaria em si segue sem tarefa própria; o que a revisão trouxe foi a \"Revisão do Projeto Fundação e LSF - Execução de Cocho em Alvenaria\" (19), que é a tarefa do PROJETO, não da execução.",
+    "ATUALIZAÇÃO 12/08: o REBAIXAMENTO de ~20 cm do nível interno de todas as baias (Galpões A e B), definido em 07/08 com a Eng. Ana Luísa (Fort Gerenciadora) e executado em 08 e 09/08, NÃO TEM TAREFA no cronograma de 12.08 — é escopo novo, surgido depois da revisão. Dois dias de RDO (08 e 09/08) ficam sem físico por causa disso. Pedir ao engenheiro que inclua a tarefa na próxima revisão.",
+    "ATUALIZAÇÃO 12/08: os serviços de preparação do RDO de 11/08 — carpintaria das laterais internas do Bloco B, locação das brocas para concretagem, recorte e preparo das vigas transversais, limpeza das valas longitudinais e retirada das lonas de proteção das calçadas — são preparação para as tarefas 25/71 (concreto magro e concretagem das brocas, 13/08) e 27 (caixaria e armação das vigas transversais, 11–18/08), todas em 0% no Project. Nenhum % foi inventado para elas.",
+    "ATUALIZAÇÃO 12/08: a PAINELIZAÇÃO DE LSF em São José dos Campos/SP, que o RDO de 11/08 dá por INICIADA, tem tarefa (42, Galpão B, janela 11–17/08) mas está em 0% no .mpp de 12.08. Divergência RDO x Project no sentido \"o diário sabe mais\": nenhum % foi lançado, porque não há número no texto — confirmar o avanço com o engenheiro."
   ]
 }

@@ -500,6 +500,65 @@
             </div>
         </div>
     </div>
+    {# ── Timbre dos PDFs (migration 286) ────────────────────────────────────
+       Um JSON versionado com logo, dados da empresa e cores. Fica FORA do
+       formulário grande de cima: o import é upload de arquivo e precisa do
+       próprio `enctype`, e misturá-lo ali faria salvar a empresa toda a cada
+       import. Ver services/timbre_pdf.py para a precedência dos valores. #}
+    <div class="row mt-4">
+        <div class="col-lg-8 mx-auto">
+            <div class="card" id="timbre-pdf">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-file-pdf me-2"></i>
+                        Timbre dos PDFs
+                        <span class="badge bg-primary ms-2">Novo</span>
+                    </h5>
+                    <small class="text-muted">
+                        Logo, dados da empresa e cores que aparecem nos documentos
+                        gerados — hoje no cronograma em PDF.
+                    </small>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">
+                        Baixe o arquivo atual, edite o que quiser e importe de volta.
+                        O import é <strong>incremental</strong>: um arquivo só com
+                        cores não apaga a logo. Cores em <code>#RRGGBB</code>; a logo
+                        vai embutida em base64 no campo <code>logo_base64</code>.
+                    </p>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <a class="btn btn-outline-secondary btn-sm"
+                           href="{{ url_for('configuracoes.exportar_timbre') }}">
+                            <i class="fas fa-download me-1"></i> Baixar timbre atual
+                        </a>
+                        <a class="btn btn-outline-secondary btn-sm"
+                           href="{{ url_for('configuracoes.exportar_timbre', sem_logo=1) }}"
+                           title="Mesmo arquivo sem a logo em base64 — bem menor">
+                            <i class="fas fa-download me-1"></i> Baixar sem a logo
+                        </a>
+                    </div>
+                    <form method="POST"
+                          action="{{ url_for('configuracoes.importar_timbre') }}"
+                          enctype="multipart/form-data" class="row g-2 align-items-end">
+                        <div class="col-sm-8">
+                            <label for="timbre_json" class="form-label">
+                                Importar timbre (.json)
+                            </label>
+                            <input type="file" class="form-control" id="timbre_json"
+                                   name="timbre_json" accept=".json,application/json"
+                                   required>
+                        </div>
+                        <div class="col-sm-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-file-import me-1"></i> Importar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row mt-4">
         <div class="col-lg-8 mx-auto">
             <div class="card">

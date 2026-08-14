@@ -38,7 +38,7 @@
                     <span class="hm-lbl">Etapas</span>
                 </div>
                 <div class="hm">
-                    <span class="hm-val">{{ rdos|length if rdos else 0 }}</span>
+                    <span class="hm-val">{{ rdos_total if rdos_total is defined else (rdos|length if rdos else 0) }}</span>
                     <span class="hm-lbl">Relatórios</span>
                 </div>
                 <div class="hm">

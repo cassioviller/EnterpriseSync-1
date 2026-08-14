@@ -1534,6 +1534,12 @@ Ela vale 72 horas e será trocada por uma senha só sua no primeiro acesso.</tex
                                 onclick="copiarMensagemAcesso('msgConvite', this)">
                             <i class="fas fa-copy me-1"></i>Copiar mensagem do convite
                         </button>
+                        {# O manual vai anexo à mesma mensagem: é aqui que a
+                           construtora está quando monta o envio. #}
+                        <a class="btn btn-sm btn-outline-secondary w-100 mt-1"
+                           href="{{ url_for('portal_obras.manual_ciencia_pdf') }}">
+                            <i class="fas fa-file-pdf me-1"></i>Baixar o manual para anexar
+                        </a>
                         <small class="text-muted d-block mt-1">
                             A senha não poderá ser vista de novo depois que você sair desta tela.
                         </small>
@@ -1590,6 +1596,14 @@ Ela vale 72 horas e será trocada por uma senha só sua no primeiro acesso.</tex
                     <small class="text-muted d-block mt-1" style="font-size:.7rem;">
                         Cadastrar, desativar ou reativar responsáveis:
                         <a href="{{ url_for('main.editar_obra', id=obra.id) }}">editar a obra</a>.
+                    </small>
+                    {# Sempre disponível, não só no momento do convite: o
+                       responsável costuma pedir o manual de novo depois. #}
+                    <small class="text-muted d-block mt-1" style="font-size:.7rem;">
+                        <a href="{{ url_for('portal_obras.manual_ciencia_pdf') }}">
+                            <i class="fas fa-file-pdf"></i> Manual da assinatura (PDF)
+                        </a>
+                        — para enviar ao responsável.
                     </small>
                     {% else %}
                     <small class="text-muted d-block mt-2">

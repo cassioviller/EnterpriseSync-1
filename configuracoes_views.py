@@ -254,6 +254,83 @@ def salvar_tema():
     return redirect(url_for('configuracoes.empresa') + '#tema-sistema')
 
 
+# ---------------------------------------------------------------------------
+# Timbre dos PDFs — importar/exportar o JSON de identidade (migration 286)
+# ---------------------------------------------------------------------------
+
+@configuracoes_bp.route('/empresa/timbre/exportar.json')
+@login_required
+@admin_required
+def exportar_timbre():
+    """Baixa o timbre EFETIVO do tenant no formato do arquivo de import.
+
+    Serve a dois usos: ponto de partida para editar (vem com todas as chaves
+    preenchidas, com os padrões do kit onde o tenant não configurou nada) e
+    backup antes de trocar de identidade.
+
+    `?sem_logo=1` produz um arquivo leve — a logo em base64 é o que faz o JSON
+    passar de 100 KB, e para versionar ou mandar por e-mail ela costuma
+    atrapalhar.
+    """
+    import io
+    import json
+
+    from flask import send_file
+
+    from multitenant_helper import get_admin_id
+    from services.timbre_pdf import exportar
+
+    admin_id = get_admin_id()
+    sem_logo = str(request.args.get('sem_logo') or '').strip() in ('1', 'true')
+    timbre = exportar(admin_id, com_logo=not sem_logo)
+    conteudo = json.dumps(timbre, ensure_ascii=False, indent=2)
+    buf = io.BytesIO(conteudo.encode('utf-8'))
+    return send_file(buf, as_attachment=True,
+                     download_name='timbre-pdf.json',
+                     mimetype='application/json')
+
+
+@configuracoes_bp.route('/empresa/timbre/importar', methods=['POST'])
+@login_required
+@admin_required
+def importar_timbre():
+    """Importa o JSON de timbre enviado no formulário da tela de Empresa.
+
+    O import é INCREMENTAL por chave: um arquivo só com `cores` não apaga a
+    logo importada antes. Quem quiser zerar troca o valor explicitamente.
+
+    Erros de validação voltam para a tela em `flash`, todos de uma vez — quem
+    editou o arquivo à mão quer a lista completa, não um problema por
+    tentativa.
+    """
+    from multitenant_helper import get_admin_id
+    from services.timbre_pdf import TimbreInvalido, importar
+
+    admin_id = get_admin_id()
+    arquivo = request.files.get('timbre_json')
+    if arquivo is None or not (arquivo.filename or '').strip():
+        flash('Escolha um arquivo .json para importar.', 'warning')
+        return redirect(url_for('configuracoes.empresa') + '#timbre-pdf')
+
+    try:
+        timbre = importar(admin_id, arquivo.read())
+        db.session.commit()
+    except TimbreInvalido as e:
+        db.session.rollback()
+        flash('O arquivo não foi aceito: ' + '; '.join(e.erros), 'error')
+        return redirect(url_for('configuracoes.empresa') + '#timbre-pdf')
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Erro ao importar timbre de PDF')
+        flash(f'Erro ao importar o timbre: {e}', 'error')
+        return redirect(url_for('configuracoes.empresa') + '#timbre-pdf')
+
+    tem_logo = 'com logo' if timbre.get('logo_base64') else 'sem logo'
+    flash(f'Timbre dos PDFs atualizado ({tem_logo}). '
+          f'Gere um cronograma em PDF para conferir.', 'success')
+    return redirect(url_for('configuracoes.empresa') + '#timbre-pdf')
+
+
 @configuracoes_bp.route('/api/empresa')
 @login_required
 def api_empresa():

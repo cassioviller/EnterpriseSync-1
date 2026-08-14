@@ -114,6 +114,15 @@
       <a href="{{ url_for('cronograma.fisico_financeiro', obra_id=obra.id) }}" class="btn btn-outline-primary btn-sm">
         <i class="fas fa-coins me-1"></i> Físico-Financeiro
       </a>
+      {# A planilha de tarefas em PDF, no layout dos documentos da empresa.
+         Fora do bloco da flag do editor v2 — o export não depende dela. O
+         `cliente=1` vai na URL para que o PDF espelhe a visão aberta: quem
+         está vendo o cronograma do cliente baixa o cronograma do cliente. #}
+      <a href="{{ url_for('cronograma.export_pdf', obra_id=obra.id) }}{% if modo_cliente %}?cliente=1{% endif %}"
+         class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener"
+         title="Baixar o cronograma em PDF">
+        <i class="fas fa-file-pdf me-1"></i> Exportar PDF
+      </a>
     </div>
   </div>
 
