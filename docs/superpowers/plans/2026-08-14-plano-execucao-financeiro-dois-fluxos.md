@@ -183,18 +183,18 @@ ninguém consegue pagar, adiantamento que não some da lista).
 
 ## F7 — Consistência, teste-guarda e runbook
 
-- [ ] **Step 1 (red):** o teste-guarda da C9: varre **todo** `.py` do repositório atrás de
+- [x] **Step 1 (red):** o teste-guarda da C9: varre **todo** `.py` do repositório atrás de
   `ContaPagar(` e falha em criação nova fora do serviço, carregando por escrito a lista dos
   cinco pontos legítimos que o spec tabela. A mensagem de falha tem de ser legível o
   bastante para quem nunca leu este plano.
-- [ ] **Step 2:** `scripts/verificar_consistencia_financeiro.py`, no formato de
+- [x] **Step 2:** `scripts/verificar_consistencia_financeiro.py`, no formato de
   `scripts/verificar_consistencia_recebimento.py`: acha conta `liberada` sem as três pernas,
   adiantamento baixado sem atesto, e lote `FECHADO` sem `fechado_por_id`. `--json`, exit
   0/1/2. **Varre só o regime novo** — sensor que grita sempre não é lido nunca.
-- [ ] **Step 3 (green):** verdes.
-- [ ] **Step 4:** runbook no fim do spec: como ligar a flag num tenant, o que conferir antes,
+- [x] **Step 3 (green):** verdes.
+- [x] **Step 4:** runbook no fim do spec: como ligar a flag num tenant, o que conferir antes,
   e o rollback.
-- [ ] **Step 5:** commit — `feat(financeiro): sensor de consistencia e o guarda da criacao de conta`
+- [x] **Step 5:** commit — `feat(financeiro): sensor de consistencia e o guarda da criacao de conta`
 
 ---
 

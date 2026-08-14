@@ -869,3 +869,127 @@ def test_a_lista_de_espera_nao_vaza_entre_tenants():
         lista_b = adiantamentos_pendentes(adm_b.id)
         assert all(a.admin_id == adm_b.id for a in lista_b)
         assert ped_a.id not in [a.pedido_id for a in lista_b]
+
+
+# ---------------------------------------------------------------------------
+# F7 — consistência, teste-guarda e runbook
+# ---------------------------------------------------------------------------
+
+# Os pontos que criam `ContaPagar` fora do serviço de compra, com o motivo de
+# cada um estar de fora. A lista é EXPLÍCITA de propósito: é ela que faz a
+# PRÓXIMA criação em caminho de compra aparecer como falha, em vez de herdar o
+# silêncio. Mesmo formato do guarda de regime da C9 (Fase 1), que foi quem
+# provou que varredura acha o que leitura não acha.
+CRIACOES_LEGITIMAS_DE_CONTA_PAGAR = {
+    'custos_escritorio_views.py': 'custo de escritório — não é compra de obra',
+    'event_manager.py': 'handler de evento — não passa por pedido',
+    'financeiro_service.py': 'lançamento avulso pela tela do financeiro',
+    'services/importacao_excel.py': 'import de planilha; nasce já PAGO',
+    'services/financeiro_compra.py': 'O serviço — é aqui que a compra cria',
+}
+
+
+def test_so_o_servico_cria_conta_pagar_de_compra():
+    """Guarda de fonte: nenhum `ContaPagar(...)` novo em caminho de compra.
+
+    A F3 tirou a criação de `compras_views.py` e a pôs no serviço. Sem este
+    teste, a próxima rota de compra que precisar de uma conta a criaria inline
+    de novo — `situacao_liberacao` cairia no default 'liberada' e aquele caminho
+    passaria a furar a tríade em silêncio, que é o defeito que a fase inteira
+    existe para fechar.
+
+    Por `ast` e não regex: formatação não é contrato.
+    """
+    import ast
+
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ignorados = {'tests', '.pythonlibs', 'archive', 'node_modules',
+                 '__pycache__', '.git', 'backups', 'attached_assets',
+                 'migrations_backup', '.local', 'obra_kabod'}
+
+    inesperadas = []
+    for pasta, subpastas, arquivos in os.walk(raiz):
+        subpastas[:] = [d for d in subpastas if d not in ignorados]
+        for nome in arquivos:
+            if not nome.endswith('.py'):
+                continue
+            caminho = os.path.join(pasta, nome)
+            try:
+                with open(caminho, encoding='utf-8') as f:
+                    arvore = ast.parse(f.read(), filename=caminho)
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            rel = os.path.relpath(caminho, raiz)
+            for no in ast.walk(arvore):
+                if not isinstance(no, ast.Call):
+                    continue
+                chamado = (getattr(no.func, 'id', None)
+                           or getattr(no.func, 'attr', None))
+                if chamado != 'ContaPagar':
+                    continue
+                if rel not in CRIACOES_LEGITIMAS_DE_CONTA_PAGAR:
+                    inesperadas.append(f'{rel}:{no.lineno}')
+
+    assert not inesperadas, (
+        'ContaPagar criada fora da lista conhecida:\n  '
+        + '\n  '.join(inesperadas)
+        + '\n\nSe for compra, use `services.financeiro_compra.criar_obrigacao` '
+          '— senão a conta nasce `liberada` por default e aquele caminho fura '
+          'a tríade em silêncio. Se NÃO for compra, acrescente o arquivo a '
+          '`CRIACOES_LEGITIMAS_DE_CONTA_PAGAR` com o motivo por escrito.')
+
+
+def test_a_criacao_de_compra_saiu_de_compras_views():
+    """O que a F3 moveu não pode voltar sem alguém perceber."""
+    import ast
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(raiz, 'compras_views.py'), encoding='utf-8') as f:
+        arvore = ast.parse(f.read())
+    criacoes = [no.lineno for no in ast.walk(arvore)
+                if isinstance(no, ast.Call)
+                and (getattr(no.func, 'id', None)
+                     or getattr(no.func, 'attr', None)) == 'ContaPagar']
+    assert not criacoes, (
+        f'`compras_views.py` voltou a criar ContaPagar (linhas {criacoes}). '
+        f'A camada de obrigação mora em services/financeiro_compra.py.')
+
+
+def test_sensor_acha_conta_liberada_sem_a_triade():
+    """O sensor grita quando alguém escreve `situacao_liberacao` na marra."""
+    from scripts.verificar_consistencia_financeiro import inconsistencias
+    from services.financeiro_compra import criar_obrigacao
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+        contas = criar_obrigacao(ped)
+        db.session.commit()
+
+        assert inconsistencias(adm.id) == [], (
+            'conta bloqueada e sem tríade é o estado NORMAL — não é drift')
+
+        contas[0].situacao_liberacao = 'liberada'   # na marra
+        db.session.commit()
+
+        achados = inconsistencias(adm.id)
+        assert achados, 'o sensor não viu a conta liberada sem a tríade'
+        assert any(str(contas[0].id) in str(a) for a in achados)
+
+
+def test_sensor_ignora_o_regime_antigo():
+    """Sensor que grita sempre não é lido nunca.
+
+    Todo pedido legado tem conta `liberada` e nenhuma nota — varrer esses seria
+    produzir drift de mentira em cada tenant que ainda não virou.
+    """
+    from scripts.verificar_consistencia_financeiro import inconsistencias
+    from services.financeiro_compra import criar_obrigacao
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id, recebimento_atesto_ativo=False,
+                    financeiro_dois_fluxos_ativo=False)
+        obra = _obra(adm.id)
+        forn = _fornecedor(adm.id)
+        ped = _pedido(adm.id, obra.id, forn.id)
+        criar_obrigacao(ped)
+        db.session.commit()
+
+        assert inconsistencias(adm.id) == []
