@@ -84,7 +84,10 @@ def test_importa_cria_obra_com_contrato():
         assert obra.admin_id == admin_id
         assert abs(float(obra.valor_contrato) - 1505613.76) < 0.01
         assert obra.data_inicio == date(2026, 6, 8)
-        assert obra.data_previsao_fim == date(2026, 10, 19)
+        # 20/10 e não 19/10 desde o replanejamento de 12/08: 51 tarefas-folha
+        # foram deslocadas de 1 a 4 dias e o fim do cronograma andou um dia.
+        # O número vem de `contrato.data_fim_cronograma` na fixture.
+        assert obra.data_previsao_fim == date(2026, 10, 20)
         assert obra.endereco == 'Fazenda Santa Mônica'  # exibido no portal
 
 
@@ -702,9 +705,15 @@ def test_fixture_baia_traz_rdos_do_relatorio():
         caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
                                'cronograma_fisico_financeiro_baias.json')
         payload = json.load(open(caminho, encoding='utf-8'))
-        assert len(payload.get('rdos', [])) == 37
+        # 42 RDOs desde a rodada de 13/08 (eram 37; entram 07, 08, 09, 10 e
+        # 11/08, vindos do export do WhatsApp). O pino aqui é da FIXTURE.
+        assert len(payload.get('rdos', [])) == 42
         oid = importar_fisico_financeiro(payload, aid)['obra_id']
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 37
+        # Já esta compara com a fixture, não com um número: o que se afirma é
+        # que o import não perdeu RDO nenhum, e isso continua valendo na
+        # próxima carga sem ninguém ter de vir aqui.
+        assert (RDO.query.filter_by(obra_id=oid, admin_id=aid).count()
+                == len(payload['rdos']))
         por_nome = {t.nome_tarefa: float(t.percentual_concluido or 0) for t in
                     TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
         assert por_nome['Estudo de Solo SPT'] == 100.0
@@ -908,7 +917,7 @@ def test_fixture_rdos_sem_mao_de_obra():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(d, aid)['obra_id']
         rdo_ids = [r.id for r in RDO.query.filter_by(obra_id=oid, admin_id=aid).all()]
-        assert len(rdo_ids) == 37
+        assert len(rdo_ids) == len(d['rdos'])
         assert RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).count() == 0
 
 
@@ -1218,7 +1227,8 @@ def test_reimport_limpa_custo_obra_referenciando_rdo():
         # reimporta — não deve levantar IntegrityError de FK
         oid2 = importar_fisico_financeiro(payload, aid)['obra_id']
         assert oid2 == oid
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 37
+        assert (RDO.query.filter_by(obra_id=oid, admin_id=aid).count()
+                == len(payload['rdos']))
         assert CustoObra.query.filter_by(obra_id=oid, tipo='mao_obra').count() == 0
 
 
