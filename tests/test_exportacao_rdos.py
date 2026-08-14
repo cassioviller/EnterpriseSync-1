@@ -184,9 +184,13 @@ def test_rdo_imutavel_exporta_estado_e_reimport_pula():
         admin_id, obra, tarefas = _ambiente()
         _criar_rdo_via_updater(obra, admin_id, tarefas)
         rdo = RDO.query.filter_by(obra_id=obra.id).one()
-        db.session.execute(
-            db.text('UPDATE rdo SET estado = :e WHERE id = :i'),
-            {'e': 'assinado', 'i': rdo.id})
+        # Pela máquina de estados, não no braço — mesma razão do fixture de
+        # `test_e2e_carga_obra`: UPDATE direto grava 'assinado' sem trilha, e o
+        # detector de autoria forjada da Fase 5 acusa a linha para sempre num
+        # banco compartilhado. O que este teste precisa é do RDO imutável, e
+        # `transicionar` entrega isso registrando quem/quando.
+        from services.rdo_ciclo_vida import transicionar
+        transicionar(rdo, 'assinado', motivo='setup de teste')
         db.session.commit()
         db.session.expire_all()
 

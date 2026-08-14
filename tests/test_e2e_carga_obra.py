@@ -244,9 +244,15 @@ def test_e2e_obra_em_andamento_protege_o_que_existe(tmp_path):
             db.session.add(r)
             db.session.commit()
             if estado != 'preenchido':
-                db.session.execute(db.text(
-                    'UPDATE rdo SET estado = :e WHERE id = :i'),
-                    {'e': estado, 'i': r.id})
+                # Pela máquina de estados, não no braço: um UPDATE direto
+                # deixa o RDO 'assinado' SEM linha em rdo_transicao_estado, e
+                # `test_fase5_rdo_ciclo_vida.test_backfill_marcou_os_rdos_
+                # historicos_como_preenchido` lê isso — corretamente — como
+                # autoria forjada. Num banco de dev compartilhado a linha fica
+                # para sempre, então cada rodada desta suíte somava uma falha
+                # ao gate de todo mundo.
+                from services.rdo_ciclo_vida import transicionar
+                transicionar(r, estado, motivo='setup de teste')
                 db.session.commit()
             return r
 
