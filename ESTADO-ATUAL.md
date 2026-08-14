@@ -605,7 +605,7 @@ sem atesto não existe a tríade do Fluxo A nem a baixa do adiantamento do Fluxo
 | # | Fase | Estado |
 |---|---|---|
 | 1 | Recebimento e atesto | ✅ **mesclada em `main` em 14/08** (`9c997bf8`) |
-| 2 | Financeiro em dois fluxos | ✅ **F1-F7 completas**, em `feat/financeiro-dois-fluxos` |
+| 2 | Financeiro em dois fluxos | ✅ **mesclada em `main` em 14/08** (`e74360cb`) — F1-F7 |
 | 3 | Alçadas (as 4 condições, anti-fracionamento, emergência 48h, corte de 3 cotações) | ⬜ sem spec |
 | 4 | Status unificado (régua de 9 etapas) | ⬜ sem spec |
 | 5 | Relatórios (os 5) | ⬜ sem spec |
