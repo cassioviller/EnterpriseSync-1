@@ -49,11 +49,11 @@ ninguém consegue pagar, adiantamento que não some da lista).
 
 ## F1 — Modelos e migrations 287/288/289
 
-- [ ] **Step 0:** conferir `migration_history` no dev **antes** de fixar número. O spec diz
+- [x] **Step 0:** conferir `migration_history` no dev **antes** de fixar número. O spec diz
   287-289 e o repositório termina em 286 — mas essa conferência já falhou duas vezes
   (B6.1 e R1), e o merge de 14/08 mostrou por quê. Se o dev estiver à frente, renumerar
   aqui e **no spec**, e não seguir com dois documentos discordando.
-- [ ] **Step 1 (red):** testes que provam o esqueleto:
+- [x] **Step 1 (red):** testes que provam o esqueleto:
   - `NotaFiscalPedido` e `AdiantamentoFornecedor` importáveis de `models`;
   - UNIQUE `(admin_id, fornecedor_id, numero, serie)` recusa a mesma nota duas vezes;
   - `NotaFiscalPedido.chave_acesso` **aceita NULL** — é a diferença deliberada em relação
@@ -62,24 +62,24 @@ ninguém consegue pagar, adiantamento que não some da lista).
     default `'liberada'` num registro recém-criado.
 
   Rodar e **ver os quatro vermelhos**.
-- [ ] **Step 2:** os dois modelos em `models.py`, junto de `PedidoCompra` e `ContaPagar`
+- [x] **Step 2:** os dois modelos em `models.py`, junto de `PedidoCompra` e `ContaPagar`
   respectivamente — vizinhança importa para quem lê. Docstring no padrão da casa: o que é,
   por que existe, e **por que não reusa `NotaFiscal`** (o UNIQUE global de `chave_acesso` e
   o vínculo com `MovimentacaoEstoque`), com ponteiro para o parágrafo do spec.
-- [ ] **Step 3:** as colunas: `fluxo_pagamento` em `PedidoCompra`; `situacao_liberacao`,
+- [x] **Step 3:** as colunas: `fluxo_pagamento` em `PedidoCompra`; `situacao_liberacao`,
   `liberada_por_id`, `liberada_em` em `ContaPagar`; `fechado_por_id`, `fechado_em`,
   `reaberto_por_id` em `FechamentoPagamento`.
-- [ ] **Step 4:** `migration_287_nota_e_adiantamento` — as duas tabelas, com as constraints
+- [x] **Step 4:** `migration_287_nota_e_adiantamento` — as duas tabelas, com as constraints
   e os índices do spec. Sem backfill.
-- [ ] **Step 5:** `migration_288_regime_e_liberacao` — as sete colunas do Step 3. **Todos os
+- [x] **Step 5:** `migration_288_regime_e_liberacao` — as sete colunas do Step 3. **Todos os
   defaults descrevem o registro histórico**: pedido antigo é `faturado`, conta antiga é
   `liberada`. Um default diferente disso trancaria o parque no dia do deploy.
-- [ ] **Step 6:** `migration_289_flag_e_tolerancia` — `financeiro_dois_fluxos_ativo`
+- [x] **Step 6:** `migration_289_flag_e_tolerancia` — `financeiro_dois_fluxos_ativo`
   (bool, NOT NULL, default FALSE) e `tolerancia_divergencia_nf_pct` (numeric, default 2.00)
   em `configuracao_empresa`.
-- [ ] **Step 7 (green):** os quatro verdes. Aplicar as três migrations no dev e conferir por
+- [x] **Step 7 (green):** os quatro verdes. Aplicar as três migrations no dev e conferir por
   `psql`: tabelas, constraints, índices e defaults.
-- [ ] **Step 8:** commit — `feat(financeiro): tabelas de nota e adiantamento, regime e liberacao (migrations 287-289)`
+- [x] **Step 8:** commit — `feat(financeiro): tabelas de nota e adiantamento, regime e liberacao (migrations 287-289)`
 
 ## F2 — Flag por tenant e o carimbo do fluxo
 
