@@ -316,26 +316,21 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
         # fluxo — previsto E realizado. Consequência declarada: compra paga
         # pela tela de Contas a Pagar NÃO gera realizado no fluxo de caixa; o
         # realizado de compra entra só quando paga pela Gestão de Custos.
-        cp = ContaPagar(
-            admin_id=admin_id,
-            fornecedor_id=pedido.fornecedor_id,
-            obra_id=pedido.obra_id,
-            numero_documento=pedido.numero,
-            descricao=desc_cp[:500],
-            valor_original=v,
-            valor_pago=0,
-            saldo=v,
-            status='PENDENTE',
-            data_emissao=pedido.data_compra,
-            data_vencimento=data_venc,
-            origem_tipo='COMPRA',
-            origem_id=pedido.id,
-            pedido_compra_id=pedido.id,
-            parcela_numero=idx,
-            parcela_total=n_parcelas,
-            responsavel_id=pedido.responsavel_id,
-        )
-        db.session.add(cp)
+        # ⚠️ Fase 2 do ciclo de compras — a construção da `ContaPagar` SAIU
+        # deste laço. Ela agora nasce em
+        # `services.financeiro_compra.criar_obrigacao`, chamada logo abaixo,
+        # que reproduz campo a campo o que estava aqui e acrescenta uma coisa
+        # só: `situacao_liberacao`. Com o regime desligado o resultado é
+        # idêntico ao de antes — é o que o teste de paridade mede.
+        #
+        # O laço continua criando GCP e GCF: a camada de CUSTO não muda nesta
+        # fase, e misturar as duas coisas num mesmo commit é o que torna
+        # impossível dizer depois qual delas quebrou.
+
+    # A camada de OBRIGAÇÃO, num lugar só. Ter dois pontos criando ContaPagar
+    # de compra seria dois pontos onde a regra de liberação pode divergir.
+    from services.financeiro_compra import criar_obrigacao
+    criar_obrigacao(pedido)
 
     # Entrada automática no almoxarifado (ENTRADA + lote)
     movs_entrada = _gerar_entrada_almoxarifado(pedido, itens_validos, admin_id, usuario_id)

@@ -102,7 +102,7 @@ ninguém consegue pagar, adiantamento que não some da lista).
 
 ## F3 — O serviço: conta bloqueada, nota, liberação
 
-- [ ] **Step 1 (red):** testes do serviço, um por regra do spec:
+- [x] **Step 1 (red):** testes do serviço, um por regra do spec:
   - no regime novo + Fluxo A, a emissão cria `ContaPagar` **`bloqueada`**, com o valor do
     pedido (não zero — a projeção de caixa depende disso);
   - `lancar_nota()` recusa nota duplicada, aceita sem `chave_acesso`, e grava `lancada_por_id`;
@@ -112,17 +112,17 @@ ninguém consegue pagar, adiantamento que não some da lista).
     diferença na observação;
   - divergência nota × atestado **dentro** da tolerância libera; **fora** dela avisa e
     libera assim mesmo (D1), com o aviso persistido.
-- [ ] **Step 2:** `services/financeiro_compra.py` — chokepoint único, no molde de
+- [x] **Step 2:** `services/financeiro_compra.py` — chokepoint único, no molde de
   `services/recebimento_pedido.py`. `criar_obrigacao()`, `lancar_nota()`, `liberar()`,
   `pernas_faltantes(pedido)` como função **pura** (é ela que a tela e a mensagem de erro
   consomem, e função pura é a que dá para testar sem montar meio banco).
-- [ ] **Step 3:** mover a criação de `compras_views.py:305` para o serviço, com o caminho
+- [x] **Step 3:** mover a criação de `compras_views.py:305` para o serviço, com o caminho
   antigo preservado sob a flag desligada. **Não** apagar o código antigo: mesma decisão da
   R4, pelo mesmo motivo — o regime velho continua sendo o de quase todo tenant.
-- [ ] **Step 4 (green + mutação):** todos verdes. Mutação de sanidade: fazer
+- [x] **Step 4 (green + mutação):** todos verdes. Mutação de sanidade: fazer
   `pernas_faltantes` devolver lista vazia sempre e confirmar que o teste da tríade
   incompleta **mata** a mutação.
-- [ ] **Step 5:** commit — `feat(financeiro): servico da obrigacao de compra — conta bloqueada, nota e liberacao`
+- [x] **Step 5:** commit — `feat(financeiro): servico da obrigacao de compra — conta bloqueada, nota e liberacao`
 
 ## F4 — A tríade barra o pagamento
 

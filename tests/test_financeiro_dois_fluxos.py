@@ -362,3 +362,175 @@ def test_todo_ponto_que_cria_pedido_carimba_o_fluxo():
         f'`fluxo_do_pedido_novo(admin_id, escolha)` para pedido de usuário, ou '
         f"`'faturado'` explícito para dado histórico ou de demonstração.\n  "
         + '\n  '.join(sem_carimbo))
+
+
+# ---------------------------------------------------------------------------
+# F3 — o serviço: conta bloqueada, nota e liberação
+# ---------------------------------------------------------------------------
+
+def _tenant_regime_novo():
+    """Tenant com as duas flags ligadas + obra + fornecedor + pedido faturado."""
+    adm = _admin()
+    _cfg_tenant(adm.id, recebimento_atesto_ativo=True,
+                financeiro_dois_fluxos_ativo=True)
+    obra = _obra(adm.id)
+    forn = _fornecedor(adm.id)
+    ped = _pedido(adm.id, obra.id, forn.id)
+    ped.exige_atesto = True
+    ped.fluxo_pagamento = 'faturado'
+    db.session.commit()
+    return adm, obra, forn, ped
+
+
+def test_obrigacao_do_fluxo_a_nasce_bloqueada_com_o_valor_do_pedido():
+    """Bloqueada, e NÃO com valor zero.
+
+    O valor do atestado no instante da emissão é zero — nada chegou ainda. Uma
+    conta de R$ 0,00 some de toda projeção de caixa, e o financeiro perderia a
+    previsão, que é metade do valor do módulo. O reajuste para o atestado
+    acontece na LIBERAÇÃO, não no nascimento.
+    """
+    from services.financeiro_compra import criar_obrigacao
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+
+        contas = criar_obrigacao(ped)
+        db.session.commit()
+
+        assert contas, 'a emissão tem de criar a obrigação, mesmo bloqueada'
+        for cp in contas:
+            assert cp.situacao_liberacao == 'bloqueada'
+            assert cp.liberada_em is None
+        assert sum(Decimal(str(c.valor_original)) for c in contas) == Decimal('1625.00')
+
+
+def test_lancar_nota_recusa_duplicada_e_aceita_sem_chave():
+    from services.financeiro_compra import lancar_nota, NotaDuplicada
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+
+        nf = lancar_nota(ped, numero='555', serie='1',
+                         valor_total=Decimal('1625.00'),
+                         data_emissao=date(2026, 8, 5),
+                         data_vencimento=date(2026, 9, 5),
+                         usuario=adm)
+        db.session.commit()
+        assert nf.chave_acesso is None
+        assert nf.lancada_por_id == adm.id
+
+        with pytest.raises(NotaDuplicada):
+            lancar_nota(ped, numero='555', serie='1',
+                        valor_total=Decimal('1625.00'),
+                        data_emissao=date(2026, 8, 5),
+                        data_vencimento=date(2026, 9, 5), usuario=adm)
+        db.session.rollback()
+
+
+def test_pernas_faltantes_nomeia_o_que_falta():
+    """Função PURA — é o que a tela e a mensagem de erro consomem.
+
+    Pura porque a mensagem "sem nota lançada" tem de ser testável sem montar
+    meio banco, e porque recusar sem dizer o que falta é o que faz usuário
+    procurar o caminho de fora do sistema.
+    """
+    from services.financeiro_compra import lancar_nota, pernas_faltantes
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+
+        faltam = pernas_faltantes(ped)
+        assert 'nota' in ' '.join(faltam).lower()
+        assert 'atesto' in ' '.join(faltam).lower()
+
+        lancar_nota(ped, numero='777', serie='1',
+                    valor_total=Decimal('1625.00'),
+                    data_emissao=date(2026, 8, 5),
+                    data_vencimento=date(2026, 9, 5), usuario=adm)
+        db.session.commit()
+
+        faltam = pernas_faltantes(ped)
+        assert 'nota' not in ' '.join(faltam).lower()
+        assert 'atesto' in ' '.join(faltam).lower()
+
+
+def test_liberar_recusa_com_a_triade_incompleta():
+    from services.financeiro_compra import TriadeIncompleta, criar_obrigacao, liberar
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+        criar_obrigacao(ped)
+        db.session.commit()
+
+        with pytest.raises(TriadeIncompleta) as exc:
+            liberar(ped, usuario=adm)
+        assert 'nota' in str(exc.value).lower()
+        db.session.rollback()
+
+
+def test_paridade_da_obrigacao_com_a_flag_desligada():
+    """A prova de que mover a criação para o serviço não mudou nada.
+
+    Este é o teste que autoriza o Step 3 da F3: com `financeiro_dois_fluxos_ativo`
+    DESLIGADA, a `ContaPagar` que `processar_compra_normal` produz tem de ser a
+    mesma de antes — mesmos valores, mesmas parcelas, mesma descrição, e
+    `liberada`. Ler o diff não prova isso; contar as linhas no banco prova.
+    """
+    from compras_views import processar_compra_normal
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id, recebimento_atesto_ativo=False,
+                    financeiro_dois_fluxos_ativo=False)
+        obra = _obra(adm.id)
+        forn = _fornecedor(adm.id)
+        ped = _pedido(adm.id, obra.id, forn.id)
+
+        processar_compra_normal(ped, [], adm.id, adm.id)
+        db.session.commit()
+
+        contas = ContaPagar.query.filter_by(pedido_compra_id=ped.id).all()
+        assert len(contas) == 1
+        cp = contas[0]
+        assert cp.situacao_liberacao == 'liberada'
+        assert Decimal(str(cp.valor_original)) == Decimal('1625.00')
+        assert Decimal(str(cp.saldo)) == Decimal('1625.00')
+        assert cp.status == 'PENDENTE'
+        assert cp.origem_tipo == 'COMPRA'
+        assert cp.parcela_numero == 1 and cp.parcela_total == 1
+        assert cp.obra_id == obra.id
+        assert 'Forn Teste' in cp.descricao
+
+
+def test_liberar_reajusta_a_conta_para_o_que_chegou():
+    """O momento em que `valor_atestado` finalmente é lido por alguém.
+
+    Entrega parcial: pediu R$ 1.625,00 (50 × 32,50) e chegaram 30 — R$ 975,00.
+    A conta tem de cair para o que veio, e a diferença tem de ficar ESCRITA, não
+    sumida.
+    """
+    from services.financeiro_compra import criar_obrigacao, lancar_nota, liberar
+    from services.recebimento_pedido import registrar_recebimento
+    from models import PedidoCompraItem
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+        criar_obrigacao(ped)
+        db.session.commit()
+
+        item = PedidoCompraItem.query.filter_by(pedido_id=ped.id).first()
+        registrar_recebimento(
+            ped, usuario=adm, data=date(2026, 8, 10),
+            linhas=[(item.id, Decimal('30'))])
+        lancar_nota(ped, numero='4242', serie='1',
+                    valor_total=Decimal('975.00'),
+                    data_emissao=date(2026, 8, 10),
+                    data_vencimento=date(2026, 9, 10), usuario=adm)
+        db.session.commit()
+
+        contas = liberar(ped, usuario=adm)
+        db.session.commit()
+
+        assert len(contas) == 1
+        cp = contas[0]
+        assert cp.situacao_liberacao == 'liberada'
+        assert cp.liberada_por_id == adm.id
+        assert cp.liberada_em is not None
+        assert Decimal(str(cp.valor_original)) == Decimal('975.00')
+        assert 'ajustado' in (cp.observacoes or '').lower(), (
+            'a diferença tem de ficar escrita — sumir com ela é o defeito')
