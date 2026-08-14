@@ -6172,6 +6172,139 @@ def _migration_281_conta_receber_banco_id():
                 "estorno de recebimento passa a saber de onde debitar).")
 
 
+def _migration_283_recebimento_atesto():
+    """Fase 4 — as tabelas do recebimento e o regime do pedido.
+
+    Até aqui o material que chegava na obra não era registrado em lugar
+    nenhum: o estoque entrava na EMISSÃO do pedido
+    (compras_views._gerar_entrada_almoxarifado), e a rota `/receber` lançava
+    "o que falta" — que já era zero, o que fazia dela um no-op para todo
+    pedido 'normal'.
+
+    `pedido_compra.exige_atesto` é o REGIME, carimbado na criação a partir da
+    flag do tenant (migration 284). Default FALSE, e é por isso que esta
+    migration não tem backfill: pedido histórico É legado, e FALSE descreve
+    exatamente o que aconteceu com ele — o estoque dele já entrou na emissão,
+    e reescrever isso seria reescrever estoque histórico.
+
+    `situacao_recebimento` nasce 'nao_recebido' pelo mesmo motivo. Ela é
+    derivável da soma dos recebimentos, mas fica persistida para não fazer N+1
+    na listagem de pedidos; o drift é vigiado por
+    scripts/verificar_consistencia_recebimento.py.
+
+    Alocação: 283. A faixa 282-283 estava anotada como livre no docstring da
+    281; a 282 foi consumida pelo backfill do CRM em 07/08, e esta toma a 283.
+    Conferido contra `migration_history` do dev em 11/08 (máx. aplicada: 282).
+
+    Idempotente: IF NOT EXISTS em tudo.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text("""
+            CREATE TABLE IF NOT EXISTS recebimento_pedido (
+                id SERIAL PRIMARY KEY,
+                pedido_id INTEGER NOT NULL
+                    REFERENCES pedido_compra(id) ON DELETE CASCADE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                sequencia INTEGER NOT NULL DEFAULT 1,
+                recebido_por_id INTEGER NOT NULL REFERENCES usuario(id),
+                data_recebimento DATE NOT NULL,
+                observacao TEXT,
+                encerra_saldo BOOLEAN NOT NULL DEFAULT FALSE,
+                motivo_encerramento TEXT,
+                created_at TIMESTAMP,
+                CONSTRAINT uq_recebimento_pedido_sequencia
+                    UNIQUE (pedido_id, sequencia)
+            )"""))
+        conn.execute(sa_text(
+            "CREATE INDEX IF NOT EXISTS ix_recebimento_pedido_pedido "
+            "ON recebimento_pedido (pedido_id)"))
+
+        conn.execute(sa_text("""
+            CREATE TABLE IF NOT EXISTS recebimento_pedido_item (
+                id SERIAL PRIMARY KEY,
+                recebimento_id INTEGER NOT NULL
+                    REFERENCES recebimento_pedido(id) ON DELETE CASCADE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                pedido_item_id INTEGER NOT NULL
+                    REFERENCES pedido_compra_item(id),
+                quantidade_recebida NUMERIC(12, 3) NOT NULL,
+                almoxarifado_movimento_id INTEGER
+                    REFERENCES almoxarifado_movimento(id) ON DELETE SET NULL,
+                CONSTRAINT uq_recebimento_item_pedido_item
+                    UNIQUE (recebimento_id, pedido_item_id)
+            )"""))
+        conn.execute(sa_text(
+            "CREATE INDEX IF NOT EXISTS ix_recebimento_item_pedido_item "
+            "ON recebimento_pedido_item (pedido_item_id)"))
+
+        conn.execute(sa_text(
+            "ALTER TABLE pedido_compra ADD COLUMN IF NOT EXISTS exige_atesto "
+            "BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(sa_text(
+            "ALTER TABLE pedido_compra ADD COLUMN IF NOT EXISTS "
+            "situacao_recebimento VARCHAR(24) NOT NULL "
+            "DEFAULT 'nao_recebido'"))
+
+    logger.info("[Migration 283] recebimento_pedido + recebimento_pedido_item "
+                "criadas; pedido_compra ganhou exige_atesto e "
+                "situacao_recebimento (Fase 4 — o estoque passa a nascer do "
+                "atesto).")
+
+
+def _migration_284_flag_recebimento_atesto():
+    """Fase 4 — `configuracao_empresa.recebimento_atesto_ativo`.
+
+    Irmã de `compras_governanca_ativa` (migration 246): a virada é POR TENANT,
+    porque ligar o regime novo muda de onde o almoxarifado recebe entrada, e
+    isso não se faz no parque inteiro num deploy.
+
+    Default FALSE — ninguém vira sozinho. Quem liga é
+    scripts/flag_recebimento_atesto.py, que recusa tenant sem item de
+    almoxarifado cadastrado (ligar ali criaria pedido que ninguém consegue
+    receber).
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+            "recebimento_atesto_ativo BOOLEAN NOT NULL DEFAULT FALSE"))
+    logger.info("[Migration 284] configuracao_empresa."
+                "recebimento_atesto_ativo criada (default FALSE — a virada do "
+                "recebimento é por tenant).")
+
+
+def _migration_285_saida_do_atesto():
+    """Fase 4 / C2 — `recebimento_pedido_item.almoxarifado_saida_movimento_id`.
+
+    A correção do achado 1 da revisão de 12/08: o regime novo gerava só a
+    ENTRADA, porque o guard de emissão devolve `[]` e os dois chamadores
+    derivavam a SAÍDA pareada dessa lista. Material comprado para obra ficava
+    DISPONIVEL para sempre, quando antes era reconhecido como consumido no
+    ato.
+
+    Com a saída voltando a existir, o estorno da exclusão de recebimento
+    precisa saber QUAL saída era dele: a que ele gerou e a que alguém lançou
+    depois apontam para o mesmo lote, e só a primeira pode ser desfeita.
+    Guardar o id resolve isso sem convenção frágil.
+
+    Sem backfill: recebimento gravado antes desta correção não tem saída para
+    apontar, e NULL descreve exatamente isso.
+
+    Alocação: 285. Conferido em `migration_history` no dev em 12/08 — a última
+    aplicada é a 284.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE recebimento_pedido_item ADD COLUMN IF NOT EXISTS "
+            "almoxarifado_saida_movimento_id INTEGER "
+            "REFERENCES almoxarifado_movimento(id) ON DELETE SET NULL"))
+    logger.info("[Migration 285] recebimento_pedido_item."
+                "almoxarifado_saida_movimento_id criada (a saída pareada do "
+                "atesto, para o estorno saber o que desfazer).")
+
+
 def _migration_286_timbre_pdf():
     """`configuracao_empresa.timbre_pdf` — a identidade dos PDFs, em JSON.
 
@@ -6184,11 +6317,12 @@ def _migration_286_timbre_pdf():
     na falta deles, nos tokens do kit oficial. É o que torna a coluna aditiva:
     ninguém muda de comportamento por ela existir.
 
-    Alocação do número: **286**, e não 283. A faixa 283-285 está tomada pela
-    branch `feat/recebimento-atesto`, que ainda NÃO foi mesclada em `main` —
-    conferir antes de fixar é a lição da B6.1, repetida na R1 do plano de
-    compras, e aqui ela apareceu de novo: `main` termina em 282 e o número
-    "livre" seria 283, que colidiria no dia do merge.
+    Alocação do número: **286**, e não 283. Quando esta migration foi escrita,
+    a faixa 283-285 já estava tomada pela branch `feat/recebimento-atesto`,
+    que ainda não tinha sido mesclada em `main` — conferir antes de fixar é a
+    lição da B6.1, repetida na R1 do plano de compras, e aqui ela apareceu de
+    novo: `main` terminava em 282 e o número "livre" seria 283, que colidiria
+    no dia do merge. (Este merge é aquele dia, e não houve colisão.)
 
     Idempotente por `IF NOT EXISTS`. `jsonb` e não `json`: o Postgres compara e
     indexa jsonb, e a diferença de custo na escrita é irrelevante para uma
@@ -6559,7 +6693,10 @@ def executar_migracoes():
             (280, "B5.6 / D-B5.6(A) — conta_pagar.banco_id: o banco debitado na baixa, para o estorno creditar de volta (NULL = sem banco ou pré-migração)", _migration_280_conta_pagar_banco_id),
             (281, "B6.1 / D-B6.1 — conta_receber.banco_id: o banco creditado na baixa, para o estorno de recebimento debitar de volta (NULL = sem banco, pré-migração ou OBRA_MEDICAO)", _migration_281_conta_receber_banco_id),
             (282, "CRM C1 / D-CRM.1 — backfill dos dropdowns: cria o grupo que a 173 pulou e copia as opções legadas crm_* que a 174 não alcançou (JOIN sem grupo não casa)", _migration_282_backfill_dropdown_crm),
-            (286, "Timbre dos PDFs — configuracao_empresa.timbre_pdf (JSONB): logo, dados da empresa e cores num JSON importável pela tela. 283-285 estão tomadas pela branch feat/recebimento-atesto, ainda não mesclada", _migration_286_timbre_pdf),
+            (283, "Fase 4 — recebimento_pedido + recebimento_pedido_item; pedido_compra.exige_atesto (regime carimbado na linha) e situacao_recebimento", _migration_283_recebimento_atesto),
+            (284, "Fase 4 — configuracao_empresa.recebimento_atesto_ativo: a virada do recebimento é por tenant (default FALSE)", _migration_284_flag_recebimento_atesto),
+            (285, "Fase 4/C2 — recebimento_pedido_item.almoxarifado_saida_movimento_id: a saída de consumo pareada do atesto, para o estorno saber o que desfazer", _migration_285_saida_do_atesto),
+            (286, "Timbre dos PDFs — configuracao_empresa.timbre_pdf (JSONB): logo, dados da empresa e cores num JSON importável pela tela", _migration_286_timbre_pdf),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

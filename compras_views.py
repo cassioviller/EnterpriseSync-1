@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -24,7 +25,8 @@ from services.alcada_compras import (esta_totalmente_aprovada,
 from services.requisicao_compra import (TransicaoInvalida, proximo_numero,
                                         recalcular_valor, transicionar)
 from utils.autorizacao import (obras_visiveis, pode_comprar_na_obra,
-                               pode_requisitar_na_obra, pode_ver_obra)
+                               pode_receber_na_obra, pode_requisitar_na_obra,
+                               pode_ver_obra)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,16 @@ compras_bp = Blueprint('compras', __name__, url_prefix='/compras')
 
 UPLOAD_FOLDER = os.path.join('static', 'uploads', 'compras')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf', 'xml', 'webp'}
+
+# Fase 4 — os rótulos das quatro situações de `PedidoCompra.situacao_recebimento`.
+# O valor persistido é o do serviço (services/recebimento_pedido); aqui é só
+# como ele aparece na tela.
+SITUACOES_RECEBIMENTO = {
+    'nao_recebido': 'Não recebido',
+    'parcial': 'Recebido parcialmente',
+    'recebido': 'Recebido',
+    'encerrado_com_saldo': 'Encerrado com saldo',
+}
 
 CONDICOES = {
     'a_vista': 'À Vista',
@@ -56,6 +68,19 @@ def _check_v2():
 
 def _admin_id():
     return get_tenant_admin_id()
+
+
+def _regime_recebimento(admin_id):
+    """O regime de recebimento a carimbar num pedido que nasce agora.
+
+    Indireção de uma linha de propósito: os DOIS pontos que criam
+    `PedidoCompra` (o POST avulso e a emissão a partir de requisição) chamam
+    esta função em vez de ler a flag cada um por si. Duas leituras são duas
+    chances de divergirem na regra — e a regra aqui decide se o estoque entra
+    na emissão ou só no atesto.
+    """
+    from services.recebimento_pedido import regime_do_tenant
+    return regime_do_tenant(admin_id)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -97,7 +122,22 @@ def _gerar_entrada_almoxarifado(pedido, itens_validos, admin_id, usuario_id):
 
     NÃO commita — o chamador é responsável pelo commit/rollback.
     Retorna lista de tuplas (movimento, estoque) criadas.
+
+    Fase 4 — pedido com `exige_atesto` NÃO passa por aqui: o estoque dele
+    nasce do atesto (services/recebimento_pedido.registrar_recebimento), com a
+    quantidade que fisicamente chegou. Emitir não é receber; o caminhão ainda
+    nem saiu quando esta função rodaria.
+
+    O guard mora AQUI, e não nos dois chamadores, porque é aqui que a escrita
+    acontece: um terceiro chamador nascer no futuro não reabre a dupla
+    escrita por esquecimento. Ver o spec, seção "Como fica".
     """
+    if getattr(pedido, 'exige_atesto', False):
+        logger.info(
+            f"[emissão] pedido={pedido.id} exige atesto — estoque não entra "
+            f"agora, entra no recebimento")
+        return []
+
     itens_catalogo = [(desc, qtd, preco, almox_id, subtotal)
                       for desc, qtd, preco, almox_id, subtotal in itens_validos
                       if almox_id]
@@ -483,6 +523,7 @@ def index():
         filtro_data_inicio=filtro_data_inicio,
         filtro_data_fim=filtro_data_fim,
         CONDICOES=CONDICOES,
+        SITUACOES_RECEBIMENTO=SITUACOES_RECEBIMENTO,
     )
 
 
@@ -754,6 +795,9 @@ def nova_post():
             responsavel_id=responsavel_id,
             data_vencimento_primeira_parcela=data_primeira_parcela,
             intervalo_parcelas_dias=intervalo_parcelas_dias,
+            # Fase 4 — o regime é carimbado no nascimento e não muda depois,
+            # nem se a flag do tenant for desligada (services/recebimento_pedido).
+            exige_atesto=_regime_recebimento(admin_id),
         )
         db.session.add(pedido)
         db.session.flush()
@@ -811,7 +855,16 @@ def nova_post():
             except Exception as _re:
                 logger.warning(f"[WARN] Reembolso compra nao processado: {_re}")
 
-            flash('Compra registrada com sucesso! Custo, contas a pagar e entrada no almoxarifado geradas.', 'success')
+            if pedido.exige_atesto:
+                # No regime novo o estoque NÃO entra aqui — entra no atesto.
+                # Repetir a mensagem antiga faria quem lê não abrir a tela de
+                # recebimento quando o caminhão chegasse, e o material ficaria
+                # sem lançamento em lugar nenhum.
+                flash('Compra registrada com sucesso! Custo e contas a pagar '
+                      'gerados. O estoque entra quando o recebimento for '
+                      'atestado na obra.', 'success')
+            else:
+                flash('Compra registrada com sucesso! Custo, contas a pagar e entrada no almoxarifado geradas.', 'success')
 
         else:  # tipo_compra == 'aprovacao_cliente'
             # Apenas persiste o pedido + itens. Custos e movimentos só serão criados
@@ -899,6 +952,11 @@ def detalhe(pedido_id):
         todos_recebidos=todos_recebidos,
         fornecedores=fornecedores,
         obras=obras,
+        SITUACOES_RECEBIMENTO=SITUACOES_RECEBIMENTO,
+        # A permissão é consultada AQUI, e não no template: botão verde que
+        # responde 403 é pior que botão ausente, e é assim que os outros
+        # botões desta tela já se comportam.
+        pode_receber=pode_receber_na_obra(pedido.obra_id),
     )
 
 
@@ -918,18 +976,310 @@ def comprovante(pedido_id):
 
 
 # ─────────────────────────────────────────────
-# RECEBIMENTO NO ALMOXARIFADO
+# RECEBIMENTO NA OBRA — Fase 4
+# ─────────────────────────────────────────────
+def _quantidade_do_form(valor):
+    """Texto do formulário → `(Decimal, erro)`. Erro é mensagem para humano.
+
+    Devolve o erro em vez de engolir. A versão anterior transformava tudo o
+    que não entendia em `Decimal('0')` — e zero, nesta tela, significa "item
+    que não veio nesta entrega". Um "3O" digitado com a letra O sumia da
+    entrega, o recebimento era gravado sem aquele item, e o flash saía verde:
+    quem estava no portão ia embora achando que tinha atestado o cimento.
+
+    A vírgula é decimal, porque é o que o teclado brasileiro entrega. O ponto
+    é decimal quando não pode ser milhar, milhar quando não pode ser decimal,
+    e **recusado quando pode ser os dois**: "1.500" tanto vale mil e
+    quinhentos quanto um e meio, e escolher errado entre eles erra por 1000×
+    sem ninguém ver. Entre duas leituras dessas, perguntar é a única resposta
+    honesta.
+
+    Campo vazio continua sendo ausência, não erro: `(Decimal('0'), None)`.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    texto = (valor or '').strip()
+    if not texto:
+        return Decimal('0'), None
+
+    bruto = texto.replace(' ', '').replace(' ', '')
+    tem_virgula = ',' in bruto
+    tem_ponto = '.' in bruto
+
+    ilegivel = (Decimal('0'), (
+        f'não deu para ler "{texto}" como quantidade. Digite só o número, '
+        f'com vírgula no decimal (ex.: 30,5).'))
+
+    if tem_virgula and tem_ponto:
+        # "1.500,25" — com a vírgula presente, o ponto só pode ser milhar.
+        inteiro, _, decimais = bruto.partition(',')
+        if not _milhar_bem_formado(inteiro):
+            return ilegivel
+        normalizado = f'{inteiro.replace(".", "")}.{decimais}'
+    elif tem_virgula:
+        normalizado = bruto.replace(',', '.')
+    elif tem_ponto:
+        grupos = bruto.split('.')
+        if len(grupos) > 2:
+            # "1.500.000" é milhar; "30.5.0" não é número nenhum, e lê-lo
+            # como 3050 seria a mesma adivinhação que este parser existe
+            # para não fazer.
+            if not _milhar_bem_formado(bruto):
+                return ilegivel
+            normalizado = bruto.replace('.', '')
+        elif len(grupos[1]) == 3 and grupos[0].lstrip('+-').isdigit():
+            # O caso ambíguo, e o único que recusamos por ambiguidade.
+            milhar = _num_pt(bruto.replace('.', ''))
+            decimal_ = _num_pt(bruto)
+            return Decimal('0'), (
+                f'"{texto}" pode ser {milhar} ou {decimal_}, e a diferença é '
+                f'de mil vezes. Escreva {milhar} ou {decimal_} para não '
+                f'restar dúvida.')
+        else:
+            normalizado = bruto
+    else:
+        normalizado = bruto
+
+    try:
+        quantidade = Decimal(normalizado)
+    except InvalidOperation:
+        return Decimal('0'), (
+            f'não deu para ler "{texto}" como quantidade. Digite só o número, '
+            f'com vírgula no decimal (ex.: 30,5).')
+
+    if not quantidade.is_finite():
+        # `Decimal('nan')` e `Decimal('inf')` não levantam no construtor, e
+        # comparar NaN com zero levanta `InvalidOperation` lá adiante.
+        return Decimal('0'), (
+            f'"{texto}" não é uma quantidade. Digite só o número, com vírgula '
+            f'no decimal (ex.: 30,5).')
+
+    return quantidade, None
+
+
+def _milhar_bem_formado(inteiro):
+    """"1.500.000" sim, "30.5.0" não — os grupos depois do primeiro têm 3 dígitos.
+
+    É o que separa milhar de digitação embolada. Sem esta checagem, "30.5.0"
+    vira 3050 calado, que é o mesmo defeito que o parser existe para não ter.
+    """
+    grupos = inteiro.split('.')
+    if len(grupos) < 2:
+        return bool(grupos[0]) and grupos[0].lstrip('+-').isdigit()
+    cabeca = grupos[0].lstrip('+-')
+    return (cabeca.isdigit() and 1 <= len(cabeca) <= 3
+            and all(g.isdigit() and len(g) == 3 for g in grupos[1:]))
+
+
+def _num_pt(valor):
+    """Decimal ou texto numérico → '1500' / '1,5', no formato de quem lê."""
+    from decimal import Decimal, InvalidOperation
+    try:
+        return format(Decimal(str(valor)).normalize(), 'f').replace('.', ',')
+    except InvalidOperation:
+        return str(valor)
+
+
+def _num_enxuto(valor):
+    """Decimal('20.000') → '20'; Decimal('20.500') → '20.5'; zero → ''.
+
+    A coluna é `Numeric(12,3)`, então tudo sai com três casas. Preencher o
+    campo do celular com "20.000" faz quem recebe apagar caractere por
+    caractere antes de digitar o número certo.
+    """
+    if not valor:
+        return ''
+    texto = format(Decimal(valor).normalize(), 'f')
+    return texto
+
+
+@compras_bp.route('/<int:pedido_id>/recebimento', methods=['GET', 'POST'])
+@login_required
+def recebimento(pedido_id):
+    """A tela de quem recebe o caminhão no portão da obra.
+
+    Substitui, para pedido do regime novo, o botão que hoje aceita o clique e
+    não faz nada: o estoque desses pedidos já entrou na emissão, então a rota
+    antiga calcula pendente=0 e sai calada. Aqui pedido legado é **recusado
+    com a razão dita** — um no-op silencioso é pior que uma recusa, porque
+    quem clicou acha que registrou.
+
+    GET e POST na mesma rota porque é uma tela só, usada no celular: campo de
+    quantidade por item já preenchido com o que falta, observação, e o par
+    encerrar-saldo + motivo.
+    """
+    from flask import abort
+
+    from services.recebimento_pedido import (RecebimentoInvalido,
+                                             validar_estado_do_pedido,
+                                             recebido_por_item,
+                                             registrar_recebimento)
+
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    pedido = PedidoCompra.query.filter_by(
+        id=pedido_id, admin_id=admin_id).first_or_404()
+
+    if not pode_receber_na_obra(pedido.obra_id):
+        abort(403)
+
+    if not pedido.exige_atesto:
+        flash('Este pedido é do regime antigo: o estoque dele já entrou na '
+              'emissão da compra, e receber de novo o contaria em dobro. Use '
+              'o botão de recebimento no estoque, na tela do pedido.', 'warning')
+        return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
+    # A mesma regra do serviço, perguntada antes de a tela abrir: deixar
+    # alguém preencher quantidade por item para levar a recusa no POST é
+    # gastar o tempo de quem está com o caminhão parado no portão.
+    try:
+        validar_estado_do_pedido(pedido)
+    except RecebimentoInvalido as e:
+        flash(str(e), 'warning')
+        return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
+    itens = PedidoCompraItem.query.filter_by(pedido_id=pedido_id).all()
+    acumulado = recebido_por_item(pedido)
+    falta = {i.id: max(Decimal('0'), Decimal(str(i.quantidade or 0))
+                       - acumulado.get(i.id, Decimal('0'))) for i in itens}
+
+    if request.method == 'POST':
+        linhas = []
+        ilegiveis = []
+        for i in itens:
+            qtd, erro = _quantidade_do_form(request.form.get(f'qtd_{i.id}'))
+            if erro:
+                ilegiveis.append(f'"{i.descricao}": {erro}')
+            elif qtd != 0:
+                # Item ausente é item que não veio nesta entrega — e agora é
+                # só isso: quantidade ilegível não vira mais zero e some.
+                linhas.append((i.id, qtd))
+
+        if ilegiveis:
+            flash(' '.join(ilegiveis), 'danger')
+            return redirect(url_for('compras.recebimento', pedido_id=pedido_id))
+
+        data_txt = (request.form.get('data_recebimento') or '').strip()
+        try:
+            data_rec = (datetime.strptime(data_txt, '%Y-%m-%d').date()
+                        if data_txt else date.today())
+        except ValueError:
+            data_rec = date.today()
+
+        try:
+            rec = registrar_recebimento(
+                pedido, current_user, linhas, data_rec,
+                observacao=(request.form.get('observacao') or '').strip() or None,
+                encerra_saldo=bool(request.form.get('encerra_saldo')),
+                motivo=(request.form.get('motivo_encerramento') or '').strip(),
+                permitir_sobre_entrega=bool(
+                    request.form.get('permitir_sobre_entrega')),
+            )
+        except RecebimentoInvalido as e:
+            db.session.rollback()
+            flash(str(e), 'danger')
+            return redirect(url_for('compras.recebimento', pedido_id=pedido_id))
+
+        flash(f'Recebimento {rec.rotulo} registrado. Pedido agora: '
+              f'{SITUACOES_RECEBIMENTO.get(pedido.situacao_recebimento, "—")}.',
+              'success')
+        return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
+    return render_template(
+        'compras/recebimento.html',
+        pedido=pedido,
+        itens=itens,
+        falta={item_id: _num_enxuto(qtd) for item_id, qtd in falta.items()},
+        pedido_qtd={i.id: _num_enxuto(i.quantidade) for i in itens},
+        recebido={item_id: _num_enxuto(qtd)
+                  for item_id, qtd in acumulado.items()},
+        recebimentos=pedido.recebimentos.all(),
+        SITUACOES_RECEBIMENTO=SITUACOES_RECEBIMENTO,
+        hoje=date.today().isoformat(),
+    )
+
+
+@compras_bp.route('/<int:pedido_id>/recebimento/<int:recebimento_id>/excluir',
+                  methods=['POST'])
+@login_required
+def excluir_recebimento(pedido_id, recebimento_id):
+    """Desfaz o ÚLTIMO recebimento do pedido, estornando o estoque que gerou.
+
+    O serviço existe desde a R5 e não tinha por onde ser chamado: errar a
+    quantidade é o erro mais comum de quem recebe caminhão no portão, e a
+    única correção possível era acesso direto ao banco.
+
+    Toda a regra (só o último, só enquanto o material estiver na prateleira,
+    quem pode) vive em `services.recebimento_pedido.excluir_recebimento`. Esta
+    rota só resolve o pedido, checa o tenant e mostra a mensagem que vier.
+    """
+    from flask import abort
+
+    from models import RecebimentoPedido
+    from services.recebimento_pedido import RecebimentoInvalido
+    from services.recebimento_pedido import \
+        excluir_recebimento as servico_excluir
+
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    pedido = PedidoCompra.query.filter_by(
+        id=pedido_id, admin_id=admin_id).first_or_404()
+
+    if not pode_receber_na_obra(pedido.obra_id):
+        abort(403)
+
+    recebimento = RecebimentoPedido.query.filter_by(
+        id=recebimento_id, pedido_id=pedido.id, admin_id=admin_id).first_or_404()
+    rotulo = recebimento.rotulo
+
+    try:
+        servico_excluir(recebimento, current_user)
+    except RecebimentoInvalido as e:
+        db.session.rollback()
+        flash(str(e), 'danger')
+        return redirect(url_for('compras.recebimento', pedido_id=pedido_id))
+
+    flash(f'Recebimento {rotulo} excluído, e o estoque que ele gerou foi '
+          f'estornado. Pedido agora: '
+          f'{SITUACOES_RECEBIMENTO.get(pedido.situacao_recebimento, "—")}.',
+          'success')
+    return redirect(url_for('compras.recebimento', pedido_id=pedido_id))
+
+
+# ─────────────────────────────────────────────
+# RECEBIMENTO NO ALMOXARIFADO — rota do regime antigo
 # ─────────────────────────────────────────────
 @compras_bp.route('/receber/<int:pedido_id>', methods=['POST'])
 @login_required
 def receber(pedido_id):
-    """Registra o recebimento físico dos itens de um PedidoCompra no almoxarifado."""
+    """Registra o recebimento físico dos itens de um PedidoCompra no almoxarifado.
+
+    Fase 4 — esta rota é do REGIME ANTIGO e não some: o estoque de pedido
+    legado já entrou na emissão, e mudar isso reescreveria estoque histórico.
+    Pedido com `exige_atesto` recebe pela tela nova (`compras.recebimento`).
+    """
     guard = _check_v2()
     if guard:
         return guard
 
     admin_id = _admin_id()
     pedido = PedidoCompra.query.filter_by(id=pedido_id, admin_id=admin_id).first_or_404()
+
+    # A porta dos fundos da dupla escrita. O botão do detalhe já não aponta
+    # para cá em pedido do regime novo, mas quem tiver a URL ainda pode
+    # postar — e aqui a quantidade lançada é a INTEIRA, a mesma que o atesto
+    # vai lançar quando o caminhão chegar.
+    if pedido.exige_atesto:
+        flash('Este pedido recebe por atesto: o estoque entra pela quantidade '
+              'que chegar em cada entrega, na tela de recebimento.', 'warning')
+        return redirect(url_for('compras.recebimento', pedido_id=pedido_id))
+
     itens = PedidoCompraItem.query.filter_by(pedido_id=pedido_id).all()
     itens_com_catalogo = [i for i in itens if i.almoxarifado_item_id]
 
@@ -1111,6 +1461,23 @@ def excluir(pedido_id):
 
     admin_id = _admin_id()
     pedido = PedidoCompra.query.filter_by(id=pedido_id, admin_id=admin_id).first_or_404()
+
+    # Pedido com atesto gravado não é excluído por aqui. O cascade levaria a
+    # trilha de recebimento junto (quem recebeu, quando, com que observação —
+    # o controle compensatório pela ausência de segregação de funções),
+    # enquanto ENTRADA, SAÍDA e lote sobreviveriam com `pedido_compra_id`
+    # NULL, por ON DELETE SET NULL: estoque sem documento que explique de onde
+    # veio. E todos os guards de `excluir_recebimento` — só o último, só
+    # enquanto o material estiver na prateleira — ficariam contornados por
+    # esta porta.
+    quantos = pedido.recebimentos.count()
+    if quantos:
+        flash(f'Este pedido tem {quantos} recebimento(s) registrado(s), e o '
+              f'estoque que eles geraram está no almoxarifado. Exclua os '
+              f'recebimentos primeiro, do último para o primeiro — o estorno '
+              f'acontece lá, com as conferências que ele faz.', 'danger')
+        return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
     try:
         # Remover GestaoCustoPai vinculados (criados via filho origem_tabela=pedido_compra)
         filhos = GestaoCustoFilho.query.filter_by(
@@ -1731,6 +2098,8 @@ def requisicao_emitir_pedido(requisicao_id):
             admin_id=admin_id,
             responsavel_id=current_user.id,
             requisicao_id=requisicao.id,
+            # Fase 4 — idem ao POST avulso: mesma função, mesmo carimbo.
+            exige_atesto=_regime_recebimento(admin_id),
         )
         db.session.add(pedido)
         db.session.flush()

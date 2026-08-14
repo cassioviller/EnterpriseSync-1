@@ -4385,6 +4385,17 @@ class ConfiguracaoEmpresa(db.Model):
     compras_governanca_ativa = db.Column(db.Boolean, nullable=False,
                                          default=False, server_default='false')
 
+    # Fase 4 — flag de rollout do recebimento com atesto, por tenant.
+    # Default FALSE: com ela desligada, o estoque entra na EMISSÃO do pedido
+    # (compras_views._gerar_entrada_almoxarifado) exatamente como sempre.
+    # Ligada, os pedidos NOVOS nascem com `exige_atesto=True` e o estoque
+    # passa a nascer do atesto de recebimento — e só dele.
+    # A virada é por tenant porque muda de onde o almoxarifado recebe entrada,
+    # e isso não se faz no parque inteiro num deploy. Liga-se por
+    # scripts/flag_recebimento_atesto.py. Irmã de compras_governanca_ativa.
+    recebimento_atesto_ativo = db.Column(db.Boolean, nullable=False,
+                                         default=False, server_default='false')
+
     # Cronograma editável Fase 1 — motor de agendamento novo
     # (multi-predecessoras via tarefa_vinculo, caminho crítico) mais a grade
     # tipo planilha com menu de botão direito. Nasceu como flag de rollout
@@ -5672,6 +5683,29 @@ class PedidoCompra(db.Model):
         'RequisicaoCompra', foreign_keys=[requisicao_id],
         backref=db.backref('pedidos', lazy='dynamic'))
 
+    # ── Fase 4 (recebimento e atesto), migration 283 ──
+    #
+    # `exige_atesto` é o REGIME do pedido, carimbado na criação a partir de
+    # `configuracao_empresa.recebimento_atesto_ativo`. Carimbar na linha, e não
+    # comparar `created_at` com uma data de corte, é o que impede que ligar e
+    # desligar a flag reinterprete pedido já fechado: um pedido recebido sob o
+    # regime antigo continua sendo cobrado pelo antigo, para sempre. Mesmo
+    # raciocínio de `RequisicaoTransicao.valor_no_momento`.
+    #
+    # False = regime antigo: o estoque entra na EMISSÃO
+    # (compras_views._gerar_entrada_almoxarifado) e a rota /receber lança o
+    # saldo. True = o estoque nasce do atesto, e só dele.
+    exige_atesto = db.Column(db.Boolean, nullable=False, default=False,
+                             server_default='false')
+    # Derivada da soma dos recebimentos, mas PERSISTIDA: derivar a cada
+    # listagem seria N+1 na tela de pedidos. Quem escreve é só
+    # services/recebimento_pedido.py; o drift é vigiado por
+    # scripts/verificar_consistencia_recebimento.py.
+    # nao_recebido | parcial | recebido | encerrado_com_saldo
+    situacao_recebimento = db.Column(db.String(24), nullable=False,
+                                     default='nao_recebido',
+                                     server_default='nao_recebido')
+
 
 class PedidoCompraItem(db.Model):
     """Itens de um pedido de compra V2"""
@@ -5688,6 +5722,145 @@ class PedidoCompraItem(db.Model):
 
     # Relacionamentos
     almoxarifado_item = db.relationship('AlmoxarifadoItem', backref='pedido_itens', foreign_keys=[almoxarifado_item_id])
+
+
+class RecebimentoPedido(db.Model):
+    """O material chegou na obra — quem recebeu, quando, e o que veio junto.
+
+    Fase 4. Até 2026-08-11 esse fato não existia em lugar nenhum: `atesto` e
+    `recebido_por` não apareciam no código. O estoque entrava na EMISSÃO do
+    pedido (compras_views._gerar_entrada_almoxarifado), semanas antes de o
+    caminhão chegar, e a rota `/receber` lançava "o que falta" — que já era
+    zero, o que fazia dela um no-op silencioso para todo pedido 'normal'.
+
+    Um pedido tem N recebimentos: entrega parcial é a regra, não a exceção.
+    A situação do pedido (`PedidoCompra.situacao_recebimento`) é a soma destes
+    documentos, item a item.
+
+    NÃO tem número global próprio. `sequencia` é 1, 2, 3… DENTRO do pedido, e o
+    rótulo que a tela mostra é derivado: `PC-1234/2`. Uma terceira sequência
+    global teria de ser mantida em sincronia com as outras duas sem ganhar
+    nada — a rastreabilidade pedida já vem da cadeia
+    `RC-2026-0001 → PC-1234 → PC-1234/2`.
+
+    Quem pode atestar: qualquer papel de obra menos LEITOR, INCLUSIVE quem
+    solicitou e quem emitiu o pedido. É decisão registrada no spec, não
+    esquecimento: em obra de equipe pequena quem pede é quem recebe o caminhão,
+    e exigir uma terceira pessoa deixaria material parado no portão. O controle
+    compensatório é esta trilha — autoria e data por entrega —, não a separação
+    de pessoas.
+    """
+    __tablename__ = 'recebimento_pedido'
+    __table_args__ = (
+        db.UniqueConstraint('pedido_id', 'sequencia',
+                            name='uq_recebimento_pedido_sequencia'),
+        db.Index('ix_recebimento_pedido_pedido', 'pedido_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    pedido_id = db.Column(
+        db.Integer, db.ForeignKey('pedido_compra.id', ondelete='CASCADE'),
+        nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    sequencia = db.Column(db.Integer, nullable=False, default=1)
+
+    recebido_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                                nullable=False)
+    # A data do FATO, não a do registro: o material chega no sábado e alguém
+    # lança na segunda. `created_at` guarda o registro.
+    data_recebimento = db.Column(db.Date, nullable=False)
+    # Divergência de quantidade OU de qualidade ("dois sacos vieram rasgados").
+    observacao = db.Column(db.Text)
+
+    # Encerrar o saldo é dizer "o resto não vem". Fecha o pedido mesmo faltando
+    # quantidade, e o motivo é obrigatório — é ele que torna o encerramento
+    # auditável seis meses depois.
+    encerra_saldo = db.Column(db.Boolean, nullable=False, default=False,
+                              server_default='false')
+    motivo_encerramento = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    pedido = db.relationship(
+        'PedidoCompra', foreign_keys=[pedido_id],
+        backref=db.backref('recebimentos', lazy='dynamic',
+                           cascade='all, delete-orphan',
+                           order_by='RecebimentoPedido.sequencia'))
+    recebido_por = db.relationship('Usuario', foreign_keys=[recebido_por_id])
+    itens = db.relationship(
+        'RecebimentoPedidoItem', backref='recebimento', lazy='dynamic',
+        cascade='all, delete-orphan', order_by='RecebimentoPedidoItem.id')
+
+    @property
+    def rotulo(self):
+        """`PC-1234/2` — o número do pedido com a sequência da entrega."""
+        numero = (self.pedido.numero if self.pedido else None) or f'PC-{self.pedido_id}'
+        return f'{numero}/{self.sequencia}'
+
+    def __repr__(self):
+        return f'<RecebimentoPedido {self.rotulo} em {self.data_recebimento}>'
+
+
+class RecebimentoPedidoItem(db.Model):
+    """Quanto de UM item do pedido chegou NESTE recebimento.
+
+    `quantidade_recebida` é sempre positiva: devolução não é recebimento
+    negativo, e não entra nesta fase.
+
+    `almoxarifado_movimento_id` guarda o movimento de estoque que esta linha
+    gerou. Serve a duas coisas: auditar "esta entrada veio deste atesto", e
+    tornar o estorno possível sem adivinhação quando alguém exclui o
+    recebimento. Item de texto livre fica NULL — tem atesto, não tem movimento,
+    porque não está no catálogo do almoxarifado.
+
+    `almoxarifado_saida_movimento_id` guarda a SAÍDA pareada, quando ela
+    existe: material comprado para uma obra é reconhecido como consumido no
+    ato de chegar (era assim na emissão, e continua sendo — só mudou o
+    instante). Pedido sem obra não tem saída, e a coluna fica NULL.
+
+    Guardar o id em vez de deduzir por convenção é o que permite ao estorno
+    distinguir "a saída que este recebimento gerou" de "alguém consumiu o
+    lote depois" — as duas apontam para o mesmo lote, e só uma pode ser
+    desfeita.
+    """
+    __tablename__ = 'recebimento_pedido_item'
+    __table_args__ = (
+        # Uma linha por item por recebimento. Duas seriam duas quantidades
+        # para o mesmo fato, e a soma que decide a situação do pedido passaria
+        # a depender de qual delas alguém editou por último.
+        db.UniqueConstraint('recebimento_id', 'pedido_item_id',
+                            name='uq_recebimento_item_pedido_item'),
+        db.Index('ix_recebimento_item_pedido_item', 'pedido_item_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    recebimento_id = db.Column(
+        db.Integer, db.ForeignKey('recebimento_pedido.id', ondelete='CASCADE'),
+        nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    pedido_item_id = db.Column(
+        db.Integer, db.ForeignKey('pedido_compra_item.id'), nullable=False)
+    quantidade_recebida = db.Column(db.Numeric(12, 3), nullable=False)
+    almoxarifado_movimento_id = db.Column(
+        db.Integer,
+        db.ForeignKey('almoxarifado_movimento.id', ondelete='SET NULL'),
+        nullable=True)
+    almoxarifado_saida_movimento_id = db.Column(
+        db.Integer,
+        db.ForeignKey('almoxarifado_movimento.id', ondelete='SET NULL'),
+        nullable=True)
+
+    pedido_item = db.relationship('PedidoCompraItem',
+                                  foreign_keys=[pedido_item_id])
+    almoxarifado_movimento = db.relationship(
+        'AlmoxarifadoMovimento', foreign_keys=[almoxarifado_movimento_id])
+    almoxarifado_saida = db.relationship(
+        'AlmoxarifadoMovimento',
+        foreign_keys=[almoxarifado_saida_movimento_id])
+
+    def __repr__(self):
+        return (f'<RecebimentoPedidoItem rec={self.recebimento_id} '
+                f'item={self.pedido_item_id} qtd={self.quantidade_recebida}>')
 
 
 class RequisicaoCompra(db.Model):
