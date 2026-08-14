@@ -6492,6 +6492,37 @@ def _migration_289_flag_e_tolerancia():
                 "criadas.")
 
 
+
+def _migration_296_fechamento_criado_por():
+    """Fase 2 / F5 — `fechamento_pagamento.criado_por_id`.
+
+    Faltou no desenho da F1 e o buraco só apareceu ao escrever a F5: as três
+    colunas de trilha diziam quem FECHOU e quem REABRIU o lote, e nenhuma dizia
+    quem o MONTOU. Sem esse lado, "quem monta não fecha" não é uma regra — é uma
+    frase, porque não há com quem comparar `fechado_por_id`.
+
+    Nullable de propósito: lote que já existe não tem autor registrado, e
+    inventar um seria forjar autoria — exatamente o defeito que o detector da
+    Fase 5 pega em RDO assinado sem trilha. A consequência está escrita no
+    serviço: a segregação só é EXIGIDA quando os dois lados são conhecidos.
+
+    Alocação: **296**, e não 290. A faixa 290-295 é reservada da Fase 8 e
+    300-307 da Fase 9; mexer em faixa reservada é o que a renumeração 270→277
+    existiu para evitar, e aquela renumeração armou o fantasma que ainda está
+    no histórico. Conferido em `migration_history` do dev em 14/08: a maior
+    aplicada é a 289 e nada entre 290 e 307 foi aplicado.
+
+    Idempotente: IF NOT EXISTS.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE fechamento_pagamento ADD COLUMN IF NOT EXISTS "
+            "criado_por_id INTEGER REFERENCES usuario(id)"))
+    logger.info("[Migration 296] fechamento_pagamento.criado_por_id criada "
+                "(o outro lado da segregacao: quem montou o lote).")
+
+
 def _migration_282_backfill_dropdown_crm():
     """D-CRM.1 — o backfill que a 174 pulou: grupo de dropdown para TODO
     tenant com dado nas tabelas legadas `crm_*`.
@@ -6855,6 +6886,7 @@ def executar_migracoes():
             (287, "Fase 2 do ciclo de compras — nota_fiscal_pedido (chave_acesso NULLABLE, ao contrário da NotaFiscal legada) + adiantamento_fornecedor", _migration_287_nota_e_adiantamento),
             (288, "Fase 2 — pedido_compra.fluxo_pagamento; conta_pagar.situacao_liberacao/liberada_por_id/liberada_em; trilha de quem fechou e reabriu o lote", _migration_288_regime_e_liberacao),
             (289, "Fase 2 — configuracao_empresa.financeiro_dois_fluxos_ativo (default FALSE) + tolerancia_divergencia_nf_pct (2,00%, decisão D1 editável)", _migration_289_flag_e_tolerancia),
+            (296, "Fase 2/F5 — fechamento_pagamento.criado_por_id: quem MONTOU o lote, sem o qual a segregacao \"quem monta nao fecha\" nao e verificavel. 290-295 e faixa da Fase 8; 300-307 da Fase 9", _migration_296_fechamento_criado_por),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

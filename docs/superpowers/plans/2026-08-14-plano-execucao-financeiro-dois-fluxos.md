@@ -126,7 +126,7 @@ ninguém consegue pagar, adiantamento que não some da lista).
 
 ## F4 — A tríade barra o pagamento
 
-- [ ] **Step 1 (red):** os testes que definem a virada:
+- [x] **Step 1 (red):** os testes que definem a virada:
   - `POST /financeiro/pagar/<id>` de conta `bloqueada` **recusa**, e o corpo da resposta
     nomeia a perna que falta;
   - conta `liberada` paga igual a hoje — o caminho feliz não pode regredir;
@@ -134,37 +134,37 @@ ninguém consegue pagar, adiantamento que não some da lista).
     mesmos registros de antes (conferido por `SELECT`, não pela ORM);
   - a guarda fica **antes** do `if POST` e **fora** do try, pela mesma razão que a B5.1
     documenta em `financeiro_views.py:445` — `abort()` dentro daquele try vira 200.
-- [ ] **Step 2:** a guarda em `financeiro.pagar_conta`, consultando `pernas_faltantes`.
-- [ ] **Step 3:** varrer atrás de outro caminho de baixa **antes de assumir que só há um**.
+- [x] **Step 2:** a guarda em `financeiro.pagar_conta`, consultando `pernas_faltantes`.
+- [x] **Step 3:** varrer atrás de outro caminho de baixa **antes de assumir que só há um**.
   Hoje há um: `FinanceiroService.baixar_pagamento` tem uma única chamada de produção
   (`financeiro_views.py:518`, dentro do próprio `pagar_conta`). Se a varredura achar um
   segundo, ele é achado — pare e decida o regime dele na mesma rodada, em vez de guardar
   só o caminho conhecido. A C9 da Fase 1 é a prova de que a varredura acha o que a leitura
   não acha.
-- [ ] **Step 4 (green + mutação):** verdes. Mutação: remover a guarda e confirmar que o
+- [x] **Step 4 (green + mutação):** verdes. Mutação: remover a guarda e confirmar que o
   teste da conta bloqueada morre.
-- [ ] **Step 5:** commit — `fix(financeiro): conta sem a triade nao aceita baixa, e diz o que falta`
+- [x] **Step 5:** commit — `fix(financeiro): conta sem a triade nao aceita baixa, e diz o que falta`
 
 ## F5 — O fechamento ganha efeito e segregação
 
-- [ ] **Step 1 (red):**
+- [x] **Step 1 (red):**
   - no regime novo, `pagar_conta` exige conta em fechamento `FECHADO`;
   - quem **montou** o lote não consegue **fechá-lo** — invariante, não configuração,
     espelhando `solicitante_id != aprovador_id` da Fase 3;
   - `reabrir` recusa lote que já tenha conta paga;
   - `fechado_por_id`/`fechado_em` gravados; `reaberto_por_id` idem;
   - no regime **antigo**, nada disso vale — o lote continua decorativo, como sempre foi.
-- [ ] **Step 2:** as guardas em `financeiro_views.fechamento_pagamentos`, chamando o serviço.
+- [x] **Step 2:** as guardas em `financeiro_views.fechamento_pagamentos`, chamando o serviço.
   A trilha é gravada no serviço, não na rota.
-- [ ] **Step 3:** a tela passa a mostrar quem fechou e quando, e a esconder `reabrir` quando
+- [x] **Step 3:** a tela passa a mostrar quem fechou e quando, e a esconder `reabrir` quando
   a regra o recusaria — botão que existe e sempre falha é pior que botão ausente (lição da
   C5 da Fase 1).
-- [ ] **Step 4 (green):** verdes.
-- [ ] **Step 5:** commit — `feat(financeiro): o fechamento passa a liberar de verdade, com trilha e segregacao`
+- [x] **Step 4 (green):** verdes.
+- [x] **Step 5:** commit — `feat(financeiro): o fechamento passa a liberar de verdade, com trilha e segregacao`
 
 ## F6 — Fluxo B: adiantamento e a lista de espera
 
-- [ ] **Step 1 (red):**
+- [x] **Step 1 (red):**
   - pedido `adiantamento` nasce com `ContaPagar` **`liberada`** (não há o que atestar ainda)
     + linha em `adiantamento_fornecedor` com `baixado_em` NULL;
   - adiantamento **parcial** (D4): duas linhas no mesmo pedido, duas contas;
@@ -172,14 +172,14 @@ ninguém consegue pagar, adiantamento que não some da lista).
   - pedido cancelado com adiantamento pago **não** some da lista: vira pendência de
     devolução, com o valor à vista;
   - a lista "pago, aguardando entrega" não vaza entre tenants.
-- [ ] **Step 2:** `registrar_adiantamento()` e `baixar_adiantamentos(pedido)` no serviço.
-- [ ] **Step 3:** o gancho no `registrar_recebimento` da Fase 1 — chamada ao serviço daqui,
+- [x] **Step 2:** `registrar_adiantamento()` e `baixar_adiantamentos(pedido)` no serviço.
+- [x] **Step 3:** o gancho no `registrar_recebimento` da Fase 1 — chamada ao serviço daqui,
   **não** lógica de adiantamento dentro do serviço de recebimento. Uma dependência, num
   sentido só.
-- [ ] **Step 4:** a tela da lista, na obra e no financeiro.
-- [ ] **Step 5 (green + mutação):** verdes. Mutação: baixar o adiantamento na emissão em vez
+- [x] **Step 4:** a tela da lista, na obra e no financeiro.
+- [x] **Step 5 (green + mutação):** verdes. Mutação: baixar o adiantamento na emissão em vez
   do atesto e confirmar que o teste da lista **mata** a mutação.
-- [ ] **Step 6:** commit — `feat(financeiro): adiantamento a fornecedor e a lista de pago aguardando entrega`
+- [x] **Step 6:** commit — `feat(financeiro): adiantamento a fornecedor e a lista de pago aguardando entrega`
 
 ## F7 — Consistência, teste-guarda e runbook
 

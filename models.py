@@ -9273,6 +9273,13 @@ class FechamentoPagamento(db.Model):
     fechado_em = db.Column(db.DateTime, nullable=True)
     reaberto_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
                                 nullable=True)
+    # Migration 296 — quem MONTOU o lote. Faltava no desenho da F1, e sem ela a
+    # regra "quem monta não fecha" é inverificável: dá para saber quem fechou e
+    # não com quem comparar. Nullable porque lote histórico não tem autor
+    # registrado — e é por isso que a segregação só vale quando os DOIS lados
+    # são conhecidos (ver services/financeiro_compra.fechar_lote).
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                              nullable=True)
 
     contas = db.relationship('ContaPagar', foreign_keys='ContaPagar.fechamento_id',
                              backref='fechamento', lazy='dynamic')

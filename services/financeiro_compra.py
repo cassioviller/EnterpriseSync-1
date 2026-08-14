@@ -316,3 +316,152 @@ def liberar(pedido, *, usuario=None):
 
     db.session.flush()
     return abertas
+
+
+class SegregacaoViolada(ErroFinanceiroCompra):
+    """Quem montou o lote tentou fechá-lo."""
+
+
+class LoteImutavel(ErroFinanceiroCompra):
+    """Lote fechado que já tem pagamento não volta a ser rascunho."""
+
+
+# ── F5 — o fechamento passa a ter efeito ─────────────────────────────
+#
+# `FechamentoPagamento` já existia e já tinha tela: selecionava contas,
+# agrupava e mudava o status de ABERTO para FECHADO. O que faltava era o
+# efeito — `pagar_conta` não consultava o lote em ponta nenhuma, `FECHADO`
+# não autorizava nada e `reabrir` desfazia sem rastro.
+#
+# ⚠️ DESVIO DELIBERADO do spec, e vale saber por quê. O spec dizia que no
+# regime novo `pagar_conta` exigiria a conta num lote FECHADO. Não foi
+# feito assim: `pagar_conta` continua com UMA porta — `situacao_liberacao`.
+# Duas guardas no mesmo ponto recusariam o mesmo pagamento por dois motivos
+# diferentes e dobrariam as formas de o usuário ficar preso, sem acrescentar
+# controle: fechar o lote é justamente o que muda a situação para 'liberada'.
+# O estado mora num lugar só; o fechamento é quem o move.
+
+def fechar_lote(fechamento, *, usuario=None):
+    """Fecha o lote e libera as contas dele. Levanta `SegregacaoViolada`.
+
+    A segregação só é EXIGIDA quando os dois lados são conhecidos: lote
+    anterior à migration 296 não tem `criado_por_id`, e exigir com um lado
+    ausente travaria todo lote histórico — cujo efeito prático seria o time
+    desligar a regra. Regra que atrapalha sem proteger é regra que morre.
+
+    Contas cujo pedido ainda não fechou a tríade são PULADAS, não estouram: um
+    lote com dez contas não pode falhar inteiro porque uma delas está sem nota.
+    O que fica de fora continua bloqueado, e é o sensor da F7 que o mostra.
+    """
+    from datetime import datetime
+    from app import db
+    from models import ContaPagar, PedidoCompra
+
+    criado_por = getattr(fechamento, 'criado_por_id', None)
+    quem_fecha = getattr(usuario, 'id', None)
+    if criado_por is not None and quem_fecha is not None and criado_por == quem_fecha:
+        raise SegregacaoViolada(
+            'quem montou este lote não pode fechá-lo. A separação entre quem '
+            'seleciona as contas e quem autoriza o pagamento é o que faz o '
+            'lote valer alguma coisa — peça a outra pessoa que feche.')
+
+    contas = ContaPagar.query.filter_by(fechamento_id=fechamento.id).all()
+    liberadas = []
+    for cp in contas:
+        if cp.situacao_liberacao != 'bloqueada':
+            continue
+        pedido = (db.session.get(PedidoCompra, cp.pedido_compra_id)
+                  if cp.pedido_compra_id else None)
+        if pedido is None:
+            continue
+        try:
+            liberadas.extend(liberar(pedido, usuario=usuario))
+        except TriadeIncompleta:
+            continue   # fica bloqueada, e o sensor da F7 a nomeia
+
+    fechamento.status = 'FECHADO'
+    fechamento.fechado_por_id = quem_fecha
+    fechamento.fechado_em = datetime.utcnow()
+    db.session.flush()
+    return liberadas
+
+
+def reabrir_lote(fechamento, *, usuario=None):
+    """Reabre o lote. Levanta `LoteImutavel` se alguma conta já foi paga.
+
+    Lote fechado com pagamento é documento: reabri-lo seria reescrever o
+    registro de uma autorização que já produziu saída de dinheiro.
+    """
+    from app import db
+    from models import ContaPagar
+
+    pagas = ContaPagar.query.filter_by(fechamento_id=fechamento.id).filter(
+        ContaPagar.status == 'PAGO').count()
+    if pagas:
+        raise LoteImutavel(
+            f'este lote já tem {pagas} conta(s) paga(s) e não pode ser '
+            f'reaberto — a autorização dele já virou saída de dinheiro. '
+            f'Para corrigir um pagamento, estorne-o.')
+
+    fechamento.status = 'ABERTO'
+    fechamento.reaberto_por_id = getattr(usuario, 'id', None)
+    db.session.flush()
+    return fechamento
+
+
+# ── F6 — Fluxo B: o adiantamento e a lista de espera ─────────────────
+
+def registrar_adiantamento(pedido, *, valor, conta_pagar=None,
+                           data_prevista_entrega=None, observacao=None):
+    """Registra a pendência de ENTREGA de um adiantamento.
+
+    O adiantamento em si JÁ é uma `ContaPagar` — paga-se por ela, ela vai ao
+    fluxo de caixa, ela debita banco pela B5.6. Esta linha é a outra ponta, a
+    que hoje não existe em lugar nenhum: o material ainda não chegou.
+
+    N linhas por pedido, porque 50% na assinatura e 50% na entrega é o caso
+    comum e não a exceção (D4).
+    """
+    from app import db
+    from models import AdiantamentoFornecedor
+
+    adto = AdiantamentoFornecedor(
+        pedido_id=pedido.id, admin_id=pedido.admin_id,
+        conta_pagar_id=getattr(conta_pagar, 'id', None),
+        valor=_d(valor), data_prevista_entrega=data_prevista_entrega,
+        observacao=observacao)
+    db.session.add(adto)
+    db.session.flush()
+    return adto
+
+
+def baixar_adiantamentos(pedido, *, usuario=None):
+    """Baixa TODAS as pendências de entrega do pedido. Só o atesto chama isto.
+
+    Baixa manual sem material é exatamente o buraco que a lista existe para
+    tapar: se der para riscar a pendência sem nada ter chegado, a lista deixa
+    de significar "aguardando entrega" e passa a significar "alguém lembrou de
+    clicar".
+    """
+    from datetime import datetime
+    from app import db
+    from models import AdiantamentoFornecedor
+
+    pendentes = AdiantamentoFornecedor.query.filter_by(
+        pedido_id=pedido.id, baixado_em=None).all()
+    if not pendentes:
+        return []
+    agora = datetime.utcnow()
+    for a in pendentes:
+        a.baixado_em = agora
+        a.baixado_por_id = getattr(usuario, 'id', None)
+    db.session.flush()
+    return pendentes
+
+
+def adiantamentos_pendentes(admin_id):
+    """A lista "pago, aguardando entrega" do tenant."""
+    from models import AdiantamentoFornecedor
+    return (AdiantamentoFornecedor.query
+            .filter_by(admin_id=admin_id, baixado_em=None)
+            .order_by(AdiantamentoFornecedor.data_prevista_entrega).all())

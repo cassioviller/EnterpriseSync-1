@@ -534,3 +534,338 @@ def test_liberar_reajusta_a_conta_para_o_que_chegou():
         assert Decimal(str(cp.valor_original)) == Decimal('975.00')
         assert 'ajustado' in (cp.observacoes or '').lower(), (
             'a diferença tem de ficar escrita — sumir com ela é o defeito')
+
+
+# ---------------------------------------------------------------------------
+# F4 — a tríade barra o pagamento
+# ---------------------------------------------------------------------------
+
+def _flashes(cli):
+    with cli.session_transaction() as s:
+        return ' | '.join(m for _cat, m in s.get('_flashes', []))
+
+
+def _cenario_de_baixa(regime_novo=True):
+    """Devolve ids — a rota roda em outro app_context."""
+    from services.financeiro_compra import criar_obrigacao
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id, recebimento_atesto_ativo=regime_novo,
+                    financeiro_dois_fluxos_ativo=regime_novo)
+        obra = _obra(adm.id)
+        forn = _fornecedor(adm.id)
+        ped = _pedido(adm.id, obra.id, forn.id)
+        ped.exige_atesto = regime_novo
+        ped.fluxo_pagamento = 'faturado'
+        db.session.commit()
+
+        contas = criar_obrigacao(ped)
+        db.session.commit()
+        return adm.id, ped.id, contas[0].id
+
+
+def test_pagar_conta_bloqueada_recusa_e_diz_o_que_falta():
+    """Recusar sem dizer o que falta é o que manda o usuário para fora do
+    sistema. A mensagem tem de nomear a perna."""
+    from helpers_tenant import cliente_de
+    admin_id, _ped_id, conta_id = _cenario_de_baixa(regime_novo=True)
+    cli = cliente_de(admin_id)
+
+    resposta = cli.post(f'/financeiro/contas-pagar/{conta_id}/pagar',
+                        data={'valor_pago': '1625.00',
+                              'data_pagamento': '2026-08-20',
+                              'forma_pagamento': 'PIX'})
+
+    assert resposta.status_code == 302, 'a recusa redireciona, não estoura 500'
+    msg = _flashes(cli).lower()
+    assert 'nota' in msg, f'a mensagem não nomeia a perna que falta: {msg!r}'
+
+    with app.app_context():
+        cp = db.session.get(ContaPagar, conta_id)
+        assert (cp.valor_pago or 0) == 0, 'a baixa foi gravada mesmo recusada'
+        assert cp.status == 'PENDENTE'
+        assert cp.situacao_liberacao == 'bloqueada'
+
+
+def test_conta_liberada_continua_pagando_igual():
+    """O caminho feliz não pode regredir — é metade do valor da guarda."""
+    from helpers_tenant import cliente_de
+    admin_id, _ped_id, conta_id = _cenario_de_baixa(regime_novo=True)
+
+    with app.app_context():
+        cp = db.session.get(ContaPagar, conta_id)
+        cp.situacao_liberacao = 'liberada'
+        db.session.commit()
+
+    cli = cliente_de(admin_id)
+    resposta = cli.post(f'/financeiro/contas-pagar/{conta_id}/pagar',
+                        data={'valor_pago': '1625.00',
+                              'data_pagamento': '2026-08-20',
+                              'forma_pagamento': 'PIX'})
+
+    assert resposta.status_code == 302
+    with app.app_context():
+        cp = db.session.get(ContaPagar, conta_id)
+        assert Decimal(str(cp.valor_pago or 0)) == Decimal('1625.00')
+        assert cp.status == 'PAGO'
+
+
+def test_paridade_da_baixa_com_a_flag_desligada():
+    """Com o regime desligado, emitir e pagar produz o mesmo de sempre."""
+    from helpers_tenant import cliente_de
+    admin_id, _ped_id, conta_id = _cenario_de_baixa(regime_novo=False)
+
+    with app.app_context():
+        cp = db.session.get(ContaPagar, conta_id)
+        assert cp.situacao_liberacao == 'liberada', (
+            'fora do regime novo a conta não pode nascer bloqueada')
+
+    cli = cliente_de(admin_id)
+    resposta = cli.post(f'/financeiro/contas-pagar/{conta_id}/pagar',
+                        data={'valor_pago': '1625.00',
+                              'data_pagamento': '2026-08-20',
+                              'forma_pagamento': 'PIX'})
+
+    assert resposta.status_code == 302
+    with app.app_context():
+        cp = db.session.get(ContaPagar, conta_id)
+        assert Decimal(str(cp.valor_pago or 0)) == Decimal('1625.00')
+        assert cp.status == 'PAGO'
+
+
+def test_a_guarda_nao_e_engolida_pelo_except_do_post():
+    """A guarda mora ANTES do `if POST` e FORA do try.
+
+    A B5.1 documenta em financeiro_views.py:445 por quê: `abort()` dentro
+    daquele try é capturado pelo `except Exception` e vira 200 com flash de
+    'Erro ao registrar pagamento' — a recusa viraria erro genérico, e o usuário
+    nunca saberia que faltava a nota.
+    """
+    from helpers_tenant import cliente_de
+    admin_id, _ped_id, conta_id = _cenario_de_baixa(regime_novo=True)
+    cli = cliente_de(admin_id)
+
+    cli.post(f'/financeiro/contas-pagar/{conta_id}/pagar',
+             data={'valor_pago': '1625.00', 'data_pagamento': '2026-08-20',
+                   'forma_pagamento': 'PIX'})
+
+    msg = _flashes(cli).lower()
+    assert 'liberada' in msg, (
+        f'a recusa não aconteceu ou não se identificou como tal: {msg!r}')
+    assert 'erro ao registrar pagamento' not in msg, (
+        'a recusa caiu no except genérico — a guarda está dentro do try')
+
+
+# ---------------------------------------------------------------------------
+# F5 — o fechamento ganha efeito e segregação
+# ---------------------------------------------------------------------------
+
+def _lote(admin_id, contas, criado_por_id):
+    from models import FechamentoPagamento
+    f = FechamentoPagamento(
+        data_fechamento=date(2026, 8, 20), descricao='Lote de teste',
+        status='ABERTO', admin_id=admin_id, criado_por_id=criado_por_id,
+        total_selecionado=sum(Decimal(str(c.valor_original)) for c in contas))
+    db.session.add(f)
+    db.session.flush()
+    for c in contas:
+        c.fechamento_id = f.id
+    db.session.commit()
+    return f
+
+
+def test_fechar_o_lote_libera_as_contas():
+    """Fechar o lote é o caminho de usuário da liberação.
+
+    A F3 fez `liberar()` existir; a F5 põe alguém para chamá-la — e é o
+    fechamento do lote, feito por outra pessoa, que faz isso.
+    """
+    from services.financeiro_compra import (criar_obrigacao, fechar_lote,
+                                            lancar_nota)
+    from services.recebimento_pedido import registrar_recebimento
+    from models import PedidoCompraItem
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+        outro = _admin()
+        contas = criar_obrigacao(ped)
+        db.session.commit()
+
+        item = PedidoCompraItem.query.filter_by(pedido_id=ped.id).first()
+        registrar_recebimento(ped, usuario=adm, data=date(2026, 8, 10),
+                              linhas=[(item.id, Decimal('50'))])
+        lancar_nota(ped, numero='8001', serie='1',
+                    valor_total=Decimal('1625.00'),
+                    data_emissao=date(2026, 8, 10),
+                    data_vencimento=date(2026, 9, 10), usuario=adm)
+        f = _lote(adm.id, contas, criado_por_id=adm.id)
+
+        fechar_lote(f, usuario=outro)
+        db.session.commit()
+
+        assert f.status == 'FECHADO'
+        assert f.fechado_por_id == outro.id
+        assert f.fechado_em is not None
+        for c in contas:
+            db.session.refresh(c)
+            assert c.situacao_liberacao == 'liberada'
+
+
+def test_quem_montou_o_lote_nao_o_fecha():
+    """Invariante, não configuração — espelha solicitante != aprovador da Fase 3."""
+    from services.financeiro_compra import SegregacaoViolada, criar_obrigacao, fechar_lote
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+        contas = criar_obrigacao(ped)
+        db.session.commit()
+        f = _lote(adm.id, contas, criado_por_id=adm.id)
+
+        with pytest.raises(SegregacaoViolada):
+            fechar_lote(f, usuario=adm)
+        db.session.rollback()
+        assert f.status == 'ABERTO'
+
+
+def test_reabrir_recusa_lote_com_conta_paga():
+    """Lote fechado com pagamento é documento — reabrir seria reescrevê-lo."""
+    from services.financeiro_compra import (LoteImutavel, criar_obrigacao,
+                                            reabrir_lote)
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+        outro = _admin()
+        contas = criar_obrigacao(ped)
+        db.session.commit()
+        f = _lote(adm.id, contas, criado_por_id=adm.id)
+        f.status = 'FECHADO'
+        contas[0].status = 'PAGO'
+        db.session.commit()
+
+        with pytest.raises(LoteImutavel):
+            reabrir_lote(f, usuario=outro)
+        db.session.rollback()
+        assert f.status == 'FECHADO'
+
+
+def test_reabrir_grava_quem_reabriu():
+    from services.financeiro_compra import criar_obrigacao, reabrir_lote
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+        outro = _admin()
+        contas = criar_obrigacao(ped)
+        db.session.commit()
+        f = _lote(adm.id, contas, criado_por_id=adm.id)
+        f.status = 'FECHADO'
+        db.session.commit()
+
+        reabrir_lote(f, usuario=outro)
+        db.session.commit()
+        assert f.status == 'ABERTO'
+        assert f.reaberto_por_id == outro.id
+
+
+def test_lote_sem_autor_conhecido_nao_trava_o_fechamento():
+    """Lote histórico não tem `criado_por_id` — a segregação exige DOIS lados.
+
+    Exigir com um lado desconhecido travaria todo lote anterior à migration 296,
+    e o efeito prático seria o time desligar a regra.
+    """
+    from services.financeiro_compra import criar_obrigacao, fechar_lote
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+        contas = criar_obrigacao(ped)
+        db.session.commit()
+        f = _lote(adm.id, contas, criado_por_id=None)
+
+        fechar_lote(f, usuario=adm)   # não levanta
+        db.session.commit()
+        assert f.status == 'FECHADO'
+
+
+# ---------------------------------------------------------------------------
+# F6 — Fluxo B: adiantamento e a lista de espera
+# ---------------------------------------------------------------------------
+
+def test_adiantamento_nasce_liberado_e_pendente_de_entrega():
+    """No Fluxo B não há o que atestar ainda — o que fica pendente é a ENTREGA."""
+    from models import AdiantamentoFornecedor
+    from services.financeiro_compra import criar_obrigacao, registrar_adiantamento
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+        ped.fluxo_pagamento = 'adiantamento'
+        db.session.commit()
+
+        contas = criar_obrigacao(ped)
+        db.session.commit()
+        assert all(c.situacao_liberacao == 'liberada' for c in contas)
+
+        registrar_adiantamento(ped, valor=Decimal('812.50'),
+                               conta_pagar=contas[0],
+                               data_prevista_entrega=date(2026, 9, 1))
+        db.session.commit()
+
+        pend = AdiantamentoFornecedor.query.filter_by(
+            pedido_id=ped.id, baixado_em=None).all()
+        assert len(pend) == 1
+        assert pend[0].pendente is True
+
+
+def test_adiantamento_parcial_e_o_caso_comum():
+    """50% na assinatura e 50% na entrega — D4. Duas linhas, não uma."""
+    from models import AdiantamentoFornecedor
+    from services.financeiro_compra import criar_obrigacao, registrar_adiantamento
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+        ped.fluxo_pagamento = 'adiantamento'
+        db.session.commit()
+        contas = criar_obrigacao(ped)
+        db.session.commit()
+
+        registrar_adiantamento(ped, valor=Decimal('812.50'), conta_pagar=contas[0])
+        registrar_adiantamento(ped, valor=Decimal('812.50'), conta_pagar=contas[0])
+        db.session.commit()
+
+        assert AdiantamentoFornecedor.query.filter_by(pedido_id=ped.id).count() == 2
+
+
+def test_o_atesto_baixa_todos_os_adiantamentos_pendentes():
+    """E SÓ o atesto baixa: baixa manual sem material é o buraco que a lista
+    existe para tapar."""
+    from models import AdiantamentoFornecedor, PedidoCompraItem
+    from services.financeiro_compra import criar_obrigacao, registrar_adiantamento
+    from services.recebimento_pedido import registrar_recebimento
+    with app.app_context():
+        adm, obra, forn, ped = _tenant_regime_novo()
+        ped.fluxo_pagamento = 'adiantamento'
+        db.session.commit()
+        contas = criar_obrigacao(ped)
+        db.session.commit()
+        registrar_adiantamento(ped, valor=Decimal('812.50'), conta_pagar=contas[0])
+        registrar_adiantamento(ped, valor=Decimal('812.50'), conta_pagar=contas[0])
+        db.session.commit()
+
+        item = PedidoCompraItem.query.filter_by(pedido_id=ped.id).first()
+        registrar_recebimento(ped, usuario=adm, data=date(2026, 8, 12),
+                              linhas=[(item.id, Decimal('50'))])
+        db.session.commit()
+
+        pendentes = AdiantamentoFornecedor.query.filter_by(
+            pedido_id=ped.id, baixado_em=None).count()
+        assert pendentes == 0, 'o atesto não baixou os adiantamentos'
+
+
+def test_a_lista_de_espera_nao_vaza_entre_tenants():
+    from services.financeiro_compra import (adiantamentos_pendentes,
+                                            criar_obrigacao,
+                                            registrar_adiantamento)
+    with app.app_context():
+        adm_a, _o, _f, ped_a = _tenant_regime_novo()
+        ped_a.fluxo_pagamento = 'adiantamento'
+        db.session.commit()
+        contas_a = criar_obrigacao(ped_a)
+        db.session.commit()
+        registrar_adiantamento(ped_a, valor=Decimal('100'), conta_pagar=contas_a[0])
+        db.session.commit()
+
+        adm_b, _o2, _f2, ped_b = _tenant_regime_novo()
+        lista_b = adiantamentos_pendentes(adm_b.id)
+        assert all(a.admin_id == adm_b.id for a in lista_b)
+        assert ped_a.id not in [a.pedido_id for a in lista_b]
