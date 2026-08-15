@@ -232,6 +232,14 @@ estiver OFF, a sanção não tem onde morder** (a conta nasce `liberada`). Por i
 `--ligar` da flag nova **avisa** — sem recusar — quando o tenant não tem os dois fluxos.
 Recusar seria errado: as outras três regras funcionam sem eles.
 
+> 📌 **Como o "avisa sem recusar" ficou no código (A2).** `pode_ligar` devolve
+> `(bool, motivo)` como no molde da Fase 2, mas aqui o segundo elemento passou a carregar
+> **duas** coisas: com `ok=False` é o motivo da recusa; com `ok=True` e texto não vazio é o
+> aviso, que o `main()` imprime **antes** de ligar. Foi a forma de não inventar um terceiro
+> valor de retorno para uma distinção que é de grau, não de tipo. Quem for ler no passo 2 do
+> runbook vai ver a linha começando por `AVISO (não impede ligar):` — a ausência dela é que
+> significa cadeia inteira ligada.
+
 ### Onde a régua de estados **não** muda
 
 Nenhum estado novo em `EstadoRequisicao` (📖 `models.py:80-99`). Emergência é atributo, não

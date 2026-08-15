@@ -70,6 +70,26 @@ def garantir_faixas_do_tenant(admin_id):
     return True
 
 
+REGIME_SIMPLES = 'simples'
+REGIME_AVANCADO = 'avancado'
+
+
+def regime_alcada_do_tenant(admin_id):
+    """O regime de alçada que uma requisição nascida AGORA carregaria.
+
+    Uma função só, para que o ponto que cria requisição não leia a flag por
+    conta própria — hoje o ponto é um (`requisicao_nova_post`), e é justamente
+    por isso que a indireção precisa existir antes de ser dois.
+
+    O valor devolvido é CARIMBADO em `requisicao_compra.regime_alcada` e nunca
+    mais reconsultado para aquela requisição: desligar a flag depois não muda
+    o regime do que já nasceu. Ver o spec 2026-08-15-alcadas-design.md, seção
+    "Regime de virada".
+    """
+    from scripts.flag_alcadas_avancadas import alcadas_avancadas_ativa
+    return REGIME_AVANCADO if alcadas_avancadas_ativa(admin_id) else REGIME_SIMPLES
+
+
 def faixa_para_valor(admin_id, valor):
     """A faixa ativa de menor teto que ainda cobre `valor`.
 

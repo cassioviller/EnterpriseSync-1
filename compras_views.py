@@ -97,6 +97,22 @@ def _fluxo_pagamento(admin_id, escolha=None):
     return fluxo_do_pedido_novo(admin_id, escolha)
 
 
+def _regime_alcada(admin_id):
+    """O regime de alçada a carimbar numa requisição que nasce agora.
+
+    Terceira da série, e pelo mesmo motivo das duas de cima: quem cria a linha
+    chama uma função, não lê a flag. Hoje o único ponto que cria
+    `RequisicaoCompra` é `requisicao_nova_post` — a indireção existe para o dia
+    em que for dois, que é exatamente o dia em que a regra divergiria.
+
+    Import tardio como nas irmãs: a leitura da flag mora em `scripts/`, que
+    não é importável no boot, e quem faz a ponte é
+    `services.alcada_compras.regime_alcada_do_tenant`.
+    """
+    from services.alcada_compras import regime_alcada_do_tenant
+    return regime_alcada_do_tenant(admin_id)
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # HELPERS DE PROCESSAMENTO — dois fluxos de compra
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1721,6 +1737,13 @@ def requisicao_nova_post():
     if garantir_faixas_do_tenant(admin_id):
         db.session.commit()
 
+    # Fase 3 (alçadas avançadas) — o regime é lido UMA vez, aqui, e carimbado
+    # na linha. Fora do laço de retry de propósito: uma colisão de numeração
+    # não é motivo para reconsultar a flag, e reler dentro do laço abriria a
+    # porta para duas tentativas do MESMO request nascerem em regimes
+    # diferentes.
+    regime = _regime_alcada(admin_id)
+
     # Retry de numeração: o UNIQUE (admin_id, numero) fecha a corrida entre
     # dois requests simultâneos. Mesmo padrão de views/obras.py:3279.
     from sqlalchemy.exc import IntegrityError
@@ -1735,6 +1758,7 @@ def requisicao_nova_post():
                 mapa_v2_id=mapa_id,
                 solicitante_id=current_user.id,
                 estado=EstadoRequisicao.RASCUNHO,
+                regime_alcada=regime,
                 justificativa=(request.form.get('justificativa') or '').strip() or None,
                 data_necessidade=data_necessidade,
                 valor_estimado=0,

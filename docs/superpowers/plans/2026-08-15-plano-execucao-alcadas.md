@@ -90,27 +90,27 @@ ligada em tenant real antes de A8**, porque o sensor é o que enxerga emergênci
 
 ## A2 — A flag e o carimbo do regime
 
-- [ ] **Step 1 (red):** flag nasce OFF; `--ligar` **recusa** tenant sem
+- [x] **Step 1 (red):** flag nasce OFF; `--ligar` **recusa** tenant sem
   `compras_governanca_ativa` e a mensagem termina com o comando exato que falta; `--ligar`
   **avisa e não recusa** quando falta `financeiro_dois_fluxos_ativo`; flag ilegível é
   tratada como OFF; requisição criada com a flag ON nasce `regime_alcada = 'avancado'` e
   **não muda** depois do `--desligar`.
-- [ ] **Step 2:** `scripts/flag_alcadas_avancadas.py`, molde de
+- [x] **Step 2:** `scripts/flag_alcadas_avancadas.py`, molde de
   `scripts/flag_financeiro_dois_fluxos.py`: `alcadas_avancadas_ativa(admin_id)` com
   `except → False`, `definir_flag`, `pode_ligar(admin_id) → (bool, motivo)` importando
   `governanca_ativa` de `scripts/flag_compras_governanca.py`, `main()` com `--ligar` /
   `--desligar` / `--forcar`. Docstring com o bloco `Uso:` e a nota de que o regime é
   carimbado na linha.
-- [ ] **Step 3:** a distinção entre recusa e aviso mora em `pode_ligar` e é **comentada
+- [x] **Step 3:** a distinção entre recusa e aviso mora em `pode_ligar` e é **comentada
   lá**: governança é dependência dura (sem ela o degrau não tem sobre o que agir); dois
   fluxos é dependência parcial (só a sanção da emergência depende dela). Quem ler o script
   daqui a um ano precisa achar o porquê sem abrir o spec.
-- [ ] **Step 4:** `regime_alcada_do_tenant(admin_id)` em `services/alcada_compras.py`, e a
+- [x] **Step 4:** `regime_alcada_do_tenant(admin_id)` em `services/alcada_compras.py`, e a
   indireção `_regime_alcada(admin_id)` em `compras_views.py`, no molde de
   `_regime_recebimento` e `_fluxo_pagamento`. Aplicada em `requisicao_nova_post` — hoje o
   único ponto que cria requisição.
-- [ ] **Step 5 (green):** rodar. Verdes.
-- [ ] **Step 6:** commit — `feat(compras): flag de alcadas avancadas e o carimbo do regime`
+- [x] **Step 5 (green):** rodar. Verdes.
+- [x] **Step 6:** commit — `feat(compras): flag de alcadas avancadas e o carimbo do regime`
 
 ## A3 — O corte de cotações vira dado, e a faixa de topo destrava
 
