@@ -26,11 +26,17 @@ MARCA_APROVACAO = '[aprovacao]'
 # Faixas RECOMENDADAS (Fase 3, decisão D1). Um só lugar: a migration 243
 # importa desta constante, e `garantir_faixas_do_tenant` também — assim
 # mudar a recomendação é mudar uma lista.
+#
+# `minimo_cotacoes` entrou na Fase 3 do ciclo de compras. O número semeado é
+# 2, não 3, pelo mesmo motivo do backfill da migration 297: o seed PRESERVA o
+# comportamento que o código aplicava (`>= 2`). Subir a faixa de topo para 3 é
+# a decisão D6, feita por UPDATE no passo 1 do runbook — semear 3 aqui faria
+# tenant novo e tenant antigo divergirem sem que ninguém tivesse decidido isso.
 FAIXAS_RECOMENDADAS = [
-    # (ordem, valor_ate, aprovacoes, exige_admin, exige_mapa)
-    (1, Decimal('5000.00'), 1, False, False),
-    (2, Decimal('30000.00'), 2, True, False),
-    (3, None, 2, True, True),
+    # (ordem, valor_ate, aprovacoes, exige_admin, exige_mapa, minimo_cotacoes)
+    (1, Decimal('5000.00'), 1, False, False, 0),
+    (2, Decimal('30000.00'), 2, True, False, 0),
+    (3, None, 2, True, True, 2),
 ]
 
 
@@ -48,6 +54,12 @@ class _FaixaSeguranca:
     aprovacoes_necessarias = 2
     exige_admin = True
     exige_mapa_concorrencia = False
+    # 0 e não 2: a faixa de segurança exige o MÁXIMO do que ela consegue
+    # cobrar, e mapa de concorrência não é algo que ela consiga cobrar — um
+    # tenant sem faixa nenhuma também não tem quem monte mapa. Exigir aqui
+    # seria travar a compra em vez de endurecê-la.
+    minimo_cotacoes = 0
+    condicoes_ativas = ''
     ativo = True
 
 
@@ -60,11 +72,13 @@ def garantir_faixas_do_tenant(admin_id):
     """
     if FaixaAlcada.query.filter_by(admin_id=admin_id).count() > 0:
         return False
-    for ordem, valor_ate, aprov, exige_admin, exige_mapa in FAIXAS_RECOMENDADAS:
+    for (ordem, valor_ate, aprov, exige_admin, exige_mapa,
+         minimo_cotacoes) in FAIXAS_RECOMENDADAS:
         db.session.add(FaixaAlcada(
             admin_id=admin_id, ordem=ordem, valor_ate=valor_ate,
             aprovacoes_necessarias=aprov, exige_admin=exige_admin,
-            exige_mapa_concorrencia=exige_mapa, ativo=True))
+            exige_mapa_concorrencia=exige_mapa,
+            minimo_cotacoes=minimo_cotacoes, ativo=True))
     db.session.flush()
     logger.info('faixas de alçada semeadas para o tenant %s', admin_id)
     return True
@@ -163,19 +177,59 @@ def _tem_aprovacao_de_admin(requisicao):
     return any(v.papel_aplicado == 'ADMIN' for v in votos_de_aprovacao(requisicao))
 
 
-def _mapa_serve_de_concorrencia(requisicao):
-    """Mapa V2 concluído, do mesmo tenant e da mesma obra, com >= 2
-    fornecedores. Um fornecedor só não é concorrência — é orçamento."""
+def mapa_da_requisicao(requisicao):
+    """O MapaConcorrenciaV2 vinculado, se ele PUDER servir de concorrência.
+
+    Devolve None — e não o mapa — quando o vínculo existe mas não vale:
+    outro tenant, outra obra, ou mapa ainda aberto (cotação em andamento não
+    é concorrência fechada). Os dois primeiros são isolamento e por isso são
+    conferidos aqui E na rota que grava o vínculo: o serviço protege quem
+    chama, a rota impede que a linha errada chegue a existir.
+    """
     if not requisicao.mapa_v2_id:
-        return False
+        return None
     mapa = db.session.get(MapaConcorrenciaV2, requisicao.mapa_v2_id)
     if mapa is None:
-        return False
+        return None
     if mapa.obra_id != requisicao.obra_id or mapa.admin_id != requisicao.admin_id:
-        return False
+        return None
     if mapa.status != 'concluido':
-        return False
-    return len(mapa.fornecedores) >= 2
+        return None
+    return mapa
+
+
+def cotacoes_da_requisicao(requisicao):
+    """Quantas cotações o mapa vinculado traz. 0 = não há mapa que sirva.
+
+    Uma cotação é um fornecedor do mapa (`MapaFornecedor`, a coluna da
+    tabela comparativa). É este número que a faixa compara com
+    `minimo_cotacoes`, e é ele que a pendência mostra ao aprovador.
+    """
+    mapa = mapa_da_requisicao(requisicao)
+    return len(mapa.fornecedores) if mapa is not None else 0
+
+
+def _mapa_serve_de_concorrencia(requisicao, faixa):
+    """A requisição atende à exigência de concorrência DESTA faixa?
+
+    O corte era `len(mapa.fornecedores) >= 2`, literal no código — a única
+    regra de alçada que não era dado (📖 spec 2026-08-15-alcadas-design.md,
+    "O que já existe"). Agora quem diz quantas cotações bastam é
+    `faixa.minimo_cotacoes`, linha de tabela por tenant.
+
+    `minimo_cotacoes = 0` dispensa: a faixa não exige mapa nenhum, e a
+    resposta é True mesmo sem vínculo. Nunca 1 — um fornecedor só não é
+    concorrência, é orçamento; quem garante isso é a validação da tela de
+    faixas (A7), porque um SQL manual continua sendo possível.
+
+    `exige_mapa_concorrencia` NÃO é mais lida aqui. Ela permanece na tabela e
+    passa a ser derivada (`minimo_cotacoes > 0`) — ver o comentário em
+    `models.FaixaAlcada`.
+    """
+    minimo = int(getattr(faixa, 'minimo_cotacoes', 0) or 0)
+    if minimo <= 0:
+        return True
+    return cotacoes_da_requisicao(requisicao) >= minimo
 
 
 def pendencias_de_aprovacao(requisicao):
@@ -196,9 +250,20 @@ def pendencias_de_aprovacao(requisicao):
     if faixa.exige_admin and not _tem_aprovacao_de_admin(requisicao):
         faltando.append('falta a aprovação de um administrador')
 
-    if faixa.exige_mapa_concorrencia and not _mapa_serve_de_concorrencia(requisicao):
-        faltando.append('falta mapa de concorrência concluído com pelo menos '
-                        '2 fornecedores vinculado a esta requisição')
+    # O número vem da faixa, não do código. E a pendência diz QUANTAS faltam:
+    # "falta mapa" fez o aprovador anexar um mapa de duas cotações numa faixa
+    # que pede três e voltar exatamente ao mesmo lugar.
+    minimo = int(getattr(faixa, 'minimo_cotacoes', 0) or 0)
+    if minimo > 0 and not _mapa_serve_de_concorrencia(requisicao, faixa):
+        tem = cotacoes_da_requisicao(requisicao)
+        if tem == 0:
+            faltando.append(f'falta mapa de concorrência concluído com pelo '
+                            f'menos {minimo} cotações vinculado a esta '
+                            f'requisição')
+        else:
+            restam = minimo - tem
+            faltando.append(f'o mapa vinculado tem {tem} de {minimo} cotações '
+                            f'— falta{"m" if restam > 1 else ""} {restam}')
 
     return faltando
 

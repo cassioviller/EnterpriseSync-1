@@ -4586,7 +4586,12 @@ def migration_243_faixa_alcada():
     # essa volumetria de suíte — ESTADO-ATUAL.md, armadilha 1).
     from services.alcada_compras import FAIXAS_RECOMENDADAS
 
-    for ordem, valor_ate, aprov, exige_admin, exige_mapa in FAIXAS_RECOMENDADAS:
+    # `minimo_cotacoes` (o 6º campo) é ignorado AQUI de propósito: a coluna só
+    # nasce na migration 297, que roda depois desta, e é o backfill dela que
+    # traduz `exige_mapa_concorrencia` em cotações. Desempacotar o campo sem
+    # usá-lo é o que mantém FAIXAS_RECOMENDADAS como lista única.
+    for (ordem, valor_ate, aprov, exige_admin, exige_mapa,
+         _minimo_cotacoes) in FAIXAS_RECOMENDADAS:
         db.session.execute(text("""
             INSERT INTO faixa_alcada
                 (admin_id, ordem, valor_ate, aprovacoes_necessarias,

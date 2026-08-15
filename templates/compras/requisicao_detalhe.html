@@ -115,7 +115,10 @@
             {% if faixa.valor_ate is none %}sem teto{% else %}R$ {{ '%.2f'|format(faixa.valor_ate) }}{% endif %}
             · {{ faixa.aprovacoes_necessarias }} aprovação(ões)
             {% if faixa.exige_admin %} · uma tem que ser de administrador{% endif %}
-            {% if faixa.exige_mapa_concorrencia %} · exige mapa de concorrência{% endif %}
+            {# O corte de cotações é DADO da faixa desde a Fase 3 do ciclo de
+               compras: `exige_mapa_concorrencia` não é mais lida, e quem diz
+               quantas cotações bastam é `minimo_cotacoes`. #}
+            {% if (faixa.minimo_cotacoes or 0) > 0 %} · exige mapa com {{ faixa.minimo_cotacoes }} cotações{% endif %}
           </p>
           {% if pendencias %}
             <ul class="small text-danger mb-0">
@@ -125,6 +128,45 @@
             <p class="small text-success mb-0">
               <i class="fas fa-check me-1"></i>Requisitos de alçada atendidos.
             </p>
+          {% endif %}
+
+          {# A pendência de mapa precisa ter SAÍDA nesta tela. Quem descobre
+             que a faixa exige concorrência é quem abre o detalhe — mandá-lo
+             cancelar e recriar a requisição para poder escolher um mapa foi o
+             que manteve a faixa de topo travada desde a Fase 3 do núcleo. #}
+          {% if (faixa.minimo_cotacoes or 0) > 0
+                and requisicao.estado.name in ('RASCUNHO', 'AGUARDANDO_APROVACAO') %}
+            <hr class="my-3">
+            <h6 class="fw-bold mb-1">Mapa de concorrência</h6>
+            {% if requisicao.mapa_v2 %}
+              <p class="small text-muted mb-2">
+                Vinculado: <strong>{{ requisicao.mapa_v2.nome }}</strong>
+                ({{ requisicao.mapa_v2.fornecedores|length }} cotação(ões),
+                {{ requisicao.mapa_v2.status }})
+              </p>
+            {% else %}
+              <p class="small text-muted mb-2">
+                Nenhum mapa vinculado. Esta faixa pede
+                {{ faixa.minimo_cotacoes }} cotações.
+              </p>
+            {% endif %}
+            <form method="POST"
+                  action="{{ url_for('compras.requisicao_vincular_mapa', requisicao_id=requisicao.id) }}">
+              <select name="mapa_v2_id" class="form-select form-select-sm mb-2">
+                <option value="">Nenhum</option>
+                {% for m in mapas_elegiveis %}
+                  <option value="{{ m.id }}"
+                          {% if requisicao.mapa_v2_id == m.id %}selected{% endif %}>{{ m.nome }} — {{ m.fornecedores|length }} cotação(ões)</option>
+                {% endfor %}
+              </select>
+              <button class="btn btn-outline-primary btn-sm w-100">
+                <i class="fas fa-link me-1"></i> Vincular mapa
+              </button>
+            </form>
+            <a class="small d-inline-block mt-2"
+               href="{{ url_for('main.detalhes_obra', id=requisicao.obra_id) }}#tab-mapa">
+              <i class="fas fa-plus me-1"></i>Criar um mapa de concorrência nesta obra
+            </a>
           {% endif %}
         </div>
       </div>

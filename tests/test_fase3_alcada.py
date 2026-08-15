@@ -88,7 +88,17 @@ def _vincular(usuario, obra, papel):
 
 
 def _faixas_de_teste(admin_id):
-    """Faixas próprias, independentes do seed — o teste trava o mecanismo."""
+    """Faixas próprias, independentes do seed — o teste trava o mecanismo.
+
+    A faixa de topo ganhou `minimo_cotacoes=2` na Fase 3 do ciclo de compras
+    (A3). A exigência é a MESMA que estes testes sempre travaram — mapa
+    concluído com dois fornecedores — mas ela deixou de ser o literal
+    `len(mapa.fornecedores) >= 2` do código e passou a ser dado da faixa.
+    Estas linhas são montadas à mão, sem passar pela migration 297, e por isso
+    precisam dizer aqui o que o backfill dela diz no banco:
+    `minimo_cotacoes = 2` onde `exige_mapa_concorrencia` é true. Sem isso a
+    faixa nasceria com 0 — e 0 dispensa o mapa.
+    """
     FaixaAlcada.query.filter_by(admin_id=admin_id).delete()
     db.session.add(FaixaAlcada(
         admin_id=admin_id, ordem=1, valor_ate=Decimal('100.00'),
@@ -101,7 +111,7 @@ def _faixas_de_teste(admin_id):
     db.session.add(FaixaAlcada(
         admin_id=admin_id, ordem=3, valor_ate=None,
         aprovacoes_necessarias=2, exige_admin=True,
-        exige_mapa_concorrencia=True, ativo=True))
+        exige_mapa_concorrencia=True, minimo_cotacoes=2, ativo=True))
     db.session.commit()
 
 

@@ -83,6 +83,27 @@ bem a **uma** pergunta: dado um valor, quantas aprovações e de quem.
   o usuário **não tem como resolver pela tela**. Isso não é dívida desta fase; é defeito
   aberto da Fase 3 do núcleo, e esta fase é onde ele morre.
 
+> ✅ **15/08, A3: o 🔴 morreu — e precisou de DOIS pontos de escrita, não de um.**
+> O spec e o plano falam do campo como se fosse um só, no formulário de criação. Ao
+> executar ficou claro que um não basta: quem descobre que a faixa exige concorrência é
+> quem abre o **detalhe** da requisição, depois de ela existir — a pendência é exibida lá.
+> Com input só na criação, a única saída de uma requisição já criada seria cancelá-la e
+> abrir outra, que é a mesma pendência sem saída com outro nome. Ficaram:
+>
+> 1. `templates/compras/requisicao_nova.html` — select `mapa_v2_id` com os mapas
+>    concluídos das obras visíveis, filtrado por obra no cliente; a rota `requisicao_nova`
+>    (GET) carrega os elegíveis. O plano nomeia só `requisicao_detalhe` no Step 5, mas o
+>    select do Step 4 mora na tela de criação, e ela também precisa da lista.
+> 2. `compras.requisicao_vincular_mapa` (POST, novo) e o bloco de mapa em
+>    `requisicao_detalhe.html`: vincular um mapa concluído que já existe, **ou** o link
+>    para criar um na obra (`/obras/detalhes/<id>#tab-mapa`). Só em RASCUNHO e
+>    AGUARDANDO_APROVACAO — depois de virar pedido o mapa é registro histórico da decisão,
+>    e trocá-lo reescreveria a justificativa de uma compra já feita.
+>
+> Os **dois** conferem `obra_id` e `admin_id` do mapa na rota, antes de gravar, além da
+> conferência que `services.alcada_compras.mapa_da_requisicao` já fazia. O serviço protege
+> a decisão de alçada; a rota impede que o vínculo indevido chegue a existir na linha.
+
 E o mínimo de cotações é 📖 `len(mapa.fornecedores) >= 2`, **literal no código**
 (`services/alcada_compras.py:159`) — a única regra de alçada que não é dado.
 
@@ -100,6 +121,23 @@ se remove no mesmo release que muda o leitor, e há tenant com faixa editada por
 Backfill: onde `exige_mapa_concorrencia = true`, `minimo_cotacoes = 2` — o número que o
 código aplicava. **Não** 3: o backfill preserva o comportamento, e subir para 3 é decisão
 D6, aplicada por UPDATE depois.
+
+> 📌 **O backfill cobre o tenant que já existe; o SEED cobre o que nascer amanhã.**
+> Descoberto ao executar a A3: `FAIXAS_RECOMENDADAS` (📖 `services/alcada_compras.py`) é
+> a lista de onde saem as faixas de tenant novo, por `garantir_faixas_do_tenant` e pela
+> migration 243. Com o leitor trocado, deixá-la sem `minimo_cotacoes` faria a faixa de
+> topo de todo tenant criado a partir de agora nascer com 0 — isto é, **deixando de
+> exigir mapa**, silenciosamente, exatamente na faixa em que ele importa. A lista ganhou
+> um sexto campo, e o valor semeado é **2**, pelo mesmo motivo do backfill: preservar o
+> comportamento. A migration 243 desempacota o campo e o ignora, porque a coluna só nasce
+> na 297, que roda depois dela. Subir a faixa de topo para 3 continua sendo a D6, por
+> UPDATE, no passo 1 do runbook — e agora vale para tenant novo e antigo pelo mesmo
+> caminho.
+>
+> Na mesma linha, `_FaixaSeguranca` (a falha fechada de tenant sem faixa nenhuma) recebeu
+> `minimo_cotacoes = 0`, e **não** 2: ela exige o máximo do que consegue cobrar, e um
+> tenant sem faixa configurada também não tem quem monte mapa. Exigir ali travaria a
+> compra em vez de endurecê-la.
 
 ### `faixa_alcada.condicoes_ativas` — quais das quatro valem neste tenant
 

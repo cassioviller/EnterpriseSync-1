@@ -116,27 +116,27 @@ ligada em tenant real antes de A8**, porque o sensor é o que enxerga emergênci
 
 > Esta task fecha um 🔴 **aberto desde a Fase 3 do núcleo**, não só prepara a A4.
 
-- [ ] **Step 1 (red):** `_mapa_serve_de_concorrencia` passa a exigir
+- [x] **Step 1 (red):** `_mapa_serve_de_concorrencia` passa a exigir
   `faixa.minimo_cotacoes` fornecedores, não 2 fixos: mapa com 2 fornecedores **passa** na
   faixa de `minimo_cotacoes = 2` e **falha** na de 3; `minimo_cotacoes = 0` dispensa o mapa;
   e o teste de tela — POST de requisição com `mapa_v2_id` **vindo do form renderizado**
   grava o vínculo.
-- [ ] **Step 2:** trocar o literal `len(mapa.fornecedores) >= 2` pela leitura da faixa. A
+- [x] **Step 2:** trocar o literal `len(mapa.fornecedores) >= 2` pela leitura da faixa. A
   assinatura de `_mapa_serve_de_concorrencia` ganha a faixa; `pendencias_de_aprovacao`
   passa a dizer **quantas** cotações faltam, não só que falta mapa.
-- [ ] **Step 3:** `exige_mapa_concorrencia` deixa de ser lida e vira derivada
+- [x] **Step 3:** `exige_mapa_concorrencia` deixa de ser lida e vira derivada
   (`minimo_cotacoes > 0`). **A coluna não é removida** — há tenant com faixa editada por
   SQL, e coluna não se remove no mesmo release que muda o leitor. Comentário no modelo
   dizendo isso, para que a remoção seja uma decisão futura e não um esquecimento.
-- [ ] **Step 4:** o campo do mapa em `templates/compras/requisicao_nova.html`: select das
+- [x] **Step 4:** o campo do mapa em `templates/compras/requisicao_nova.html`: select das
   `MapaConcorrenciaV2` da mesma obra com `status = 'concluido'`, opcional, com texto curto
   explicando quando é exigido. E em `requisicao_detalhe.html`, quando a pendência de mapa
   aparece, o link para criar o mapa da obra — a pendência precisa ter saída na própria tela.
-- [ ] **Step 5:** a rota `requisicao_detalhe` passa a carregar os mapas elegíveis; a
+- [x] **Step 5:** a rota `requisicao_detalhe` passa a carregar os mapas elegíveis; a
   validação do `mapa_v2_id` confere `obra_id` e `admin_id` **na rota**, não só no serviço.
-- [ ] **Step 6 (green):** rodar. Verdes. Conferir na tela que uma requisição acima de 30k
+- [x] **Step 6 (green):** rodar. Verdes. Conferir na tela que uma requisição acima de 30k
   agora tem caminho até APROVADA.
-- [ ] **Step 7:** commit — `feat(compras): minimo de cotacoes vira dado da faixa e o mapa ganha campo na tela`
+- [x] **Step 7:** commit — `feat(compras): minimo de cotacoes vira dado da faixa e o mapa ganha campo na tela`
 
 ## A4 — `faixa_efetiva` e as quatro condições ← gate de merge
 

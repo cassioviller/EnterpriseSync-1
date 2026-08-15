@@ -41,6 +41,26 @@
                 <textarea name="justificativa" rows="2" class="form-control"
                           placeholder="Para que serve, e por que agora"></textarea>
               </div>
+              <div class="col-12">
+                <label class="form-label">
+                  Mapa de concorrência
+                  <span class="text-muted fw-normal">(opcional)</span>
+                </label>
+                <select name="mapa_v2_id" id="mapaSelect" class="form-select">
+                  <option value="">Nenhum</option>
+                  {% for m in mapas_elegiveis %}
+                    <option value="{{ m.id }}" data-obra="{{ m.obra_id }}">{{ m.nome }} — {{ m.fornecedores|length }} cotação(ões)</option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted">
+                  Só aparecem mapas <strong>concluídos</strong> da obra
+                  selecionada. Acima de um certo valor a alçada da sua empresa
+                  exige mapa com um número mínimo de cotações — sem ele a
+                  requisição fica parada na aprovação. A tela de detalhe diz
+                  quantas cotações a faixa pede, e o mapa pode ser vinculado
+                  lá também.
+                </small>
+              </div>
             </div>
           </div>
         </div>
@@ -113,6 +133,29 @@
 <script>
 (function () {
   var tabela = document.querySelector('#tabelaItens tbody');
+
+  // O select de mapas traz os mapas concluídos de TODAS as obras visíveis e
+  // filtra pela obra escolhida. Isso é conforto de tela, não segurança: a
+  // rota confere `obra_id` e `admin_id` do mapa antes de gravar o vínculo, e
+  // é ela que decide — HTML não é barreira.
+  var obraSelect = document.getElementById('obraSelect');
+  var mapaSelect = document.getElementById('mapaSelect');
+
+  function filtrarMapas() {
+    var obra = obraSelect.value;
+    Array.prototype.forEach.call(mapaSelect.options, function (op) {
+      if (!op.value) { return; }
+      var serve = (op.getAttribute('data-obra') === obra);
+      op.hidden = !serve;
+      op.disabled = !serve;
+      if (!serve && op.selected) { mapaSelect.value = ''; }
+    });
+  }
+
+  if (obraSelect && mapaSelect) {
+    obraSelect.addEventListener('change', filtrarMapas);
+    filtrarMapas();
+  }
 
   document.getElementById('btnAddItem').addEventListener('click', function () {
     var modelo = tabela.rows[0].cloneNode(true);

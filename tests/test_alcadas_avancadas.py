@@ -18,6 +18,7 @@ condição nenhuma; tenant que já existia tem a flag desligada. É o que garant
 que a migration não reescreve o passado.
 """
 import os
+import re
 import sys
 import uuid
 from datetime import date
@@ -31,7 +32,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import main  # noqa: F401 — registra os blueprints
 from app import app, db
 from models import (Cliente, ConfiguracaoEmpresa, EstadoRequisicao, FaixaAlcada,
-                    Obra, RequisicaoCompra, TipoUsuario, Usuario)
+                    MapaConcorrenciaV2, MapaFornecedor, Obra, PapelObra,
+                    RequisicaoCompra, TipoUsuario, Usuario, UsuarioObra)
 
 pytestmark = pytest.mark.integration
 
@@ -124,6 +126,53 @@ def _cliente_de(user_id):
         sess['_user_id'] = str(user_id)
         sess['_fresh'] = True
     return c
+
+
+def _operador(admin_id, nome='Operador'):
+    suf = uuid.uuid4().hex[:8]
+    u = Usuario(
+        username=f'alcp_{suf}', email=f'alcp_{suf}@test.local',
+        nome=f'{nome} {suf}',
+        password_hash=generate_password_hash('Senha@2026'),
+        tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+        admin_id=admin_id, versao_sistema='v2')
+    db.session.add(u)
+    db.session.commit()
+    return u
+
+
+def _vincular(usuario, obra, papel):
+    v = UsuarioObra(usuario_id=usuario.id, obra_id=obra.id, papel=papel,
+                    admin_id=obra.admin_id, ativo=True)
+    db.session.add(v)
+    db.session.commit()
+    return v
+
+
+def _mapa(admin_id, obra_id, fornecedores=2, status='concluido', nome=None):
+    """Mapa V2 com N fornecedores. N é o que a faixa conta como cotação."""
+    m = MapaConcorrenciaV2(obra_id=obra_id, admin_id=admin_id,
+                           nome=nome or f'Mapa {uuid.uuid4().hex[:8]}',
+                           status=status)
+    db.session.add(m)
+    db.session.flush()
+    for i in range(fornecedores):
+        db.session.add(MapaFornecedor(mapa_id=m.id, admin_id=admin_id,
+                                      nome=f'Fornecedor {i + 1}', ordem=i))
+    db.session.commit()
+    return m
+
+
+def _faixa_topo(admin_id, minimo_cotacoes, valor_ate=None, ordem=9,
+                aprovacoes=1, exige_admin=False, exige_mapa=True):
+    f = FaixaAlcada(admin_id=admin_id, ordem=ordem, valor_ate=valor_ate,
+                    aprovacoes_necessarias=aprovacoes,
+                    exige_admin=exige_admin,
+                    exige_mapa_concorrencia=exige_mapa,
+                    minimo_cotacoes=minimo_cotacoes, ativo=True)
+    db.session.add(f)
+    db.session.commit()
+    return f
 
 
 # ---------------------------------------------------------------------------
@@ -404,3 +453,325 @@ def test_desligar_a_flag_nao_reescreve_requisicao_ja_criada():
         assert nova.regime_alcada == 'simples', (
             'a requisição NOVA volta ao regime antigo — é isso que o '
             '--desligar faz, e é só isso')
+
+
+# ---------------------------------------------------------------------------
+# A3 — o corte de cotações vira dado, e a faixa de topo destrava
+#
+# Esta seção fecha o 🔴 aberto desde a Fase 3 do núcleo (📖 spec, "O que já
+# existe — e o teto em que ela bate", item 3): a faixa de topo exigia
+# `requisicao.mapa_v2_id`, a rota lia o campo do form e o gravava, e nenhum
+# template tinha o input. Toda requisição acima de R$ 30.000 nascia com uma
+# pendência que o usuário não tinha como resolver pela tela.
+# ---------------------------------------------------------------------------
+
+def test_minimo_de_cotacoes_da_faixa_diz_quantos_fornecedores_bastam():
+    """O corte deixa de ser `len(mapa.fornecedores) >= 2` literal.
+
+    O MESMO mapa, com dois fornecedores, serve numa faixa que pede 2 e não
+    serve na que pede 3. Era a única regra de alçada que não era dado — e o
+    número que decide passa a vir da linha da tabela, por tenant.
+    """
+    from services.alcada_compras import _mapa_serve_de_concorrencia
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        mapa = _mapa(adm.id, obra.id, fornecedores=2)
+        req = _requisicao(adm.id, obra.id, adm.id)
+        req.mapa_v2_id = mapa.id
+        db.session.commit()
+
+        exige_dois = _faixa_topo(adm.id, minimo_cotacoes=2, ordem=1)
+        exige_tres = _faixa_topo(adm.id, minimo_cotacoes=3, ordem=2)
+
+        assert _mapa_serve_de_concorrencia(req, exige_dois) is True
+        assert _mapa_serve_de_concorrencia(req, exige_tres) is False, (
+            'o mesmo mapa não pode servir para os dois cortes — quem decide '
+            'é a faixa, não o código')
+
+
+def test_minimo_de_cotacoes_zero_dispensa_o_mapa():
+    """`minimo_cotacoes = 0` dispensa — mesmo com `exige_mapa_concorrencia`.
+
+    É este teste que prova que a coluna antiga DEIXOU DE SER LIDA. Ela
+    permanece na tabela (há tenant com faixa editada por SQL, e coluna não se
+    remove no mesmo release que muda o leitor), mas quem responde a pergunta
+    agora é `minimo_cotacoes`.
+    """
+    from services.alcada_compras import pendencias_de_aprovacao
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        req = _requisicao(adm.id, obra.id, adm.id)
+        _faixa_topo(adm.id, minimo_cotacoes=0, exige_mapa=True,
+                    aprovacoes=0, ordem=1)
+
+        assert not any('mapa' in p.lower() for p in pendencias_de_aprovacao(req))
+
+
+def test_pendencia_de_mapa_diz_quantas_cotacoes_faltam():
+    """A pendência passa a dizer QUANTAS faltam, não só que falta mapa.
+
+    Um aprovador que lê "falta mapa" e anexa um mapa de duas cotações numa
+    faixa que pede três volta ao mesmo lugar. O número tem de estar na tela.
+    """
+    from services.alcada_compras import pendencias_de_aprovacao
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        req = _requisicao(adm.id, obra.id, adm.id)
+        _faixa_topo(adm.id, minimo_cotacoes=3, aprovacoes=0, ordem=1)
+
+        sem_mapa = ' | '.join(pendencias_de_aprovacao(req))
+        assert 'mapa' in sem_mapa.lower() and '3' in sem_mapa
+
+        req.mapa_v2_id = _mapa(adm.id, obra.id, fornecedores=2).id
+        db.session.commit()
+        curto = ' | '.join(pendencias_de_aprovacao(req))
+        assert '2 de 3' in curto, (
+            f'a pendência tem de contar o que já existe: {curto!r}')
+
+
+def test_mapa_de_outra_obra_ou_de_outro_tenant_nunca_serve():
+    """Isolamento no SERVIÇO — a rota é a segunda barreira, não a única."""
+    from services.alcada_compras import _mapa_serve_de_concorrencia
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        outra_obra = _obra(adm.id)
+        outro = _admin()
+        obra_do_outro = _obra(outro.id)
+
+        faixa = _faixa_topo(adm.id, minimo_cotacoes=2, ordem=1)
+        req = _requisicao(adm.id, obra.id, adm.id)
+
+        req.mapa_v2_id = _mapa(adm.id, outra_obra.id, fornecedores=3).id
+        db.session.commit()
+        assert _mapa_serve_de_concorrencia(req, faixa) is False
+
+        req.mapa_v2_id = _mapa(outro.id, obra_do_outro.id, fornecedores=3).id
+        db.session.commit()
+        assert _mapa_serve_de_concorrencia(req, faixa) is False
+
+        req.mapa_v2_id = _mapa(adm.id, obra.id, fornecedores=3,
+                               status='aberto').id
+        db.session.commit()
+        assert _mapa_serve_de_concorrencia(req, faixa) is False, (
+            'mapa ainda aberto é cotação em andamento, não concorrência')
+
+
+def test_form_de_nova_requisicao_oferece_os_mapas_concluidos_da_obra():
+    """O campo que nunca existiu. 📖 grep por `mapa_v2_id` em `templates/`
+    retornava ZERO — este teste é o que passa a impedir que volte a zero."""
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        concluido = _mapa(adm.id, obra.id, fornecedores=3,
+                          nome=f'MapaOK{uuid.uuid4().hex[:8]}')
+        aberto = _mapa(adm.id, obra.id, fornecedores=3, status='aberto',
+                       nome=f'MapaAberto{uuid.uuid4().hex[:8]}')
+        outro = _admin()
+        alheio = _mapa(outro.id, _obra(outro.id).id, fornecedores=3,
+                       nome=f'MapaAlheio{uuid.uuid4().hex[:8]}')
+        aid = adm.id
+        nome_ok, nome_aberto, nome_alheio = (concluido.nome, aberto.nome,
+                                             alheio.nome)
+
+    html = _cliente_de(aid).get('/compras/requisicoes/nova').get_data(as_text=True)
+    assert 'mapa_v2_id' in html, 'o input do mapa tem de existir na tela'
+    assert nome_ok in html
+    assert nome_aberto not in html, 'mapa aberto não é concorrência fechada'
+    assert nome_alheio not in html, 'mapa de outra empresa nunca aparece'
+
+
+def test_post_com_mapa_vindo_do_form_grava_o_vinculo():
+    """O ciclo real: o id sai do SELECT RENDERIZADO e volta no POST.
+
+    Ler o valor do HTML em vez de montá-lo no teste é o ponto: prova que a
+    tela oferece exatamente o que a rota aceita.
+    """
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        mapa = _mapa(adm.id, obra.id, fornecedores=3)
+        aid, oid, mid = adm.id, obra.id, mapa.id
+
+    cliente = _cliente_de(aid)
+    html = cliente.get('/compras/requisicoes/nova').get_data(as_text=True)
+    ofertados = re.findall(
+        r'<option[^>]*value="(\d+)"[^>]*data-obra="%d"' % oid, html)
+    assert str(mid) in ofertados, (
+        f'o mapa {mid} tinha de estar no select da obra {oid}: {ofertados}')
+
+    r = cliente.post('/compras/requisicoes/nova', data={
+        'obra_id': str(oid),
+        'mapa_v2_id': ofertados[ofertados.index(str(mid))],
+        'justificativa': 'Esquadrias do bloco B',
+        'item_descricao[]': ['Esquadria de alumínio'],
+        'item_unidade[]': ['un'],
+        'item_quantidade[]': ['4'],
+        'item_preco[]': ['1.500,00'],
+        'item_almoxarifado_id[]': [''],
+    }, follow_redirects=False)
+    assert r.status_code == 302
+
+    with app.app_context():
+        req = RequisicaoCompra.query.filter_by(admin_id=aid).one()
+        assert req.mapa_v2_id == mid
+
+
+def test_rota_recusa_mapa_de_outra_empresa_e_de_outra_obra():
+    """Isolamento entre empresas NA ROTA — o defeito mais caro deste
+    repositório. O serviço já barra; a rota barra antes de gravar, para que o
+    vínculo indevido nunca chegue a existir na linha."""
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        outra_obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        outro = _admin()
+        alheio = _mapa(outro.id, _obra(outro.id).id, fornecedores=3)
+        da_outra_obra = _mapa(adm.id, outra_obra.id, fornecedores=3)
+        aid, oid = adm.id, obra.id
+        ids = {'alheio': alheio.id, 'outra_obra': da_outra_obra.id}
+
+    base = {
+        'obra_id': str(oid),
+        'justificativa': 'Tentativa',
+        'item_descricao[]': ['Item'],
+        'item_unidade[]': ['un'],
+        'item_quantidade[]': ['1'],
+        'item_preco[]': ['10,00'],
+        'item_almoxarifado_id[]': [''],
+    }
+    for rotulo, mid in ids.items():
+        dados = dict(base, mapa_v2_id=str(mid))
+        assert _cliente_de(aid).post('/compras/requisicoes/nova', data=dados,
+                                     follow_redirects=False).status_code == 302
+
+    with app.app_context():
+        for req in RequisicaoCompra.query.filter_by(admin_id=aid).all():
+            assert req.mapa_v2_id is None, (
+                'mapa de outro tenant ou de outra obra não pode ser gravado')
+
+
+def test_detalhe_da_pendencia_de_mapa_tem_saida_na_propria_tela():
+    """Pendência sem saída é pendência que vira ligação para o suporte.
+
+    A tela de detalhe passa a oferecer as duas saídas: vincular um mapa
+    concluído que já existe, ou ir criar um na obra.
+    """
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        _faixa_topo(adm.id, minimo_cotacoes=2, aprovacoes=0, ordem=1)
+        mapa = _mapa(adm.id, obra.id, fornecedores=2,
+                     nome=f'MapaSaida{uuid.uuid4().hex[:8]}')
+        req = _requisicao(adm.id, obra.id, adm.id)
+        req.estado = EstadoRequisicao.AGUARDANDO_APROVACAO
+        db.session.commit()
+        aid, oid, rid, nome = adm.id, obra.id, req.id, mapa.nome
+
+    html = _cliente_de(aid).get(
+        f'/compras/requisicoes/{rid}').get_data(as_text=True)
+    assert 'mapa' in html.lower()
+    assert nome in html, 'o mapa concluído da obra tem de estar oferecido'
+    assert f'/obras/detalhes/{oid}#tab-mapa' in html, (
+        'e tem de haver caminho para criar um mapa novo na obra')
+
+
+def test_vincular_mapa_pela_tela_de_detalhe_resolve_a_pendencia():
+    from services.alcada_compras import pendencias_de_aprovacao
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        _faixa_topo(adm.id, minimo_cotacoes=2, aprovacoes=0, ordem=1)
+        mapa = _mapa(adm.id, obra.id, fornecedores=2)
+        outro = _admin()
+        alheio = _mapa(outro.id, _obra(outro.id).id, fornecedores=3)
+        req = _requisicao(adm.id, obra.id, adm.id)
+        req.estado = EstadoRequisicao.AGUARDANDO_APROVACAO
+        db.session.commit()
+        aid, rid, mid, alheio_id = adm.id, req.id, mapa.id, alheio.id
+
+    cliente = _cliente_de(aid)
+    cliente.post(f'/compras/requisicoes/{rid}/vincular-mapa',
+                 data={'mapa_v2_id': str(alheio_id)}, follow_redirects=False)
+    with app.app_context():
+        assert db.session.get(RequisicaoCompra, rid).mapa_v2_id is None, (
+            'a rota confere admin_id e obra_id ANTES de gravar')
+
+    cliente.post(f'/compras/requisicoes/{rid}/vincular-mapa',
+                 data={'mapa_v2_id': str(mid)}, follow_redirects=False)
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, rid)
+        assert req.mapa_v2_id == mid
+        assert not any('mapa' in p.lower() for p in pendencias_de_aprovacao(req))
+
+
+def test_requisicao_acima_de_30k_com_mapa_de_tres_chega_a_aprovada():
+    """🔴 O teste que prova que o bloqueio permanente morreu.
+
+    Ciclo inteiro PELA TELA, sem tocar no banco no meio: criar com o mapa
+    escolhido no select, enviar, e as duas aprovações da faixa de topo. Antes
+    da A3 este caminho não existia — a requisição parava numa pendência que
+    nenhum template sabia resolver.
+    """
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        # As três faixas recomendadas, com a de topo já na decisão D6 (3
+        # cotações acima de 30k) — que é UPDATE de tenant, não migration.
+        _faixa_topo(adm.id, 0, valor_ate=Decimal('5000.00'), ordem=1,
+                    aprovacoes=1, exige_admin=False, exige_mapa=False)
+        _faixa_topo(adm.id, 0, valor_ate=Decimal('30000.00'), ordem=2,
+                    aprovacoes=2, exige_admin=True, exige_mapa=False)
+        _faixa_topo(adm.id, 3, valor_ate=None, ordem=3,
+                    aprovacoes=2, exige_admin=True, exige_mapa=True)
+        solicitante = _operador(adm.id, 'Solicitante')
+        gestor = _operador(adm.id, 'Gestor')
+        _vincular(solicitante, obra, PapelObra.COMPRADOR)
+        _vincular(gestor, obra, PapelObra.GESTOR)
+        _mapa(adm.id, obra.id, fornecedores=3)
+        aid, oid = adm.id, obra.id
+        sid, gid = solicitante.id, gestor.id
+
+    cliente = _cliente_de(sid)
+    html = cliente.get('/compras/requisicoes/nova').get_data(as_text=True)
+    ofertados = re.findall(
+        r'<option[^>]*value="(\d+)"[^>]*data-obra="%d"' % oid, html)
+    assert ofertados, 'sem mapa no select não há como destravar a faixa de topo'
+
+    assert cliente.post('/compras/requisicoes/nova', data={
+        'obra_id': str(oid),
+        'mapa_v2_id': ofertados[0],
+        'justificativa': 'Estrutura metálica — 3 cotações no mapa',
+        'item_descricao[]': ['Estrutura metálica'],
+        'item_unidade[]': ['un'],
+        'item_quantidade[]': ['1'],
+        'item_preco[]': ['40.000,00'],
+        'item_almoxarifado_id[]': [''],
+    }, follow_redirects=False).status_code == 302
+
+    with app.app_context():
+        req = RequisicaoCompra.query.filter_by(admin_id=aid).one()
+        rid = req.id
+        assert req.valor_estimado == Decimal('40000.00')
+        assert req.mapa_v2_id is not None
+
+    cliente.post(f'/compras/requisicoes/{rid}/enviar', follow_redirects=False)
+    _cliente_de(gid).post(f'/compras/requisicoes/{rid}/aprovar',
+                          follow_redirects=False)
+    _cliente_de(aid).post(f'/compras/requisicoes/{rid}/aprovar',
+                          follow_redirects=False)
+
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, rid)
+        assert req.estado == EstadoRequisicao.APROVADA, (
+            'acima de 30k com mapa de 3 cotações a requisição TEM de chegar '
+            'a APROVADA pela tela — é o 🔴 que a A3 fecha')

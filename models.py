@@ -6145,7 +6145,16 @@ class RequisicaoCompra(db.Model):
     # Mapa de concorrência opcional. FK, NÃO reparentagem: os mapas
     # existentes continuam pendurados na obra (models.py:5604) e continuam
     # funcionando. Faixas de alçada altas podem exigir que esta FK esteja
-    # preenchida e o mapa concluído (FaixaAlcada.exige_mapa_concorrencia).
+    # preenchida e o mapa concluído — quem diz quantas cotações bastam é
+    # `FaixaAlcada.minimo_cotacoes` (Fase 3 do ciclo de compras, A3), não mais
+    # `exige_mapa_concorrencia`.
+    #
+    # A FK é preenchida em DOIS pontos, os dois conferindo `obra_id` e
+    # `admin_id` do mapa antes de gravar: `requisicao_nova_post` (o select da
+    # tela de criação) e `requisicao_vincular_mapa` (a saída da pendência, na
+    # tela de detalhe). Até 15/08 não havia nenhum: a rota lia o campo do form
+    # e template nenhum tinha o input, o que fazia da faixa de topo um
+    # bloqueio permanente.
     mapa_v2_id = db.Column(
         db.Integer, db.ForeignKey('mapa_concorrencia_v2.id', ondelete='SET NULL'),
         nullable=True)

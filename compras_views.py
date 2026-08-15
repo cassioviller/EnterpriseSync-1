@@ -113,6 +113,29 @@ def _regime_alcada(admin_id):
     return regime_alcada_do_tenant(admin_id)
 
 
+def _mapas_elegiveis(admin_id, obra_ids):
+    """Os MapaConcorrenciaV2 que podem servir de concorrência a uma requisição.
+
+    Concluídos (mapa aberto é cotação em andamento, não concorrência fechada),
+    do tenant, e SÓ das obras passadas — que já vêm filtradas por
+    `obras_visiveis`, o predicado do escopo de obra da Fase 1.
+
+    O `admin_id` entra no filtro mesmo quando as obras já são do tenant: é
+    cinto e suspensório sobre o defeito mais caro deste repositório, e o custo
+    é uma coluna a mais no WHERE. A rota que GRAVA o vínculo repete a
+    conferência — oferecer certo e gravar sem checar seria confiar no HTML.
+    """
+    if not obra_ids:
+        return []
+    return (MapaConcorrenciaV2.query
+            .filter(MapaConcorrenciaV2.admin_id == admin_id,
+                    MapaConcorrenciaV2.obra_id.in_(obra_ids),
+                    MapaConcorrenciaV2.status == 'concluido')
+            .order_by(MapaConcorrenciaV2.obra_id,
+                      MapaConcorrenciaV2.created_at.desc())
+            .all())
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # HELPERS DE PROCESSAMENTO — dois fluxos de compra
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1661,6 +1684,10 @@ def requisicao_nova():
         'compras/requisicao_nova.html',
         obras=obras,
         itens_catalogo=itens_catalogo,
+        # Fase 3 — o campo que faltava. Sem ele, `exige_mapa_concorrencia`
+        # tornava a faixa de topo um bloqueio permanente: a rota lia
+        # `mapa_v2_id` do form e nenhum template tinha o input.
+        mapas_elegiveis=_mapas_elegiveis(admin_id, [o.id for o in obras]),
         hoje=date.today().isoformat(),
     )
 
@@ -1829,6 +1856,12 @@ def requisicao_detalhe(requisicao_id):
         motivo_recusa=motivo_recusa,
         pode_emitir=pode_comprar_na_obra(requisicao.obra_id),
         pedidos=pedidos,
+        # Fase 3 — a pendência de mapa precisa ter saída NESTA tela: ou se
+        # vincula um mapa concluído que já existe, ou se vai criar um na obra.
+        # Quem descobre que falta mapa é quem abre o detalhe, não quem abriu o
+        # formulário de criação.
+        mapas_elegiveis=_mapas_elegiveis(requisicao.admin_id,
+                                         [requisicao.obra_id]),
         EstadoRequisicao=EstadoRequisicao,
         fornecedores=Fornecedor.query.filter_by(
             admin_id=requisicao.admin_id, ativo=True).order_by(
@@ -1836,6 +1869,80 @@ def requisicao_detalhe(requisicao_id):
         CONDICOES=CONDICOES,
         hoje=date.today().isoformat(),
     )
+
+
+@compras_bp.route('/requisicoes/<int:requisicao_id>/vincular-mapa',
+                  methods=['POST'])
+@login_required
+def requisicao_vincular_mapa(requisicao_id):
+    """Vincula (ou desvincula) o mapa de concorrência de uma requisição.
+
+    Existe porque a pendência de mapa aparece no DETALHE, depois da criação:
+    quem descobre que a faixa exige concorrência é o aprovador, e sem esta
+    rota a única saída seria cancelar a requisição e abrir outra. Era metade
+    do 🔴 da faixa de topo (📖 spec 2026-08-15-alcadas-design.md, "O que já
+    existe", item 3).
+
+    A conferência de `obra_id` e `admin_id` é feita AQUI, na rota, e não só em
+    `services.alcada_compras.mapa_da_requisicao`: o serviço protege a decisão
+    de alçada, mas quem impede que o vínculo indevido chegue a existir na
+    linha é a rota. Isolamento entre empresas é o defeito mais caro deste
+    repositório, e uma barreira só é uma barreira a menos do que o necessário.
+    """
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    requisicao = _requisicao_do_tenant(requisicao_id)
+
+    if not pode_requisitar_na_obra(requisicao.obra_id):
+        flash('Você não pode movimentar requisições desta obra.', 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    # Depois de virar pedido o mapa é registro histórico da decisão — trocá-lo
+    # reescreveria a justificativa de uma compra já feita.
+    if requisicao.estado not in (EstadoRequisicao.RASCUNHO,
+                                 EstadoRequisicao.AGUARDANDO_APROVACAO):
+        flash('O mapa só pode ser trocado enquanto a requisição está em '
+              'rascunho ou aguardando aprovação.', 'warning')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    bruto = (request.form.get('mapa_v2_id') or '').strip()
+    if not bruto:
+        requisicao.mapa_v2_id = None
+        db.session.commit()
+        flash('Mapa de concorrência desvinculado da requisição.', 'info')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    try:
+        candidato = int(bruto)
+    except (TypeError, ValueError):
+        candidato = None
+
+    mapa = MapaConcorrenciaV2.query.filter_by(
+        id=candidato, obra_id=requisicao.obra_id,
+        admin_id=requisicao.admin_id, status='concluido').first() if candidato \
+        else None
+
+    if mapa is None:
+        logger.warning('[fase3] vínculo de mapa recusado: requisicao=%s '
+                       'mapa=%s tenant=%s obra=%s', requisicao_id, bruto,
+                       requisicao.admin_id, requisicao.obra_id)
+        flash('Mapa de concorrência não encontrado nesta obra, ou ainda não '
+              'concluído. Só mapa concluído da própria obra serve de '
+              'concorrência.', 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    requisicao.mapa_v2_id = mapa.id
+    db.session.commit()
+    flash(f'Mapa "{mapa.nome}" vinculado à requisição '
+          f'({len(mapa.fornecedores)} cotações).', 'success')
+    return redirect(url_for('compras.requisicao_detalhe',
+                            requisicao_id=requisicao_id))
 
 
 @compras_bp.route('/requisicoes/<int:requisicao_id>/enviar', methods=['POST'])
