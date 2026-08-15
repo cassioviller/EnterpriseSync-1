@@ -145,32 +145,32 @@ ligada em tenant real antes de A8**, porque o sensor é o que enxerga emergênci
 > entra no código igual às outras; quem decide se roda em cada tenant é
 > `faixa.condicoes_ativas`, e o sensor da A8 mede o volume antes de alguém ligar.
 
-- [ ] **Step 1 (red):** paridade primeiro — com a flag OFF, `faixa_efetiva` devolve o mesmo
+- [x] **Step 1 (red):** paridade primeiro — com a flag OFF, `faixa_efetiva` devolve o mesmo
   objeto de `faixa_para_valor` numa grade de valores que cruza os três tetos (0, 4999, 5000,
   5001, 29999, 30000, 30001, 1e6). Depois: uma condição sobe uma faixa; duas sobem duas; na
   faixa de topo satura **e mesmo assim grava** `degrau_aplicado`; requisição em regime
   `'simples'` ignora as condições ainda que a flag esteja ON.
-- [ ] **Step 2:** os quatro avaliadores em `services/alcada_compras.py`, um por função
+- [x] **Step 2:** os quatro avaliadores em `services/alcada_compras.py`, um por função
   pequena e testável isoladamente: `_cond_fornecedor_novo`, `_cond_sem_cotacao`,
   `_cond_nao_menor_preco`, `_cond_fora_do_orcamento`. Cada um recebe a requisição (e o
   fornecedor, quando só existe na emissão) e devolve bool. Nenhum deles consulta flag —
   quem decide se valem é o chamador.
-- [ ] **Step 3:** `condicoes_disparadas(requisicao, faixa, fornecedor=None)` — intersecta os
+- [x] **Step 3:** `condicoes_disparadas(requisicao, faixa, fornecedor=None)` — intersecta os
   avaliadores com `faixa.condicoes_ativas`. Condição que o tenant não ativou não roda: o
   custo de query também é comportamento.
-- [ ] **Step 4:** `faixa_efetiva(requisicao, fornecedor=None)` — base, degrau, saturação no
+- [x] **Step 4:** `faixa_efetiva(requisicao, fornecedor=None)` — base, degrau, saturação no
   topo, e a gravação de `degrau_aplicado`. **Não commita**, no mesmo contrato de
   `registrar_aprovacao`: quem persiste é a rota.
-- [ ] **Step 5:** trocar as chamadas de `faixa_para_valor` por `faixa_efetiva` nos quatro
+- [x] **Step 5:** trocar as chamadas de `faixa_para_valor` por `faixa_efetiva` nos quatro
   pontos que decidem (`services/alcada_compras.py` em `pendencias_de_aprovacao`,
   `compras_views.py` em `requisicao_nova_post`, `requisicao_detalhe` e a guarda 2 de
   `requisicao_emitir_pedido`). O ponto de **exibição** do flash na criação também passa a
   usar a efetiva — senão a tela promete uma faixa e o envio cobra outra.
-- [ ] **Step 6:** `requisicao_detalhe.html` mostra **por que** subiu: a faixa base, a
+- [x] **Step 6:** `requisicao_detalhe.html` mostra **por que** subiu: a faixa base, a
   efetiva e os códigos em português. Pendência sem motivo visível é pendência que vira
   ligação para o suporte.
-- [ ] **Step 7 (green):** rodar a suíte da fase inteira. Verdes.
-- [ ] **Step 8:** commit — `feat(compras): as quatro condicoes que sobem um degrau na alcada`
+- [x] **Step 7 (green):** rodar a suíte da fase inteira. Verdes.
+- [x] **Step 8:** commit — `feat(compras): as quatro condicoes que sobem um degrau na alcada`
 
 ## A5 — Anti-fracionamento
 

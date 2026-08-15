@@ -32,8 +32,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import main  # noqa: F401 — registra os blueprints
 from app import app, db
 from models import (Cliente, ConfiguracaoEmpresa, EstadoRequisicao, FaixaAlcada,
-                    MapaConcorrenciaV2, MapaFornecedor, Obra, PapelObra,
-                    RequisicaoCompra, TipoUsuario, Usuario, UsuarioObra)
+                    Fornecedor, MapaConcorrenciaV2, MapaCotacao, MapaFornecedor,
+                    MapaItemCotacao, Obra, ObraServicoCusto, PapelObra,
+                    PedidoCompra, RequisicaoCompra, TipoUsuario, Usuario,
+                    UsuarioObra)
 
 pytestmark = pytest.mark.integration
 
@@ -775,3 +777,578 @@ def test_requisicao_acima_de_30k_com_mapa_de_tres_chega_a_aprovada():
         assert req.estado == EstadoRequisicao.APROVADA, (
             'acima de 30k com mapa de 3 cotações a requisição TEM de chegar '
             'a APROVADA pela tela — é o 🔴 que a A3 fecha')
+
+
+# ---------------------------------------------------------------------------
+# A4 — `faixa_efetiva` e as quatro condições  ← gate de merge
+#
+# A ordem desta seção não é decorativa. A PARIDADE vem primeiro porque é ela
+# que autoriza todo o resto: enquanto não estiver provado que, com a flag
+# desligada, a regra nova devolve exatamente a faixa de sempre, nenhum degrau
+# pode ser ligado em lugar nenhum. `faixa_para_valor` fica INTOCADA — a regra
+# nova mora numa função ACIMA dela, e é isso que protege os 100+ testes de
+# alçada que já existiam (📖 spec, "O motor ganha uma pergunta, não um
+# segundo motor").
+# ---------------------------------------------------------------------------
+
+# A grade cruza os TRÊS tetos das faixas recomendadas, e cruza cada um por
+# baixo, em cima e por fora: 5000 e 30000 estão lá porque a comparação é
+# inclusiva (`valor <= valor_ate`) e um `<` no lugar do `<=` só apareceria
+# num desses dois pontos.
+GRADE_DE_PARIDADE = [0, 4999, 5000, 5001, 29999, 30000, 30001, 1000000]
+
+TODAS_AS_CONDICOES = ('fornecedor_novo,sem_cotacao,nao_menor_preco,'
+                      'fora_do_orcamento')
+
+
+def _escada(admin_id, condicoes='', minimo_topo=0):
+    """As três faixas recomendadas do tenant, na ordem: 5k → 30k → aberta.
+
+    Os números são os de `FAIXAS_RECOMENDADAS`: 5k pede 1 aprovação; 30k pede
+    2 e uma de admin; a aberta pede 2 + admin. `condicoes` é o texto de
+    `condicoes_ativas` aplicado a TODAS as faixas — quem decide se a condição
+    roda é a faixa BASE, e ter a mesma lista nas três é o caso realista.
+    """
+    faixas = []
+    for ordem, teto, aprov, adm in ((1, Decimal('5000.00'), 1, False),
+                                    (2, Decimal('30000.00'), 2, True),
+                                    (3, None, 2, True)):
+        f = FaixaAlcada(admin_id=admin_id, ordem=ordem, valor_ate=teto,
+                        aprovacoes_necessarias=aprov, exige_admin=adm,
+                        exige_mapa_concorrencia=(ordem == 3),
+                        minimo_cotacoes=(minimo_topo if ordem == 3 else 0),
+                        condicoes_ativas=condicoes, ativo=True)
+        db.session.add(f)
+        faixas.append(f)
+    db.session.commit()
+    return faixas
+
+
+def _etapa(obra, orcado='10000.00'):
+    """Etapa (centro de custo) da obra, com o orçado no campo agregado.
+
+    Sem `ObraServicoCustoItem`, de propósito: é o fluxo manual/legado, em que
+    `custo_orcado_por_servico` cai para `valor_orcado` (📖
+    services/custo_orcado.py). É o caminho que o teste quer exercitar porque é
+    o que a maioria dos tenants tem.
+    """
+    e = ObraServicoCusto(admin_id=obra.admin_id, obra_id=obra.id,
+                         nome=f'Etapa {uuid.uuid4().hex[:6]}',
+                         valor_orcado=Decimal(orcado))
+    db.session.add(e)
+    db.session.commit()
+    return e
+
+
+def _fornecedor(admin_id):
+    suf = uuid.uuid4().hex[:8]
+    f = Fornecedor(nome=f'Fornecedor {suf}', cnpj=f'{suf}0001-99',
+                   admin_id=admin_id, ativo=True)
+    db.session.add(f)
+    db.session.commit()
+    return f
+
+
+def _pedido(admin_id, fornecedor_id, obra_id=None, valor='100.00'):
+    p = PedidoCompra(fornecedor_id=fornecedor_id, data_compra=date(2026, 8, 1),
+                     obra_id=obra_id, valor_total=Decimal(valor),
+                     admin_id=admin_id, tipo_compra='normal')
+    db.session.add(p)
+    db.session.commit()
+    return p
+
+
+def _mapa_com_precos(admin_id, obra_id, precos, escolhido=0):
+    """Mapa concluído com UM item, N fornecedores e um preço para cada.
+
+    `escolhido` é o índice do fornecedor marcado em
+    `MapaItemCotacao.fornecedor_escolhido_id` — a fonte canônica da escolha
+    desde a Task #21 (a migration 142 fez o backfill a partir de
+    `MapaCotacao.selecionado`, que o spec ainda nomeia).
+    """
+    m = MapaConcorrenciaV2(obra_id=obra_id, admin_id=admin_id,
+                           nome=f'Mapa {uuid.uuid4().hex[:8]}',
+                           status='concluido')
+    db.session.add(m)
+    db.session.flush()
+    forns = []
+    for i, _ in enumerate(precos):
+        f = MapaFornecedor(mapa_id=m.id, admin_id=admin_id,
+                           nome=f'Fornecedor {i + 1}', ordem=i)
+        db.session.add(f)
+        forns.append(f)
+    item = MapaItemCotacao(mapa_id=m.id, admin_id=admin_id, descricao='Item',
+                           unidade='un', quantidade=1, ordem=0)
+    db.session.add(item)
+    db.session.flush()
+    for f, preco in zip(forns, precos):
+        db.session.add(MapaCotacao(mapa_id=m.id, item_id=item.id,
+                                   fornecedor_id=f.id, admin_id=admin_id,
+                                   valor_unitario=Decimal(str(preco))))
+    item.fornecedor_escolhido_id = forns[escolhido].id
+    db.session.commit()
+    return m
+
+
+def test_faixa_efetiva_com_a_flag_desligada_e_a_faixa_de_sempre():
+    """PARIDADE — o teste que autoriza todos os outros.
+
+    Com a flag desligada, `faixa_efetiva` devolve **o mesmo objeto** que
+    `faixa_para_valor` em toda a grade, e as quatro condições estão ATIVAS nas
+    três faixas: é justamente o cenário em que um degrau vazado apareceria. O
+    que segura o degrau é o `regime_alcada` carimbado na linha, e nada mais.
+    """
+    from scripts.flag_alcadas_avancadas import alcadas_avancadas_ativa
+    from services.alcada_compras import faixa_efetiva, faixa_para_valor
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        _escada(adm.id, condicoes=TODAS_AS_CONDICOES, minimo_topo=3)
+        assert alcadas_avancadas_ativa(adm.id) is False
+
+        req = _requisicao(adm.id, obra.id, adm.id)
+        assert req.regime_alcada == 'simples'
+
+        for valor in GRADE_DE_PARIDADE:
+            req.valor_estimado = Decimal(str(valor))
+            db.session.flush()
+            esperada = faixa_para_valor(adm.id, req.valor_estimado)
+            assert faixa_efetiva(req) is esperada, (
+                f'com a flag OFF o valor {valor} tem de cair exatamente na '
+                f'faixa de sempre (ordem {esperada.ordem})')
+
+        assert req.degrau_aplicado == '', (
+            'flag desligada não escreve trilha de degrau nenhuma')
+
+
+def test_regime_simples_ignora_as_condicoes_ainda_que_a_flag_esteja_ligada():
+    """Quem decide é o CARIMBO da linha, não a flag do tenant.
+
+    Requisição nascida antes da virada continua no motor de hoje mesmo com a
+    flag ligada — é a outra metade de "desligar não reescreve o passado":
+    ligar também não reescreve.
+    """
+    from scripts.flag_alcadas_avancadas import definir_flag
+    from services.alcada_compras import faixa_efetiva, faixa_para_valor
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        definir_flag(adm.id, True)
+        _escada(adm.id, condicoes=TODAS_AS_CONDICOES)
+
+        req = _requisicao(adm.id, obra.id, adm.id)   # nasce 'simples'
+        assert faixa_efetiva(req) is faixa_para_valor(adm.id,
+                                                      req.valor_estimado)
+        assert req.degrau_aplicado == ''
+
+
+def test_uma_condicao_ativa_sobe_uma_faixa_e_grava_o_motivo():
+    """R$ 4.900 é faixa 1; sem etapa apontada, `fora_do_orcamento` dispara e a
+    exigência passa a ser a da faixa 2 — 2 aprovações, uma de admin."""
+    from services.alcada_compras import faixa_efetiva, faixa_para_valor
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        f1, f2, _f3 = _escada(adm.id, condicoes='fora_do_orcamento')
+
+        req = _requisicao(adm.id, obra.id, adm.id)
+        req.regime_alcada = 'avancado'
+        db.session.commit()
+
+        assert faixa_para_valor(adm.id, req.valor_estimado) is f1
+        assert faixa_efetiva(req) is f2, 'uma condição sobe UMA faixa'
+        assert req.degrau_aplicado == 'fora_do_orcamento', (
+            'a trilha diz POR QUE subiu — sem ela o aprovador liga para o '
+            'suporte')
+
+
+def test_duas_condicoes_sobem_duas_faixas():
+    """Degrau é contagem, não booleano: duas condições sobem dois degraus."""
+    from services.alcada_compras import faixa_efetiva
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        f1, _f2, f3 = _escada(adm.id,
+                              condicoes='sem_cotacao,fora_do_orcamento')
+        # A faixa BASE passa a exigir mapa: é ela quem diz se `sem_cotacao`
+        # dispara, e a requisição não tem mapa nenhum.
+        f1.minimo_cotacoes = 2
+        db.session.commit()
+
+        req = _requisicao(adm.id, obra.id, adm.id)
+        req.regime_alcada = 'avancado'
+        db.session.commit()
+
+        assert faixa_efetiva(req) is f3
+        assert req.degrau_aplicado == 'sem_cotacao,fora_do_orcamento'
+
+
+def test_na_faixa_de_topo_o_degrau_satura_e_mesmo_assim_grava():
+    """Teto é teto — e a trilha registra que disparou ainda que a exigência
+    não tenha mudado. Sem isso, a requisição de topo seria a única em que
+    ninguém saberia que uma condição pegou (📖 spec, "Casos de borda")."""
+    from services.alcada_compras import faixa_efetiva
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        _f1, _f2, f3 = _escada(adm.id, condicoes='fora_do_orcamento')
+
+        req = _requisicao(adm.id, obra.id, adm.id)
+        req.regime_alcada = 'avancado'
+        req.valor_estimado = Decimal('40000.00')
+        db.session.commit()
+
+        assert faixa_efetiva(req) is f3, 'não há para onde subir'
+        assert req.degrau_aplicado == 'fora_do_orcamento', (
+            'saturado NÃO é motivo para não registrar')
+
+
+def test_condicao_que_o_tenant_nao_ativou_nao_e_nem_avaliada(monkeypatch):
+    """Custo de query também é comportamento.
+
+    A condição que não está em `condicoes_ativas` não roda — não é avaliada e
+    descartada, é *não avaliada*. O avaliador trocado por uma bomba prova a
+    diferença: se ele for chamado, o teste estoura.
+    """
+    from services import alcada_compras
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        f1, _f2, _f3 = _escada(adm.id, condicoes='sem_cotacao')
+        f1.minimo_cotacoes = 2
+        db.session.commit()
+
+        req = _requisicao(adm.id, obra.id, adm.id)
+        req.regime_alcada = 'avancado'
+        db.session.commit()
+
+        def _bomba(*args, **kwargs):
+            raise AssertionError('condição não ativada não pode nem ser '
+                                 'consultada')
+
+        monkeypatch.setattr(alcada_compras, '_cond_fora_do_orcamento', _bomba)
+        assert alcada_compras.condicoes_disparadas(req, f1) == ['sem_cotacao']
+
+
+def test_codigo_desconhecido_em_condicoes_ativas_e_ignorado():
+    """`condicoes_ativas` é texto, e texto editado por SQL erra.
+
+    Um código que o código não conhece não pode virar degrau silencioso nem
+    exceção no meio de uma aprovação: é ignorado, e a lista das quatro
+    conhecidas continua valendo.
+    """
+    from services.alcada_compras import condicoes_disparadas
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        f1, _f2, _f3 = _escada(adm.id,
+                               condicoes='frete_alto, fora_do_orcamento ,')
+
+        req = _requisicao(adm.id, obra.id, adm.id)
+        req.regime_alcada = 'avancado'
+        db.session.commit()
+
+        assert condicoes_disparadas(req, f1) == ['fora_do_orcamento']
+
+
+# ── Os quatro avaliadores, um a um ─────────────────────────────────────────
+
+def test_cond_fornecedor_novo_nao_e_avaliavel_sem_fornecedor():
+    """A requisição NÃO TEM fornecedor — ele só é escolhido na emissão
+    (📖 `PedidoCompra.fornecedor_id` é NOT NULL; a requisição não tem a
+    coluna). Ausência de fornecedor é condição NÃO AVALIADA (None), e não
+    "não disparou" (False): a diferença é o que impede o dia em que alguém
+    concluir que todo fornecedor da tela de requisição é conhecido."""
+    from services.alcada_compras import _cond_fornecedor_novo
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        req = _requisicao(adm.id, obra.id, adm.id)
+
+        assert _cond_fornecedor_novo(req, None) is None
+        assert _cond_fornecedor_novo(req) is None
+
+
+def test_cond_fornecedor_novo_olha_pedido_anterior_do_tenant():
+    """Novo = sem pedido emitido NESTE tenant. E a segunda compra do mesmo
+    fornecedor no mesmo dia já não é nova — é intencional (📖 spec, "Casos de
+    borda")."""
+    from services.alcada_compras import _cond_fornecedor_novo
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        req = _requisicao(adm.id, obra.id, adm.id)
+        forn = _fornecedor(adm.id)
+
+        assert _cond_fornecedor_novo(req, forn) is True
+
+        # Pedido do MESMO fornecedor, mas de outro tenant: não conta.
+        outro = _admin()
+        _pedido(outro.id, forn.id)
+        assert _cond_fornecedor_novo(req, forn) is True, (
+            'histórico de outra empresa não torna o fornecedor conhecido aqui')
+
+        _pedido(adm.id, forn.id, obra_id=obra.id)
+        assert _cond_fornecedor_novo(req, forn) is False
+
+
+def test_cond_sem_cotacao_segue_o_minimo_da_faixa():
+    """Dispara quando a faixa exige mapa e a requisição não tem um que sirva.
+
+    Não substitui a pendência de mapa — ela continua. A condição existe para
+    a DISPENSA (fornecedor único, item sem concorrente), que hoje não tem
+    caminho nenhum e por isso vira requisição travada.
+    """
+    from services.alcada_compras import _cond_sem_cotacao
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        req = _requisicao(adm.id, obra.id, adm.id)
+        dispensa = _faixa_topo(adm.id, minimo_cotacoes=0, ordem=1)
+        exige_tres = _faixa_topo(adm.id, minimo_cotacoes=3, ordem=2)
+
+        assert _cond_sem_cotacao(req, dispensa) is False
+        assert _cond_sem_cotacao(req, exige_tres) is True
+
+        req.mapa_v2_id = _mapa(adm.id, obra.id, fornecedores=3).id
+        db.session.commit()
+        assert _cond_sem_cotacao(req, exige_tres) is False
+
+
+def test_cond_nao_menor_preco_compara_o_escolhido_com_o_menor_do_item():
+    """O mapa existe, tem escolha, e a escolha não é a mais barata.
+
+    É o caso que o mapa de concorrência sozinho nunca barrou: escolher o
+    fornecedor mais caro é legítimo (prazo, qualidade) — e por isso custa uma
+    aprovação a mais, registrada, em vez de um bloqueio.
+    """
+    from services.alcada_compras import _cond_nao_menor_preco
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        req = _requisicao(adm.id, obra.id, adm.id)
+
+        assert _cond_nao_menor_preco(req) is False, (
+            'sem mapa vinculado quem cobre é sem_cotacao, não esta')
+
+        barato = _mapa_com_precos(adm.id, obra.id, [10, 20, 30], escolhido=0)
+        req.mapa_v2_id = barato.id
+        db.session.commit()
+        assert _cond_nao_menor_preco(req) is False
+
+        caro = _mapa_com_precos(adm.id, obra.id, [10, 20, 30], escolhido=2)
+        req.mapa_v2_id = caro.id
+        db.session.commit()
+        assert _cond_nao_menor_preco(req) is True
+
+
+def test_cond_fora_do_orcamento_dispara_sem_etapa_apontada():
+    """A mais RUIDOSA das quatro, e de propósito (⚠️ D1 do spec).
+
+    `obra_servico_custo_id` é nullable: requisição que simplesmente não aponta
+    etapa dispara. É comportamento correto — compra sem centro de custo é o
+    que a Fase 4 do núcleo passou a barrar — e é por isso que a condição é
+    ligável uma a uma, por tenant.
+    """
+    from services.alcada_compras import _cond_fora_do_orcamento
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        req = _requisicao(adm.id, obra.id, adm.id)   # sem etapa
+        assert req.obra_servico_custo_id is None
+        assert _cond_fora_do_orcamento(req) is True
+
+
+def test_cond_fora_do_orcamento_soma_as_requisicoes_da_etapa():
+    """Com etapa apontada, dispara quando a SOMA da etapa passa o previsto.
+
+    A soma inclui as irmãs da mesma etapa; REJEITADA e CANCELADA ficam de
+    fora, pelo mesmo critério do acumulado (📖 spec, "Casos de borda").
+    """
+    from services.alcada_compras import _cond_fora_do_orcamento
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        etapa = _etapa(obra, orcado='10000.00')
+
+        req = _requisicao(adm.id, obra.id, adm.id)   # R$ 4.900
+        req.obra_servico_custo_id = etapa.id
+        db.session.commit()
+        assert _cond_fora_do_orcamento(req) is False
+
+        irma = _requisicao(adm.id, obra.id, adm.id)  # + R$ 4.900 = 9.800
+        irma.obra_servico_custo_id = etapa.id
+        db.session.commit()
+        assert _cond_fora_do_orcamento(req) is False
+
+        cancelada = _requisicao(adm.id, obra.id, adm.id)
+        cancelada.obra_servico_custo_id = etapa.id
+        cancelada.estado = EstadoRequisicao.CANCELADA
+        db.session.commit()
+        assert _cond_fora_do_orcamento(req) is False, (
+            'requisição cancelada não consome orçamento de etapa nenhuma')
+
+        terceira = _requisicao(adm.id, obra.id, adm.id)  # + 4.900 = 14.700
+        terceira.obra_servico_custo_id = etapa.id
+        db.session.commit()
+        assert _cond_fora_do_orcamento(req) is True
+
+
+# ── Os pontos que DECIDEM e o ponto que EXIBE ──────────────────────────────
+
+def test_pendencias_cobram_a_faixa_efetiva_e_nao_a_faixa_do_valor():
+    """O primeiro dos quatro pontos de decisão.
+
+    Sem isto o degrau seria decoração: a faixa subiria e a requisição fecharia
+    a alçada com o número de aprovações da faixa de baixo.
+    """
+    from services.alcada_compras import pendencias_de_aprovacao
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        _escada(adm.id, condicoes='fora_do_orcamento')
+
+        req = _requisicao(adm.id, obra.id, adm.id)
+        req.estado = EstadoRequisicao.AGUARDANDO_APROVACAO
+        req.regime_alcada = 'avancado'
+        db.session.commit()
+
+        texto = ' | '.join(pendencias_de_aprovacao(req))
+        assert 'de 2' in texto, (
+            f'a faixa efetiva pede 2 aprovações, não 1: {texto!r}')
+        assert 'administrador' in texto, (
+            'e a faixa efetiva também é quem diz que uma tem de ser de admin')
+
+
+def test_flash_da_criacao_anuncia_a_mesma_faixa_que_a_pendencia_cobra():
+    """A tela não pode prometer uma faixa e o envio cobrar outra.
+
+    O flash da criação e as pendências saem do MESMO cálculo. Foi o risco
+    nomeado no Step 5 do plano: ponto de exibição e ponto de decisão em
+    desacordo fariam a fase nascer mentindo.
+    """
+    from scripts.flag_alcadas_avancadas import definir_flag
+    from services.alcada_compras import pendencias_de_aprovacao
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        definir_flag(adm.id, True)
+        _escada(adm.id, condicoes='fora_do_orcamento')
+        aid, oid = adm.id, obra.id
+
+    html = _cliente_de(aid).post('/compras/requisicoes/nova', data={
+        'obra_id': str(oid),
+        'justificativa': 'Cimento — sem etapa apontada de propósito',
+        'item_descricao[]': ['Cimento CP-II'],
+        'item_unidade[]': ['sc'],
+        'item_quantidade[]': ['10'],
+        'item_preco[]': ['100,00'],
+        'item_almoxarifado_id[]': [''],
+    }, follow_redirects=True).get_data(as_text=True)
+
+    assert 'precisar de 2 aprovação(ões)' in html, (
+        'o flash da criação tem de anunciar a faixa EFETIVA')
+
+    with app.app_context():
+        req = RequisicaoCompra.query.filter_by(admin_id=aid).one()
+        assert req.regime_alcada == 'avancado'
+        assert req.degrau_aplicado == 'fora_do_orcamento', (
+            'a rota é quem persiste o carimbo — `faixa_efetiva` não commita')
+        assert 'de 2' in ' | '.join(pendencias_de_aprovacao(req)), (
+            'e o que o envio cobra é exatamente o que a tela prometeu')
+
+
+def test_detalhe_mostra_a_faixa_base_a_efetiva_e_o_motivo_em_portugues():
+    """Pendência sem motivo visível é pendência que vira ligação para o
+    suporte. A tela mostra as duas faixas e o código traduzido."""
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        _escada(adm.id, condicoes='fora_do_orcamento')
+
+        req = _requisicao(adm.id, obra.id, adm.id)
+        req.estado = EstadoRequisicao.AGUARDANDO_APROVACAO
+        req.regime_alcada = 'avancado'
+        db.session.commit()
+        aid, rid = adm.id, req.id
+
+    html = _cliente_de(aid).get(
+        f'/compras/requisicoes/{rid}').get_data(as_text=True)
+    assert 'subiu de faixa' in html.lower()
+    assert 'R$ 5000.00' in html, 'a faixa BASE (pelo valor) tem de aparecer'
+    assert 'R$ 30000.00' in html, 'e a EFETIVA, que é a que vai ser cobrada'
+    assert 'etapa' in html.lower(), (
+        'o motivo em português, não o código: quem lê a tela não lê o spec')
+
+
+def test_emissao_usa_a_faixa_efetiva_e_e_onde_o_fornecedor_novo_pesa():
+    """O quarto ponto de decisão — a guarda 2 de `requisicao_emitir_pedido`.
+
+    `fornecedor_novo` só existe aqui: a requisição não tem fornecedor, e por
+    isso a aprovação passou pela faixa de baixo. Na emissão o fornecedor
+    aparece, a faixa efetiva sobe para 2 aprovações e a separação de funções
+    passa a valer — quem aprovou não emite.
+    """
+    from scripts.flag_alcadas_avancadas import definir_flag
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        definir_flag(adm.id, True)
+        _escada(adm.id, condicoes='fornecedor_novo')
+        solicitante = _operador(adm.id, 'Comprador')
+        _vincular(solicitante, obra, PapelObra.COMPRADOR)
+        forn = _fornecedor(adm.id)
+        aid, oid, sid, fid = adm.id, obra.id, solicitante.id, forn.id
+
+    cliente = _cliente_de(sid)
+    assert cliente.post('/compras/requisicoes/nova', data={
+        'obra_id': str(oid),
+        'justificativa': 'Andaime',
+        'item_descricao[]': ['Andaime'],
+        'item_unidade[]': ['un'],
+        'item_quantidade[]': ['1'],
+        'item_preco[]': ['1.000,00'],
+        'item_almoxarifado_id[]': [''],
+    }, follow_redirects=False).status_code == 302
+
+    with app.app_context():
+        req = RequisicaoCompra.query.filter_by(admin_id=aid).one()
+        rid = req.id
+        # Sem fornecedor a condição não é avaliada: a faixa base vale, e uma
+        # aprovação fecha a alçada.
+        assert req.degrau_aplicado == ''
+
+    cliente.post(f'/compras/requisicoes/{rid}/enviar', follow_redirects=False)
+    # O ADMIN aprova (o solicitante nunca aprova a própria requisição).
+    _cliente_de(aid).post(f'/compras/requisicoes/{rid}/aprovar',
+                          follow_redirects=False)
+    with app.app_context():
+        assert db.session.get(RequisicaoCompra, rid).estado == \
+            EstadoRequisicao.APROVADA
+
+    # ADMIN aprovou e agora tenta emitir: com o fornecedor novo a faixa
+    # efetiva pede 2 aprovações, e a guarda 2 passa a morder.
+    html = _cliente_de(aid).post(
+        f'/compras/requisicoes/{rid}/emitir-pedido',
+        data={'fornecedor_id': str(fid), 'data_compra': '2026-08-15'},
+        follow_redirects=True).get_data(as_text=True)
+
+    assert 'não pode emitir o pedido' in html, (
+        'a guarda 2 tem de ler a faixa EFETIVA, e ela conhece o fornecedor')
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, rid)
+        assert PedidoCompra.query.filter_by(requisicao_id=rid).count() == 0
+        assert req.degrau_aplicado == '', (
+            'a guarda recusou e a rota NÃO commitou — `faixa_efetiva` carimba '
+            'na sessão, e quem persiste é sempre a rota')

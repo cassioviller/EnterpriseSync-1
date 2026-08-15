@@ -110,6 +110,35 @@
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
           <h6 class="fw-bold">Alçada</h6>
+
+          {# Fase 3 do ciclo de compras — POR QUE esta requisição subiu.
+             As duas faixas e o motivo em português, na mesma tela em que a
+             pendência aparece: uma exigência que o aprovador não consegue
+             explicar é uma exigência que ele contorna por fora do sistema.
+             `condicoes_do_degrau` só vem preenchida em requisição de regime
+             'avancado' — com a flag desligada este bloco não existe. #}
+          {% if condicoes_do_degrau %}
+            <div class="alert alert-warning py-2 px-2 small mb-2">
+              <strong>Esta requisição subiu de faixa.</strong><br>
+              Pelo valor, ela cairia na faixa de
+              {% if faixa_base.valor_ate is none %}teto aberto{% else %}até R$ {{ '%.2f'|format(faixa_base.valor_ate) }}{% endif %}
+              ({{ faixa_base.aprovacoes_necessarias }} aprovação(ões)).
+              {% if faixa.id == faixa_base.id %}
+                Ela já está na faixa de topo, então a exigência não muda — mas o
+                motivo fica registrado.
+              {% else %}
+                Passa a valer a faixa de
+                {% if faixa.valor_ate is none %}teto aberto{% else %}até R$ {{ '%.2f'|format(faixa.valor_ate) }}{% endif %}
+                ({{ faixa.aprovacoes_necessarias }} aprovação(ões)).
+              {% endif %}
+              <ul class="mb-0 mt-1">
+                {% for c in condicoes_do_degrau %}
+                  <li>{{ rotulos_condicao.get(c, c) }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+
           <p class="small text-muted mb-2">
             Faixa aplicada: até
             {% if faixa.valor_ate is none %}sem teto{% else %}R$ {{ '%.2f'|format(faixa.valor_ate) }}{% endif %}

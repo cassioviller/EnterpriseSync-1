@@ -210,6 +210,28 @@ Duas propriedades que isso preserva e que uma segunda máquina de regras perderi
 o degrau nunca inventa exigência que o tenant não configurou (só anda entre faixas que
 existem na tabela), e nunca **desce** — teto é teto.
 
+> 📌 **15/08, A4: o degrau anda POSIÇÕES na escada, não números de `ordem`.**
+> O pseudocode acima diz "a faixa de ordem (base.ordem + degrau)". Ao executar ficou
+> claro que somar à `ordem` só funciona enquanto a numeração do tenant não tiver buraco —
+> e nada a impede de ter, porque `ordem` é digitada (a tela da A7 valida o que nasce
+> nela, não o que já está no banco). Num tenant com faixas 1, 2 e 9, um degrau a partir
+> da 2 procuraria uma faixa 3 que não existe e o resultado seria "nenhuma faixa", isto é,
+> um degrau que **desce**. `faixa_efetiva` ordena as faixas ativas por `ordem`, acha a
+> posição da base na lista e anda N posições, saturando na última. O efeito é o mesmo
+> quando a numeração é contígua, que é o caso semeado.
+>
+> Na mesma execução, duas escolhas que o spec não fixava e que passam a estar fixadas:
+>
+> 1. **`degrau_aplicado` só cresce.** Nenhuma passada apaga código já gravado, nem
+>    quando a condição deixou de disparar. É o que a própria seção "Modelo de dados"
+>    pede ("é trilha, não decisão") e recalcular daria outra resposta: depois da emissão
+>    o fornecedor novo já não é novo, e apagar o código apagaria justamente o motivo da
+>    exigência que a compra cumpriu. O campo também preserva código que este módulo não
+>    conhece, para que `fracionamento` (A5) não seja varrido por uma passada de condições.
+> 2. **Quem manda é o `regime_alcada` da linha, e a flag não é consultada na decisão.**
+>    É a leitura literal de "Regime de virada" + "Rollback", e vale nos dois sentidos:
+>    requisição `'simples'` não sobe degrau ainda que a flag esteja ligada hoje.
+
 ### `valor_para_alcada` — onde o acumulado entra
 
 Não é `valor_estimado`; é o maior entre o valor da linha e o **acumulado da janela**:
@@ -236,6 +258,34 @@ quer evitar. O que ela faz é **tirar a decisão de quem estava dividindo**.
 | `sem_cotacao` | a faixa exige `minimo_cotacoes > 0` e a requisição não tem mapa que sirva | `_mapa_serve_de_concorrencia`, que já existe |
 | `nao_menor_preco` | o mapa tem fornecedor escolhido que não é o de menor valor no item | `MapaCotacao.selecionado` × `valor_unitario` (📖 `models.py:7442`) |
 | `fora_do_orcamento` | a requisição não aponta etapa, ou a soma da etapa passa o previsto | `RequisicaoCompra.obra_servico_custo_id` (nullable, 📖 `models.py:6055`) |
+
+> 📌 **15/08, A4: duas das quatro colunas "de onde sai o dado" estavam desatualizadas.**
+> As condições entraram como estão na tabela; o que mudou foi de onde cada uma lê.
+>
+> 1. **`nao_menor_preco` lê `MapaItemCotacao.fornecedor_escolhido_id`, não
+>    `MapaCotacao.selecionado`.** `selecionado` é o campo anterior à Task #21: a migration
+>    142 o usou como ORIGEM de backfill para a coluna nova e, desde então, **nenhum
+>    caminho de escrita o alimenta** — nem a tela do mapa (📖 `views/obras.py`), nem o
+>    portal do cliente (📖 `portal_obras_views.py`), nem o PDF, que já lê a coluna nova.
+>    Ler `selecionado` faria a condição não disparar nunca em mapa montado depois da 142,
+>    isto é, em todos. O código lê a coluna canônica e mantém `selecionado` como segunda
+>    leitura, para os mapas anteriores àquela migration. Comparação só entre cotações de
+>    valor positivo: fornecedor que não cotou o item tem zero na célula, e zero não é o
+>    menor preço do mundo.
+> 2. **`fora_do_orcamento` não lê `ObraServicoCusto.valor_orcado`.** Aquele campo guarda
+>    **preço de venda** nesta cadeia — herdado do item comercial pelo listener — e lê-lo
+>    como custo é o defeito que a A13/B2.4 já pagou uma vez (📖 `services/custo_orcado.py`,
+>    cabeçalho). O previsto vem de `custo_orcado_por_servico`, que é o ponto único da regra
+>    "linha de custo vence agregado". A soma que se compara com ele é a das requisições da
+>    mesma etapa em estado que ainda consome orçamento (RASCUNHO, AGUARDANDO, APROVADA,
+>    CONVERTIDA), mais o valor da própria — mesma lista de estados do acumulado da A5.
+>
+> E uma consequência de desenho que o spec deixava implícita: **`fornecedor_novo` devolve
+> "não avaliada", e não "não disparou", quando não há fornecedor.** A requisição não tem
+> a coluna, então no envio a resposta honesta é que não dá para saber; o único ponto que
+> consegue avaliá-la é a guarda 2 de `requisicao_emitir_pedido`, que é onde o fornecedor
+> é escolhido. Consequência prática, e ela é boa: a aprovação passa pela faixa do valor, e
+> é a EMISSÃO que descobre que o fornecedor é novo e cobra o degrau.
 
 `sem_cotacao` merece o parágrafo que os outros não precisam: ela **não** substitui a
 pendência de mapa. A pendência continua (a compra não sai sem mapa); a condição existe para

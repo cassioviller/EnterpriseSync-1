@@ -17,9 +17,9 @@ from utils.tenant import get_tenant_admin_id, is_v2_active
 
 # Fase 3 — governança de compras. Imports no topo de propósito: estes
 # módulos não importam compras_views de volta, então não há ciclo.
-from services.alcada_compras import (esta_totalmente_aprovada,
-                                     garantir_faixas_do_tenant,
-                                     faixa_para_valor,
+from services.alcada_compras import (ROTULOS_CONDICAO, decisao_de_alcada,
+                                     esta_totalmente_aprovada,
+                                     garantir_faixas_do_tenant, faixa_efetiva,
                                      pendencias_de_aprovacao, pode_aprovar,
                                      registrar_aprovacao)
 from services.requisicao_compra import (TransicaoInvalida, proximo_numero,
@@ -111,6 +111,27 @@ def _regime_alcada(admin_id):
     """
     from services.alcada_compras import regime_alcada_do_tenant
     return regime_alcada_do_tenant(admin_id)
+
+
+def _fornecedor_do_form(admin_id):
+    """O `Fornecedor` ativo do tenant escolhido no formulário, ou None.
+
+    Leniente de propósito: NÃO recusa, NÃO faz flash, NÃO redireciona. Existe
+    porque a guarda 2 de `requisicao_emitir_pedido` precisa saber QUEM é o
+    fornecedor antes de a validação estrita rodar — é o fornecedor que torna
+    `fornecedor_novo` avaliável, e ela é a única das quatro condições que não
+    existe no momento do envio (a requisição não tem fornecedor).
+
+    Quem recusa continua sendo o bloco de validação da rota, no lugar em que
+    sempre esteve e com as duas mensagens que sempre teve.
+    """
+    bruto = (request.form.get('fornecedor_id') or '').strip()
+    try:
+        fornecedor_id = int(bruto)
+    except (TypeError, ValueError):
+        return None
+    return Fornecedor.query.filter_by(
+        id=fornecedor_id, admin_id=admin_id, ativo=True).first()
 
 
 def _mapas_elegiveis(admin_id, obra_ids):
@@ -1816,7 +1837,16 @@ def requisicao_nova_post():
               'danger')
         return redirect(url_for('compras.requisicao_nova'))
 
-    faixa = faixa_para_valor(admin_id, requisicao.valor_estimado)
+    # Fase 3 (alçadas avançadas) — o ponto de EXIBIÇÃO lê a MESMA faixa que os
+    # pontos de decisão vão cobrar. Anunciar aqui a faixa do valor e cobrar
+    # depois a efetiva faria a tela prometer uma coisa e o envio exigir outra —
+    # e o usuário descobriria a diferença já com a requisição parada.
+    #
+    # `faixa_efetiva` pode carimbar `degrau_aplicado` e NÃO commita, no mesmo
+    # contrato de `registrar_aprovacao`: quem persiste é a rota, e é este
+    # commit.
+    faixa = faixa_efetiva(requisicao)
+    db.session.commit()
     flash(f'Requisição {requisicao.numero} criada (R$ '
           f'{requisicao.valor_estimado}). Pela alçada configurada, ela vai '
           f'precisar de {faixa.aprovacoes_necessarias} aprovação(ões).',
@@ -1838,7 +1868,13 @@ def requisicao_detalhe(requisicao_id):
     if not pode_ver_obra(requisicao.obra_id):
         abort(404)
 
-    faixa = faixa_para_valor(requisicao.admin_id, requisicao.valor_estimado)
+    # Fase 3 (alçadas avançadas) — as TRÊS coisas de uma vez só, do ponto
+    # único de cálculo: a faixa pelo valor, a que vale de verdade e por que
+    # elas diferem. Um cálculo só porque exibir e decidir têm de sair do mesmo
+    # lugar; as três porque pendência sem motivo visível vira ligação para o
+    # suporte.
+    decisao = decisao_de_alcada(requisicao)
+    faixa = decisao.efetiva
     pode, motivo_recusa = pode_aprovar(requisicao, current_user)
 
     pedidos = PedidoCompra.query.filter_by(
@@ -1851,6 +1887,9 @@ def requisicao_detalhe(requisicao_id):
         itens=requisicao.itens.all(),
         transicoes=requisicao.transicoes.all(),
         faixa=faixa,
+        faixa_base=decisao.base,
+        condicoes_do_degrau=decisao.condicoes,
+        rotulos_condicao=ROTULOS_CONDICAO,
         pendencias=pendencias_de_aprovacao(requisicao),
         pode_aprovar=pode,
         motivo_recusa=motivo_recusa,
@@ -2144,9 +2183,18 @@ def requisicao_emitir_pedido(requisicao_id):
     # de uma aprovação: numa faixa de aprovação única, exigir uma terceira
     # pessoa para clicar em "emitir" travaria a compra de R$ 200 numa
     # equipe de três.
+    #
+    # Fase 3 (alçadas avançadas) — a faixa aqui é a EFETIVA, e este é o único
+    # ponto do sistema que consegue avaliar `fornecedor_novo`: a requisição não
+    # tem fornecedor, ele é escolhido neste formulário. A resolução abaixo é
+    # deliberadamente LENIENTE (devolve None em vez de recusar) porque a
+    # validação de verdade continua no lugar em que sempre esteve, mais
+    # abaixo, com as duas mensagens que ela sempre teve — mudar a ordem das
+    # recusas mudaria a mensagem que o usuário vê por um motivo que não é dele.
     from services.alcada_compras import votos_de_aprovacao
 
-    faixa = faixa_para_valor(admin_id, requisicao.valor_estimado)
+    fornecedor_escolhido = _fornecedor_do_form(admin_id)
+    faixa = faixa_efetiva(requisicao, fornecedor=fornecedor_escolhido)
     aprovadores = {v.usuario_id for v in votos_de_aprovacao(requisicao)}
     if faixa.aprovacoes_necessarias > 1 and current_user.id in aprovadores:
         flash('Você aprovou esta requisição e por isso não pode emitir o '
@@ -2169,8 +2217,9 @@ def requisicao_emitir_pedido(requisicao_id):
         flash('Selecione um fornecedor para emitir o pedido.', 'danger')
         return redirect(url_for('compras.requisicao_detalhe',
                                 requisicao_id=requisicao_id))
-    if not Fornecedor.query.filter_by(
-            id=fornecedor_id, admin_id=admin_id, ativo=True).first():
+    # Mesmo predicado de antes, resolvido uma vez só: `_fornecedor_do_form`
+    # já procurou o fornecedor ativo deste tenant para a guarda 2.
+    if fornecedor_escolhido is None:
         flash('Fornecedor não encontrado ou não pertence à sua conta.', 'danger')
         return redirect(url_for('compras.requisicao_detalhe',
                                 requisicao_id=requisicao_id))
