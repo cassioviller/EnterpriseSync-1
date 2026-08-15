@@ -6523,6 +6523,148 @@ def _migration_296_fechamento_criado_por():
                 "(o outro lado da segregacao: quem montou o lote).")
 
 
+def _migration_297_faixa_condicoes():
+    """Fase 3 do ciclo de compras — `faixa_alcada.minimo_cotacoes` e
+    `condicoes_ativas`.
+
+    O corte de cotações era a ÚNICA regra de alçada que não era dado:
+    `services/alcada_compras.py` exigia `len(mapa.fornecedores) >= 2`, literal
+    no código. Alçada é dado, não código — invariante fixado pela Fase 3 do
+    núcleo em 21/07 — e esta coluna é o que faz o literal virar linha de
+    tabela, editável por tenant sem deploy.
+
+    `condicoes_ativas` é TEXTO separado por vírgula, e não quatro booleanos,
+    porque as condições vão mudar de número (o backlog da seção 2 já tem frete
+    e validade da proposta esperando) e porque o tenant precisa poder ligar uma
+    a uma: `fora_do_orcamento` é a mais ruidosa das quatro e em tenant que não
+    preenche etapa com disciplina ela sobe quase tudo um degrau.
+
+    BACKFILL: `minimo_cotacoes = 2` onde `exige_mapa_concorrencia` é true — o
+    número que o código APLICAVA. Não 3. A migration preserva comportamento; a
+    subida da faixa de topo para 3 é a decisão D6, feita por UPDATE no passo 1
+    do runbook, com a tela da A7 à vista. Migration que muda regra de negócio
+    junto com estrutura é migration que ninguém consegue reverter pela metade.
+
+    `exige_mapa_concorrencia` NÃO é removida: passa a ser derivada
+    (`minimo_cotacoes > 0`) e continua na tabela. Há tenant com faixa editada
+    por SQL direto, e coluna antiga não se remove no mesmo release que muda o
+    leitor.
+
+    Alocação: 297. A faixa 290-295 é reservada da Fase 8 e 300-307 da Fase 9,
+    nenhuma das duas aplicada — 297-299 é a única faixa contígua livre, pelo
+    mesmo motivo que levou a Fase 2 a usar 296 e não 290. Conferido em
+    `migration_history` do dev em 15/08: a maior aplicada é a 296 e nada entre
+    290 e 307 foi aplicado.
+
+    Idempotente: IF NOT EXISTS no ALTER e WHERE no backfill.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE faixa_alcada ADD COLUMN IF NOT EXISTS "
+            "minimo_cotacoes INTEGER NOT NULL DEFAULT 0"))
+        conn.execute(sa_text(
+            "ALTER TABLE faixa_alcada ADD COLUMN IF NOT EXISTS "
+            "condicoes_ativas VARCHAR(120) NOT NULL DEFAULT ''"))
+        r = conn.execute(sa_text(
+            "UPDATE faixa_alcada SET minimo_cotacoes = 2 "
+            "WHERE exige_mapa_concorrencia IS TRUE AND minimo_cotacoes = 0"))
+        backfilled = r.rowcount
+
+    logger.info(f"[Migration 297] faixa_alcada.minimo_cotacoes e "
+                f"condicoes_ativas criadas; {backfilled} faixa(s) que exigiam "
+                f"mapa receberam minimo_cotacoes=2 (o que o codigo ja fazia; "
+                f"subir para 3 e a D6, por UPDATE).")
+
+
+def _migration_298_requisicao_alcada():
+    """Fase 3 do ciclo de compras — as quatro colunas de `requisicao_compra`
+    e os dois índices do acumulado.
+
+    TODOS OS DEFAULTS DESCREVEM O REGISTRO HISTÓRICO. Requisição que já existe
+    foi criada num mundo em que a alçada só olhava o valor da linha: ela é
+    `'simples'`, não é emergencial e não subiu degrau nenhum. Nenhum default
+    aqui inventa passado — é a mesma disciplina do `exige_atesto` da 283 e do
+    `fluxo_pagamento` da 288.
+
+    `regime_alcada` é o CARIMBO NA LINHA. A decisão de alçada lê esta coluna,
+    não a flag: desligar `alcadas_avancadas_ativa` não rebaixa requisição em
+    curso, de propósito. `ratificada_em` é nullable porque NULL numa
+    emergencial significa "pendente OU vencida" — a diferença é o relógio das
+    48 horas corridas, não uma terceira coluna.
+
+    OS DOIS ÍNDICES SÃO PARTE DESTA MIGRATION, não otimização posterior. O
+    acumulado do anti-fracionamento roda A CADA ENVIO de requisição e a cada
+    emissão de pedido; `requisicao_compra` não tinha índice nenhum por data e
+    `pedido_compra` não tinha nada sobre `data_compra`. Sem eles a regra nova
+    seria varredura por tenant no chokepoint.
+
+    Alocação: 298. Idempotente: IF NOT EXISTS nas colunas e nos índices.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE requisicao_compra ADD COLUMN IF NOT EXISTS "
+            "regime_alcada VARCHAR(12) NOT NULL DEFAULT 'simples'"))
+        conn.execute(sa_text(
+            "ALTER TABLE requisicao_compra ADD COLUMN IF NOT EXISTS "
+            "emergencial BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(sa_text(
+            "ALTER TABLE requisicao_compra ADD COLUMN IF NOT EXISTS "
+            "ratificada_em TIMESTAMP"))
+        conn.execute(sa_text(
+            "ALTER TABLE requisicao_compra ADD COLUMN IF NOT EXISTS "
+            "degrau_aplicado VARCHAR(200) NOT NULL DEFAULT ''"))
+
+        conn.execute(sa_text(
+            "CREATE INDEX IF NOT EXISTS ix_requisicao_obra_etapa_criada "
+            "ON requisicao_compra (obra_id, obra_servico_custo_id, created_at)"))
+        conn.execute(sa_text(
+            "CREATE INDEX IF NOT EXISTS ix_pedido_admin_fornecedor_data "
+            "ON pedido_compra (admin_id, fornecedor_id, data_compra)"))
+
+    logger.info("[Migration 298] requisicao_compra.regime_alcada/emergencial/"
+                "ratificada_em/degrau_aplicado criadas (defaults = o registro "
+                "historico) e os dois indices do acumulado.")
+
+
+def _migration_299_flag_e_janela():
+    """Fase 3 do ciclo de compras — `alcadas_avancadas_ativa` e a janela da D2.
+
+    Irmã de `compras_governanca_ativa` (246), `recebimento_atesto_ativo` (284)
+    e `financeiro_dois_fluxos_ativo` (289): a virada é POR TENANT, porque muda
+    o que o sistema exige para aprovar uma compra, e isso não se faz no parque
+    num deploy.
+
+    Default FALSE — ninguém vira sozinho. Quem liga é
+    scripts/flag_alcadas_avancadas.py, que RECUSA tenant sem
+    `compras_governanca_ativa` e apenas AVISA quando falta
+    `financeiro_dois_fluxos_ativo`. A assimetria é deliberada: sem governança
+    (e portanto sem escopo de obra) todo autenticado é GESTOR e o degrau não
+    tem sobre o que agir; sem dois fluxos só a SANÇÃO da emergência perde o
+    dente, e as outras três regras seguem funcionando.
+
+    `janela_fracionamento_dias` semeada em 30 é a RECOMENDAÇÃO do spec
+    (decisão D2), não decisão do negócio. É coluna e não constante exatamente
+    para poder virar 7 por UPDATE, sem deploy — mesmo motivo da
+    `tolerancia_divergencia_nf_pct` da 289.
+
+    Alocação: 299, última das três desta fase (297-299). Idempotente:
+    IF NOT EXISTS.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+            "alcadas_avancadas_ativa BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(sa_text(
+            "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+            "janela_fracionamento_dias INTEGER NOT NULL DEFAULT 30"))
+    logger.info("[Migration 299] configuracao_empresa.alcadas_avancadas_ativa "
+                "(default FALSE) e janela_fracionamento_dias (30, decisao D2 "
+                "editavel) criadas.")
+
+
 def _migration_282_backfill_dropdown_crm():
     """D-CRM.1 — o backfill que a 174 pulou: grupo de dropdown para TODO
     tenant com dado nas tabelas legadas `crm_*`.
@@ -6887,6 +7029,14 @@ def executar_migracoes():
             (288, "Fase 2 — pedido_compra.fluxo_pagamento; conta_pagar.situacao_liberacao/liberada_por_id/liberada_em; trilha de quem fechou e reabriu o lote", _migration_288_regime_e_liberacao),
             (289, "Fase 2 — configuracao_empresa.financeiro_dois_fluxos_ativo (default FALSE) + tolerancia_divergencia_nf_pct (2,00%, decisão D1 editável)", _migration_289_flag_e_tolerancia),
             (296, "Fase 2/F5 — fechamento_pagamento.criado_por_id: quem MONTOU o lote, sem o qual a segregacao \"quem monta nao fecha\" nao e verificavel. 290-295 e faixa da Fase 8; 300-307 da Fase 9", _migration_296_fechamento_criado_por),
+            # ⚠️ migration_history.migration_name e VARCHAR(200): descricao mais
+            # longa que isso faz o INSERT do historico falhar em SILENCIO
+            # (record_migration engole a excecao) — a migration roda, nao fica
+            # registrada e volta a rodar a cada boot. O "porque" longo mora na
+            # docstring de cada funcao; aqui cabe so a frase. Ver 📌 no spec.
+            (297, "Fase 3 — faixa_alcada.minimo_cotacoes (default 0) e condicoes_ativas (default ''); backfill minimo_cotacoes=2 onde exige_mapa_concorrencia e true (preserva o >= 2 de hoje; o 3 e a D6, por UPDATE)", _migration_297_faixa_condicoes),
+            (298, "Fase 3 — requisicao_compra.regime_alcada/emergencial/ratificada_em/degrau_aplicado (defaults = o registro historico) + os dois indices do acumulado do anti-fracionamento", _migration_298_requisicao_alcada),
+            (299, "Fase 3 — configuracao_empresa.alcadas_avancadas_ativa (default FALSE) + janela_fracionamento_dias (30 dias, decisao D2 editavel)", _migration_299_flag_e_janela),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

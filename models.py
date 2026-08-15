@@ -4437,6 +4437,32 @@ class ConfiguracaoEmpresa(db.Model):
                                               default=2.00,
                                               server_default='2.00')
 
+    # Fase 3 do ciclo de compras — flag das alçadas avançadas, por tenant.
+    # Default FALSE: desligada, `faixa_efetiva()` devolve exatamente o que
+    # `faixa_para_valor()` sempre devolveu e nenhuma coluna nova é lida — a
+    # alçada continua sendo só o valor da linha.
+    #
+    # A cadeia passa a ter CINCO elos: alcadas_avancadas_ativa →
+    # compras_governanca_ativa → escopo_obra_ativo. O `--ligar` de
+    # scripts/flag_alcadas_avancadas.py RECUSA tenant sem
+    # `compras_governanca_ativa`, e a razão é dura, não estética: com
+    # `escopo_obra_ativo` OFF, `papel_de_usuario_na_obra` devolve GESTOR a
+    # TODO autenticado do tenant (utils/autorizacao.py) — alçada avançada
+    # sobre esse chão só multiplica pendências que a mesma pessoa resolve
+    # sozinha. Com `financeiro_dois_fluxos_ativo` OFF ele apenas AVISA: só a
+    # sanção da emergência depende dos dois fluxos; as outras três regras
+    # funcionam sem eles.
+    alcadas_avancadas_ativa = db.Column(db.Boolean, nullable=False,
+                                        default=False, server_default='false')
+    # Decisão D2 do spec: a janela do anti-fracionamento, em dias corridos.
+    # Mês é a unidade em que a obra pensa e em que o financeiro fecha — semana
+    # pega compra sazonal legítima, 90 dias transformam quase toda obra ativa
+    # em faixa de topo. Coluna e não constante para poder virar 7 por UPDATE,
+    # sem deploy, quando um tenant descobrir que 30 não descreve a operação
+    # dele.
+    janela_fracionamento_dias = db.Column(db.Integer, nullable=False,
+                                          default=30, server_default='30')
+
     # Cronograma editável Fase 1 — motor de agendamento novo
     # (multi-predecessoras via tarefa_vinculo, caminho crítico) mais a grade
     # tipo planilha com menu de botão direito. Nasceu como flag de rollout
@@ -5664,6 +5690,15 @@ FrotaDespesa = VehicleExpense
 class PedidoCompra(db.Model):
     """Pedido / recibo de compra V2 — vinculado a fornecedor e obra (obra é o centro de custo)"""
     __tablename__ = 'pedido_compra'
+    __table_args__ = (
+        # Fase 3 do ciclo de compras — o acumulado por fornecedor do
+        # anti-fracionamento, que só existe na EMISSÃO (a requisição não tem
+        # fornecedor; ele é escolhido aqui). Não havia índice nenhum sobre
+        # `data_compra`, e sem ele a soma da janela varre o tenant inteiro a
+        # cada pedido emitido.
+        db.Index('ix_pedido_admin_fornecedor_data', 'admin_id',
+                 'fornecedor_id', 'data_compra'),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     numero = db.Column(db.String(50))                        # Número da NF/recibo (livre)
@@ -6073,6 +6108,12 @@ class RequisicaoCompra(db.Model):
         db.UniqueConstraint('admin_id', 'numero', name='uq_requisicao_admin_numero'),
         db.Index('ix_requisicao_obra_estado', 'obra_id', 'estado'),
         db.Index('ix_requisicao_admin_estado', 'admin_id', 'estado'),
+        # Fase 3 do ciclo de compras — o acumulado do anti-fracionamento soma
+        # as requisições da mesma (obra, etapa) numa janela de N dias. Sem este
+        # índice a soma vira varredura por tenant A CADA ENVIO de requisição:
+        # não havia nenhum índice por data nesta tabela.
+        db.Index('ix_requisicao_obra_etapa_criada', 'obra_id',
+                 'obra_servico_custo_id', 'created_at'),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -6108,6 +6149,47 @@ class RequisicaoCompra(db.Model):
     mapa_v2_id = db.Column(
         db.Integer, db.ForeignKey('mapa_concorrencia_v2.id', ondelete='SET NULL'),
         nullable=True)
+
+    # Fase 3 do ciclo de compras — spec 2026-08-15-alcadas-design.md, seção
+    # "Modelo de dados".
+    #
+    # O REGIME É CARIMBADO NA LINHA, e não lido da flag na hora de decidir.
+    # 'simples' = o motor de hoje, em que a faixa só olha o valor.
+    # 'avancado' = as condições, o acumulado da janela e a emergência valem.
+    # Gravado na criação, a partir de `configuracao_empresa.alcadas_avancadas_
+    # ativa`. Desligar a flag NÃO reescreve requisição já criada — de
+    # propósito, e é a mesma decisão das Fases 1 (pedido_compra.exige_atesto)
+    # e 2 (pedido_compra.fluxo_pagamento). O motivo é sempre o mesmo: uma
+    # requisição em curso foi aprovada sob uma regra, e rebaixar a alçada dela
+    # no meio do caminho é o contrário do que a fase faz. Ler a flag na
+    # decisão faria o passado mudar toda vez que alguém mexesse na
+    # configuração.
+    regime_alcada = db.Column(db.String(12), nullable=False,
+                              default='simples', server_default='simples')
+
+    # Invocação do rito de emergência 48h (decisão D4): a requisição vai de
+    # RASCUNHO a APROVADA sem voto, com justificativa obrigatória, e a alçada
+    # é cobrada *ex post*. Atributo, não estado — um PENDENTE_RATIFICACAO
+    # obrigaria a mexer em TRANSICOES_VALIDAS, nos badges, nos filtros e na
+    # matriz de governança para exprimir o que duas colunas exprimem.
+    emergencial = db.Column(db.Boolean, nullable=False, default=False,
+                            server_default='false')
+
+    # Quando os aprovadores da faixa ratificaram a emergência. NULL numa
+    # requisição emergencial = pendente OU vencida; a diferença é o relógio
+    # (48 horas corridas a partir da aprovação emergencial), não uma terceira
+    # coluna. Passadas as 48h sem ratificação, a sanção é a ContaPagar
+    # derivada não liberar (D5) — o dinheiro é onde ainda dá para parar,
+    # porque o material já chegou.
+    ratificada_em = db.Column(db.DateTime, nullable=True)
+
+    # POR QUE esta requisição subiu de faixa: os códigos das condições que
+    # dispararam, mais `fracionamento` se foi o acumulado da janela. É
+    # trilha, não decisão — quem reabre a requisição seis meses depois precisa
+    # ver o motivo sem recalcular uma janela que já passou. Gravado mesmo
+    # quando a faixa satura no topo e o degrau não muda exigência nenhuma.
+    degrau_aplicado = db.Column(db.String(200), nullable=False, default='',
+                                server_default='')
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow,
@@ -6232,9 +6314,9 @@ class FaixaAlcada(db.Model):
 
     Leitura de uma linha: "compra de até `valor_ate` precisa de
     `aprovacoes_necessarias` aprovações distintas; se `exige_admin`, uma
-    delas tem que ser de ADMIN/SUPER_ADMIN; se `exige_mapa_concorrencia`,
-    a requisição precisa apontar para um MapaConcorrenciaV2 concluído com
-    pelo menos dois fornecedores".
+    delas tem que ser de ADMIN/SUPER_ADMIN; se `minimo_cotacoes > 0`, a
+    requisição precisa apontar para um MapaConcorrenciaV2 concluído com
+    pelo menos esse número de fornecedores".
 
     `valor_ate = NULL` é o teto aberto — tem que existir exatamente uma
     faixa assim por tenant, e ela é sempre a de maior `ordem`.
@@ -6255,6 +6337,38 @@ class FaixaAlcada(db.Model):
     aprovacoes_necessarias = db.Column(db.Integer, nullable=False, default=1)
     exige_admin = db.Column(db.Boolean, nullable=False, default=False)
     exige_mapa_concorrencia = db.Column(db.Boolean, nullable=False, default=False)
+
+    # Fase 3 do ciclo de compras (spec 2026-08-15-alcadas-design.md, seção
+    # "Modelo de dados"). O corte de cotações deixa de ser literal no código:
+    # até aqui `services/alcada_compras.py` exigia `len(mapa.fornecedores) >= 2`
+    # — a ÚNICA regra de alçada que não era dado. Agora é linha de tabela.
+    #   0    = a faixa não exige mapa.
+    #   >= 2 = exige mapa concluído com pelo menos esse número de fornecedores.
+    # Nunca 1: um fornecedor não é concorrência, é orçamento.
+    #
+    # `exige_mapa_concorrencia` PERMANECE na tabela e passa a ser derivada
+    # (`minimo_cotacoes > 0`). Não se remove coluna no mesmo release em que se
+    # muda o leitor — há tenant com faixa editada por SQL direto. A remoção é
+    # decisão futura e deliberada, não um esquecimento que ninguém revisita.
+    minimo_cotacoes = db.Column(db.Integer, nullable=False, default=0,
+                                server_default='0')
+
+    # Quais das quatro condições sobem um degrau NESTE tenant, separadas por
+    # vírgula: fornecedor_novo, sem_cotacao, nao_menor_preco, fora_do_orcamento.
+    # Vazio = a faixa não sobe degrau por condição nenhuma, que é o
+    # comportamento de hoje e por isso é o default.
+    #
+    # Por que texto e não quatro booleanos: as condições vão mudar de número —
+    # esta fase entrega quatro e o backlog da seção 2 já tem frete e validade
+    # da proposta esperando. Quatro colunas viram oito sem que ninguém decida
+    # por isso, e cada uma dessas seria uma migration a mais. Lista também
+    # deixa o tenant ligar uma a uma: `fora_do_orcamento` é a mais ruidosa das
+    # quatro (⚠️ D1 do spec — `obra_servico_custo_id` é nullable), e em tenant
+    # que ainda não preenche etapa com disciplina ela sobe quase tudo um
+    # degrau. Poder deixá-la de fora na primeira volta é o motivo do formato.
+    condicoes_ativas = db.Column(db.String(120), nullable=False, default='',
+                                 server_default='')
+
     ativo = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
