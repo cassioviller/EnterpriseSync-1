@@ -118,6 +118,12 @@ menos esse número de fornecedores. Substitui a leitura de `exige_mapa_concorren
 **permanece na tabela** e passa a ser derivada (`minimo_cotacoes > 0`) — coluna antiga não
 se remove no mesmo release que muda o leitor, e há tenant com faixa editada por SQL.
 
+> 📌 **15/08, A7: derivada na leitura, sincronizada na escrita.** A A3 fez
+> `exige_mapa_concorrencia` deixar de ser lida. O spec não dizia o que fazer com ela na
+> **escrita**, e deixá-la parada faria a tela produzir linhas em que a coluna velha afirma o
+> contrário do que o motor faz. A tela grava `exige_mapa_concorrencia = minimo_cotacoes > 0`
+> junto, sempre. A coluna continua sem leitor; o que ela deixa de ser é mentira.
+
 Backfill: onde `exige_mapa_concorrencia = true`, `minimo_cotacoes = 2` — o número que o
 código aplicava. **Não** 3: o backfill preserva o comportamento, e subir para 3 é decisão
 D6, aplicada por UPDATE depois.
@@ -447,6 +453,23 @@ hoje, e mudá-lo junto misturaria duas viradas.
 Esta fase acrescenta duas colunas com semântica; confirmar os números "antes de ligar a
 flag" sem tela para vê-los seria confiar num SELECT que alguém rodou. **Deixa de ser a
 task cortável** — o passo 1 do runbook e o UPDATE da D6 dependem dela.
+
+> 📌 **15/08, A7: os invariantes da escada são TRÊS, não dois — e o terceiro é do degrau da
+> A4.** O plano nomeia dois (exatamente uma faixa de teto aberto; tetos crescentes por
+> `ordem`). Ao executar apareceu um terceiro, que já estava escrito em `models.FaixaAlcada` e
+> nunca tinha sido cobrado: **a faixa de teto aberto é sempre a última da escada**. Ele não é
+> decoração: o 📌 da A4 fixou que `faixa_efetiva` anda **posições** na lista ordenada por
+> `ordem`, e uma faixa de `valor_ate` NULL no meio faria o degrau "subir" para uma faixa de
+> teto fechado — isto é, um degrau que desce, o contrário do que a fase inteira faz.
+> `services/faixa_alcada_admin.py` verifica os três (`teto_aberto_ausente`,
+> `teto_aberto_duplicado`, `teto_aberto_fora_do_fim`, `teto_nao_cresce:<ordem>`) e
+> `diagnosticar(admin_id)` os devolve em português, para a tela e para o sensor da A8.
+>
+> E a regra de convivência com o passado, que é o que torna a tela usável: **ela recusa o que
+> a edição CRIA e apenas AVISA o que ela herdou.** O invariante nunca teve constraint, então
+> existe tenant que já chega aqui fora dele; validar só o estado final o travaria justamente
+> na tela que existe para consertá-lo. A comparação é antes × depois por código de violação, e
+> o conserto sempre passa porque só remove código.
 
 ---
 

@@ -229,17 +229,28 @@ ligada em tenant real antes de A8**, porque o sensor é o que enxerga emergênci
 > depende dela, e é por ela que sai o UPDATE da D6 (faixa de topo para
 > `minimo_cotacoes = 3`, que o backfill deliberadamente não fez).
 
-- [ ] **Step 1 (red):** só ADMIN alcança a tela; editar faixa de outro tenant dá 404;
+- [x] **Step 1 (red):** só ADMIN alcança a tela; editar faixa de outro tenant dá 404;
   salvar mantém o invariante de **exatamente uma** faixa com `valor_ate` NULL; tetos têm que
   ser crescentes por `ordem`; `minimo_cotacoes` aceita 0 ou ≥ 2, nunca 1.
-- [ ] **Step 2:** rota em `configuracoes_views.py` e template, listando as faixas do tenant
+- [x] **Step 2:** rota em `configuracoes_views.py` e template, listando as faixas do tenant
   com os campos editáveis, incluindo os checkboxes das quatro condições.
-- [ ] **Step 3:** as validações **no serviço**, não no template — a tela é a primeira
+
+> 📌 **15/08: a tela precisou de um quarto caminho, que o Step 2 não nomeia — semear.**
+> Listar as faixas do tenant pressupõe que ele tenha faixas. O tenant com zero cai na
+> `_FaixaSeguranca` (2 aprovações, exige ADMIN), que é falha fechada e **não aparece em tela
+> nenhuma** — e o passo 1 do runbook mandaria conferir uma escada vazia. A tela mostra o
+> estado por escrito e oferece `POST /configuracoes/alcadas/semear`, que chama
+> `garantir_faixas_do_tenant` (idempotente). É POST explícito e não efeito colateral do GET:
+> escrever no banco porque alguém abriu uma página é um GET virando UPDATE sem que ninguém
+> tenha pedido.
+
+- [x] **Step 3:** as validações **no serviço**, não no template — a tela é a primeira
   consumidora, o script de flag é a segunda, e um SQL manual continua sendo possível. O
   invariante da faixa de teto aberto nunca teve constraint (📖 só docstring em
   `models.py:6239`); esta é a primeira vez que alguém o verifica em código.
-- [ ] **Step 4 (green):** rodar. Verdes.
-- [ ] **Step 5:** commit — `feat(compras): tela de faixas de alcada por tenant`
+- [x] **Step 4 (green):** rodar. Verdes — 24 testes em `tests/test_faixa_alcada_tela.py`
+  (arquivo próprio, e não o da fase, porque a A7 rodou em paralelo com a A5).
+- [x] **Step 5:** commit — `feat(compras): tela de faixas de alcada por tenant` (`74a62c49`)
 
 ## A8 — Sensor, teste-guarda e runbook
 
