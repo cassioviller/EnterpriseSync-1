@@ -174,30 +174,30 @@ ligada em tenant real antes de A8**, porque o sensor é o que enxerga emergênci
 
 ## A5 — Anti-fracionamento
 
-- [ ] **Step 1 (red):** três requisições de R$ 4.900 na mesma `(obra, etapa)` dentro da
+- [x] **Step 1 (red):** três requisições de R$ 4.900 na mesma `(obra, etapa)` dentro da
   janela → a terceira cai na faixa de 30k e grava `fracionamento`; a mesma terceira **fora**
   da janela fica na faixa de 5k; requisição REJEITADA e CANCELADA **não** entram no
   acumulado; o acumulado por fornecedor aparece **só** na emissão, nunca no envio; janela
   configurada em 7 dias no tenant muda o resultado sem tocar em código.
-- [ ] **Step 2:** `acumulado_da_etapa(requisicao, dias)` e
+- [x] **Step 2:** `acumulado_da_etapa(requisicao, dias)` e
   `acumulado_do_fornecedor(admin_id, obra_id, fornecedor_id, dias)` em
   `services/alcada_compras.py`. Duas queries agregadas, cada uma pousando num dos índices
   da A1 — e um comentário nomeando qual índice cada uma usa, para que quem mexer no índice
   saiba o que quebra.
-- [ ] **Step 3:** `valor_para_alcada(requisicao, fornecedor=None)` — `max(valor da linha,
+- [x] **Step 3:** `valor_para_alcada(requisicao, fornecedor=None)` — `max(valor da linha,
   acumulado aplicável)`. É o único ponto que sabe escolher entre os dois acumulados, e o
   critério é de onde veio a chamada, não um parâmetro solto.
-- [ ] **Step 4:** ligar em `requisicao_enviar` (acumulado de etapa) e em
+- [x] **Step 4:** ligar em `requisicao_enviar` (acumulado de etapa) e em
   `requisicao_emitir_pedido` (acumulado de fornecedor). Na emissão, o degrau por
   fracionamento **não** invalida a aprovação já dada — ele recusa a emissão com mensagem
   que diz o que fazer (voltar para aprovação na faixa nova). Reaprovar é caminho; emitir
   calado, não.
-- [ ] **Step 5:** a listagem de requisições ganha o marcador de quem subiu por acumulado, e
+- [x] **Step 5:** a listagem de requisições ganha o marcador de quem subiu por acumulado, e
   o detalhe mostra as irmãs da janela com número e valor. Sem isso o aprovador vê uma
   exigência e não vê o fato que a gerou.
-- [ ] **Step 6 (green):** rodar. Verdes. Conferir por SQL cru, num tenant de dev, que o
+- [x] **Step 6 (green):** rodar. Verdes. Conferir por SQL cru, num tenant de dev, que o
   acumulado bate com a soma manual da janela.
-- [ ] **Step 7:** commit — `feat(compras): o acumulado da janela passa a definir a faixa`
+- [x] **Step 7:** commit — `feat(compras): o acumulado da janela passa a definir a faixa`
 
 ## A6 — O rito de emergência 48h
 

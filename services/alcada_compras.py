@@ -25,13 +25,14 @@ tabela de histórico que teria de ser mantida em sincronia com a primeira.
 """
 import logging
 from collections import namedtuple
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func
 
-from models import (EstadoRequisicao, FaixaAlcada, MapaConcorrenciaV2,
-                    PedidoCompra, RequisicaoCompra, RequisicaoTransicao,
-                    TipoUsuario, db)
+from models import (ConfiguracaoEmpresa, EstadoRequisicao, FaixaAlcada,
+                    MapaConcorrenciaV2, PedidoCompra, RequisicaoCompra,
+                    RequisicaoTransicao, TipoUsuario, db)
 
 logger = logging.getLogger('alcada_compras')
 
@@ -499,6 +500,206 @@ def condicoes_disparadas(requisicao, faixa, fornecedor=None):
     return disparadas
 
 
+# ---------------------------------------------------------------------------
+# Anti-fracionamento — o acumulado da janela  (A5)
+#
+# 📖 spec 2026-08-15-alcadas-design.md, "`valor_para_alcada` — onde o acumulado
+# entra" e decisões D2 (janela de 30 dias, por tenant) e D3 (degrau, não
+# bloqueio).
+#
+# São DOIS acumulados, e eles não são o mesmo com filtro diferente:
+#
+#   * `acumulado_da_etapa` — a soma das requisições da mesma `(obra, etapa)`.
+#     É o que vale no ENVIO, e o agrupamento é por etapa porque a REQUISIÇÃO
+#     NÃO TEM FORNECEDOR: ele só é escolhido na emissão (📖
+#     `PedidoCompra.fornecedor_id` é NOT NULL; `RequisicaoCompra` não tem a
+#     coluna).
+#   * `acumulado_do_fornecedor` — a soma dos pedidos do mesmo
+#     `(admin, fornecedor)` na mesma obra. É o que vale na EMISSÃO, e é o
+#     único momento em que o fracionamento por fornecedor pode aparecer.
+#
+# Quem escolhe entre os dois é `valor_para_alcada`, e o critério é DE ONDE VEIO
+# A CHAMADA — presença de fornecedor —, não um parâmetro de configuração. Uma
+# chamada com fornecedor só existe na emissão; uma sem fornecedor só existe
+# antes dela.
+# ---------------------------------------------------------------------------
+
+MOTIVO_FRACIONAMENTO = 'fracionamento'
+
+# Os estados que ENTRAM no acumulado. É deliberadamente a MESMA lista de
+# `ESTADOS_QUE_CONSOMEM_ORCAMENTO`, e não uma cópia com outro nome: "consome
+# orçamento da etapa" e "conta no acumulado da janela" são a mesma pergunta
+# ("esta requisição ainda vale dinheiro?") feita por dois lugares. REJEITADA e
+# CANCELADA ficam de fora — a requisição rejeitada e reenviada conta a rodada
+# nova, não as duas (📖 spec, "Casos de borda").
+ESTADOS_QUE_ACUMULAM = ESTADOS_QUE_CONSOMEM_ORCAMENTO
+
+# O rótulo do fracionamento mora ao lado dos das quatro condições porque a
+# TELA mostra uma lista só ("por que esta requisição subiu"), mas fora de
+# `ROTULOS_CONDICAO`: fracionamento NÃO é uma das condições de
+# `faixa.condicoes_ativas` e não pode ser ligado nem desligado por tenant — ele
+# é a regra do acumulado, e ficou fora da lista de propósito (📖 spec, D1).
+ROTULOS_DEGRAU = dict(ROTULOS_CONDICAO)
+ROTULOS_DEGRAU[MOTIVO_FRACIONAMENTO] = (
+    'o acumulado da janela (outras compras da mesma etapa, ou do mesmo '
+    'fornecedor na emissão) passa o teto da faixa deste valor')
+
+
+def janela_de_fracionamento(admin_id):
+    """Quantos dias corridos a janela do acumulado cobre NESTE tenant.
+
+    A janela é decisão D2 e é DADO: `configuracao_empresa.janela_fracionamento_
+    dias`. Nenhum número desta fase entra num `if` — trocar 30 por 7 é UPDATE,
+    não deploy, e há teste que prova que 7 muda o resultado sem tocar em
+    código.
+
+    O padrão sai do DEFAULT DA PRÓPRIA COLUNA, e não de um literal repetido
+    aqui: tenant sem linha de configuração tem de decidir igual a tenant com a
+    linha recém-criada, e duas fontes para o mesmo número é como elas passam a
+    divergir. Leitura ilegível cai no padrão em vez de estourar — a alçada não
+    pode travar uma compra por causa de uma linha de configuração ausente.
+    """
+    padrao = ConfiguracaoEmpresa.__table__.c.janela_fracionamento_dias.default.arg
+    try:
+        cfg = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+        dias = int(getattr(cfg, 'janela_fracionamento_dias', None) or 0)
+    except Exception:
+        logger.warning('janela de fracionamento ilegível no tenant %s — '
+                       'aplicando o padrão de %s dias', admin_id, padrao)
+        return padrao
+    # 0 ou negativo desligaria o acumulado por acidente de digitação. O padrão
+    # é o que já valia, e a A7 valida o campo na tela.
+    return dias if dias > 0 else padrao
+
+
+def _criterios_da_etapa_na_janela(requisicao, dias):
+    """Os filtros da janela por `(obra, etapa)`. Um lugar só, dois usuários.
+
+    ⚠️ ÍNDICE: esta lista de critérios foi escrita para pousar em
+    `ix_requisicao_obra_etapa_criada (obra_id, obra_servico_custo_id,
+    created_at)`, criado na migration 298 — igualdade nas duas primeiras
+    colunas e faixa na terceira, exatamente na ordem do índice. Quem mexer
+    naquele índice quebra o desempenho de `acumulado_da_etapa` e de
+    `irmas_da_janela`, que são chamadas A CADA ENVIO de requisição e a cada
+    abertura do detalhe. `admin_id` entra como filtro residual (defesa de
+    tenant; `obra_id` já o implica) e `estado` também — os dois depois do
+    índice, sobre pouquíssimas linhas.
+
+    Etapa NULA é um grupo, não "todas as etapas": requisição sem centro de
+    custo apontado acumula com as outras requisições sem centro de custo da
+    mesma obra. É a leitura literal de "mesma (obra, etapa)" quando a etapa é
+    NULL, e é a que o fracionamento precisa — omitir a etapa é a forma mais
+    fácil de dividir uma compra.
+    """
+    criterios = [
+        RequisicaoCompra.admin_id == requisicao.admin_id,
+        RequisicaoCompra.obra_id == requisicao.obra_id,
+        RequisicaoCompra.estado.in_(ESTADOS_QUE_ACUMULAM),
+        RequisicaoCompra.created_at >= datetime.utcnow() - timedelta(days=dias),
+    ]
+    if requisicao.obra_servico_custo_id is None:
+        criterios.append(RequisicaoCompra.obra_servico_custo_id.is_(None))
+    else:
+        criterios.append(RequisicaoCompra.obra_servico_custo_id ==
+                         requisicao.obra_servico_custo_id)
+    # Requisição ainda não persistida não tem id: aí não há linha nenhuma para
+    # excluir, e o filtro sai da lista em vez de virar `id IS NOT NULL`.
+    if requisicao.id is not None:
+        criterios.append(RequisicaoCompra.id != requisicao.id)
+    return criterios
+
+
+def irmas_da_janela(requisicao, dias=None):
+    """As OUTRAS requisições da mesma `(obra, etapa)` dentro da janela.
+
+    Existe para a TELA, não para a decisão: o aprovador que vê "esta
+    requisição subiu de faixa" sem ver quais irmãs somaram liga para o
+    suporte. A soma que decide é `acumulado_da_etapa`, agregada no banco.
+    """
+    dias = janela_de_fracionamento(requisicao.admin_id) if dias is None else dias
+    return (RequisicaoCompra.query
+            .filter(*_criterios_da_etapa_na_janela(requisicao, dias))
+            .order_by(RequisicaoCompra.created_at.desc())
+            .limit(50).all())
+
+
+def acumulado_da_etapa(requisicao, dias=None):
+    """O que a `(obra, etapa)` desta requisição já pediu na janela, ela inclusa.
+
+    A própria requisição entra somada EM SEPARADO, e não pela query: assim uma
+    requisição com valor alterado na sessão e ainda não gravada é contada pelo
+    valor que o chamador está decidindo, e não pelo que está no banco. Mesma
+    escolha de `_cond_fora_do_orcamento`, pelo mesmo motivo.
+    """
+    dias = janela_de_fracionamento(requisicao.admin_id) if dias is None else dias
+    irmas = db.session.query(
+        func.coalesce(func.sum(RequisicaoCompra.valor_estimado), 0)
+    ).filter(*_criterios_da_etapa_na_janela(requisicao, dias)).scalar() or 0
+    return Decimal(str(irmas)) + Decimal(str(requisicao.valor_estimado or 0))
+
+
+def acumulado_do_fornecedor(admin_id, obra_id, fornecedor_id, dias=None):
+    """O que este fornecedor já levou DESTA OBRA na janela, em pedidos emitidos.
+
+    Recebe ids e não a requisição de propósito: só a emissão consegue chamar
+    esta função, porque só lá existe fornecedor — e a assinatura torna isso
+    explícito para quem for reusá-la (o sensor da A8 é o próximo).
+
+    O valor da compra que está sendo emitida AGORA não entra: ela ainda não é
+    pedido. Quem junta os dois é `valor_para_alcada`, com o `max` — e é por
+    isso que o `max` não é decoração.
+
+    ⚠️ ÍNDICE, e aqui há DOIS candidatos — conferido por EXPLAIN em 15/08:
+    `ix_pedido_admin_fornecedor_data (admin_id, fornecedor_id, data_compra)`,
+    criado na migration 298 para esta query, e o `idx_pedido_compra_admin_obra
+    (admin_id, obra_id)`, que já existia. As quatro condições abaixo casam com
+    os dois pela esquerda, e quem escolhe é o planejador: no dev, com três
+    linhas na tabela, ele preferiu o antigo. O da 298 é o que sustenta o caso
+    que importa — tenant com MUITOS pedidos na mesma obra, em que filtrar por
+    obra não seleciona quase nada e filtrar por fornecedor + janela seleciona.
+    Quem mexer em qualquer um dos dois mexe no custo desta soma, que roda a
+    cada emissão de pedido. Antes da 298 não havia índice NENHUM sobre
+    `data_compra`.
+    """
+    dias = janela_de_fracionamento(admin_id) if dias is None else dias
+    total = db.session.query(
+        func.coalesce(func.sum(PedidoCompra.valor_total), 0)
+    ).filter(
+        PedidoCompra.admin_id == admin_id,
+        PedidoCompra.fornecedor_id == fornecedor_id,
+        PedidoCompra.data_compra >= date.today() - timedelta(days=dias),
+        PedidoCompra.obra_id == obra_id,
+    ).scalar() or 0
+    return Decimal(str(total))
+
+
+def valor_para_alcada(requisicao, fornecedor=None):
+    """O valor que a faixa deve olhar: `max(linha, acumulado aplicável)`.
+
+    O ÚNICO ponto que sabe escolher entre os dois acumulados, e o critério é de
+    onde veio a chamada: com fornecedor é emissão (acumulado do fornecedor),
+    sem fornecedor é envio/aprovação (acumulado da etapa). Não há parâmetro
+    para forçar um ou outro, de propósito — a escolha é um fato do fluxo, não
+    uma opção de quem chama.
+
+    `max` e não soma: o acumulado NUNCA faz a faixa descer. Uma compra de
+    R$ 40.000 num fornecedor que só tinha R$ 100 de histórico continua sendo
+    uma compra de R$ 40.000.
+
+    Não consulta a flag nem o regime — quem decide se o acumulado vale é o
+    chamador (`decisao_de_alcada`), pelo mesmo contrato dos quatro avaliadores.
+    É o que permite ao sensor da A8 medir com a flag desligada.
+    """
+    linha = Decimal(str(requisicao.valor_estimado or 0))
+    fornecedor_id = getattr(fornecedor, 'id', fornecedor)
+    if fornecedor_id:
+        acumulado = acumulado_do_fornecedor(
+            requisicao.admin_id, requisicao.obra_id, fornecedor_id)
+    else:
+        acumulado = acumulado_da_etapa(requisicao)
+    return max(linha, acumulado)
+
+
 _LIMITE_DEGRAU = 200   # tamanho da coluna requisicao_compra.degrau_aplicado
 
 
@@ -538,14 +739,39 @@ def _gravar_degrau(requisicao, codigos):
 DecisaoAlcada = namedtuple('DecisaoAlcada', 'base efetiva condicoes')
 
 
+def _mesma_faixa(uma, outra):
+    """As duas referências apontam para a MESMA linha de `faixa_alcada`?
+
+    `is` não serve aqui: `faixa_para_valor` devolve uma `_FaixaSeguranca` NOVA
+    a cada chamada quando o tenant não tem faixa nenhuma, e duas instâncias
+    diferentes da mesma política diriam falsamente que a faixa mudou —
+    inventando um fracionamento num tenant que sequer configurou faixas.
+    """
+    if uma is outra:
+        return True
+    id_uma = getattr(uma, 'id', None)
+    return id_uma is not None and id_uma == getattr(outra, 'id', None)
+
+
 def decisao_de_alcada(requisicao, fornecedor=None):
-    """`(faixa base, faixa efetiva, condições disparadas)` — o cálculo inteiro.
+    """`(faixa base, faixa efetiva, motivos do degrau)` — o cálculo inteiro.
 
     Existe para que a TELA possa mostrar as três coisas sem pagar o cálculo
     duas vezes: `faixa_efetiva` devolve só a faixa, e o detalhe da requisição
     precisa também da base e do porquê. Ponto único do cálculo — quem decide e
     quem exibe leem daqui, e é isso que impede a tela de prometer uma faixa
     enquanto o envio cobra outra.
+
+    A conta tem DOIS movimentos, nesta ordem, e eles não se somam duas vezes:
+
+      1. o ACUMULADO da janela move a faixa de PARTIDA (`fracionamento`) — o
+         valor que a faixa olha deixa de ser o da linha e passa a ser
+         `valor_para_alcada`;
+      2. cada CONDIÇÃO disparada anda uma posição a partir dali.
+
+    `base` continua sendo a faixa DO VALOR DA LINHA, e é ela que a tela mostra
+    como "pelo valor, cairia em" — sobrescrevê-la com a do acumulado faria a
+    tela esconder justamente o fato que gerou a exigência.
 
     NÃO commita, no mesmo contrato de `registrar_aprovacao`: `degrau_aplicado`
     é escrito na sessão e quem persiste é a rota.
@@ -560,40 +786,65 @@ def decisao_de_alcada(requisicao, fornecedor=None):
     if getattr(requisicao, 'regime_alcada', REGIME_SIMPLES) != REGIME_AVANCADO:
         return DecisaoAlcada(base, base, [])
 
-    disparadas = condicoes_disparadas(requisicao, base, fornecedor)
-    if not disparadas:
+    motivos = []
+    partida = base
+
+    # (1) O acumulado da janela. Só mexe em alguma coisa quando cruza um teto
+    # que a linha sozinha não cruzaria — é a definição do fracionamento no
+    # spec, e é o que impede uma obra grande de virar faixa de topo só por ser
+    # movimentada.
+    valor = valor_para_alcada(requisicao, fornecedor)
+    if valor > Decimal(str(requisicao.valor_estimado or 0)):
+        por_acumulado = faixa_para_valor(requisicao.admin_id, valor)
+        if not _mesma_faixa(por_acumulado, base):
+            partida = por_acumulado
+            motivos.append(MOTIVO_FRACIONAMENTO)
+            logger.info('[fase3] requisicao %s: acumulado da janela %s move a '
+                        'faixa de partida da %s para a %s', requisicao.numero,
+                        valor, base.ordem, partida.ordem)
+
+    # (2) As condições, a partir da faixa em que a requisição de fato está —
+    # `sem_cotacao` pergunta o mínimo de cotações DA FAIXA, e depois do
+    # fracionamento a faixa é outra.
+    disparadas = condicoes_disparadas(requisicao, partida, fornecedor)
+    motivos.extend(disparadas)
+
+    if not motivos:
         return DecisaoAlcada(base, base, [])
 
     # A trilha é gravada MESMO quando o degrau satura na faixa de topo: que a
     # condição disparou é fato, e a única requisição sobre a qual ninguém
     # saberia disso seria justamente a de maior valor.
-    _gravar_degrau(requisicao, disparadas)
+    _gravar_degrau(requisicao, motivos)
 
     escada = (FaixaAlcada.query
               .filter_by(admin_id=requisicao.admin_id, ativo=True)
               .order_by(FaixaAlcada.ordem.asc())
               .all())
     try:
-        posicao = escada.index(base)
+        posicao = escada.index(partida)
     except ValueError:
         # `_FaixaSeguranca` não está na escada (tenant sem faixa nenhuma). Não
         # é erro: é o caso em que o degrau é sempre saturado, como no tenant
         # de faixa única (📖 spec, "Casos de borda").
-        return DecisaoAlcada(base, base, disparadas)
+        return DecisaoAlcada(base, partida, motivos)
 
     # O degrau anda POSIÇÕES na escada, não números de `ordem`. Somar à ordem
     # devolveria uma faixa inexistente em qualquer tenant cuja numeração tenha
     # buraco (1, 2, 9) — e nada impede que tenha, porque a ordem é digitada.
+    # São `len(disparadas)` posições, e não `len(motivos)`: o fracionamento já
+    # gastou o degrau dele ao mover a partida, e contá-lo de novo aqui subiria
+    # duas faixas por um motivo só.
     efetiva = escada[min(posicao + len(disparadas), len(escada) - 1)]
-    if efetiva is not base:
+    if not _mesma_faixa(efetiva, base):
         logger.info('[fase3] requisicao %s subiu da faixa %s para a %s por %s',
                     requisicao.numero, base.ordem, efetiva.ordem,
-                    ','.join(disparadas))
+                    ','.join(motivos))
     else:
         logger.info('[fase3] requisicao %s já está na faixa de topo — degrau '
-                    'saturado, condições %s registradas', requisicao.numero,
-                    ','.join(disparadas))
-    return DecisaoAlcada(base, efetiva, disparadas)
+                    'saturado, motivos %s registrados', requisicao.numero,
+                    ','.join(motivos))
+    return DecisaoAlcada(base, efetiva, motivos)
 
 
 def faixa_efetiva(requisicao, fornecedor=None):

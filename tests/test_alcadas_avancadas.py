@@ -21,7 +21,7 @@ import os
 import re
 import sys
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -1352,3 +1352,423 @@ def test_emissao_usa_a_faixa_efetiva_e_e_onde_o_fornecedor_novo_pesa():
         assert req.degrau_aplicado == '', (
             'a guarda recusou e a rota NÃO commitou — `faixa_efetiva` carimba '
             'na sessão, e quem persiste é sempre a rota')
+
+
+# ---------------------------------------------------------------------------
+# A5 — anti-fracionamento: o acumulado da janela passa a definir a faixa
+#
+# Dois acumulados, e eles NÃO são o mesmo com filtro diferente. O critério de
+# qual vale é DE ONDE VEIO A CHAMADA, não um parâmetro solto:
+#   * no envio da requisição, `(obra, etapa)` — porque a requisição não tem
+#     fornecedor (📖 `PedidoCompra.fornecedor_id` é NOT NULL; a requisição não
+#     tem a coluna);
+#   * na emissão do pedido, `(admin, obra, fornecedor)` — o único momento em
+#     que o fornecedor existe.
+# O efeito é DEGRAU, não bloqueio (D3): bloquear compra legítima de obra grande
+# empurra a compra para fora do sistema, e o sistema deixa de saber o que a
+# obra gastou.
+# ---------------------------------------------------------------------------
+
+def _req_na_etapa(admin_id, obra_id, solicitante_id, etapa_id=None,
+                  valor='4900.00', estado=EstadoRequisicao.RASCUNHO,
+                  dias_atras=0, regime='avancado'):
+    """Requisição com etapa, valor, estado e IDADE escolhidos.
+
+    `dias_atras` escreve `created_at` na criação — a janela é por data e a
+    borda dela só se exercita com a data na mão. O default da coluna continua
+    valendo para quem não passa nada (é o caminho da rota).
+    """
+    r = RequisicaoCompra(
+        numero=f'RC-{uuid.uuid4().hex[:8].upper()}', admin_id=admin_id,
+        obra_id=obra_id, solicitante_id=solicitante_id,
+        obra_servico_custo_id=etapa_id, estado=estado,
+        regime_alcada=regime, valor_estimado=Decimal(valor),
+        created_at=datetime.utcnow() - timedelta(days=dias_atras))
+    db.session.add(r)
+    db.session.commit()
+    return r
+
+
+def test_acumulado_da_etapa_soma_a_janela_e_deixa_de_fora_o_que_morreu():
+    """O acumulado é a soma da `(obra, etapa)` na janela, a própria inclusa.
+
+    REJEITADA e CANCELADA ficam de fora (📖 spec, "Casos de borda"): a
+    requisição rejeitada e reenviada conta a rodada nova, não as duas, e uma
+    requisição morta não pode segurar faixa nenhuma. CONVERTIDA conta — ela
+    virou compra de verdade, que é justamente o que o fracionamento divide.
+    """
+    from services.alcada_compras import acumulado_da_etapa
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        etapa = _etapa(obra)
+
+        alvo = _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        assert acumulado_da_etapa(alvo, 30) == Decimal('4900.00'), (
+            'sozinha, a requisição acumula o próprio valor')
+
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id,
+                      estado=EstadoRequisicao.CONVERTIDA)
+        assert acumulado_da_etapa(alvo, 30) == Decimal('14700.00')
+
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id,
+                      estado=EstadoRequisicao.REJEITADA)
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id,
+                      estado=EstadoRequisicao.CANCELADA)
+        assert acumulado_da_etapa(alvo, 30) == Decimal('14700.00'), (
+            'rejeitada e cancelada não entram no acumulado')
+
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id, dias_atras=45)
+        assert acumulado_da_etapa(alvo, 30) == Decimal('14700.00'), (
+            'fora da janela não entra')
+
+        outra_etapa = _etapa(obra)
+        _req_na_etapa(adm.id, obra.id, adm.id, outra_etapa.id)
+        assert acumulado_da_etapa(alvo, 30) == Decimal('14700.00'), (
+            'o agrupamento é por (obra, etapa) — outra etapa é outra conta')
+
+
+def test_tres_requisicoes_de_4900_na_mesma_etapa_levam_a_terceira_a_30k():
+    """O caso do spec, inteiro: 3 × R$ 4.900 na mesma `(obra, etapa)`.
+
+    Cada uma sozinha é faixa de 5k, uma aprovação. Somadas na janela dão
+    R$ 14.700, que é faixa de 30k — 2 aprovações e uma de admin. A terceira
+    sobe, e a trilha diz por quê.
+    """
+    from services.alcada_compras import faixa_efetiva, faixa_para_valor
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        _f1, f2, _f3 = _escada(adm.id)      # sem condição nenhuma ativa
+        etapa = _etapa(obra)
+
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        terceira = _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+
+        assert faixa_para_valor(adm.id, terceira.valor_estimado).ordem == 1
+        assert faixa_efetiva(terceira) is f2, (
+            'o acumulado da janela cruza o teto que a linha sozinha não cruza')
+        assert terceira.degrau_aplicado == 'fracionamento', (
+            'a trilha registra que quem subiu a faixa foi o acumulado, e não '
+            'uma das quatro condições')
+
+
+def test_a_mesma_terceira_fora_da_janela_fica_na_faixa_do_proprio_valor():
+    """A outra metade do teste anterior — e é ela que prova que existe janela.
+
+    As duas irmãs de 45 dias atrás não somam com a de hoje: compra que se
+    repete todo mês não é compra dividida.
+    """
+    from services.alcada_compras import faixa_efetiva
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        f1, _f2, _f3 = _escada(adm.id)
+        etapa = _etapa(obra)
+
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id, dias_atras=45)
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id, dias_atras=45)
+        terceira = _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+
+        assert faixa_efetiva(terceira) is f1
+        assert terceira.degrau_aplicado == ''
+
+
+def test_a_janela_vem_da_configuracao_do_tenant_e_nao_do_codigo():
+    """Configurar 7 dias muda o resultado SEM tocar em código (D2).
+
+    As irmãs são de 10 dias atrás: dentro dos 30 do default, fora dos 7 que o
+    tenant configurou. É por isso que a janela é coluna e não constante.
+    """
+    from services.alcada_compras import faixa_efetiva
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        f1, f2, _f3 = _escada(adm.id)
+        etapa = _etapa(obra)
+
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id, dias_atras=10)
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id, dias_atras=10)
+        alvo = _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+
+        assert faixa_efetiva(alvo) is f2, 'com os 30 dias do default, soma'
+
+        _cfg_tenant(adm.id, janela_fracionamento_dias=7)
+        alvo.degrau_aplicado = ''      # a trilha só cresce; aqui o teste zera
+        db.session.commit()
+        assert faixa_efetiva(alvo) is f1, (
+            'com a janela em 7 dias as irmãs de 10 dias atrás saem da conta — '
+            'e ninguém tocou em código para isso')
+        assert alvo.degrau_aplicado == ''
+
+
+def test_o_acumulado_por_fornecedor_aparece_so_na_emissao():
+    """Os dois acumulados são coisas diferentes, e o critério é a chamada.
+
+    O mesmo fornecedor já levou R$ 40.000 desta obra na janela. No ENVIO isso
+    é invisível — a requisição não tem fornecedor. Na EMISSÃO, que é onde ele
+    é escolhido, o acumulado passa a valer e a faixa sobe.
+    """
+    from services.alcada_compras import (acumulado_do_fornecedor,
+                                         faixa_efetiva)
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        f1, _f2, f3 = _escada(adm.id)
+        forn = _fornecedor(adm.id)
+
+        _pedido(adm.id, forn.id, obra_id=obra.id, valor='20000.00')
+        _pedido(adm.id, forn.id, obra_id=obra.id, valor='20000.00')
+        assert acumulado_do_fornecedor(adm.id, obra.id, forn.id,
+                                       3650) == Decimal('40000.00')
+
+        req = _req_na_etapa(adm.id, obra.id, adm.id)
+
+        assert faixa_efetiva(req) is f1, (
+            'no envio o fornecedor não existe — o acumulado dele não pode '
+            'entrar na conta')
+        assert req.degrau_aplicado == ''
+
+        assert faixa_efetiva(req, fornecedor=forn) is f3
+        assert req.degrau_aplicado == 'fracionamento'
+
+
+def test_o_acumulado_nunca_faz_a_faixa_descer():
+    """`max(valor da linha, acumulado)` — e o max não é decoração.
+
+    Requisição de R$ 40.000 com um único pedido de R$ 100 no histórico do
+    fornecedor: o acumulado é menor que a linha, e a faixa continua sendo a
+    da linha. Teto é teto, e acumulado só sobe.
+    """
+    from services.alcada_compras import faixa_efetiva, valor_para_alcada
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        _f1, _f2, f3 = _escada(adm.id)
+        forn = _fornecedor(adm.id)
+        _pedido(adm.id, forn.id, obra_id=obra.id, valor='100.00')
+
+        req = _req_na_etapa(adm.id, obra.id, adm.id, valor='40000.00')
+        assert valor_para_alcada(req, forn) == Decimal('40000.00')
+        assert faixa_efetiva(req, fornecedor=forn) is f3
+        assert req.degrau_aplicado == '', (
+            'sem mudança de faixa não há fracionamento a registrar')
+
+
+def test_fracionamento_e_condicao_somam_degraus_sem_contar_duas_vezes():
+    """O acumulado move a BASE; as condições andam a partir dela.
+
+    R$ 4.900 com duas irmãs na etapa vira base de 30k pelo acumulado; a
+    condição `fora_do_orcamento` sobe mais um, e o resultado é a faixa aberta
+    — não a de 30k contada duas vezes.
+    """
+    from services.alcada_compras import decisao_de_alcada
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        f1, _f2, f3 = _escada(adm.id, condicoes='fora_do_orcamento')
+        etapa = _etapa(obra, orcado='1.00')
+
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        alvo = _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+
+        decisao = decisao_de_alcada(alvo)
+        assert decisao.base is f1, (
+            'a faixa BASE exibida continua sendo a do valor da linha — é o '
+            'que a tela mostra como "pelo valor, cairia em"')
+        assert decisao.efetiva is f3
+        assert decisao.condicoes == ['fracionamento', 'fora_do_orcamento']
+        assert alvo.degrau_aplicado == 'fracionamento,fora_do_orcamento'
+
+
+def test_regime_simples_ignora_o_acumulado():
+    """Paridade também vale para o acumulado: sem o carimbo, nada soma."""
+    from services.alcada_compras import faixa_efetiva, faixa_para_valor
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        _escada(adm.id)
+        etapa = _etapa(obra)
+
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id, regime='simples')
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id, regime='simples')
+        alvo = _req_na_etapa(adm.id, obra.id, adm.id, etapa.id,
+                             regime='simples')
+
+        assert faixa_efetiva(alvo) is faixa_para_valor(adm.id,
+                                                       alvo.valor_estimado)
+        assert alvo.degrau_aplicado == ''
+
+
+def test_envio_pela_tela_carimba_o_fracionamento_e_anuncia_a_faixa_nova():
+    """O chokepoint do envio (`requisicao_enviar`) é quem persiste o carimbo.
+
+    `faixa_efetiva` escreve na sessão e não commita — quem commita é a rota,
+    e é por isso que o carimbo tem de ser conferido DEPOIS do POST.
+    """
+    from scripts.flag_alcadas_avancadas import definir_flag
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        definir_flag(adm.id, True)
+        _escada(adm.id)
+        etapa = _etapa(obra)
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        aid, oid, eid = adm.id, obra.id, etapa.id
+
+    cliente = _cliente_de(aid)
+    assert cliente.post('/compras/requisicoes/nova', data={
+        'obra_id': str(oid),
+        'obra_servico_custo_id': str(eid),
+        'justificativa': 'A terceira compra da mesma etapa no mês',
+        'item_descricao[]': ['Cimento CP-II'],
+        'item_unidade[]': ['sc'],
+        'item_quantidade[]': ['49'],
+        'item_preco[]': ['100,00'],
+        'item_almoxarifado_id[]': [''],
+    }, follow_redirects=False).status_code == 302
+
+    with app.app_context():
+        req = RequisicaoCompra.query.filter_by(
+            admin_id=aid, obra_servico_custo_id=eid).filter(
+                RequisicaoCompra.valor_estimado == Decimal('4900.00')).order_by(
+                    RequisicaoCompra.id.desc()).first()
+        rid = req.id
+
+    html = cliente.post(f'/compras/requisicoes/{rid}/enviar',
+                        follow_redirects=True).get_data(as_text=True)
+    assert 'acumulado' in html.lower(), (
+        'o envio anuncia que a faixa subiu por acumulado — quem envia precisa '
+        'saber que a exigência mudou antes de ir cobrar aprovação')
+
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, rid)
+        assert req.estado == EstadoRequisicao.AGUARDANDO_APROVACAO
+        assert 'fracionamento' in req.degrau_aplicado
+
+
+def test_emissao_recusa_quando_o_acumulado_do_fornecedor_sobe_a_faixa():
+    """D3 na emissão: recusa com SAÍDA, e sem invalidar a aprovação dada.
+
+    A requisição foi aprovada na faixa do valor dela, e a aprovação continua
+    valendo: o estado segue APROVADA. O que a emissão faz é não sair calada —
+    o acumulado com este fornecedor põe a compra numa faixa que pede mais
+    aprovação do que a requisição tem, e a mensagem diz o que fazer.
+    """
+    from scripts.flag_alcadas_avancadas import definir_flag
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        definir_flag(adm.id, True)
+        _escada(adm.id)
+        comprador = _operador(adm.id, 'Comprador')
+        gestor = _operador(adm.id, 'Gestor')
+        _vincular(comprador, obra, PapelObra.COMPRADOR)
+        _vincular(gestor, obra, PapelObra.GESTOR)
+        forn = _fornecedor(adm.id)
+        _pedido(adm.id, forn.id, obra_id=obra.id, valor='20000.00')
+        _pedido(adm.id, forn.id, obra_id=obra.id, valor='20000.00')
+        aid, oid, cid, gid, fid = (adm.id, obra.id, comprador.id, gestor.id,
+                                   forn.id)
+
+    cliente = _cliente_de(cid)
+    assert cliente.post('/compras/requisicoes/nova', data={
+        'obra_id': str(oid),
+        'justificativa': 'Mais uma parcela do mesmo fornecedor',
+        'item_descricao[]': ['Tubo PVC'],
+        'item_unidade[]': ['un'],
+        'item_quantidade[]': ['49'],
+        'item_preco[]': ['100,00'],
+        'item_almoxarifado_id[]': [''],
+    }, follow_redirects=False).status_code == 302
+
+    with app.app_context():
+        rid = RequisicaoCompra.query.filter_by(admin_id=aid).one().id
+
+    cliente.post(f'/compras/requisicoes/{rid}/enviar', follow_redirects=False)
+    _cliente_de(gid).post(f'/compras/requisicoes/{rid}/aprovar',
+                          follow_redirects=False)
+    with app.app_context():
+        assert db.session.get(RequisicaoCompra, rid).estado == \
+            EstadoRequisicao.APROVADA, (
+            'a faixa do valor pede uma aprovação, e ela foi dada')
+
+    html = cliente.post(
+        f'/compras/requisicoes/{rid}/emitir-pedido',
+        data={'fornecedor_id': str(fid), 'data_compra': date.today().isoformat()},
+        follow_redirects=True).get_data(as_text=True)
+
+    assert 'acumulado' in html.lower(), (
+        'a recusa nomeia o FATO que a gerou, não só a exigência')
+    assert 'reenvie para aprovação' in html, (
+        'D3 é degrau, não bloqueio: a mensagem diz o que fazer para seguir')
+
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, rid)
+        assert PedidoCompra.query.filter_by(requisicao_id=rid).count() == 0
+        assert req.estado == EstadoRequisicao.APROVADA, (
+            'o degrau por fracionamento NÃO invalida a aprovação já dada')
+        assert 'fracionamento' in req.degrau_aplicado, (
+            'e a trilha fica gravada, senão quem for reaprovar não vê por quê')
+
+
+def test_listagem_marca_quem_subiu_por_acumulado():
+    """O marcador na listagem — o aprovador escolhe o que abrir por ele."""
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        etapa = _etapa(obra)
+        req = _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        req.degrau_aplicado = 'fracionamento'
+        comum = _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        db.session.commit()
+        aid, numero, numero_comum = adm.id, req.numero, comum.numero
+
+    html = _cliente_de(aid).get('/compras/requisicoes').get_data(as_text=True)
+    assert numero in html and numero_comum in html
+    assert 'acumulado' in html.lower(), (
+        'a listagem tem de marcar quem subiu por acumulado')
+
+
+def test_detalhe_mostra_as_irmas_da_janela_com_numero_e_valor():
+    """O fato que gerou a exigência, na mesma tela em que a exigência aparece.
+
+    Aprovador que vê "esta requisição subiu de faixa" sem ver QUAIS irmãs
+    somaram liga para o suporte — foi o defeito nº 8 da revisão da Fase 3.
+    """
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        _escada(adm.id)
+        etapa = _etapa(obra)
+        irma1 = _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        irma2 = _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        alvo = _req_na_etapa(adm.id, obra.id, adm.id, etapa.id)
+        alvo.estado = EstadoRequisicao.AGUARDANDO_APROVACAO
+        db.session.commit()
+        aid, rid = adm.id, alvo.id
+        numeros = (irma1.numero, irma2.numero)
+
+    html = _cliente_de(aid).get(
+        f'/compras/requisicoes/{rid}').get_data(as_text=True)
+    for numero in numeros:
+        assert numero in html, f'a irmã {numero} tem de aparecer no detalhe'
+    assert '14700' in html.replace('.', '').replace(',', ''), (
+        'e o acumulado da janela tem de estar escrito')
+    assert '4900' in html.replace('.', '').replace(',', ''), (
+        'com o valor de cada irmã, não só a soma')

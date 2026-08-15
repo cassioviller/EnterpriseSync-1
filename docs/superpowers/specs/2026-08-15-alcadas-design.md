@@ -250,6 +250,34 @@ faixa e grava `fracionamento` em `degrau_aplicado`**. Não bloqueia: bloquear co
 legítima de obra grande gera contorno por fora do sistema, que é exatamente o que a fase
 quer evitar. O que ela faz é **tirar a decisão de quem estava dividindo**.
 
+> 📌 **15/08, A5: quatro coisas que o spec deixava em aberto e que passam a estar fixadas.**
+>
+> 1. **O acumulado move a BASE; as condições andam a partir dela — e o fracionamento não
+>    é contado duas vezes.** `decisao_de_alcada` faz `partida = faixa_para_valor(
+>    valor_para_alcada(...))` e depois anda `len(condições disparadas)` posições a partir
+>    de `partida`. O campo `base` da `DecisaoAlcada` continua sendo a faixa **do valor da
+>    linha**, porque é ele que a tela mostra como "pelo valor, cairia em" — sobrescrevê-lo
+>    com a faixa do acumulado esconderia justamente o fato que gerou a exigência.
+>    `condicoes_disparadas` recebe `partida`, e não `base`: `sem_cotacao` pergunta o
+>    mínimo de cotações **da faixa**, e depois do fracionamento a faixa é outra.
+> 2. **Etapa NULA é um grupo, não "todas as etapas".** Requisição sem centro de custo
+>    apontado acumula com as outras requisições sem centro de custo da mesma obra. É a
+>    leitura literal de "mesma `(obra, etapa)`" quando a etapa é NULL, e é a que o
+>    fracionamento precisa: omitir a etapa é a forma mais fácil de dividir uma compra.
+> 3. **`acumulado_da_etapa` inclui a própria requisição; `acumulado_do_fornecedor` não
+>    inclui a compra que está sendo emitida.** A assimetria é do mundo, não do código: a
+>    requisição já é uma das linhas da `(obra, etapa)`; o pedido ainda não existe. É por
+>    isso que `valor_para_alcada` é `max` e não uma soma — sem o `max`, a emissão de uma
+>    compra grande num fornecedor de histórico pequeno cairia numa faixa **abaixo** da do
+>    próprio valor.
+> 4. **A janela nunca é literal no código, nem no fallback.** `janela_de_fracionamento`
+>    lê `configuracao_empresa.janela_fracionamento_dias` e, quando não há linha de
+>    configuração, cai no **default da própria coluna**
+>    (`ConfiguracaoEmpresa.__table__.c.janela_fracionamento_dias.default.arg`), e não num
+>    `30` repetido no serviço. Duas fontes para o mesmo número é como elas passam a
+>    divergir. Valor 0 ou negativo (digitação) também cai no padrão: desligar o acumulado
+>    por acidente seria pior que ignorá-lo.
+
 ### As quatro condições
 
 | Código | Dispara quando | De onde sai o dado |
@@ -370,6 +398,30 @@ transforma quase toda obra ativa em faixa de topo.
 Sobe de faixa e grava o motivo na trilha; a compra segue. Bloqueio empurra a compra para
 fora do sistema, e o sistema deixa de saber o que a obra gastou — pior que uma aprovação a
 menos.
+
+> 📌 **15/08, A5: na EMISSÃO, "degrau" precisou de uma recusa — e a volta tem um limite
+> que este spec não previa.**
+> No envio o degrau é degrau puro: a faixa sobe e a requisição segue o caminho normal. Na
+> emissão não dá para ser só isso, porque a aprovação **já aconteceu** sob a faixa do
+> valor: sem recusa, o acumulado por fornecedor seria descoberto e ignorado no mesmo
+> request, e o degrau viraria decoração. A guarda 2b de `requisicao_emitir_pedido` recusa
+> a emissão quando o acumulado do fornecedor põe a compra numa faixa mais exigente do que
+> as aprovações que a requisição tem — e o faz do jeito que D3 exige: **não reverte nada**
+> (o estado segue APROVADA), grava e commita `fracionamento` na trilha, e a mensagem
+> nomeia o número (quanto o fornecedor já levou, em quantos dias), o que falta e as duas
+> saídas.
+>
+> ⚠️ **O limite, registrado porque é real:** a saída "volte para aprovação na faixa nova"
+> passa por REJEITADA → RASCUNHO → AGUARDANDO (📖 `TRANSICOES_VALIDAS`; de APROVADA não
+> se volta para AGUARDANDO), e nesse caminho quem recalcula é o acumulado **da etapa** —
+> a requisição continua sem fornecedor. Quando as compras irmãs são da mesma etapa, o
+> reenvio cobra a faixa nova e o ciclo fecha. Quando são de etapas diferentes, o reenvio
+> devolve a mesma faixa de antes e a emissão recusaria de novo: aí a saída real é emitir
+> com outro fornecedor, reduzir o pedido, ou o ADMIN ajustar a faixa. Fechar isso de
+> verdade exigiria ou uma requisição com fornecedor candidato (mudança de modelo) ou ler
+> `degrau_aplicado` como entrada de decisão — e a seção "Modelo de dados" diz que ele é
+> trilha, não decisão. **Fica para a Fase 4**, que revê a régua com o quadro inteiro à
+> vista; até lá, a mensagem da recusa é o que impede o beco sem saída.
 
 **D4 — o rito de emergência. ✅ GESTOR da obra e ADMIN; 48 horas corridas.**
 Corridas porque a emergência não respeita fim de semana — horas úteis dariam a uma compra

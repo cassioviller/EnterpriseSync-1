@@ -17,9 +17,13 @@ from utils.tenant import get_tenant_admin_id, is_v2_active
 
 # Fase 3 — governança de compras. Imports no topo de propósito: estes
 # módulos não importam compras_views de volta, então não há ciclo.
-from services.alcada_compras import (ROTULOS_CONDICAO, decisao_de_alcada,
+from services.alcada_compras import (MOTIVO_FRACIONAMENTO, ROTULOS_DEGRAU,
+                                     acumulado_da_etapa,
+                                     acumulado_do_fornecedor,
+                                     decisao_de_alcada,
                                      esta_totalmente_aprovada,
                                      garantir_faixas_do_tenant, faixa_efetiva,
+                                     irmas_da_janela, janela_de_fracionamento,
                                      pendencias_de_aprovacao, pode_aprovar,
                                      registrar_aprovacao)
 from services.requisicao_compra import (TransicaoInvalida, proximo_numero,
@@ -1877,6 +1881,21 @@ def requisicao_detalhe(requisicao_id):
     faixa = decisao.efetiva
     pode, motivo_recusa = pode_aprovar(requisicao, current_user)
 
+    # Fase 3 (A5) — o FATO que gerou a exigência, na mesma tela em que a
+    # exigência aparece: as irmãs da janela, com número e valor. Aprovador que
+    # lê "esta requisição subiu de faixa" e não vê quais compras somaram liga
+    # para o suporte.
+    #
+    # Só em regime 'avancado': em requisição carimbada 'simples' o acumulado
+    # não decide nada, e as duas queries seriam custo puro numa rota que é a
+    # mais aberta do módulo.
+    irmas, acumulado_etapa, janela_dias = [], None, None
+    if requisicao.regime_alcada == 'avancado':
+        janela_dias = janela_de_fracionamento(requisicao.admin_id)
+        irmas = irmas_da_janela(requisicao, janela_dias)
+        if irmas:
+            acumulado_etapa = acumulado_da_etapa(requisicao, janela_dias)
+
     pedidos = PedidoCompra.query.filter_by(
         requisicao_id=requisicao.id).all() if hasattr(
             PedidoCompra, 'requisicao_id') else []
@@ -1889,7 +1908,11 @@ def requisicao_detalhe(requisicao_id):
         faixa=faixa,
         faixa_base=decisao.base,
         condicoes_do_degrau=decisao.condicoes,
-        rotulos_condicao=ROTULOS_CONDICAO,
+        rotulos_degrau=ROTULOS_DEGRAU,
+        # Fase 3 (A5) — as irmãs da janela e a soma delas.
+        irmas_da_janela=irmas,
+        acumulado_etapa=acumulado_etapa,
+        janela_dias=janela_dias,
         pendencias=pendencias_de_aprovacao(requisicao),
         pode_aprovar=pode,
         motivo_recusa=motivo_recusa,
@@ -2006,12 +2029,33 @@ def requisicao_enviar(requisicao_id):
                                 requisicao_id=requisicao_id))
 
     recalcular_valor(requisicao)
+
+    # Fase 3 (A5) — o CHOKEPOINT do acumulado por etapa. Aqui a requisição
+    # ainda não tem fornecedor (ele só é escolhido na emissão), e por isso o
+    # acumulado que vale é o da `(obra, etapa)` na janela. `decisao_de_alcada`
+    # carimba `fracionamento` em `degrau_aplicado` e NÃO commita — quem
+    # persiste é o commit desta rota, junto com a transição, para que não haja
+    # requisição enviada com trilha pela metade.
+    decisao = decisao_de_alcada(requisicao)
+
     try:
         transicionar(requisicao, EstadoRequisicao.AGUARDANDO_APROVACAO,
                      current_user,
                      motivo=(request.form.get('motivo') or '').strip() or None)
         db.session.commit()
-        flash(f'Requisição {requisicao.numero} enviada para aprovação.', 'success')
+        aviso = ''
+        if MOTIVO_FRACIONAMENTO in decisao.condicoes:
+            dias = janela_de_fracionamento(requisicao.admin_id)
+            # Quem envia precisa saber que a exigência mudou ANTES de sair
+            # atrás de aprovação — descobrir depois é o que faz a requisição
+            # parar sem ninguém entender por quê.
+            aviso = (f' Atenção: o acumulado desta etapa nos últimos {dias} '
+                     f'dias soma R$ {acumulado_da_etapa(requisicao):.2f}, e '
+                     f'por isso ela passa a precisar de '
+                     f'{decisao.efetiva.aprovacoes_necessarias} '
+                     f'aprovação(ões).')
+        flash(f'Requisição {requisicao.numero} enviada para aprovação.{aviso}',
+              'warning' if aviso else 'success')
     except TransicaoInvalida as e:
         db.session.rollback()
         flash(str(e), 'danger')
@@ -2194,7 +2238,8 @@ def requisicao_emitir_pedido(requisicao_id):
     from services.alcada_compras import votos_de_aprovacao
 
     fornecedor_escolhido = _fornecedor_do_form(admin_id)
-    faixa = faixa_efetiva(requisicao, fornecedor=fornecedor_escolhido)
+    decisao = decisao_de_alcada(requisicao, fornecedor=fornecedor_escolhido)
+    faixa = decisao.efetiva
     aprovadores = {v.usuario_id for v in votos_de_aprovacao(requisicao)}
     if faixa.aprovacoes_necessarias > 1 and current_user.id in aprovadores:
         flash('Você aprovou esta requisição e por isso não pode emitir o '
@@ -2202,6 +2247,57 @@ def requisicao_emitir_pedido(requisicao_id):
               'danger')
         return redirect(url_for('compras.requisicao_detalhe',
                                 requisicao_id=requisicao_id))
+
+    # Guarda 2b — anti-fracionamento POR FORNECEDOR (A5, decisão D3).
+    #
+    # É aqui, e só aqui, que o acumulado do fornecedor pode aparecer: a
+    # requisição foi aprovada pela faixa do valor dela, sem saber de quem ia
+    # vender. Se o que este fornecedor já levou desta obra na janela põe a
+    # compra numa faixa mais exigente do que as aprovações que a requisição
+    # tem, a emissão NÃO sai calada.
+    #
+    # D3 é DEGRAU, não bloqueio, e a diferença está em três coisas desta
+    # guarda: a aprovação já dada continua valendo (o estado segue APROVADA,
+    # nada é revertido); a trilha é gravada e COMMITADA, para que quem for
+    # reaprovar veja o motivo; e a mensagem diz o que fazer. Recusar sem saída
+    # empurra a compra para fora do sistema, que é exatamente o que a fase
+    # quer evitar.
+    #
+    # Depois da guarda 2 de propósito: quando as duas valem, a separação de
+    # funções é a recusa mais estrutural, e trocar a ordem trocaria a mensagem
+    # que o usuário vê por um motivo que não é dele.
+    # `fornecedor_escolhido is not None` não é defensividade: sem fornecedor
+    # válido a decisão acima caiu no acumulado da ETAPA, e recusar aqui com uma
+    # mensagem sobre fornecedor seria mentir. Quem trata o fornecedor inválido
+    # é a validação de sempre, logo abaixo, com a mensagem de sempre.
+    if fornecedor_escolhido is not None and \
+            MOTIVO_FRACIONAMENTO in decisao.condicoes:
+        pendentes = pendencias_de_aprovacao(
+            requisicao, fornecedor=fornecedor_escolhido)
+        if pendentes:
+            dias = janela_de_fracionamento(admin_id)
+            acumulado = acumulado_do_fornecedor(
+                admin_id, requisicao.obra_id, fornecedor_escolhido.id, dias)
+            # O carimbo do `fracionamento` fica gravado mesmo com a emissão
+            # recusada: sem ele, quem abrir a requisição depois vê a exigência
+            # e não vê o fato que a gerou.
+            db.session.commit()
+            flash(f'Este fornecedor já recebeu R$ {acumulado:.2f} desta obra '
+                  f'nos últimos {dias} dias. Somada a esse acumulado, a compra '
+                  f'cai numa faixa que pede '
+                  f'{faixa.aprovacoes_necessarias} aprovação(ões) — a '
+                  f'requisição {requisicao.numero} tem menos que isso, e '
+                  f'segue APROVADA (a aprovação já dada continua valendo). '
+                  f'Falta: {"; ".join(pendentes)}. Para seguir: rejeite a '
+                  f'requisição, volte-a para rascunho e reenvie para aprovação '
+                  f'na faixa nova, ou emita este pedido com outro fornecedor.',
+                  'danger')
+            logger.warning('[fase3] emissão recusada por fracionamento: '
+                           'requisicao=%s fornecedor=%s acumulado=%s janela=%s',
+                           requisicao.numero, fornecedor_escolhido.id,
+                           acumulado, dias)
+            return redirect(url_for('compras.requisicao_detalhe',
+                                    requisicao_id=requisicao_id))
 
     # Idempotência — a requisição só produz um pedido.
     if PedidoCompra.query.filter_by(requisicao_id=requisicao.id).count() > 0:

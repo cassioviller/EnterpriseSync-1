@@ -48,7 +48,20 @@
         <tbody>
         {% for r in requisicoes %}
           <tr>
-            <td class="fw-semibold">{{ r.numero }}</td>
+            <td class="fw-semibold">
+              {{ r.numero }}
+              {# Fase 3 do ciclo de compras (A5) — o marcador de quem subiu de
+                 faixa pelo ACUMULADO da janela, e não pelo próprio valor. Sai
+                 de `degrau_aplicado`, que já está carregado na linha: marcar
+                 aqui não custa uma query por requisição, e é o que permite ao
+                 aprovador escolher o que abrir. #}
+              {% if 'fracionamento' in (r.degrau_aplicado or '') %}
+                <span class="badge bg-warning text-dark ms-1"
+                      title="O acumulado da janela desta etapa (ou deste fornecedor, na emissão) subiu a faixa de alçada desta requisição.">
+                  <i class="fas fa-layer-group me-1"></i>acumulado
+                </span>
+              {% endif %}
+            </td>
             <td>{{ r.obra.nome if r.obra else '—' }}</td>
             <td class="small text-muted">
               {{ r.obra_servico_custo.nome if r.obra_servico_custo else '—' }}

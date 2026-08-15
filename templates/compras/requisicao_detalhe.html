@@ -133,9 +133,43 @@
               {% endif %}
               <ul class="mb-0 mt-1">
                 {% for c in condicoes_do_degrau %}
-                  <li>{{ rotulos_condicao.get(c, c) }}</li>
+                  <li>{{ rotulos_degrau.get(c, c) }}</li>
                 {% endfor %}
               </ul>
+            </div>
+          {% endif %}
+
+          {# Fase 3 do ciclo de compras (A5) — O FATO, e não só a exigência.
+             As irmãs da mesma (obra, etapa) dentro da janela, com número e
+             valor, mais a soma. Sem isto o aprovador lê "o acumulado subiu a
+             faixa" e não tem como conferir de onde saiu o número — e uma
+             exigência que ninguém consegue explicar é uma exigência que se
+             contorna por fora do sistema. Aparece mesmo quando a faixa NÃO
+             subiu: saber que há três compras irmãs na mesma etapa é
+             informação de quem aprova, não só de quem foi barrado. #}
+          {% if irmas_da_janela %}
+            <div class="border rounded p-2 small mb-2 bg-light">
+              <div class="fw-semibold mb-1">
+                Outras requisições desta etapa nos últimos {{ janela_dias }} dias
+              </div>
+              <ul class="list-unstyled mb-1">
+                {% for irma in irmas_da_janela %}
+                  <li class="d-flex justify-content-between">
+                    <a href="{{ url_for('compras.requisicao_detalhe', requisicao_id=irma.id) }}">{{ irma.numero }}</a>
+                    <span class="text-muted">
+                      R$ {{ '%.2f'|format(irma.valor_estimado or 0) }}
+                      · {{ irma.estado.value|replace('_', ' ') }}
+                    </span>
+                  </li>
+                {% endfor %}
+              </ul>
+              <div class="border-top pt-1 d-flex justify-content-between fw-semibold">
+                <span>Acumulado da janela (com esta)</span>
+                <span>R$ {{ '%.2f'|format(acumulado_etapa or 0) }}</span>
+              </div>
+              <div class="text-muted mt-1">
+                Rejeitadas e canceladas não entram na conta.
+              </div>
             </div>
           {% endif %}
 
