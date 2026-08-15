@@ -1,0 +1,229 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Alçadas de Compra - SIGE{% endblock %}
+
+{#
+  A7 — fase 3 do ciclo de compras.
+  📖 docs/superpowers/specs/2026-08-15-alcadas-design.md (decisões D6 e D7)
+
+  Nenhuma regra mora neste arquivo. `min`/`required` aqui são conforto de
+  digitação; quem recusa é `services/faixa_alcada_admin.py`, porque a tela é a
+  primeira consumidora e não a única — o script de flag é a segunda e SQL
+  manual continua possível.
+#}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-layer-group"></i> Alçadas de Compra
+            </h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('configuracoes.configuracoes') }}">Configurações</a></li>
+                    <li class="breadcrumb-item active">Alçadas de Compra</li>
+                </ol>
+            </nav>
+        </div>
+        <p class="text-muted">
+            Cada linha é uma faixa: <strong>compra de até o teto</strong> precisa
+            daquele número de aprovações distintas. A faixa de <strong>teto
+            aberto</strong> (valor em branco) é a última da escada e cobre tudo o
+            que passa da anterior — tem que existir exatamente uma.
+        </p>
+    </div>
+</div>
+
+{% if diagnostico %}
+<div class="alert alert-danger">
+    <h6 class="alert-heading mb-2">
+        <i class="fas fa-triangle-exclamation me-1"></i>
+        A escada de alçadas deste tenant está inconsistente
+    </h6>
+    <ul class="mb-2">
+        {% for problema in diagnostico %}
+        <li>{{ problema }}</li>
+        {% endfor %}
+    </ul>
+    <small class="d-block">
+        Salvar continua liberado: a tela recusa o que a sua edição <em>piora</em>,
+        nunca o que ela herdou — do contrário o tenant já inconsistente ficaria
+        travado justamente na tela que existe para consertá-lo.
+    </small>
+</div>
+{% endif %}
+
+{% if not faixas %}
+<div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+        <strong>Este tenant não tem faixa de alçada nenhuma.</strong><br>
+        <small>
+            Sem faixa, toda compra cai na faixa de segurança do sistema
+            (2 aprovações, uma delas de ADMIN, sem exigir mapa) — falha fechada
+            que não aparece em tela alguma.
+        </small>
+    </div>
+    <form method="POST" action="{{ url_for('configuracoes.semear_faixas_alcada') }}">
+        <button type="submit" class="btn btn-warning">
+            <i class="fas fa-seedling me-1"></i> Criar as faixas recomendadas
+        </button>
+    </form>
+</div>
+{% endif %}
+
+{% for faixa in faixas %}
+<div class="card mb-3 {% if not faixa.ativo %}border-secondary opacity-75{% endif %}">
+    <form method="POST" action="{{ url_for('configuracoes.salvar_faixa_alcada', id=faixa.id) }}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>
+                <strong>Faixa {{ faixa.ordem }}</strong>
+                {% if faixa.valor_ate is none %}
+                <span class="badge bg-dark ms-2">teto aberto</span>
+                {% else %}
+                <span class="badge bg-light text-dark ms-2">até R$ {{ '%.2f'|format(faixa.valor_ate) }}</span>
+                {% endif %}
+                {% if not faixa.ativo %}<span class="badge bg-secondary ms-1">inativa</span>{% endif %}
+            </span>
+            <button type="submit" class="btn btn-sm btn-primary">
+                <i class="fas fa-save me-1"></i> Salvar faixa
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="ordem_{{ faixa.id }}">Ordem</label>
+                    <input type="number" min="1" step="1" class="form-control"
+                           id="ordem_{{ faixa.id }}" name="ordem" value="{{ faixa.ordem }}">
+                    <small class="text-muted">A posição na escada.</small>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="valor_ate_{{ faixa.id }}">Teto (R$)</label>
+                    <input type="text" class="form-control" id="valor_ate_{{ faixa.id }}"
+                           name="valor_ate"
+                           value="{{ '' if faixa.valor_ate is none else '%.2f'|format(faixa.valor_ate) }}"
+                           placeholder="em branco = teto aberto">
+                    <small class="text-muted">Em branco = teto aberto.</small>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="aprovacoes_{{ faixa.id }}">Aprovações</label>
+                    <input type="number" min="1" step="1" class="form-control"
+                           id="aprovacoes_{{ faixa.id }}" name="aprovacoes_necessarias"
+                           value="{{ faixa.aprovacoes_necessarias }}">
+                    <small class="text-muted">Pessoas distintas.</small>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="cotacoes_{{ faixa.id }}">Mín. de cotações</label>
+                    <input type="number" min="0" step="1" class="form-control"
+                           id="cotacoes_{{ faixa.id }}" name="minimo_cotacoes"
+                           value="{{ faixa.minimo_cotacoes }}">
+                    <small class="text-muted">0 dispensa o mapa; 2 ou mais o exigem. Nunca 1.</small>
+                </div>
+                <div class="col-12 col-md-3">
+                    <div class="form-check mt-4">
+                        <input class="form-check-input" type="checkbox" name="exige_admin"
+                               id="exige_admin_{{ faixa.id }}" {% if faixa.exige_admin %}checked{% endif %}>
+                        <label class="form-check-label" for="exige_admin_{{ faixa.id }}">
+                            Uma das aprovações tem que ser de ADMIN
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="ativo"
+                               id="ativo_{{ faixa.id }}" {% if faixa.ativo %}checked{% endif %}>
+                        <label class="form-check-label" for="ativo_{{ faixa.id }}">
+                            Faixa ativa
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <hr>
+            <p class="mb-2">
+                <strong>Condições que sobem um degrau nesta faixa</strong>
+                <small class="text-muted d-block">
+                    Cada condição marcada que disparar sobe a requisição uma
+                    posição na escada. Só valem em requisição criada com a flag
+                    de alçadas avançadas ligada.
+                </small>
+            </p>
+            <div class="row g-2">
+                {% for codigo, rotulo in condicoes %}
+                <div class="col-12 col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condicoes"
+                               value="{{ codigo }}" id="cond_{{ faixa.id }}_{{ codigo }}"
+                               {% if codigo in (faixa.condicoes_ativas or '').split(',') %}checked{% endif %}>
+                        <label class="form-check-label" for="cond_{{ faixa.id }}_{{ codigo }}">
+                            <code>{{ codigo }}</code> — {{ rotulo }}
+                        </label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </form>
+</div>
+{% endfor %}
+
+{% if faixas %}
+<div class="card">
+    <div class="card-header">
+        <strong><i class="fas fa-plus me-1"></i> Nova faixa</strong>
+    </div>
+    <form method="POST" action="{{ url_for('configuracoes.criar_faixa_alcada') }}">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="nova_ordem">Ordem</label>
+                    <input type="number" min="1" step="1" class="form-control"
+                           id="nova_ordem" name="ordem" value="{{ (faixas|map(attribute='ordem')|max) + 1 }}">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="nova_valor_ate">Teto (R$)</label>
+                    <input type="text" class="form-control" id="nova_valor_ate"
+                           name="valor_ate" placeholder="em branco = teto aberto">
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="nova_aprovacoes">Aprovações</label>
+                    <input type="number" min="1" step="1" class="form-control"
+                           id="nova_aprovacoes" name="aprovacoes_necessarias" value="1">
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="nova_cotacoes">Mín. de cotações</label>
+                    <input type="number" min="0" step="1" class="form-control"
+                           id="nova_cotacoes" name="minimo_cotacoes" value="0">
+                </div>
+                <div class="col-12 col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="exige_admin" id="nova_exige_admin">
+                        <label class="form-check-label" for="nova_exige_admin">Exige ADMIN</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="ativo" id="nova_ativo" checked>
+                        <label class="form-check-label" for="nova_ativo">Faixa ativa</label>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-2 mt-2">
+                {% for codigo, rotulo in condicoes %}
+                <div class="col-12 col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condicoes"
+                               value="{{ codigo }}" id="nova_cond_{{ codigo }}">
+                        <label class="form-check-label" for="nova_cond_{{ codigo }}">
+                            <code>{{ codigo }}</code> — {{ rotulo }}
+                        </label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="card-footer text-end">
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-plus me-1"></i> Criar faixa
+            </button>
+        </div>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

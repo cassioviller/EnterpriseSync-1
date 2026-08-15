@@ -1,7 +1,8 @@
 """
 Blueprint para configurações da empresa
 """
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
+                   request, url_for)
 from flask_login import login_required, current_user
 from app import db
 from models import (
@@ -863,3 +864,143 @@ def reativar_engenheiro(id):
         flash(f'Erro ao reativar engenheiro: {e}', 'danger')
 
     return redirect(url_for('configuracoes.engenheiros'))
+
+
+# ==================== ALÇADAS DE COMPRA (A7 — fase 3 do ciclo) ====================
+#
+# 📖 spec docs/superpowers/specs/2026-08-15-alcadas-design.md, decisões D6 e D7.
+#
+# `FaixaAlcada` nunca teve CRUD: as faixas só existiam via migration 243 e
+# UPDATE manual. O passo 1 do runbook manda conferir tetos, `minimo_cotacoes` e
+# condições ativas ANTES de ligar a flag `alcadas_avancadas_ativa`, e é por
+# aqui que sai o UPDATE da D6 (faixa de topo para 3 cotações).
+#
+# As regras NÃO moram nestas rotas nem no template: elas estão em
+# `services/faixa_alcada_admin.py`, porque a tela é a primeira consumidora e
+# não a única — o script de flag é a segunda e SQL manual continua possível.
+# O que mora aqui é o que é da tela: quem entra (ADMIN), qual tenant
+# (`get_admin_id`), o 404 do vizinho, o commit e o flash.
+
+@configuracoes_bp.route('/alcadas')
+@login_required
+@admin_required
+def alcadas():
+    """A escada de faixas de alçada do tenant, com os campos editáveis."""
+    from multitenant_helper import get_admin_id
+    from services.alcada_compras import CONDICOES_CONHECIDAS, ROTULOS_CONDICAO
+    from services.faixa_alcada_admin import diagnosticar, listar_faixas
+
+    admin_id = get_admin_id()
+    faixas = listar_faixas(admin_id)
+    return render_template(
+        'configuracoes/alcadas.html',
+        faixas=faixas,
+        # Os invariantes quebrados HOJE. A tela os mostra em vez de travar: o
+        # invariante do teto aberto nunca teve constraint, então há tenant que
+        # já chega aqui fora dele — e esta é a tela que o conserta.
+        diagnostico=diagnosticar(admin_id),
+        condicoes=[(c, ROTULOS_CONDICAO.get(c, c)) for c in CONDICOES_CONHECIDAS],
+    )
+
+
+@configuracoes_bp.route('/alcadas/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def salvar_faixa_alcada(id):
+    """Salva uma faixa. Faixa de outro tenant é **404**, não 403.
+
+    404 porque 403 já é vazamento — confirmaria ao vizinho que aquele id
+    existe e é de alguém. É a convenção da casa (`first_or_404` sempre
+    filtrado por `admin_id`), e o isolamento entre empresas é o defeito mais
+    caro deste repositório.
+    """
+    from multitenant_helper import get_admin_id
+    from services.faixa_alcada_admin import (FaixaInvalida, faixa_do_tenant,
+                                             ler_formulario, salvar_faixa)
+
+    admin_id = get_admin_id()
+    if faixa_do_tenant(admin_id, id) is None:
+        abort(404)
+
+    try:
+        _, avisos = salvar_faixa(admin_id, id, ler_formulario(request.form))
+        db.session.commit()
+    except FaixaInvalida as e:
+        db.session.rollback()
+        flash('A faixa não foi salva: ' + '; '.join(e.erros), 'danger')
+        return redirect(url_for('configuracoes.alcadas'))
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Erro ao salvar faixa de alçada')
+        flash(f'Erro ao salvar a faixa: {e}', 'danger')
+        return redirect(url_for('configuracoes.alcadas'))
+
+    flash('Faixa de alçada salva.', 'success')
+    for aviso in avisos:
+        # Violação que já existia antes desta edição. Salvou, mas o tenant
+        # continua fora do invariante e quem está na tela precisa saber.
+        flash(f'Atenção, a escada continua inconsistente: {aviso}', 'warning')
+    return redirect(url_for('configuracoes.alcadas'))
+
+
+@configuracoes_bp.route('/alcadas/nova', methods=['POST'])
+@login_required
+@admin_required
+def criar_faixa_alcada():
+    """Cria uma faixa nova. Mesmas validações da edição, mesmo serviço."""
+    from multitenant_helper import get_admin_id
+    from services.faixa_alcada_admin import (FaixaInvalida, ler_formulario,
+                                             salvar_faixa)
+
+    admin_id = get_admin_id()
+    try:
+        _, avisos = salvar_faixa(admin_id, None, ler_formulario(request.form))
+        db.session.commit()
+    except FaixaInvalida as e:
+        db.session.rollback()
+        flash('A faixa não foi criada: ' + '; '.join(e.erros), 'danger')
+        return redirect(url_for('configuracoes.alcadas'))
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Erro ao criar faixa de alçada')
+        flash(f'Erro ao criar a faixa: {e}', 'danger')
+        return redirect(url_for('configuracoes.alcadas'))
+
+    flash('Faixa de alçada criada.', 'success')
+    for aviso in avisos:
+        flash(f'Atenção, a escada continua inconsistente: {aviso}', 'warning')
+    return redirect(url_for('configuracoes.alcadas'))
+
+
+@configuracoes_bp.route('/alcadas/semear', methods=['POST'])
+@login_required
+@admin_required
+def semear_faixas_alcada():
+    """Semeia as faixas recomendadas num tenant que não tem nenhuma.
+
+    Tenant sem faixa não é tenant sem alçada: `faixa_para_valor` devolve a
+    `_FaixaSeguranca` (2 aprovações, exige ADMIN), que é falha fechada e não
+    aparece em tela nenhuma. Semear é o caminho para sair disso — e é um POST
+    explícito, não um efeito colateral de abrir a página: escrever no banco
+    porque alguém olhou uma tela é como um GET vira UPDATE sem que ninguém
+    tenha pedido.
+    """
+    from multitenant_helper import get_admin_id
+    from services.alcada_compras import garantir_faixas_do_tenant
+
+    admin_id = get_admin_id()
+    try:
+        semeou = garantir_faixas_do_tenant(admin_id)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Erro ao semear faixas de alçada')
+        flash(f'Erro ao semear as faixas: {e}', 'danger')
+        return redirect(url_for('configuracoes.alcadas'))
+
+    if semeou:
+        flash('Faixas recomendadas criadas. Confira os tetos antes de usar.',
+              'success')
+    else:
+        flash('Este tenant já tem faixas — nada foi criado.', 'info')
+    return redirect(url_for('configuracoes.alcadas'))
