@@ -425,6 +425,29 @@ não libera**.
 > 'bloqueada'` — sem ele o sensor gritaria em todo tenant sem a Fase 2 ligada, onde a
 > conta nasce liberada e sempre nasceu.
 
+> 🔴 **15/08, EXECUÇÃO DO RUNBOOK: a ratificação depois da emissão — a saída da sanção
+> estava fechada, e nenhum teste da fase pegava.**
+>
+> A sanção da A6 **só existe quando há pedido**: a `ContaPagar` bloqueada deriva dele. E
+> emitir o pedido pela tela (`requisicao_emitir_pedido`) transiciona a requisição de
+> APROVADA para **CONVERTIDA**. `pode_ratificar` cobrava `pode_aprovar(..., estados=(
+> APROVADA,))` — logo, exatamente a requisição cuja conta a sanção segurava era a única
+> que ninguém conseguia ratificar. A tela do detalhe mostrava "Emergência VENCIDA sem
+> ratificação" e, no lugar do botão, *"A requisição está em convertida — só se aprova o
+> que está em aprovada"*. Conta bloqueada, sem saída nenhuma dentro do sistema: o
+> contorno "pagar por fora" que a consequência 2 acima diz existir para evitar.
+>
+> Por que a suíte não via: os testes da A6 criam o `PedidoCompra` direto no banco
+> (`_pedido_da_emergencia`), sem passar pela rota — e sem a rota a requisição fica em
+> APROVADA. O caminho do operador tem um passo que o teste não tinha. É o motivo de o
+> gate pedir a execução do runbook e não só a suíte verde.
+>
+> **Conserto (red-first):** `ESTADOS_QUE_RATIFICAM = (APROVADA, CONVERTIDA)`, consumida
+> por `pode_ratificar` e pelo ramo de ratificação em `requisicao_aprovar`. CANCELADA e
+> REJEITADA ficam de fora: nelas não há compra nem conta a destravar. O teste que
+> reproduz é `test_ratificar_ainda_e_possivel_depois_de_a_emergencia_virar_pedido`, e ele
+> faz o ciclo inteiro pela tela — criar emergencial, emitir, envelhecer 49h, ratificar.
+
 Consequência de acoplamento, e ela é assimétrica: **se `financeiro_dois_fluxos_ativo`
 estiver OFF, a sanção não tem onde morder** (a conta nasce `liberada`). Por isso o
 `--ligar` da flag nova **avisa** — sem recusar — quando o tenant não tem os dois fluxos.
@@ -700,6 +723,13 @@ Os que não podem faltar:
 > não rodava foi corrigido aqui.** Um runbook que não roda é pior que nenhum — quem o
 > segue no meio de uma virada não tem como saber se o erro é dele ou do texto. As
 > correções estão marcadas com `# ← A8` na primeira vez que aparecem.
+>
+> ✅ **15/08, EXECUÇÃO: o runbook foi RODADO inteiro num tenant de dev, do 0a ao Rollback,
+> pela tela e por SQL cru.** Conferir contra o código não é a mesma coisa que executar: a
+> execução achou um defeito que nenhum teste da fase pegava (a saída da sanção da
+> emergência estava fechada — 📖 o 📌 "a ratificação depois da emissão", na A6) e três
+> pontos em que o texto prometia o que o operador não vê. O que a execução corrigiu está
+> marcado com `# ← EXEC`.
 
 ```bash
 # 0a. Medir ANTES de decidir: quantas requisições dos últimos N dias
@@ -708,7 +738,11 @@ Os que não podem faltar:
 #     achar, e misturar os dois faria um cron gritar por causa do normal.
 python scripts/verificar_consistencia_alcadas.py <ADMIN_ID> --simular
 python scripts/verificar_consistencia_alcadas.py <ADMIN_ID> --simular --dias 90   # ← A8: janela maior
-#     Leia a linha `fora_do_orcamento` primeiro: é ela que decide o passo 1c.
+#     Leia a linha `fora_do_orcamento` primeiro: é ela que decide o passo 1d.
+#     ← EXEC: era "1c" e apontava para a linha errada — 1c é o mínimo de
+#     cotações (D6); quem liga e desliga condição é o 1d.
+#     Tenant sem requisição no período sai "nada a medir": aí o 0a não decide
+#     nada, e o número só aparece depois da primeira volta do passo 3.
 
 # 0b. Onde o tenant está. São cinco flags, em duas pernas (ver o 📌 de
 #     "Regime de virada"), e ligar fora de ordem produz requisição travada
@@ -726,6 +760,11 @@ python scripts/flag_financeiro_dois_fluxos.py <ADMIN_ID> # OFF só tira o dente 
 #       falha fechada e não aparece em tela nenhuma — não há o que conferir nos
 #       passos seguintes. Use o botão Semear (POST /configuracoes/alcadas/semear,
 #       idempotente) e só então siga.
+#       ← EXEC: em tenant que JÁ criou requisição alguma vez as faixas
+#       aparecem sem ninguém ter semeado — `requisicao_nova_post` chama
+#       `garantir_faixas_do_tenant` antes de gravar a linha. O botão importa
+#       para o tenant novo, que ainda não teve a primeira requisição; nos
+#       outros ele responde "já tem faixas — nada foi criado".
 #    b. os tetos (5k / 30k / aberto) continuam valendo para este tenant? O topo
 #       da tela mostra os invariantes quebrados, se houver (é o mesmo texto que
 #       o sensor do passo 4 imprime).
@@ -746,11 +785,24 @@ python scripts/flag_alcadas_avancadas.py <ADMIN_ID> --ligar
 
 # 3. Ciclo completo numa obra piloto, conferindo em ordem:
 #    a. requisição comum, valor baixo → mesma exigência de antes
-#    b. requisição com fornecedor novo → uma aprovação a mais, e o motivo
+#    b. requisição com fornecedor novo → a faixa efetiva sobe e o motivo
 #       aparece em degrau_aplicado.  ← A8: a cobrança é na EMISSÃO, não no
 #       envio — a requisição não tem fornecedor, e é a guarda 2 de
 #       `requisicao_emitir_pedido` que descobre que ele é novo (📖 o 📌 da A4)
-#    c. três requisições pequenas na mesma etapa → a terceira sobe de faixa
+#       ← EXEC: o que o operador VÊ é a guarda 2 recusando quem aprovou
+#       ("Você aprovou esta requisição e por isso não pode emitir o pedido
+#       dela") — ela só vale quando a faixa efetiva pede mais de uma
+#       aprovação, e é aí que o fornecedor novo aparece. ⚠️ Quando quem emite
+#       NÃO foi aprovador, a emissão SAI com as aprovações da faixa de baixo:
+#       o degrau fica gravado em `degrau_aplicado`, mas nenhuma assinatura a
+#       mais é colhida. Só o `fracionamento` tem recusa própria na emissão
+#       (guarda 2b, 📖 o 📌 da A5); `fornecedor_novo` não tem. Confira com as
+#       duas voltas — o mesmo ciclo com fornecedor CONHECIDO emite sem
+#       recusa, e é o contraste que prova de onde veio a exigência.
+#    c. três requisições pequenas na mesma etapa → sobe de faixa a que fizer o
+#       acumulado da janela cruzar o teto.  ← EXEC: com 3 × R$ 4.900 quem
+#       sobe é a SEGUNDA (9.800 > 5.000), não a terceira; o flash do envio
+#       diz o acumulado e o número novo de aprovações
 #    d. requisição acima de 30k com mapa de 3 fornecedores → emite (o
 #       bloqueio permanente da faixa 3 tem que ter morrido aqui)
 #    e. requisição emergencial → aprova na hora; sem ratificar em 48h, a
@@ -759,12 +811,32 @@ python scripts/flag_alcadas_avancadas.py <ADMIN_ID> --ligar
 #       `liberada`, `pernas_faltantes` volta vazia e não há o que bloquear —
 #       é a assimetria decidida, não defeito. Sem os dois fluxos, confira até
 #       "aprova na hora" e pare aí.
+#       ← EXEC, três coisas que a execução deste passo mostrou:
+#       (i)  a conta só existe depois de EMITIR o pedido, e emitir move a
+#            requisição para CONVERTIDA. Ratificar dali continua valendo
+#            (📖 `ESTADOS_QUE_RATIFICAM`) — antes da execução não valia, e a
+#            conta bloqueada não tinha saída nenhuma;
+#       (ii) para isolar a emergência como ÚNICA perna, feche a tríade antes:
+#            atesto pela tela (`/compras/<pedido_id>/recebimento`) e nota por
+#            `services.financeiro_compra.lancar_nota` — a nota ainda não tem
+#            tela própria. Sem isso a recusa da baixa nomeia as três pernas;
+#       (iii) se a faixa efetiva subiu (fracionamento, por exemplo), a
+#            ratificação pede o MESMO número de assinaturas da faixa: a
+#            primeira volta "registrada, mas a alçada ainda não fechou".
 
 # 4. Sensor.
 python scripts/verificar_consistencia_alcadas.py <ADMIN_ID>
 #    ← A8: exit 0 = sem drift; exit 1 = achado, e cada achado é impresso em
 #    português com o número da requisição ou da conta. `--json` para máquina.
 #    Rode-o de novo depois de cada volta do passo 3.
+#    ← EXEC: ⚠️ o achado 1 (`APROVADA sem a alçada fechada`) NÃO é sempre
+#    escrita por fora. Ele recalcula a faixa efetiva HOJE, e o acumulado da
+#    janela muda depois da aprovação: basta uma requisição irmã nova na mesma
+#    etapa — inclusive em RASCUNHO, inclusive em regime `simples` — para que
+#    uma requisição legitimamente aprovada ontem passe a "faltar" aprovação.
+#    Antes de tratar o achado como incidente, confira se a faixa BASE dela
+#    ainda fecha e se o degrau veio de `fracionamento`: se veio, é a janela
+#    andando, não alguém escrevendo por fora.
 ```
 
 ### Rollback
@@ -784,9 +856,10 @@ requisição **nova**.
 >    uma exigência que a compra já cumpriu.
 > 3. **Não desarma emergência nenhuma.** `ratificacao_vencida` não consulta flag: a
 >    contagem das 48h continua, e a `ContaPagar` que já está `bloqueada` continua
->    bloqueada. A saída dela é ratificar pela tela da requisição — ratificar em atraso
->    libera, de propósito (📖 o 📌 da A6), e é isso que impede a conta presa de virar
->    pagamento por fora.
+>    bloqueada. A saída dela é ratificar pela tela da requisição — inclusive com a
+>    requisição já CONVERTIDA, que é o caso normal quando existe conta (📖 o 🔴 da
+>    execução do runbook) —, ratificar em atraso libera, de propósito (📖 o 📌 da A6), e é
+>    isso que impede a conta presa de virar pagamento por fora.
 > 4. **Não tem guarda.** Ao contrário do `--ligar`, o `--desligar` não consulta
 >    `pode_ligar` nem recusa nada. Ele é sempre aceito, e as três linhas acima são o
 >    motivo de isso ser seguro.
@@ -795,6 +868,15 @@ requisição **nova**.
 > nada mais. O tenant só está de fato de volta ao regime de ontem quando a última
 > requisição `'avancado'` tiver saído do ciclo — e é o sensor do passo 4, não o
 > `--desligar`, que diz quando isso aconteceu.
+>
+> ✅ **15/08, EXECUÇÃO: as quatro linhas acima foram conferidas por SQL cru num tenant de
+> dev, antes e depois do `--desligar`.** `regime_alcada` e `degrau_aplicado` de 14
+> requisições saíram idênticos; a emergência vencida continuou vencida, a `ContaPagar`
+> dela continuou `bloqueada` e a baixa continuou recusada nomeando a requisição. E o que
+> muda de fato: a requisição criada **depois** nasce `'simples'`, não acumula janela — e
+> a caixa "emergencial" marcada no formulário volta `emergencial = False`, porque fora do
+> regime avançado o rito não existe (📖 `requisicao_nova_post`). Quem esperava ver a
+> requisição nova aprovada na hora precisa saber disso antes de chamar o suporte.
 
 ---
 

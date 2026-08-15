@@ -1222,6 +1222,13 @@ def ratificacao_vencida(requisicao, agora=None):
 QUEM_RATIFICA = ('um gestor da obra ou um administrador da empresa que não '
                  'seja quem solicitou nem quem invocou a emergência')
 
+# Em que estados a requisição ainda ACEITA a assinatura *ex post*. Os dois, e
+# não só APROVADA: a emissão do pedido pela tela move a requisição para
+# CONVERTIDA, e é justamente ela que cria a `ContaPagar` que a sanção segura
+# (📖 `pode_ratificar`).
+ESTADOS_QUE_RATIFICAM = (EstadoRequisicao.APROVADA,
+                         EstadoRequisicao.CONVERTIDA)
+
 
 def pode_ratificar(requisicao, usuario):
     """(bool, motivo) — a MESMA alçada de `pode_aprovar`, cobrada depois.
@@ -1232,6 +1239,16 @@ def pode_ratificar(requisicao, usuario):
     que a aprovação normal não precisa ter — **quem invocou não ratifica** —,
     porque deixá-la de fora faria a emergência se autoconfirmar: o rito viraria
     uma declaração unilateral com 48 horas de cerimônia.
+
+    Os estados são APROVADA **e CONVERTIDA**, e o segundo é o que a execução do
+    runbook (15/08) mostrou faltar: a sanção da A6 só existe quando há pedido —
+    a `ContaPagar` bloqueada deriva dele —, e emitir o pedido pela tela move a
+    requisição para CONVERTIDA. Cobrar aqui só APROVADA fechava a saída
+    justamente da requisição cuja conta a sanção segura: a conta ficava
+    bloqueada sem caminho nenhum dentro do sistema, que é o contrário do que a
+    A6 decidiu (📖 `registrar_ratificacao`: "ratificar em atraso é caminho, não
+    exceção"). CANCELADA e REJEITADA ficam de fora de propósito — nelas não há
+    compra nem conta a destravar.
     """
     transicao = transicao_da_emergencia(requisicao)
     if transicao is None:
@@ -1247,7 +1264,7 @@ def pode_ratificar(requisicao, usuario):
                        'na obra.')
 
     return pode_aprovar(requisicao, usuario,
-                        estados=(EstadoRequisicao.APROVADA,))
+                        estados=ESTADOS_QUE_RATIFICAM)
 
 
 def registrar_ratificacao(requisicao, usuario, observacao=None):

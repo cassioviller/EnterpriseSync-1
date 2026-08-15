@@ -308,23 +308,36 @@ ligada em tenant real antes de A8**, porque o sensor é o que enxerga emergênci
 
 ## Gate final
 
-- [ ] Suíte da fase verde: `pytest tests/test_alcadas_avancadas.py -q`
-- [ ] **Regressão dirigida** verde — é aqui que esta fase é mais arriscada que as duas
+- [x] Suíte da fase verde: `pytest tests/test_alcadas_avancadas.py -q` — 89 (88 + o teste
+  do achado da execução)
+- [x] **Regressão dirigida** verde — é aqui que esta fase é mais arriscada que as duas
   anteriores, porque mexe em código que já tem 40+ testes escritos:
   `pytest tests/test_fase3_alcada.py tests/test_fase3_matriz_governanca.py
   tests/test_fase3_requisicao.py tests/test_recebimento_atesto.py
-  tests/test_financeiro_dois_fluxos.py -q`
+  tests/test_financeiro_dois_fluxos.py -q` — 230 passed, exit 0
 - [ ] Gate completo: `pytest tests/ -m "not browser"` — exit 0
-- [ ] Ciclo em dev com a flag **desligada**: comportamento idêntico ao de hoje, conferido
-  por SQL cru (faixa escolhida, votos exigidos, pendências)
-- [ ] Ciclo em dev com a flag **ligada**: as cinco conferências do runbook (a–e)
-- [ ] Ligar e desligar **não reescreve o passado**: requisição `'avancado'` continua
-  avançada
-- [ ] `scripts/verificar_consistencia_alcadas.py` exit 0
-- [ ] Runbook no fim do spec: como ligar num tenant, o que conferir depois, e o que o
+- [x] Ciclo em dev com a flag **desligada**: comportamento idêntico ao de hoje, conferido
+  por SQL cru (faixa escolhida, votos exigidos, pendências) — quatro requisições no tenant
+  de dev, `regime_alcada = 'simples'`, `degrau_aplicado` vazio, 3 × R$ 4.900 na mesma
+  etapa **sem** subir de faixa
+- [x] Ciclo em dev com a flag **ligada**: as cinco conferências do runbook (a–e) — as
+  cinco reproduzem; a **b** reproduz com a ressalva registrada no runbook (a cobrança do
+  fornecedor novo é a guarda 2, e ela só morde quem aprovou) e a **e** só reproduziu
+  depois do conserto do 🔴 "a ratificação depois da emissão" (📖 spec, A6)
+- [x] Ligar e desligar **não reescreve o passado**: requisição `'avancado'` continua
+  avançada — 14 linhas conferidas por SQL antes e depois do `--desligar`
+- [x] `scripts/verificar_consistencia_alcadas.py` exit 0 — no tenant de dev, ao fim do
+  passo 3 (e exit 1 depois, quando a emergência de propósito não ratificada venceu)
+- [x] Runbook no fim do spec: como ligar num tenant, o que conferir depois, e o que o
   `--desligar` faz e não faz
-- [ ] As divergências entre spec e código registradas **no próprio spec**, como blockquote
+- [x] As divergências entre spec e código registradas **no próprio spec**, como blockquote
   📌 no ponto exato, e resumidas em `ESTADO-ATUAL.md`
+- [x] **O runbook rodado de ponta a ponta num tenant de dev**, do 0a ao Rollback, pela
+  tela e conferido por SQL cru — 15/08. Achados: **um defeito** (a ratificação era
+  impossível depois de a emergência virar pedido; corrigido red-first), **quatro
+  correções de texto** no runbook (`# ← EXEC`) e **uma ressalva no sensor** (o achado 1
+  recalcula a janela HOJE e por isso aponta requisição legitimamente aprovada quando uma
+  irmã nova entra na mesma etapa — fica registrado, não consertado)
 
 ---
 

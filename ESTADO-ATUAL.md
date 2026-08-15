@@ -666,7 +666,7 @@ SQL cru, zero falhas.
 `requisicao.valor_estimado` e mais nada: fornecedor novo, preço que não é o menor,
 compra fora do orçamento da etapa e dez requisições de R$ 4.900 na mesma semana
 davam todos a mesma exigência. 10 commits, migrations **297/298/299**, flag
-`alcadas_avancadas_ativa` (nasce OFF). 🔬 15/08: **88 testes** no arquivo da fase +
+`alcadas_avancadas_ativa` (nasce OFF). 🔬 15/08: **89 testes** no arquivo da fase +
 **24** na tela de faixas; regressão dirigida de 342 verdes, exit 0.
 
 **Gate completo — 🟡 3 falhas, nenhuma desta fase.** 🔬 15/08, sobre `2f3df5cc`:
@@ -748,6 +748,30 @@ contra a operação real, não contra o spec.**
 > (5) **Janela residual conhecida:** conta liberada *dentro* das 48h cuja emergência
 > vence depois **não é rebloqueada** — rebloquear de fora de `liberar()` seria a segunda
 > porta. O sensor a separa da liberação legítima por `conta_pagar.liberada_em`.
+
+> 🔬 **15/08 — o runbook foi RODADO num tenant de dev, do passo 0a ao Rollback**, pela
+> tela e conferido por SQL cru (o último item do gate da fase). Três resultados, e o
+> primeiro é o motivo de esse item existir:
+> (1) 🔴 **defeito que a suíte inteira não pegava: a saída da sanção da emergência estava
+> fechada.** A `ContaPagar` bloqueada só existe depois de o pedido ser emitido, e emitir
+> move a requisição para **CONVERTIDA** — mas `pode_ratificar` só admitia APROVADA. Isto
+> é: exatamente a requisição cuja conta a sanção segurava era a única que ninguém
+> conseguia ratificar, e a tela dizia *"a requisição está em convertida — só se aprova o
+> que está em aprovada"* no lugar do botão. Os testes da A6 não viam porque criam o
+> `PedidoCompra` direto no banco, sem passar pela rota. Corrigido **red-first**
+> (`ESTADOS_QUE_RATIFICAM = (APROVADA, CONVERTIDA)`), com teste que faz o ciclo pela tela.
+> (2) **Quatro correções de texto no runbook** (marcadas `# ← EXEC`): a referência ao
+> passo 1d que apontava para 1c; o que a conferência **b** de fato mostra (a cobrança do
+> fornecedor novo é a guarda 2 — ela só morde **quem aprovou**; com outro emissor a
+> compra sai com as aprovações da faixa de baixo e o degrau vira só trilha); qual das
+> três requisições sobe na conferência **c**; e o que a conferência **e** precisa (fechar
+> a tríade antes, nota ainda sem tela própria).
+> (3) ⚠️ **O achado 1 do sensor tem falso positivo por desenho:** ele recalcula a faixa
+> efetiva **hoje**, e o acumulado da janela anda depois da aprovação — uma irmã nova na
+> mesma etapa (mesmo em RASCUNHO, mesmo em regime `simples`) faz uma requisição
+> legitimamente aprovada aparecer como "APROVADA sem a alçada fechada". Registrado no
+> runbook, **não consertado**: mudar o que o sensor vigia é decisão da fase, não da
+> execução.
 
 
 ## O plano aprovado

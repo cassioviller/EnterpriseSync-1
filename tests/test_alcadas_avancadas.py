@@ -2490,6 +2490,83 @@ def test_ratificacao_pela_tela_passa_pela_mesma_rota_de_aprovacao():
             'ratificar não move o estado — a requisição já estava APROVADA')
 
 
+def test_ratificar_ainda_e_possivel_depois_de_a_emergencia_virar_pedido():
+    """🔴 Achado da execução do runbook (15/08): a saída da sanção estava fechada.
+
+    A sanção da A6 só EXISTE quando há pedido: a `ContaPagar` bloqueada deriva
+    dele. Mas emitir o pedido pela tela move a requisição para CONVERTIDA — e
+    `pode_ratificar` só admitia APROVADA. Resultado: exatamente a requisição
+    cuja conta a sanção segura era a única que ninguém conseguia ratificar, e
+    a conta bloqueada ficava sem saída nenhuma dentro do sistema.
+
+    Isso é o oposto do que a A6 decidiu (📖 spec: "ratificar em atraso é
+    caminho, não exceção... sem isso, a única saída de uma conta bloqueada
+    seria pagar por fora"). Os testes anteriores não pegavam porque criam o
+    `PedidoCompra` direto no banco, sem passar pela rota que transiciona.
+
+    O ciclo aqui é o do operador, pela tela, do começo ao fim.
+    """
+    from services.financeiro_compra import pernas_faltantes
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        comprador = _operador(adm.id, 'Comprador')
+        _vincular(comprador, obra, PapelObra.COMPRADOR)
+        forn = _fornecedor(adm.id)
+        aid, oid, gid = adm.id, obra.id, gestor.id
+        cid, fid = comprador.id, forn.id
+
+    _cliente_de(gid).post('/compras/requisicoes/nova', data={
+        'obra_id': str(oid),
+        'emergencial': 'on',
+        'justificativa': JUSTIFICATIVA,
+        'item_descricao[]': ['Bomba de recalque'],
+        'item_unidade[]': ['un'],
+        'item_quantidade[]': ['1'],
+        'item_preco[]': ['4900,00'],
+        'item_almoxarifado_id[]': [''],
+    }, follow_redirects=True)
+
+    with app.app_context():
+        req = RequisicaoCompra.query.filter_by(admin_id=aid).one()
+        assert req.estado == EstadoRequisicao.APROVADA
+        rid = req.id
+
+    _cliente_de(cid).post(f'/compras/requisicoes/{rid}/emitir-pedido',
+                          data={'fornecedor_id': str(fid),
+                                'data_compra': '2026-08-15'},
+                          follow_redirects=True)
+
+    with app.app_context():
+        from models import ContaPagar
+        req = db.session.get(RequisicaoCompra, rid)
+        assert req.estado == EstadoRequisicao.CONVERTIDA, (
+            'a emissão pela tela move a requisição — é ela que cria a conta '
+            'que a sanção segura')
+        pedido = PedidoCompra.query.filter_by(requisicao_id=rid).one()
+        conta = ContaPagar.query.filter_by(pedido_compra_id=pedido.id).first()
+        assert conta.situacao_liberacao == 'bloqueada'
+        _envelhecer_a_emergencia(req, horas=49)
+        assert any(req.numero in p for p in pernas_faltantes(pedido)), (
+            'a emergência vencida tem de estar segurando esta conta')
+        pid = pedido.id
+
+    _cliente_de(aid).post(f'/compras/requisicoes/{rid}/aprovar',
+                          data={'observacao': 'Confiro a emergência.'},
+                          follow_redirects=True)
+
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, rid)
+        assert req.ratificada_em is not None, (
+            'a conta bloqueada tem de ter saída pela tela da requisição — '
+            'sem ela a única saída é pagar por fora, que é o que a fase '
+            'existe para evitar')
+        pedido = db.session.get(PedidoCompra, pid)
+        assert not any(req.numero in p for p in pernas_faltantes(pedido)), (
+            'ratificada, a perna da emergência sai da lista')
+        assert req.estado == EstadoRequisicao.CONVERTIDA, (
+            'ratificar não move o estado — nem daqui')
+
+
 # ---------------------------------------------------------------------------
 # A8 — Sensor, teste-guarda e runbook
 #

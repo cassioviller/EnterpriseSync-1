@@ -17,7 +17,8 @@ from utils.tenant import get_tenant_admin_id, is_v2_active
 
 # Fase 3 — governança de compras. Imports no topo de propósito: estes
 # módulos não importam compras_views de volta, então não há ciclo.
-from services.alcada_compras import (MOTIVO_FRACIONAMENTO, ROTULOS_DEGRAU,
+from services.alcada_compras import (ESTADOS_QUE_RATIFICAM,
+                                     MOTIVO_FRACIONAMENTO, ROTULOS_DEGRAU,
                                      EmergenciaInvalida,
                                      acumulado_da_etapa,
                                      acumulado_do_fornecedor,
@@ -2180,8 +2181,11 @@ def requisicao_aprovar(requisicao_id):
 
     requisicao = _requisicao_do_tenant(requisicao_id)
 
+    # CONVERTIDA entra junto com APROVADA de propósito: a conta que a sanção da
+    # A6 segura só nasce quando o pedido é emitido, e emitir move a requisição
+    # (📖 services/alcada_compras.ESTADOS_QUE_RATIFICAM).
     if requisicao.emergencial and requisicao.ratificada_em is None and \
-            requisicao.estado == EstadoRequisicao.APROVADA:
+            requisicao.estado in ESTADOS_QUE_RATIFICAM:
         return _ratificar_emergencia(requisicao)
 
     permitido, motivo = pode_aprovar(requisicao, current_user)
