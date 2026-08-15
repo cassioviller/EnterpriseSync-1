@@ -606,7 +606,7 @@ sem atesto não existe a tríade do Fluxo A nem a baixa do adiantamento do Fluxo
 |---|---|---|
 | 1 | Recebimento e atesto | ✅ **mesclada em `main` em 14/08** (`9c997bf8`) |
 | 2 | Financeiro em dois fluxos | ✅ **mesclada em `main` em 14/08** (`e74360cb`) — F1-F7 |
-| 3 | Alçadas (as 4 condições, anti-fracionamento, emergência 48h, corte de 3 cotações) | ⬜ sem spec |
+| 3 | Alçadas (as 4 condições, anti-fracionamento, emergência 48h, corte de 3 cotações) | ✅ **A1-A8 completas em 15/08**, em `feat/alcadas-avancadas` — não mesclada |
 | 4 | Status unificado (régua de 9 etapas) | ⬜ sem spec |
 | 5 | Relatórios (os 5) | ⬜ sem spec |
 
@@ -653,6 +653,101 @@ SQL cru, zero falhas.
 > recebimentos do pedido justamente para que a próxima ocorrência distinga as
 > duas hipóteses — segundo POST não gravou, ou a primeira porta de
 > `excluir_recebimento` recusou por permissão — que hoje dão o mesmo sintoma.
+>
+> 🔬 **15/08, quinta ocorrência:** falhou de novo no gate completo (seleção larga) e
+> **passou isolada**, junto das outras duas do gate. O padrão de 14/08 se repetiu sem
+> desvio. A instrumentação do assert **não foi lida nesta corrida** — a saída do gate
+> foi pipada por `tail -30` e os tracebacks se perderam. **Na próxima corrida, não pipar:
+> redirecionar o log inteiro para arquivo.** É o que separa as duas hipóteses.
+
+### ✅ Fase 3 do ciclo — alçadas, em 15/08 (em branch)
+
+**A3 fez o valor deixar de ser a única pergunta.** Até aqui a faixa recebia
+`requisicao.valor_estimado` e mais nada: fornecedor novo, preço que não é o menor,
+compra fora do orçamento da etapa e dez requisições de R$ 4.900 na mesma semana
+davam todos a mesma exigência. 10 commits, migrations **297/298/299**, flag
+`alcadas_avancadas_ativa` (nasce OFF). 🔬 15/08: **88 testes** no arquivo da fase +
+**24** na tela de faixas; regressão dirigida de 342 verdes, exit 0.
+
+**Gate completo — 🟡 3 falhas, nenhuma desta fase.** 🔬 15/08, sobre `2f3df5cc`:
+`pytest tests/ -m "not browser"` → **2398 passed, 3 failed, 6 skipped, 2 xfailed** em
+33min06s. As três foram investigadas, e **as três reproduzem em `main`** (conferido em
+worktree separado, mesmo banco):
+
+| Teste | O que ele diz | Veredito |
+|---|---|---|
+| `test_excluir_obra::test_lista_cobre_toda_fk_no_action_para_obra` | `notificacao_cliente` tem FK NO ACTION para `obra` e ficou fora de `TABELAS_DEPENDENTES_OBRA` — **excluir obra vai estourar nela** | 🔴 defeito real, **anterior**. Sensor funcionando |
+| `test_fase5_rdo_ciclo_vida::test_backfill_marcou_os_rdos_historicos_como_preenchido` | 23 RDOs assinados **sem trilha de transição** — autoria forjada por backfill ou escrita fora da máquina | 🔴 dado do banco de **dev**, **anterior**. ⚠️ dev |
+| `test_recebimento_atesto::test_rota_de_exclusao_repassa_a_recusa_do_servico` | a intermitente aberta em 14/08 | 🟡 **apareceu de novo** na seleção larga e **passou isolada** — o padrão já registrado. Sem informação nova |
+
+⚠️ **As duas primeiras não são desta fase e também não estavam registradas aqui.** Elas
+apareceram agora porque este é o primeiro gate completo desde 14/08. A da `notificacao_cliente`
+é a mais séria das duas: é caminho de exclusão de obra que estoura, e o conserto é
+uma linha na lista — mas conferir se a tabela deve ser apagada, anulada ou barrar a
+exclusão é decisão de produto, não de digitação.
+
+⚠️ **O requisito desta fase é desenho nosso, ratificado — não levantamento.** Os
+quatro elementos ("as 4 condições", anti-fracionamento, emergência 48h, corte de 3
+cotações) aparecem no repositório **quatro vezes**, sempre como rótulo de backlog,
+nunca como enunciado de regra; e 📖 `DEVOLUTIVA.md:293` ("qual o valor de X?") segue
+aberta desde julho. As sete decisões (D1-D7) foram fechadas na sessão de 15/08, todas
+na recomendação, e estão no spec. **Quem for medir se a fase acertou tem que medir
+contra a operação real, não contra o spec.**
+
+> 📖 **Cinco achados da execução que mudaram o tamanho do diagnóstico** — todos
+> apareceram executando, nenhum relendo.
+> (1) 🔴 **`migration_history.migration_name` é `VARCHAR(200)` e o INSERT falha em
+> silêncio** — `record_migration` (`migrations.py:136`) loga e segue. Duas migrations
+> aplicaram, mudaram o schema e **não foram registradas**. Inofensivo aqui (as três são
+> idempotentes); numa destrutiva seria re-execução a cada boot com histórico mentindo.
+> **Não consertado — não é dívida desta fase.**
+> (2) **A faixa de topo era bloqueio permanente desde a Fase 3 do núcleo.** A rota lia
+> `mapa_v2_id` do form e o gravava, mas nenhum template tinha o input: toda requisição
+> acima de R$ 30.000 tinha pendência sem saída pela tela. Morreu na A3, com prova de
+> ponta a ponta (o teste extrai o id do `<option>` renderizado e o usa no POST).
+> (3) **O spec mandava ler um campo morto**: `nao_menor_preco` apontava para
+> `MapaCotacao.selecionado`, sem caminho de escrita desde a Task #21 — a condição nunca
+> dispararia. Passou a ler `MapaItemCotacao.fornecedor_escolhido_id`.
+> (4) **`FAIXAS_RECOMENDADAS` semeia o futuro.** O backfill da 297 cobre o tenant que
+> existe; sem o campo novo no seed, todo tenant criado a partir daqui teria a faixa de
+> topo com `minimo_cotacoes = 0` — deixaria de exigir mapa **em silêncio**.
+> (5) **Os invariantes da escada são três, não dois.** O terceiro (a faixa de teto
+> aberto é sempre a última) estava só em docstring e virou load-bearing: o degrau anda
+> **posições** na lista ordenada, então teto aberto no meio faria o degrau descer.
+
+> 📖 **Três decisões que divergem do spec e estão registradas nele.**
+> (1) **A emergência não ganhou aresta em `TRANSICOES_VALIDAS`.** "Direto a APROVADA" é
+> o efeito, não o caminho: `aprovar_emergencial` chama `transicionar()` duas vezes na
+> mesma transação. A aresta RASCUNHO→APROVADA abriria o atalho para todo mundo, não só
+> para o rito — e o passo intermediário ainda paga a entrada de rodada de que os votos
+> da ratificação precisam 48h depois.
+> (2) **A ponte com a Fase 2 não encostou em `financeiro_views.py`** (zero linhas de
+> diff). A sanção entrou como quarta perna em `pernas_faltantes`
+> (`services/financeiro_compra.py`), porque `pagar_conta` tem **uma** porta por decisão
+> registrada na Fase 2. Há teste-guarda contando as ocorrências para que continue assim.
+> (3) **A tela de faixas recusa o que a edição CRIA e apenas avisa o que ela herdou.**
+> O invariante nunca teve constraint, então existe tenant que já chega fora dele;
+> validar só o estado final o travaria na tela que existe para consertá-lo.
+
+> ⚠️ **Armadilhas para quem retomar as alçadas.**
+> (1) **A dependência não é uma corrente, são duas pernas**: a dura
+> (`escopo_obra_ativo` → `compras_governanca_ativa` → `alcadas_avancadas_ativa`, e o
+> `--ligar` **recusa**) e a parcial (`recebimento_atesto_ativo` →
+> `financeiro_dois_fluxos_ativo`, que sustenta **só** a sanção da emergência, e o
+> `--ligar` **avisa sem recusar**). Desenhar como corrente única faz parecer que ligar
+> alçadas exige a Fase 2 — o próprio `pode_ligar` desmente.
+> (2) 🔬 **`fora_do_orcamento` dispara em 100%** — 3.854 de 3.864 requisições no dev,
+> porque `obra_servico_custo_id` é nullable e etapa em branco domina. **Não ligue essa
+> condição no primeiro tenant**; rode `verificar_consistencia_alcadas.py --simular`
+> antes (passo 0a do runbook). O número mede a *forma*, não a operação de ninguém.
+> (3) **O backfill deixou `minimo_cotacoes = 2`, inclusive no topo.** Subir para 3 (D6)
+> é UPDATE pela tela em Configurações › Alçadas de Compra, no passo 1 do runbook —
+> nunca migration.
+> (4) **Migration 297-299 e não 290** — 290-295 segue reservada da Fase 8, 300-307 da
+> Fase 9, nenhuma das duas aplicada.
+> (5) **Janela residual conhecida:** conta liberada *dentro* das 48h cuja emergência
+> vence depois **não é rebloqueada** — rebloquear de fora de `liberar()` seria a segunda
+> porta. O sensor a separa da liberação legítima por `conta_pagar.liberada_em`.
 
 
 ## O plano aprovado
@@ -1071,7 +1166,8 @@ nenhum plano está bloqueado esperando resposta. Revise quando puder.
 | `docs/superpowers/{specs,plans}/2026-08-03-p1-*` | Spec e plano do p1 — o único pacote que teve os dois documentos antes do código, porque dois vereditos mudaram de tamanho ao serem reconferidos |
 | `docs/superpowers/plans/2026-07-21-*` | **os 10 planos das fases** (ver tabela acima). ⚠️ o da **Fase 7 está obsoleto** — substituído pelo p10 |
 | `DEVOLUTIVA.md` | aderência à especificação + sequência de fases. (O erro do `:73` sobre "não existe recebimento" foi corrigido em 23/07 — o recebimento existe, só não é o gatilho financeiro) |
-| `docs/fase-1-rollout.md` / `fase-2-rollout.md` / `fase-3-rollout.md` | **runbooks de rollout por fase** — pré-checagens, ordem de ligar flags e rollback |
+| `docs/fase-1-rollout.md` / `fase-2-rollout.md` / `fase-3-rollout.md` | **runbooks de rollout por fase** — pré-checagens, ordem de ligar flags e rollback. ⚠️ são do **núcleo**; no ciclo de compras o runbook mora no fim do próprio spec |
+| `docs/superpowers/specs/2026-08-{11,14,15}-*-design.md` | **os specs das três fases entregues do ciclo de compras** (recebimento e atesto, financeiro em dois fluxos, alçadas). Cada um traz o runbook no fim e as divergências como 📌 no ponto exato do texto — leia os 📌, são o que a execução descobriu contra o plano |
 | `DOSSIE-REPO.md` | as 29 respostas sobre arquitetura, dados, infra e qualidade |
 | `docs/anexos/A-rotas-sem-autenticacao.md` | censo AST das 724 rotas. ⚠️ `:16` classifica as rotas por token como "desenho correto" — foi o que produziu o "1 rota de escrita sem auth" |
 | `FECHO-FASE-0.5.md` | o que a Fase 0.5 entregou e o que não |
