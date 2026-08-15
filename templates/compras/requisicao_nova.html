@@ -37,9 +37,57 @@
                        value="{{ hoje }}">
               </div>
               <div class="col-12">
-                <label class="form-label">Justificativa</label>
-                <textarea name="justificativa" rows="2" class="form-control"
+                <label class="form-label">
+                  Justificativa
+                  <span class="text-danger d-none" id="justificativaObrigatoria">*</span>
+                </label>
+                <textarea name="justificativa" id="justificativaCampo" rows="2"
+                          class="form-control"
                           placeholder="Para que serve, e por que agora"></textarea>
+              </div>
+
+              {# Fase 3 do ciclo de compras (A6) — o rito de emergência 48h.
+                 O usuário decide SABENDO do prazo: o texto abaixo separa o que
+                 a emergência dispensa (a aprovação antes da compra) do que ela
+                 NÃO dispensa (nada mais — a mesma alçada, em 48 horas, sob
+                 pena de a conta a pagar não liberar). Um checkbox que só diz
+                 "urgente" seria um botão de pular a fila. #}
+              <div class="col-12">
+                <div class="border border-warning rounded p-2">
+                  <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox"
+                           name="emergencial" id="emergencialCheck" value="1">
+                    <label class="form-check-label fw-semibold" for="emergencialCheck">
+                      <i class="fas fa-triangle-exclamation text-warning me-1"></i>
+                      Rito de emergência — aprovar agora, ratificar em 48 horas
+                    </label>
+                  </div>
+                  <div id="emergencialAviso" class="small text-muted d-none">
+                    <p class="mb-1">
+                      <strong>O que a emergência dispensa:</strong> a aprovação
+                      <em>antes</em> da compra. A requisição já sai
+                      <strong>aprovada</strong> e pode virar pedido na hora.
+                    </p>
+                    <p class="mb-1">
+                      <strong>O que ela não dispensa:</strong> nada mais. A
+                      alçada é exatamente a mesma — as mesmas aprovações, das
+                      mesmas pessoas — só que <strong>depois</strong>, e você
+                      tem <strong>48 horas corridas</strong> (fim de semana
+                      conta) para conseguir a <strong>ratificação</strong>.
+                    </p>
+                    <p class="mb-1">
+                      Passadas as 48 horas sem ratificação, a
+                      <strong>conta a pagar desta compra não é liberada</strong>
+                      — o fornecedor não recebe até alguém assinar embaixo.
+                      Quem invocou a emergência não pode ratificá-la.
+                    </p>
+                    <p class="mb-0">
+                      Só um <strong>gestor desta obra</strong> ou um
+                      <strong>administrador</strong> da empresa invoca o rito, e
+                      a <strong>justificativa passa a ser obrigatória</strong>.
+                    </p>
+                  </div>
+                </div>
               </div>
               <div class="col-12">
                 <label class="form-label">
@@ -155,6 +203,25 @@
   if (obraSelect && mapaSelect) {
     obraSelect.addEventListener('change', filtrarMapas);
     filtrarMapas();
+  }
+
+  // Fase 3 (A6) — o aviso do rito de emergência aparece MARCADO, e a
+  // justificativa passa a ser obrigatória junto. O `required` aqui é
+  // conveniência de tela; quem de fato recusa é `requisicao_nova_post` e,
+  // depois dela, `aprovar_emergencial` — um POST forjado não pode ser a porta
+  // de entrada de uma compra sem aprovação e sem motivo escrito.
+  var emergCheck = document.getElementById('emergencialCheck');
+  var emergAviso = document.getElementById('emergencialAviso');
+  var justCampo = document.getElementById('justificativaCampo');
+  var justAst = document.getElementById('justificativaObrigatoria');
+  if (emergCheck && emergAviso) {
+    var sincronizarEmergencia = function () {
+      emergAviso.classList.toggle('d-none', !emergCheck.checked);
+      if (justAst) { justAst.classList.toggle('d-none', !emergCheck.checked); }
+      if (justCampo) { justCampo.required = emergCheck.checked; }
+    };
+    emergCheck.addEventListener('change', sincronizarEmergencia);
+    sincronizarEmergencia();
   }
 
   document.getElementById('btnAddItem').addEventListener('click', function () {

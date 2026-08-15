@@ -902,18 +902,30 @@ def esta_totalmente_aprovada(requisicao):
     return not pendencias_de_aprovacao(requisicao)
 
 
-def pode_aprovar(requisicao, usuario):
+def pode_aprovar(requisicao, usuario, estados=None):
     """(bool, motivo). O motivo é exibido ao usuário — escreva para humano.
 
     A ordem das checagens é do mais estrutural para o mais circunstancial,
     para que a mensagem seja a mais informativa possível.
+
+    `estados` existe por causa do rito de emergência (A6): a RATIFICAÇÃO é
+    cobrada sobre uma requisição já APROVADA, e ela tem de passar por
+    exatamente estas mesmas barreiras — o solicitante não ratifica, ninguém
+    assina duas vezes, não-admin precisa de papel na obra. Um segundo
+    `pode_ratificar` com as regras copiadas seria a mesma regra de autorização
+    em dois lugares, e o dia em que uma delas mudasse seria o dia em que a
+    outra ficaria errada em silêncio. Padrão: só AGUARDANDO_APROVACAO, que é o
+    comportamento de sempre.
     """
+    estados = estados or (EstadoRequisicao.AGUARDANDO_APROVACAO,)
+
     if usuario is None or not getattr(usuario, 'id', None):
         return False, 'Usuário não identificado.'
 
-    if requisicao.estado != EstadoRequisicao.AGUARDANDO_APROVACAO:
+    if requisicao.estado not in estados:
+        esperados = ', '.join(e.value for e in estados)
         return False, (f'A requisição está em {requisicao.estado.value} — '
-                       f'só se aprova o que está aguardando aprovação.')
+                       f'só se aprova o que está em {esperados}.')
 
     # SEPARAÇÃO DE FUNÇÕES — sem exceção, nem para ADMIN. Numa empresa
     # pequena a mesma pessoa acumula papéis; é exatamente aí que a regra
@@ -932,8 +944,17 @@ def pode_aprovar(requisicao, usuario):
         return True, ''
 
     # Não-admin: precisa ser GESTOR da obra (Fase 1, usuario_obra).
-    from utils.autorizacao import PAPEIS_QUE_EDITAM_OBRA, papel_na_obra
-    papel = papel_na_obra(requisicao.obra_id)
+    #
+    # `papel_de_usuario_na_obra` e não `papel_na_obra`: o papel conferido é o
+    # de `usuario`, o argumento, e não o de quem estiver na sessão. Nas rotas
+    # os dois são a mesma pessoa (`current_user`) e o resultado não muda — o
+    # que muda é que a função passa a poder ser chamada FORA de um request,
+    # que é o que a ratificação da emergência (A6) e o sensor da A8 precisam.
+    # O tenant vem da requisição, e não da sessão, pelo mesmo motivo.
+    from utils.autorizacao import (PAPEIS_QUE_EDITAM_OBRA,
+                                   papel_de_usuario_na_obra)
+    papel = papel_de_usuario_na_obra(usuario, requisicao.obra_id,
+                                     tenant=requisicao.admin_id)
     if papel in PAPEIS_QUE_EDITAM_OBRA:
         return True, ''
     return False, ('Você não é gestor desta obra e não tem alçada para '
@@ -944,8 +965,11 @@ def papel_para_alcada(usuario, requisicao):
     """Com que chapéu o voto será registrado."""
     if usuario.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
         return 'ADMIN'
-    from utils.autorizacao import papel_na_obra
-    papel = papel_na_obra(requisicao.obra_id)
+    # Mesma troca de `pode_aprovar`, pelo mesmo motivo: o chapéu gravado é o de
+    # `usuario`, e a função tem de servir fora de um request.
+    from utils.autorizacao import papel_de_usuario_na_obra
+    papel = papel_de_usuario_na_obra(usuario, requisicao.obra_id,
+                                     tenant=requisicao.admin_id)
     return papel.name if papel is not None else 'DESCONHECIDO'
 
 
@@ -976,3 +1000,302 @@ def registrar_aprovacao(requisicao, usuario, papel=None, observacao=None):
                 requisicao.numero, usuario.id, voto.papel_aplicado,
                 requisicao.valor_estimado)
     return voto
+
+
+# ---------------------------------------------------------------------------
+# O rito de emergência 48h  (A6)
+#
+# 📖 spec 2026-08-15-alcadas-design.md, "O rito de emergência 48h", decisões D4
+# (GESTOR da obra e ADMIN; 48 horas CORRIDAS) e D5 (a conta a pagar não libera).
+#
+# A regra inteira cabe numa frase: **a emergência dispensa a aprovação *ex
+# ante* e nada mais.** A requisição vai de RASCUNHO a APROVADA sem voto — é o
+# ponto do rito, material que a obra precisa hoje — e a MESMA alçada (mesma
+# faixa efetiva, mesmos `aprovacoes_necessarias`, contados pelos mesmos
+# `votos_de_aprovacao`) é cobrada *ex post*, dentro de 48 horas corridas.
+#
+# Três decisões de desenho que este bloco carrega:
+#
+#   1. **Emergência é ATRIBUTO, não estado.** Nenhum estado novo em
+#      `EstadoRequisicao`: um `PENDENTE_RATIFICACAO` obrigaria a mexer em
+#      `TRANSICOES_VALIDAS`, nos badges, nos filtros e na matriz de governança
+#      para exprimir o que duas colunas (`emergencial`, `ratificada_em`) já
+#      exprimem. A régua unificada de 9 etapas é a Fase 4.
+#   2. **Nenhum voto é gravado na aprovação emergencial.** Emergência não é
+#      aprovação; é a AUSÊNCIA dela, registrada. Gravar um voto aqui faria a
+#      ratificação começar com a alçada meio fechada por ninguém.
+#   3. **O chokepoint continua único.** Quem move o estado é `transicionar()`
+#      de `services/requisicao_compra.py`, com motivo marcado. Não há segundo
+#      caminho de escrita de estado nesta fase.
+#
+# ⏱️ O RELÓGIO. O marco das 48h é o `criado_em` da RequisicaoTransicao que
+# registrou a aprovação emergencial — o FATO, e não `created_at` da requisição
+# (que é quando ela foi rascunhada, podendo ser semanas antes) nem uma quinta
+# coluna que teria de ser mantida em sincronia com a trilha. Duas consequências
+# boas: o prazo é auditável por quem lê o histórico, e o teste consegue
+# envelhecer a emergência gravando aquele instante no passado, sem `sleep` e
+# sem congelar relógio global. `ratificacao_vencida` ainda aceita `agora` para
+# quem quiser falar da borda do prazo sem tocar no banco.
+# ---------------------------------------------------------------------------
+
+# Marca a transição de uma aprovação emergencial na trilha. Deliberadamente
+# DIFERENTE de `MARCA_APROVACAO`: `votos_de_aprovacao` filtra por aquela, e uma
+# emergência jamais pode ser contada como voto.
+MARCA_EMERGENCIA = '[emergencia]'
+
+# E a marca do voto que RATIFICA. Ele é um voto de verdade — entra em
+# `votos_de_aprovacao`, por isso começa com `MARCA_APROVACAO` — e o sufixo
+# existe só para a trilha dizer que aquela assinatura veio depois da compra.
+MARCA_RATIFICACAO = '[ratificacao]'
+
+# D4: CORRIDAS, e não úteis. A emergência não respeita fim de semana; horas
+# úteis dariam a uma compra de sexta o mesmo prazo que uma de segunda tem em
+# três dias. É constante e não coluna de propósito: 48h é a SEMÂNTICA do rito
+# (o spec o nomeia "rito de emergência 48h"), não um parâmetro de política como
+# o teto da faixa ou a janela do fracionamento.
+HORAS_PARA_RATIFICAR = 48
+
+
+class EmergenciaInvalida(Exception):
+    """Recusa do rito de emergência. A mensagem é lida por humano.
+
+    Exceção e não `(False, motivo)` porque quem chama está no meio de uma
+    transação: o caminho de erro precisa abortar, e não depender de alguém
+    lembrar de conferir o retorno. Mesmo contrato dos erros de
+    `services/financeiro_compra.py`.
+    """
+
+
+def pode_invocar_emergencia(requisicao, usuario):
+    """(bool, motivo) — quem dispensa a alçada precisa TER alçada (D4).
+
+    GESTOR da obra ou ADMIN do tenant, e mais ninguém. COMPRADOR abre
+    requisição (`PAPEIS_QUE_REQUISITAM`) mas não dispensa aprovação: dispensar
+    é ato de quem aprovaria.
+
+    Não confere se `usuario` é o solicitante, e isso é deliberado — o gestor
+    que está no canteiro com a bomba queimada é exatamente quem deve poder
+    abrir e liberar a compra na mesma hora. A separação de funções não some:
+    ela é cobrada na RATIFICAÇÃO, onde `pode_ratificar` barra tanto o
+    solicitante quanto quem invocou.
+    """
+    if usuario is None or not getattr(usuario, 'id', None):
+        return False, 'Usuário não identificado.'
+
+    if usuario.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
+        if usuario.id != requisicao.admin_id and \
+                getattr(usuario, 'admin_id', None) != requisicao.admin_id:
+            return False, 'Requisição de outra empresa.'
+        return True, ''
+
+    from utils.autorizacao import (PAPEIS_QUE_EDITAM_OBRA,
+                                   papel_de_usuario_na_obra)
+    papel = papel_de_usuario_na_obra(usuario, requisicao.obra_id,
+                                     tenant=requisicao.admin_id)
+    if papel in PAPEIS_QUE_EDITAM_OBRA:
+        return True, ''
+    return False, ('Só um gestor desta obra ou um administrador da empresa '
+                   'pode invocar o rito de emergência. Envie a requisição '
+                   'para aprovação pelo caminho normal.')
+
+
+def aprovar_emergencial(requisicao, usuario, motivo_extra=None):
+    """RASCUNHO → APROVADA sem voto, pelo rito de emergência. NÃO commita.
+
+    Levanta `EmergenciaInvalida` e, quando levanta, **nada foi escrito**: as
+    quatro validações vêm antes da primeira transição.
+
+    O estado anda por `transicionar()`, o chokepoint de sempre, em DOIS passos
+    (RASCUNHO → AGUARDANDO_APROVACAO → APROVADA) porque a máquina de estados
+    não tem — e não ganha — o atalho direto. Ver o 📌 do spec: acrescentar a
+    aresta RASCUNHO → APROVADA a `TRANSICOES_VALIDAS` abriria para todo mundo,
+    e não só para o rito, o caminho que dispensa aprovação. Os dois passos
+    acontecem na mesma transação e a requisição nunca REPOUSA em
+    AGUARDANDO_APROVACAO; o que a trilha ganha é a entrada da rodada, que é
+    justamente o que `_inicio_da_rodada_atual` precisa para que os votos da
+    ratificação contem.
+
+    NÃO grava voto. Emergência é a ausência de aprovação, registrada.
+    """
+    from services.requisicao_compra import transicionar
+
+    if not getattr(requisicao, 'emergencial', False):
+        raise EmergenciaInvalida(
+            'esta requisição não invocou o rito de emergência.')
+
+    if requisicao.regime_alcada != REGIME_AVANCADO:
+        raise EmergenciaInvalida(
+            'o rito de emergência só existe no regime de alçadas avançadas. '
+            'Esta requisição nasceu no regime simples e segue o caminho '
+            'normal de aprovação.')
+
+    # O NOT NULL lógico da justificativa (📖 spec: "a coluna já existe; a
+    # diferença é o NOT NULL lógico na rota"). Mora AQUI e não só no `required`
+    # do formulário: um POST forjado não pode ser a porta de entrada de uma
+    # compra sem aprovação e sem motivo escrito.
+    if not (requisicao.justificativa or '').strip():
+        raise EmergenciaInvalida(
+            'requisição emergencial exige justificativa escrita — ela é o '
+            'preço da dispensa de aprovação, e é o que os ratificadores vão '
+            'ler nas próximas 48 horas.')
+
+    if requisicao.estado != EstadoRequisicao.RASCUNHO:
+        raise EmergenciaInvalida(
+            f'o rito de emergência parte do rascunho; esta requisição já está '
+            f'em {requisicao.estado.value}.')
+
+    permitido, motivo = pode_invocar_emergencia(requisicao, usuario)
+    if not permitido:
+        raise EmergenciaInvalida(motivo)
+
+    texto = f'{MARCA_EMERGENCIA} {(requisicao.justificativa or "").strip()}'
+    if motivo_extra:
+        texto = f'{texto} — {motivo_extra.strip()}'
+    texto = texto[:2000]
+
+    transicionar(requisicao, EstadoRequisicao.AGUARDANDO_APROVACAO, usuario,
+                 motivo=texto)
+    transicionar(requisicao, EstadoRequisicao.APROVADA, usuario, motivo=texto)
+
+    logger.warning('[fase3] EMERGÊNCIA: requisicao %s aprovada sem voto por '
+                   'usuario=%s valor=%s — ratificação vence em %sh',
+                   requisicao.numero, usuario.id, requisicao.valor_estimado,
+                   HORAS_PARA_RATIFICAR)
+    return requisicao
+
+
+def transicao_da_emergencia(requisicao):
+    """A RequisicaoTransicao que registrou a aprovação emergencial, ou None.
+
+    É o marco do relógio das 48h e é a resposta a "quem invocou". None quer
+    dizer que a requisição nunca passou pelo rito — inclusive quando ela está
+    marcada `emergencial` e seguiu o caminho comum de aprovação, caso em que a
+    alçada já foi cobrada *ex ante* e não há nada a ratificar.
+    """
+    if not getattr(requisicao, 'emergencial', False) or not requisicao.id:
+        return None
+    return (RequisicaoTransicao.query
+            .filter_by(requisicao_id=requisicao.id,
+                       para_estado=EstadoRequisicao.APROVADA)
+            .filter(RequisicaoTransicao.motivo.like(f'{MARCA_EMERGENCIA}%'))
+            .order_by(RequisicaoTransicao.id.desc())
+            .first())
+
+
+def prazo_de_ratificacao(requisicao):
+    """Quando as 48 horas corridas se esgotam, ou None se não há rito."""
+    transicao = transicao_da_emergencia(requisicao)
+    if transicao is None or transicao.criado_em is None:
+        return None
+    return transicao.criado_em + timedelta(hours=HORAS_PARA_RATIFICAR)
+
+
+def ratificacao_pendente(requisicao, agora=None):
+    """Aprovada pelo rito, ainda dentro do prazo e ainda sem assinatura."""
+    if requisicao.ratificada_em is not None:
+        return False
+    prazo = prazo_de_ratificacao(requisicao)
+    if prazo is None:
+        return False
+    return (agora or datetime.utcnow()) <= prazo
+
+
+def ratificacao_vencida(requisicao, agora=None):
+    """Passaram-se as 48h e ninguém ratificou. É o gatilho da sanção (D5).
+
+    `agora` é injetável para que a borda do prazo possa ser testada sem
+    congelar relógio nenhum; em produção ninguém o passa.
+
+    Devolve False — e não "não sei" — em três casos que não são o rito:
+    requisição não emergencial, requisição já ratificada, e requisição
+    marcada emergencial que nunca foi aprovada pelo rito (ela seguiu o
+    caminho comum, e o caminho comum já cobrou a alçada *ex ante*).
+    """
+    if requisicao.ratificada_em is not None:
+        return False
+    prazo = prazo_de_ratificacao(requisicao)
+    if prazo is None:
+        return False
+    return (agora or datetime.utcnow()) > prazo
+
+
+QUEM_RATIFICA = ('um gestor da obra ou um administrador da empresa que não '
+                 'seja quem solicitou nem quem invocou a emergência')
+
+
+def pode_ratificar(requisicao, usuario):
+    """(bool, motivo) — a MESMA alçada de `pode_aprovar`, cobrada depois.
+
+    A ratificação passa por `pode_aprovar`, de propósito (📖 spec, "Casos de
+    borda"): o solicitante não ratifica, ninguém assina duas vezes, não-admin
+    precisa de papel na obra. O que esta função acrescenta é a única barreira
+    que a aprovação normal não precisa ter — **quem invocou não ratifica** —,
+    porque deixá-la de fora faria a emergência se autoconfirmar: o rito viraria
+    uma declaração unilateral com 48 horas de cerimônia.
+    """
+    transicao = transicao_da_emergencia(requisicao)
+    if transicao is None:
+        return False, ('Esta requisição não foi aprovada pelo rito de '
+                       'emergência — não há o que ratificar.')
+    if requisicao.ratificada_em is not None:
+        return False, 'A emergência desta requisição já foi ratificada.'
+
+    if usuario is not None and transicao.usuario_id == getattr(
+            usuario, 'id', None):
+        return False, ('Você invocou o rito de emergência desta requisição e '
+                       'não pode ratificá-la. Peça a outra pessoa com alçada '
+                       'na obra.')
+
+    return pode_aprovar(requisicao, usuario,
+                        estados=(EstadoRequisicao.APROVADA,))
+
+
+def registrar_ratificacao(requisicao, usuario, observacao=None):
+    """Grava UM voto de ratificação. NÃO commita. Levanta `EmergenciaInvalida`.
+
+    Carimba `ratificada_em` **só quando a alçada fecha inteira** — mesma
+    `esta_totalmente_aprovada` da aprovação normal, mesma faixa efetiva, mesmos
+    `aprovacoes_necessarias`. É o que impede a emergência de virar um jeito de
+    comprar com metade da alçada: numa faixa de duas aprovações, uma assinatura
+    *ex post* não fecha nada.
+
+    Ratificar em ATRASO é caminho, não exceção: `ratificacao_vencida` não é
+    consultada aqui. Vencer fecha a porta da conta; ratificar a reabre. Sem
+    isso, a única saída de uma conta bloqueada seria pagar por fora, que é
+    exatamente o que a fase existe para evitar.
+    """
+    permitido, motivo = pode_ratificar(requisicao, usuario)
+    if not permitido:
+        raise EmergenciaInvalida(motivo)
+
+    texto = MARCA_RATIFICACAO
+    if observacao:
+        texto = f'{MARCA_RATIFICACAO} {observacao}'
+    voto = registrar_aprovacao(requisicao, usuario, observacao=texto[:1900])
+
+    if esta_totalmente_aprovada(requisicao):
+        requisicao.ratificada_em = datetime.utcnow()
+        db.session.flush()
+        logger.info('[fase3] requisicao %s: emergência RATIFICADA por '
+                    'usuario=%s', requisicao.numero, usuario.id)
+    else:
+        logger.info('[fase3] requisicao %s: ratificação parcial por '
+                    'usuario=%s — ainda falta %s', requisicao.numero,
+                    usuario.id, '; '.join(pendencias_de_aprovacao(requisicao)))
+    return voto
+
+
+def motivo_da_emergencia_vencida(requisicao):
+    """A frase que a `ContaPagar` bloqueada exibe. Português, para humano.
+
+    Nomeia o NÚMERO da requisição e QUEM pode ratificar. Conta bloqueada sem
+    dizer o que falta foi o defeito nº 8 da revisão da Fase 3 — e o efeito
+    prático de uma recusa muda é o usuário procurar o caminho de fora do
+    sistema.
+    """
+    prazo = prazo_de_ratificacao(requisicao)
+    quando = prazo.strftime('%d/%m/%Y %H:%M') if prazo else 'há mais de 48h'
+    return (f'a requisição {requisicao.numero} foi aprovada pelo rito de '
+            f'emergência e não foi ratificada em {HORAS_PARA_RATIFICAR}h '
+            f'(o prazo venceu em {quando}) — {QUEM_RATIFICA} precisa '
+            f'ratificá-la na tela da requisição')

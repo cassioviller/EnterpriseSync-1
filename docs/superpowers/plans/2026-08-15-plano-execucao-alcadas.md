@@ -201,27 +201,47 @@ ligada em tenant real antes de A8**, porque o sensor é o que enxerga emergênci
 
 ## A6 — O rito de emergência 48h
 
-- [ ] **Step 1 (red):** emergencial sem justificativa é recusada; emergencial vai de
+- [x] **Step 1 (red):** emergencial sem justificativa é recusada; emergencial vai de
   RASCUNHO a APROVADA sem voto e a trilha registra o motivo; ratificação dentro de 48h
   carimba `ratificada_em`; quem invocou **não** ratifica; passadas 48h sem ratificação, a
   `ContaPagar` derivada fica `bloqueada`; ratificar depois **libera**; e com
   `financeiro_dois_fluxos_ativo` OFF nada disso derruba nada (a conta nasce liberada e o
-  teste **nomeia** que é assim de propósito).
-- [ ] **Step 2:** o campo na tela de nova requisição — checkbox mais textarea de
+  teste **nomeia** que é assim de propósito). — 21 testes novos, **19 vermelhos** e 2
+  verdes de nascença (os dois teste-guarda: `test_nenhum_estado_novo_em_estado_requisicao`
+  e `test_pagar_conta_continua_com_uma_porta_so`, que existem para NÃO ficarem vermelhos).
+
+> 📌 **15/08, A6: o tempo nos testes — envelhecer o FATO, não congelar o relógio.** As 48h
+> precisavam ser testáveis sem `sleep` e sem `freezegun` (que o repositório não usa). A
+> saída veio do desenho: o marco do prazo é o `criado_em` da `RequisicaoTransicao` que
+> registrou a aprovação emergencial — o fato gravado —, e não `created_at` da requisição
+> (que é quando ela foi rascunhada) nem uma quinta coluna. Isso dá dois caminhos, e o
+> arquivo usa os dois: `_envelhecer_a_emergencia()` grava aquele instante 49 ou 72 horas
+> atrás, que é exatamente o que o banco teria se a compra fosse mesmo de anteontem (é o
+> caminho dos testes de ponta a ponta, inclusive os que passam pela rota de pagamento); e
+> `ratificacao_vencida(requisicao, agora=...)` injeta o AGORA, para falar da borda exata do
+> prazo sem tocar no banco. Nenhum dos dois congela relógio global, e por isso nenhum vaza
+> para os outros 52 testes do arquivo.
+
+- [x] **Step 2:** o campo na tela de nova requisição — checkbox mais textarea de
   justificativa que só aparece marcado, com o texto do que a emergência dispensa e do que
   ela **não** dispensa. O usuário decide sabendo do prazo.
-- [ ] **Step 3:** `aprovar_emergencial(requisicao, usuario)` em
+- [x] **Step 3:** `aprovar_emergencial(requisicao, usuario)` em
   `services/alcada_compras.py`: valida papel (GESTOR da obra ou ADMIN, D4), transiciona via
   `transicionar()` — **o chokepoint continua único** — com motivo marcado, e não grava voto
-  nenhum. Emergência não é aprovação; é a ausência dela, registrada.
-- [ ] **Step 4:** `ratificacao_vencida(requisicao)` e a integração com a Fase 2: no ponto em
+  nenhum. Emergência não é aprovação; é a ausência dela, registrada. (📌 no spec: são DUAS
+  chamadas de `transicionar()`, porque a máquina de estados não ganhou a aresta
+  RASCUNHO → APROVADA.)
+- [x] **Step 4:** `ratificacao_vencida(requisicao)` e a integração com a Fase 2: no ponto em
   que a `ContaPagar` derivada é avaliada, emergência vencida entra como motivo de
   `situacao_liberacao = 'bloqueada'`. Reusar o caminho existente da Fase 2 — **não** criar
-  segunda porta em `pagar_conta`, que já tem uma só por decisão registrada.
-- [ ] **Step 5:** a mensagem de bloqueio diz o número da requisição e quem pode ratificar.
+  segunda porta em `pagar_conta`, que já tem uma só por decisão registrada. — a ponte é
+  `services.financeiro_compra.pernas_faltantes`, que ganhou uma quarta perna;
+  `financeiro_views.py` **não foi tocado**, e há teste-guarda que conta as portas daquele
+  arquivo.
+- [x] **Step 5:** a mensagem de bloqueio diz o número da requisição e quem pode ratificar.
   Conta bloqueada sem dizer o que falta foi exatamente o defeito nº 8 da revisão da Fase 3.
-- [ ] **Step 6 (green):** rodar. Verdes.
-- [ ] **Step 7:** commit — `feat(compras): rito de emergencia 48h e a conta que espera a ratificacao`
+- [x] **Step 6 (green):** rodar. Verdes — 73 em `tests/test_alcadas_avancadas.py`.
+- [x] **Step 7:** commit — `feat(compras): rito de emergencia 48h e a conta que espera a ratificacao`
 
 ## A7 — A tela de faixas
 

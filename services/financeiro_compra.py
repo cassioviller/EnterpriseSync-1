@@ -210,6 +210,45 @@ def valor_das_notas(pedido):
     return total
 
 
+def _emergencia_nao_ratificada(pedido):
+    """Frase da emergência vencida da requisição de origem, ou None.
+
+    ── A PONTE COM A FASE 3 (alçadas avançadas, A6) ────────────────────────
+    A sanção da emergência 48h não ratificada é **a conta não liberar** (📖
+    spec 2026-08-15-alcadas-design.md, decisão D5). O material já chegou;
+    reverter a requisição puniria a obra por um ato administrativo e chegaria
+    tarde. O dinheiro é onde ainda dá para parar.
+
+    Ela entra AQUI, e não em `financeiro_views.pagar_conta`, e isso é o ponto:
+    `pagar_conta` recusa por **um** critério, `situacao_liberacao`, e é ele que
+    a Fase 2 registrou como porta única (ver o ⚠️ do bloco F5, acima). Uma
+    segunda guarda lá recusaria o mesmo pagamento por dois motivos diferentes e
+    dobraria as formas de o usuário ficar preso, sem acrescentar controle
+    nenhum. `pernas_faltantes` é o lugar por onde a Fase 2 já responde "por que
+    esta conta não libera", e é consumida pelos três pontos que importam:
+    `liberar()` (que recusa), `fechar_lote()` (que pula a conta) e a mensagem
+    da recusa da baixa. Uma perna a mais é uma frase a mais na mesma resposta.
+
+    Consequência ASSIMÉTRICA, e ela é decidida: com `financeiro_dois_fluxos_
+    ativo` desligado a `ContaPagar` nasce `liberada`, `pernas_faltantes` volta
+    vazia no primeiro `return` e a sanção não tem onde morder. É por isso que o
+    `--ligar` da flag de alçadas avançadas AVISA sem recusar quando falta a
+    Fase 2 — as outras três regras da fase funcionam sem ela.
+    """
+    from app import db
+    from models import RequisicaoCompra
+    from services.alcada_compras import (motivo_da_emergencia_vencida,
+                                         ratificacao_vencida)
+
+    requisicao_id = getattr(pedido, 'requisicao_id', None)
+    if not requisicao_id:
+        return None
+    requisicao = db.session.get(RequisicaoCompra, requisicao_id)
+    if requisicao is None or not ratificacao_vencida(requisicao):
+        return None
+    return motivo_da_emergencia_vencida(requisicao)
+
+
 def pernas_faltantes(pedido):
     """Quais pernas da tríade faltam. Lista de frases em português.
 
@@ -219,6 +258,11 @@ def pernas_faltantes(pedido):
     medo.
 
     Pedido fora do Fluxo A do regime novo não tem tríade — devolve lista vazia.
+
+    Desde a Fase 3 (alçadas avançadas, A6) a lista tem uma perna que não é da
+    tríade: a emergência 48h não ratificada. Ver `_emergencia_nao_ratificada`
+    para por que ela entra por aqui e não por uma segunda porta em
+    `pagar_conta`.
     """
     from services.recebimento_pedido import valor_atestado
 
@@ -232,6 +276,10 @@ def pernas_faltantes(pedido):
     atestado = _d(valor_atestado(pedido))
     if atestado <= 0:
         faltam.append('sem atesto de recebimento — nada foi conferido ainda')
+
+    emergencia = _emergencia_nao_ratificada(pedido)
+    if emergencia:
+        faltam.append(emergencia)
     return faltam
 
 

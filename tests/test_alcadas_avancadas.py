@@ -1772,3 +1772,719 @@ def test_detalhe_mostra_as_irmas_da_janela_com_numero_e_valor():
         'e o acumulado da janela tem de estar escrito')
     assert '4900' in html.replace('.', '').replace(',', ''), (
         'com o valor de cada irmã, não só a soma')
+
+
+# ---------------------------------------------------------------------------
+# A6 — O rito de emergência 48h
+#
+# 📖 spec 2026-08-15-alcadas-design.md, "O rito de emergência 48h", decisões
+# D4 (GESTOR da obra e ADMIN; 48 horas CORRIDAS) e D5 (a conta não libera).
+#
+# A frase inteira da fase cabe numa linha: **a emergência dispensa a aprovação
+# *ex ante* e nada mais.** A requisição vai de RASCUNHO a APROVADA sem voto —
+# material que a obra precisa hoje —, e a MESMA alçada (mesma faixa efetiva,
+# mesmos `aprovacoes_necessarias`, mesmos `votos_de_aprovacao`) é cobrada
+# *ex post*, em 48 horas corridas. Não ratificou: a `ContaPagar` derivada não
+# libera. Não se pune a obra revertendo a compra — o material já chegou; pune-se
+# onde o dinheiro ainda para.
+#
+# ⏱️ COMO O TEMPO É TESTADO, e por que não há `sleep` nem `freezegun`:
+# o marco das 48h não é `created_at` da requisição nem `datetime.utcnow()` lido
+# de dentro do serviço — é o `criado_em` da RequisicaoTransicao que registrou a
+# aprovação emergencial. Isso dá DOIS caminhos ao teste, e os dois são usados
+# abaixo:
+#   1. envelhecer o FATO — gravar aquele `criado_em` no passado, que é o que o
+#      banco teria se a compra fosse mesmo de anteontem (é o caminho dos testes
+#      de ponta a ponta, incluindo os que passam pela rota de pagamento);
+#   2. injetar o AGORA — `ratificacao_vencida(requisicao, agora=...)`, para os
+#      testes que querem falar sobre a borda do prazo sem tocar no banco.
+# Nenhum dos dois congela relógio global, e por isso nenhum deles vaza para os
+# outros testes do arquivo.
+# ---------------------------------------------------------------------------
+
+JUSTIFICATIVA = ('A bomba de recalque do canteiro queimou; sem água não há '
+                 'concretagem da laje amanhã.')
+
+
+def _tenant_emergencia(dois_fluxos=True, condicoes=''):
+    """Tenant com a cadeia ligada, a escada semeada, obra e um GESTOR.
+
+    `dois_fluxos` existe para o teste da ASSIMETRIA: com ele False a
+    `ContaPagar` nasce liberada e a sanção da emergência não tem onde morder —
+    e isso é decidido, não defeito (📖 spec, "Consequência de acoplamento").
+    """
+    adm = _admin()
+    _cfg_tenant(adm.id, alcadas_avancadas_ativa=True,
+                recebimento_atesto_ativo=dois_fluxos,
+                financeiro_dois_fluxos_ativo=dois_fluxos)
+    obra = _obra(adm.id)
+    _escada(adm.id, condicoes=condicoes)
+    gestor = _operador(adm.id, 'Gestor')
+    _vincular(gestor, obra, PapelObra.GESTOR)
+    return adm, obra, gestor
+
+
+def _req_emergencial(admin_id, obra_id, solicitante_id,
+                     justificativa=JUSTIFICATIVA, valor='4900.00'):
+    r = RequisicaoCompra(
+        numero=f'RC-{uuid.uuid4().hex[:8].upper()}', admin_id=admin_id,
+        obra_id=obra_id, solicitante_id=solicitante_id,
+        estado=EstadoRequisicao.RASCUNHO, regime_alcada='avancado',
+        emergencial=True, justificativa=justificativa,
+        valor_estimado=Decimal(valor))
+    db.session.add(r)
+    db.session.commit()
+    return r
+
+
+def _envelhecer_a_emergencia(requisicao, horas=49):
+    """Grava a aprovação emergencial `horas` atrás. É o passar do tempo.
+
+    Sem `sleep` e sem congelar relógio: o que muda é o FATO gravado — o
+    `criado_em` da transição —, que é exatamente o que o banco teria se a
+    emergência fosse mesmo de anteontem. O serviço continua lendo
+    `datetime.utcnow()` de verdade.
+    """
+    from services.alcada_compras import transicao_da_emergencia
+    t = transicao_da_emergencia(requisicao)
+    assert t is not None, 'só se envelhece emergência que foi aprovada'
+    t.criado_em = datetime.utcnow() - timedelta(hours=horas)
+    db.session.commit()
+    return t
+
+
+def _pedido_da_emergencia(requisicao, fornecedor_id, valor='4900.00'):
+    """PedidoCompra do Fluxo A vindo da requisição emergencial + a obrigação."""
+    from models import PedidoCompraItem
+    from services.financeiro_compra import criar_obrigacao
+
+    p = PedidoCompra(
+        numero=f'PC-{uuid.uuid4().hex[:6].upper()}',
+        fornecedor_id=fornecedor_id, data_compra=date(2026, 8, 1),
+        obra_id=requisicao.obra_id, condicao_pagamento='a_vista', parcelas=1,
+        valor_total=Decimal(valor), tipo_compra='normal',
+        processada_apos_aprovacao=False, admin_id=requisicao.admin_id,
+        requisicao_id=requisicao.id, exige_atesto=True,
+        fluxo_pagamento='faturado')
+    db.session.add(p)
+    db.session.commit()
+    db.session.add(PedidoCompraItem(
+        pedido_id=p.id, descricao='Bomba de recalque', quantidade=Decimal('1'),
+        preco_unitario=Decimal(valor), subtotal=Decimal(valor),
+        admin_id=requisicao.admin_id))
+    db.session.commit()
+    contas = criar_obrigacao(p)
+    db.session.commit()
+    return p, contas
+
+
+def _fechar_a_triade(pedido, admin, valor='4900.00'):
+    """Nota + atesto: as duas pernas da Fase 2, para que a ÚNICA coisa que
+    possa sobrar seja a emergência não ratificada."""
+    from models import PedidoCompraItem
+    from services.financeiro_compra import lancar_nota
+    from services.recebimento_pedido import registrar_recebimento
+
+    item = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).first()
+    registrar_recebimento(pedido, usuario=admin, data=date(2026, 8, 2),
+                          linhas=[(item.id, Decimal('1'))])
+    lancar_nota(pedido, numero=uuid.uuid4().hex[:8], serie='1',
+                valor_total=Decimal(valor), data_emissao=date(2026, 8, 2),
+                data_vencimento=date(2026, 9, 2), usuario=admin)
+    db.session.commit()
+
+
+def test_emergencial_sem_justificativa_e_recusada():
+    """Justificativa é o preço da dispensa. Sem ela o rito não existe.
+
+    A coluna `justificativa` já existia e sempre foi opcional; o que a
+    emergência acrescenta é o NOT NULL lógico — e ele mora no serviço, não só
+    no `required` do HTML, porque um POST forjado não pode ser a porta de
+    entrada de uma compra sem aprovação e sem motivo escrito.
+    """
+    from services.alcada_compras import EmergenciaInvalida, aprovar_emergencial
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        req = _req_emergencial(adm.id, obra.id, gestor.id, justificativa=None)
+
+        with pytest.raises(EmergenciaInvalida) as erro:
+            aprovar_emergencial(req, adm)
+
+        assert 'justificativa' in str(erro.value).lower(), (
+            f'a recusa tem de nomear o que falta: {erro.value}')
+        assert req.estado == EstadoRequisicao.RASCUNHO, (
+            'a validação vem ANTES de qualquer escrita — nada pode ter andado')
+
+        req.justificativa = '   '
+        with pytest.raises(EmergenciaInvalida):
+            aprovar_emergencial(req, adm)
+
+
+def test_emergencial_vai_de_rascunho_a_aprovada_sem_voto():
+    """O ponto inteiro do rito, e o limite dele, no mesmo teste.
+
+    APROVADA sem nenhum `votos_de_aprovacao` — emergência não é aprovação, é a
+    AUSÊNCIA dela, registrada. Se um voto fosse gravado aqui, a ratificação de
+    48h depois começaria com a alçada meio fechada por ninguém.
+    """
+    from services.alcada_compras import (aprovar_emergencial,
+                                         aprovacoes_registradas,
+                                         votos_de_aprovacao)
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+
+        assert req.estado == EstadoRequisicao.APROVADA
+        assert votos_de_aprovacao(req) == [], (
+            'emergência NÃO grava voto — é a ausência de aprovação, registrada')
+        assert aprovacoes_registradas(req) == 0
+        assert req.ratificada_em is None, (
+            'aprovar emergencialmente não é ratificar; o relógio começa agora')
+
+
+def test_a_trilha_registra_o_motivo_da_emergencia():
+    """Seis meses depois, quem reabre a requisição tem de ver por que ela foi
+    aprovada sem ninguém aprovar — e ler a justificativa na própria trilha."""
+    from services.alcada_compras import MARCA_EMERGENCIA, aprovar_emergencial
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+
+        trilha = req.transicoes.all()
+        marcadas = [t for t in trilha
+                    if (t.motivo or '').startswith(MARCA_EMERGENCIA)]
+        assert marcadas, 'nenhuma transição carrega a marca da emergência'
+        assert any(t.para_estado == EstadoRequisicao.APROVADA
+                   for t in marcadas)
+        assert all(t.usuario_id == gestor.id for t in marcadas), (
+            'quem invocou fica gravado — é ele que não vai poder ratificar')
+        assert any(JUSTIFICATIVA[:20] in (t.motivo or '') for t in marcadas), (
+            'a justificativa entra na trilha, não só na coluna da requisição')
+
+
+def test_nenhum_estado_novo_em_estado_requisicao():
+    """Emergência é ATRIBUTO, não estado (📖 spec, "Onde a régua não muda").
+
+    Um `PENDENTE_RATIFICACAO` obrigaria a mexer em `TRANSICOES_VALIDAS`, nos
+    badges, nos filtros e na matriz de governança para exprimir o que duas
+    colunas já exprimem. A régua unificada de 9 etapas é a Fase 4, e é lá que
+    esse desenho se revê — com o quadro inteiro à vista.
+    """
+    from services.requisicao_compra import TRANSICOES_VALIDAS
+    assert {e.name for e in EstadoRequisicao} == {
+        'RASCUNHO', 'AGUARDANDO_APROVACAO', 'APROVADA', 'REJEITADA',
+        'CONVERTIDA', 'CANCELADA'}
+    assert EstadoRequisicao.APROVADA not in TRANSICOES_VALIDAS[
+        EstadoRequisicao.RASCUNHO], (
+        'a máquina de estados não ganha atalho por causa da emergência — o '
+        'rito passa pelas transições que já existiam')
+
+
+def test_so_gestor_da_obra_e_admin_invocam_a_emergencia():
+    """D4, e é o único ponto da fase em que o papel decide sozinho.
+
+    COMPRADOR abre requisição (PAPEIS_QUE_REQUISITAM), mas não dispensa
+    aprovação: dispensar a alçada é ato de quem TEM alçada.
+    """
+    from services.alcada_compras import EmergenciaInvalida, aprovar_emergencial
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        comprador = _operador(adm.id, 'Comprador')
+        _vincular(comprador, obra, PapelObra.COMPRADOR)
+        forasteiro = _operador(adm.id, 'Forasteiro')
+
+        for quem in (comprador, forasteiro):
+            req = _req_emergencial(adm.id, obra.id, quem.id)
+            with pytest.raises(EmergenciaInvalida) as erro:
+                aprovar_emergencial(req, quem)
+            assert 'gestor' in str(erro.value).lower()
+            assert req.estado == EstadoRequisicao.RASCUNHO
+
+        # E os dois que podem, pelos dois caminhos distintos.
+        req_gestor = _req_emergencial(adm.id, obra.id, comprador.id)
+        aprovar_emergencial(req_gestor, gestor)
+        assert req_gestor.estado == EstadoRequisicao.APROVADA
+
+        req_admin = _req_emergencial(adm.id, obra.id, comprador.id)
+        aprovar_emergencial(req_admin, adm)
+        assert req_admin.estado == EstadoRequisicao.APROVADA
+        db.session.commit()
+
+
+def test_admin_de_outra_empresa_nao_invoca_emergencia_aqui():
+    """Isolamento entre empresas — o defeito mais caro deste repositório."""
+    from services.alcada_compras import EmergenciaInvalida, aprovar_emergencial
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        outro_adm = _admin()
+
+        with pytest.raises(EmergenciaInvalida):
+            aprovar_emergencial(req, outro_adm)
+        assert req.estado == EstadoRequisicao.RASCUNHO
+
+
+def test_ratificacao_dentro_de_48h_carimba_ratificada_em():
+    """A alçada não sumiu — ela só mudou de hora.
+
+    A faixa é a MESMA (`faixa_efetiva`), os `aprovacoes_necessarias` são os
+    mesmos, e quem conta são os mesmos `votos_de_aprovacao`. O que a emergência
+    dispensou foi a ordem: primeiro compra, depois assina.
+    """
+    from services.alcada_compras import (aprovar_emergencial, faixa_efetiva,
+                                         ratificacao_vencida,
+                                         registrar_ratificacao)
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+
+        assert faixa_efetiva(req).aprovacoes_necessarias == 1, (
+            'R$ 4.900 cai na faixa de 5k, que pede 1 aprovação — a mesma de '
+            'sempre; a emergência não mexe na faixa')
+        assert ratificacao_vencida(req) is False, 'ainda dentro do prazo'
+
+        registrar_ratificacao(req, adm)
+        db.session.commit()
+
+        assert req.ratificada_em is not None
+        assert ratificacao_vencida(req) is False
+
+
+def test_a_ratificacao_cobra_a_mesma_alcada_ex_post():
+    """Faixa de 2 aprovações: uma ratificação só NÃO carimba.
+
+    É o teste que impede a emergência de virar um jeito de comprar com metade
+    da alçada. `ratificada_em` só é carimbado quando `esta_totalmente_aprovada`
+    — a mesma função que a aprovação normal usa.
+    """
+    from services.alcada_compras import (aprovar_emergencial,
+                                         registrar_ratificacao)
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        # R$ 20.000 cai na faixa de 30k: 2 aprovações e uma delas de ADMIN.
+        req = _req_emergencial(adm.id, obra.id, gestor.id, valor='20000.00')
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+
+        outro_gestor = _operador(adm.id, 'Gestor2')
+        _vincular(outro_gestor, obra, PapelObra.GESTOR)
+
+        registrar_ratificacao(req, outro_gestor)
+        db.session.commit()
+        assert req.ratificada_em is None, (
+            'a faixa pede 2 aprovações e uma delas de ADMIN — uma assinatura '
+            'não fecha a alçada, nem *ex post*')
+
+        registrar_ratificacao(req, adm)
+        db.session.commit()
+        assert req.ratificada_em is not None
+
+
+def test_quem_invocou_nao_ratifica():
+    """Mesma barreira do solicitante, e é o MESMO `pode_aprovar` que a aplica.
+
+    Deixar quem invocou ratificar seria a emergência se autoconfirmando: o
+    rito viraria uma declaração unilateral com 48 horas de cerimônia.
+    """
+    from services.alcada_compras import (EmergenciaInvalida,
+                                         aprovar_emergencial, pode_ratificar,
+                                         registrar_ratificacao)
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        # O gestor é solicitante E quem invoca: os dois motivos de recusa.
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+
+        ok, motivo = pode_ratificar(req, gestor)
+        assert ok is False
+        assert motivo, 'a recusa é lida por humano — tem de vir escrita'
+        with pytest.raises(EmergenciaInvalida):
+            registrar_ratificacao(req, gestor)
+        assert req.ratificada_em is None
+
+        # E quem invocou sem ser o solicitante também não ratifica.
+        comprador = _operador(adm.id, 'Comprador')
+        _vincular(comprador, obra, PapelObra.COMPRADOR)
+        req2 = _req_emergencial(adm.id, obra.id, comprador.id)
+        aprovar_emergencial(req2, gestor)
+        db.session.commit()
+        ok2, motivo2 = pode_ratificar(req2, gestor)
+        assert ok2 is False, ('quem invocou a emergência não pode ser quem a '
+                              'ratifica, ainda que não seja o solicitante')
+        assert 'invoc' in motivo2.lower() or 'emerg' in motivo2.lower()
+
+
+def test_as_48_horas_sao_corridas_e_o_agora_e_injetavel():
+    """D4: CORRIDAS. Fim de semana não estica o prazo da emergência.
+
+    Horas úteis dariam a uma compra de sexta o mesmo prazo que uma de segunda
+    tem em três dias — e a emergência é justamente o que não respeita
+    calendário. O `agora` injetável é o que permite falar da BORDA do prazo
+    sem congelar relógio nenhum.
+    """
+    from services.alcada_compras import (aprovar_emergencial,
+                                         prazo_de_ratificacao,
+                                         ratificacao_vencida)
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+
+        prazo = prazo_de_ratificacao(req)
+        assert prazo is not None
+        # Sexta-feira 18h + 48h corridas = domingo 18h, e não terça.
+        assert ratificacao_vencida(req, agora=prazo - timedelta(minutes=1)) is False
+        assert ratificacao_vencida(req, agora=prazo) is False, (
+            'a borda EXATA ainda está dentro — vence quando PASSA de 48h')
+        assert ratificacao_vencida(req, agora=prazo + timedelta(seconds=1)) is True
+
+
+def test_requisicao_nao_emergencial_nunca_vence():
+    """A sanção não pode encostar em quem não invocou rito nenhum.
+
+    É a paridade desta task: requisição comum, aprovada do jeito normal, nunca
+    é "emergência vencida" — nem quando fica meses parada.
+    """
+    from services.alcada_compras import ratificacao_vencida
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        req = _requisicao(adm.id, obra.id, gestor.id)
+        assert ratificacao_vencida(req) is False
+        assert ratificacao_vencida(
+            req, agora=datetime.utcnow() + timedelta(days=365)) is False
+
+        # Emergencial marcada mas NUNCA aprovada pelo rito: também não vence.
+        # Ela seguiu o caminho comum, e o caminho comum já cobrou a alçada.
+        emergencial_sem_rito = _req_emergencial(adm.id, obra.id, gestor.id)
+        assert ratificacao_vencida(
+            emergencial_sem_rito,
+            agora=datetime.utcnow() + timedelta(days=30)) is False
+
+
+def test_passadas_48h_sem_ratificacao_a_conta_derivada_fica_bloqueada():
+    """D5 — a sanção. E ela é a CONTA, não a compra.
+
+    A tríade da Fase 2 está FECHADA neste teste (nota lançada, material
+    atestado): sem a emergência vencida a conta liberaria agora. A única coisa
+    que sobra é a assinatura que ninguém deu — e é ela que segura o dinheiro.
+    """
+    from services.financeiro_compra import (TriadeIncompleta, liberar,
+                                            pernas_faltantes)
+    from services.alcada_compras import aprovar_emergencial
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        forn = _fornecedor(adm.id)
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+
+        pedido, contas = _pedido_da_emergencia(req, forn.id)
+        _fechar_a_triade(pedido, adm)
+        assert pernas_faltantes(pedido) == [], (
+            'a tríade está fechada — o que sobrar daqui em diante é a '
+            'emergência, e só ela')
+
+        _envelhecer_a_emergencia(req, horas=49)
+
+        faltam = pernas_faltantes(pedido)
+        assert faltam, 'emergência vencida tem de aparecer como perna faltante'
+        with pytest.raises(TriadeIncompleta):
+            liberar(pedido, usuario=adm)
+        assert contas[0].situacao_liberacao == 'bloqueada'
+
+
+def test_a_mensagem_do_bloqueio_diz_o_numero_da_requisicao_e_quem_ratifica():
+    """Defeito nº 8 da revisão da Fase 3: conta bloqueada sem dizer o que falta.
+
+    Quem abre a tela de pagamento não sabe que existe uma requisição de
+    emergência esperando assinatura. A mensagem tem de dizer QUAL requisição e
+    QUEM pode assinar — senão o caminho de saída é ligar para o suporte, e o
+    de fato é pagar por fora.
+    """
+    from services.financeiro_compra import pernas_faltantes
+    from services.alcada_compras import aprovar_emergencial
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        forn = _fornecedor(adm.id)
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+        pedido, contas = _pedido_da_emergencia(req, forn.id)
+        _fechar_a_triade(pedido, adm)
+        _envelhecer_a_emergencia(req, horas=49)
+
+        texto = '; '.join(pernas_faltantes(pedido))
+        aid, cid, numero = adm.id, contas[0].id, req.numero
+
+    assert numero in texto, f'a mensagem não diz QUAL requisição: {texto!r}'
+    assert 'ratific' in texto.lower(), texto
+    assert 'gestor' in texto.lower() and 'admin' in texto.lower(), (
+        f'a mensagem não diz QUEM pode ratificar: {texto!r}')
+
+    # E a mesma frase tem de chegar ao usuário pela porta ÚNICA da Fase 2.
+    cliente = _cliente_de(aid)
+    cliente.post(f'/financeiro/contas-pagar/{cid}/pagar',
+                 data={'valor_pago': '4900.00',
+                       'data_pagamento': '2026-08-20',
+                       'forma_pagamento': 'PIX'})
+    with cliente.session_transaction() as sess:
+        flashes = ' | '.join(m for _c, m in sess.get('_flashes', []))
+    assert numero in flashes, (
+        f'a recusa da baixa não nomeia a requisição: {flashes!r}')
+
+    with app.app_context():
+        from models import ContaPagar
+        cp = db.session.get(ContaPagar, cid)
+        assert (cp.valor_pago or 0) == 0, 'a baixa foi gravada mesmo recusada'
+
+
+def test_ratificar_depois_de_vencido_libera_a_conta():
+    """A sanção não é castigo: é uma porta fechada que reabre com a assinatura.
+
+    Vencer não mata a compra. Ratificar em atraso é o caminho, e ele tem de
+    funcionar — senão a única saída de uma conta bloqueada seria pagar por fora.
+    """
+    from services.financeiro_compra import liberar, pernas_faltantes
+    from services.alcada_compras import (aprovar_emergencial,
+                                         registrar_ratificacao)
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        forn = _fornecedor(adm.id)
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+        pedido, contas = _pedido_da_emergencia(req, forn.id)
+        _fechar_a_triade(pedido, adm)
+        _envelhecer_a_emergencia(req, horas=72)
+        assert pernas_faltantes(pedido)
+
+        registrar_ratificacao(req, adm)
+        db.session.commit()
+
+        assert req.ratificada_em is not None
+        assert pernas_faltantes(pedido) == [], (
+            'ratificada, a perna some — e ela é a única que sobrava')
+        liberadas = liberar(pedido, usuario=adm)
+        db.session.commit()
+        assert liberadas and liberadas[0].situacao_liberacao == 'liberada'
+
+
+def test_com_dois_fluxos_desligado_a_sancao_nao_morde_e_isso_e_de_proposito():
+    """⚠️ ASSIMETRIA DELIBERADA — este teste NOMEIA o comportamento.
+
+    Sem `financeiro_dois_fluxos_ativo` a `ContaPagar` nasce `liberada` e não há
+    onde a não-ratificação morder. Isso é DECIDIDO, não defeito: as outras três
+    regras da fase (condições, acumulado e corte de cotações) funcionam sem a
+    Fase 2, e recusar ligar a alçada avançada por causa de um quarto dela seria
+    negar os outros três quartos. Por isso o `--ligar` AVISA e não recusa (📖
+    spec, "Consequência de acoplamento", e o teste do aviso, acima).
+
+    O dia em que este teste ficar vermelho é o dia em que alguém transformou o
+    aviso em recusa — ou fez a sanção morder fora do regime que a sustenta.
+    """
+    from services.financeiro_compra import pernas_faltantes
+    from services.alcada_compras import aprovar_emergencial, ratificacao_vencida
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia(dois_fluxos=False)
+        forn = _fornecedor(adm.id)
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+        pedido, contas = _pedido_da_emergencia(req, forn.id)
+        _envelhecer_a_emergencia(req, horas=72)
+
+        assert ratificacao_vencida(req) is True, (
+            'a emergência vence igual — o que muda é onde ela morde')
+        assert contas[0].situacao_liberacao == 'liberada', (
+            'fora do regime de dois fluxos a conta nasce liberada, e é isso '
+            'que tira o dente da sanção — de propósito')
+        assert pernas_faltantes(pedido) == [], (
+            'pedido fora do Fluxo A do regime novo não tem tríade nenhuma, e '
+            'a emergência entra pela MESMA porta que a tríade')
+
+
+def test_emergencia_em_requisicao_que_nunca_vira_pedido_apenas_vence():
+    """📖 spec, "Casos de borda": não há conta para bloquear.
+
+    A ratificação vence e fica REGISTRADA — é o sensor da A8 que a enxerga,
+    não uma notificação. Inventar aqui um bloqueio sem objeto seria inventar
+    uma sanção que não existe.
+    """
+    from services.alcada_compras import aprovar_emergencial, ratificacao_vencida
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+        _envelhecer_a_emergencia(req, horas=100)
+
+        assert ratificacao_vencida(req) is True
+        assert req.ratificada_em is None
+        assert PedidoCompra.query.filter_by(requisicao_id=req.id).count() == 0
+        assert req.estado == EstadoRequisicao.APROVADA, (
+            'vencer não reverte a compra: o material já chegou, e punir a '
+            'obra por um ato administrativo chega tarde')
+
+
+def test_pagar_conta_continua_com_uma_porta_so():
+    """TESTE-GUARDA da ponte com a Fase 2.
+
+    `pagar_conta` recusa por UM critério: `situacao_liberacao`. A emergência
+    vencida entra por `pernas_faltantes`, que é a mesma função que a tríade já
+    usava — e é por isso que `financeiro_views.py` NÃO foi tocado nesta task.
+    Duas guardas no mesmo ponto recusariam o mesmo pagamento por dois motivos
+    diferentes e dobrariam as formas de o usuário ficar preso, sem acrescentar
+    controle nenhum. A decisão está registrada em
+    `services/financeiro_compra.py`, no cabeçalho da F5.
+    """
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(raiz, 'financeiro_views.py'), encoding='utf-8') as f:
+        fonte = f.read()
+    portas = re.findall(r"situacao_liberacao[^\n]*==\s*'bloqueada'", fonte)
+    assert len(portas) == 1, (
+        f'`pagar_conta` tem de continuar com UMA porta só; achei '
+        f'{len(portas)}: {portas}')
+    assert 'ratificacao_vencida' not in fonte and 'emergencial' not in fonte, (
+        'a emergência não pode ter aberto uma segunda porta em '
+        'financeiro_views — ela entra pelo caminho da Fase 2, em '
+        '`pernas_faltantes`')
+
+
+def test_a_tela_de_nova_requisicao_oferece_o_rito_e_diz_o_que_ele_nao_dispensa():
+    """O usuário decide SABENDO do prazo.
+
+    Checkbox mais justificativa, e o texto que separa o que a emergência
+    dispensa (a aprovação *ex ante*) do que ela não dispensa (nada mais: a
+    mesma alçada, em 48h, sob pena de a conta não pagar).
+    """
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        aid = adm.id
+
+    html = _cliente_de(aid).get('/compras/requisicoes/nova').get_data(as_text=True)
+    assert 'name="emergencial"' in html, 'o checkbox do rito não está na tela'
+    assert '48' in html, 'a tela tem de dizer o prazo'
+    assert 'ratific' in html.lower()
+    assert 'justificativa' in html.lower()
+
+
+def test_a_tela_recusa_emergencia_sem_justificativa_e_de_quem_nao_tem_alcada():
+    """A rota é a segunda barreira, e ela existe porque a primeira é HTML.
+
+    `required` no textarea some com um POST forjado; e quem não é gestor nem
+    admin não dispensa alçada nenhuma (D4) — a requisição continua sendo
+    criada, só que pelo caminho comum, com a alçada inteira.
+    """
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        comprador = _operador(adm.id, 'Comprador')
+        _vincular(comprador, obra, PapelObra.COMPRADOR)
+        aid, oid, cid = adm.id, obra.id, comprador.id
+
+    dados = {
+        'obra_id': str(oid),
+        'emergencial': 'on',
+        'item_descricao[]': ['Bomba de recalque'],
+        'item_unidade[]': ['un'],
+        'item_quantidade[]': ['1'],
+        'item_preco[]': ['4900,00'],
+        'item_almoxarifado_id[]': [''],
+    }
+
+    # (a) sem justificativa: recusa, e nada é criado.
+    html = _cliente_de(aid).post('/compras/requisicoes/nova', data=dict(dados),
+                                 follow_redirects=True).get_data(as_text=True)
+    assert 'justificativa' in html.lower()
+    with app.app_context():
+        assert RequisicaoCompra.query.filter_by(admin_id=aid).count() == 0
+
+    # (b) COMPRADOR com justificativa: a requisição nasce, mas pelo caminho
+    #     comum — em RASCUNHO, sem o rito, e a tela diz por quê.
+    dados['justificativa'] = JUSTIFICATIVA
+    html = _cliente_de(cid).post('/compras/requisicoes/nova', data=dict(dados),
+                                 follow_redirects=True).get_data(as_text=True)
+    with app.app_context():
+        req = RequisicaoCompra.query.filter_by(admin_id=aid).one()
+        assert req.estado == EstadoRequisicao.RASCUNHO
+        assert req.emergencial is False, (
+            'quem não tem alçada não invoca o rito — e a requisição não pode '
+            'ficar marcada como emergencial esperando alguém que nunca virá')
+    assert 'gestor' in html.lower()
+
+
+def test_o_gestor_cria_emergencia_pela_tela_e_ela_sai_aprovada():
+    """O ciclo de ponta a ponta, pela tela: uma tela só, um POST só.
+
+    E o detalhe passa a mostrar o prazo — quem abre a requisição precisa ver
+    quantas horas restam sem abrir o spec.
+    """
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        aid, oid, gid = adm.id, obra.id, gestor.id
+
+    _cliente_de(gid).post('/compras/requisicoes/nova', data={
+        'obra_id': str(oid),
+        'emergencial': 'on',
+        'justificativa': JUSTIFICATIVA,
+        'item_descricao[]': ['Bomba de recalque'],
+        'item_unidade[]': ['un'],
+        'item_quantidade[]': ['1'],
+        'item_preco[]': ['4900,00'],
+        'item_almoxarifado_id[]': [''],
+    }, follow_redirects=True)
+
+    with app.app_context():
+        req = RequisicaoCompra.query.filter_by(admin_id=aid).one()
+        assert req.emergencial is True
+        assert req.estado == EstadoRequisicao.APROVADA
+        assert req.ratificada_em is None
+        rid = req.id
+
+    html = _cliente_de(aid).get(
+        f'/compras/requisicoes/{rid}').get_data(as_text=True)
+    assert 'emerg' in html.lower()
+    assert 'ratific' in html.lower(), (
+        'o detalhe tem de dizer que a ratificação está pendente')
+
+
+def test_ratificacao_pela_tela_passa_pela_mesma_rota_de_aprovacao():
+    """"A ratificação passa pelo mesmo caminho, de propósito" (📖 spec).
+
+    Uma rota só de aprovação, uma barreira só (`pode_aprovar`), e a diferença
+    entre aprovar e ratificar é o estado da requisição — não um segundo
+    caminho de escrita que alguém teria de manter em sincronia com o primeiro.
+    """
+    from services.alcada_compras import aprovar_emergencial
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+        aid, gid, rid = adm.id, gestor.id, req.id
+
+    # Quem invocou tenta pela tela: recusado, com motivo.
+    html = _cliente_de(gid).post(
+        f'/compras/requisicoes/{rid}/aprovar', data={},
+        follow_redirects=True).get_data(as_text=True)
+    with app.app_context():
+        assert db.session.get(RequisicaoCompra, rid).ratificada_em is None
+
+    # O ADMIN ratifica pela mesma rota.
+    _cliente_de(aid).post(f'/compras/requisicoes/{rid}/aprovar',
+                          data={'observacao': 'Confiro a emergência.'},
+                          follow_redirects=True)
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, rid)
+        assert req.ratificada_em is not None
+        assert req.estado == EstadoRequisicao.APROVADA, (
+            'ratificar não move o estado — a requisição já estava APROVADA')

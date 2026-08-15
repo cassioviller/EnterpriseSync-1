@@ -111,6 +111,48 @@
         <div class="card-body">
           <h6 class="fw-bold">Alçada</h6>
 
+          {# Fase 3 do ciclo de compras (A6) — o relógio da emergência.
+             Esta requisição foi aprovada SEM aprovação, e a alçada é cobrada
+             agora. Quem abre a tela precisa ver o prazo, e ver que a sanção
+             existe, sem abrir o spec — e precisa ver QUEM pode assinar, senão
+             a conta bloqueada vira ligação para o suporte (defeito nº 8 da
+             revisão da Fase 3). #}
+          {% if requisicao.emergencial %}
+            {% if requisicao.ratificada_em %}
+              <div class="alert alert-success py-2 px-2 small mb-2">
+                <strong>Emergência ratificada</strong> em
+                {{ requisicao.ratificada_em.strftime('%d/%m/%Y %H:%M') }}.
+                A alçada foi cumprida — depois da compra, como o rito prevê.
+              </div>
+            {% elif emergencia_prazo %}
+              <div class="alert alert-{{ 'danger' if emergencia_vencida else 'warning' }} py-2 px-2 small mb-2">
+                <strong>
+                  {% if emergencia_vencida %}
+                    Emergência VENCIDA sem ratificação
+                  {% else %}
+                    Aprovada pelo rito de emergência — ratificação pendente
+                  {% endif %}
+                </strong><br>
+                Esta requisição foi aprovada <em>sem</em> aprovação prévia. A
+                alçada continua a mesma
+                ({{ faixa.aprovacoes_necessarias }} aprovação(ões)) e é cobrada
+                agora, até
+                <strong>{{ emergencia_prazo.strftime('%d/%m/%Y %H:%M') }}</strong>
+                (48 horas corridas).
+                {% if emergencia_vencida %}
+                  <br>O prazo passou: <strong>a conta a pagar desta compra não
+                  é liberada</strong> enquanto ninguém ratificar. Ratificar em
+                  atraso reabre a liberação.
+                {% else %}
+                  <br>Sem ratificação até lá, a conta a pagar desta compra não
+                  será liberada.
+                {% endif %}
+                <br>Quem ratifica: um gestor desta obra ou um administrador da
+                empresa — nunca quem solicitou nem quem invocou a emergência.
+              </div>
+            {% endif %}
+          {% endif %}
+
           {# Fase 3 do ciclo de compras — POR QUE esta requisição subiu.
              As duas faixas e o motivo em português, na mesma tela em que a
              pendência aparece: uma exigência que o aprovador não consegue
@@ -266,6 +308,25 @@
               </form>
             {% else %}
               <div class="alert alert-secondary small mb-0">{{ motivo_recusa }}</div>
+            {% endif %}
+          {% endif %}
+
+          {# Fase 3 (A6) — a ratificação usa a MESMA rota de aprovação, de
+             propósito: uma barreira só (`pode_aprovar`), e a diferença entre
+             aprovar e ratificar é o estado da requisição. #}
+          {% if requisicao.emergencial and not requisicao.ratificada_em
+                and emergencia_prazo %}
+            {% if pode_ratificar %}
+              <form method="POST"
+                    action="{{ url_for('compras.requisicao_aprovar', requisicao_id=requisicao.id) }}">
+                <input type="text" name="observacao" class="form-control form-control-sm mb-2"
+                       placeholder="Observação da ratificação (opcional)">
+                <button class="btn btn-warning w-100">
+                  <i class="fas fa-stamp me-1"></i> Ratificar a emergência
+                </button>
+              </form>
+            {% else %}
+              <div class="alert alert-secondary small mb-0">{{ motivo_ratificacao }}</div>
             {% endif %}
           {% endif %}
 

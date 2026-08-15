@@ -18,14 +18,19 @@ from utils.tenant import get_tenant_admin_id, is_v2_active
 # Fase 3 — governança de compras. Imports no topo de propósito: estes
 # módulos não importam compras_views de volta, então não há ciclo.
 from services.alcada_compras import (MOTIVO_FRACIONAMENTO, ROTULOS_DEGRAU,
+                                     EmergenciaInvalida,
                                      acumulado_da_etapa,
                                      acumulado_do_fornecedor,
+                                     aprovar_emergencial,
                                      decisao_de_alcada,
                                      esta_totalmente_aprovada,
                                      garantir_faixas_do_tenant, faixa_efetiva,
                                      irmas_da_janela, janela_de_fracionamento,
                                      pendencias_de_aprovacao, pode_aprovar,
-                                     registrar_aprovacao)
+                                     pode_ratificar, prazo_de_ratificacao,
+                                     ratificacao_vencida,
+                                     registrar_aprovacao,
+                                     registrar_ratificacao)
 from services.requisicao_compra import (TransicaoInvalida, proximo_numero,
                                         recalcular_valor, transicionar)
 from utils.autorizacao import (obras_visiveis, pode_comprar_na_obra,
@@ -1781,6 +1786,20 @@ def requisicao_nova_post():
     except ValueError:
         data_necessidade = None
 
+    # Fase 3 (A6) — o rito de emergência 48h. A justificativa é conferida AQUI,
+    # antes de a requisição existir: criar a linha e só depois descobrir que
+    # falta o texto deixaria no banco uma requisição marcada emergencial que
+    # ninguém consegue aprovar pelo rito. O `required` do textarea é a primeira
+    # barreira; esta é a que sobrevive a um POST forjado, e `aprovar_emergencial`
+    # é a terceira (📖 spec, "O rito de emergência 48h").
+    justificativa = (request.form.get('justificativa') or '').strip() or None
+    quer_emergencia = bool(request.form.get('emergencial'))
+    if quer_emergencia and not justificativa:
+        flash('Requisição emergencial exige justificativa escrita — ela é o '
+              'preço da dispensa de aprovação, e é o que os ratificadores vão '
+              'ler nas próximas 48 horas.', 'danger')
+        return redirect(url_for('compras.requisicao_nova'))
+
     # Tenants criados depois da migration 243 não têm faixa; semeia aqui,
     # antes de existir requisição que dependa delas. COMMIT próprio: se o
     # loop de numeração abaixo der rollback numa colisão, o seed não pode ir
@@ -1811,7 +1830,11 @@ def requisicao_nova_post():
                 solicitante_id=current_user.id,
                 estado=EstadoRequisicao.RASCUNHO,
                 regime_alcada=regime,
-                justificativa=(request.form.get('justificativa') or '').strip() or None,
+                # A emergência só é MARCADA no regime avançado: em regime
+                # simples o rito não existe, e uma linha marcada sem rito
+                # ficaria esperando uma ratificação que ninguém iria cobrar.
+                emergencial=(quer_emergencia and regime == 'avancado'),
+                justificativa=justificativa,
                 data_necessidade=data_necessidade,
                 valor_estimado=0,
             )
@@ -1851,6 +1874,32 @@ def requisicao_nova_post():
     # commit.
     faixa = faixa_efetiva(requisicao)
     db.session.commit()
+
+    # Fase 3 (A6) — o rito, no mesmo POST. Quem tem alçada (GESTOR da obra ou
+    # ADMIN, D4) já sai com a requisição APROVADA e o relógio das 48h correndo.
+    # Quem NÃO tem sai com a requisição comum, e a tela diz por quê: deixá-la
+    # marcada `emergencial` em RASCUNHO seria uma linha esperando um rito que
+    # ninguém pode invocar por ela.
+    if requisicao.emergencial:
+        try:
+            aprovar_emergencial(requisicao, current_user)
+            db.session.commit()
+            flash(f'Requisição {requisicao.numero} APROVADA pelo rito de '
+                  f'emergência (R$ {requisicao.valor_estimado}), sem aprovação '
+                  f'prévia. Ela já pode virar pedido — mas a alçada continua a '
+                  f'mesma: {faixa.aprovacoes_necessarias} aprovação(ões) têm '
+                  f'de ser registradas nas próximas 48 horas. Sem isso, a '
+                  f'conta a pagar desta compra não será liberada.', 'warning')
+        except EmergenciaInvalida as e:
+            db.session.rollback()
+            requisicao.emergencial = False
+            db.session.commit()
+            flash(f'Requisição {requisicao.numero} criada pelo caminho normal: '
+                  f'{e} Ela precisa de {faixa.aprovacoes_necessarias} '
+                  f'aprovação(ões).', 'warning')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao.id))
+
     flash(f'Requisição {requisicao.numero} criada (R$ '
           f'{requisicao.valor_estimado}). Pela alçada configurada, ela vai '
           f'precisar de {faixa.aprovacoes_necessarias} aprovação(ões).',
@@ -1880,6 +1929,18 @@ def requisicao_detalhe(requisicao_id):
     decisao = decisao_de_alcada(requisicao)
     faixa = decisao.efetiva
     pode, motivo_recusa = pode_aprovar(requisicao, current_user)
+
+    # Fase 3 (A6) — o relógio da emergência, na tela em que a requisição vive.
+    # Quem abre precisa ver quantas horas restam, ou que o prazo passou e a
+    # conta parou, sem abrir o spec. `pode_ratificar` é consultado só quando há
+    # rito pendente: fora dele a chamada seria uma query por página aberta.
+    emergencia_prazo = emergencia_vencida = None
+    pode_rat, motivo_rat = False, ''
+    if requisicao.emergencial and requisicao.ratificada_em is None:
+        emergencia_prazo = prazo_de_ratificacao(requisicao)
+        if emergencia_prazo is not None:
+            emergencia_vencida = ratificacao_vencida(requisicao)
+            pode_rat, motivo_rat = pode_ratificar(requisicao, current_user)
 
     # Fase 3 (A5) — o FATO que gerou a exigência, na mesma tela em que a
     # exigência aparece: as irmãs da janela, com número e valor. Aprovador que
@@ -1916,6 +1977,11 @@ def requisicao_detalhe(requisicao_id):
         pendencias=pendencias_de_aprovacao(requisicao),
         pode_aprovar=pode,
         motivo_recusa=motivo_recusa,
+        # Fase 3 (A6) — o rito de emergência.
+        emergencia_prazo=emergencia_prazo,
+        emergencia_vencida=emergencia_vencida,
+        pode_ratificar=pode_rat,
+        motivo_ratificacao=motivo_rat,
         pode_emitir=pode_comprar_na_obra(requisicao.obra_id),
         pedidos=pedidos,
         # Fase 3 — a pendência de mapa precisa ter saída NESTA tela: ou se
@@ -2100,12 +2166,23 @@ def requisicao_aprovar(requisicao_id):
     isso `registrar_aprovacao` grava a RequisicaoTransicao com
     `para_estado == estado atual` (voto) e só depois, se
     `esta_totalmente_aprovada`, é que `transicionar` roda de verdade.
+
+    Desde a Fase 3 (A6) esta rota é TAMBÉM a da ratificação da emergência — e
+    ser a mesma é o ponto. "A ratificação passa pelo mesmo caminho, de
+    propósito" (📖 spec, "Casos de borda"): uma barreira só, `pode_aprovar`,
+    que já barra o solicitante e quem já assinou. A diferença entre aprovar e
+    ratificar é o ESTADO da requisição, não um segundo caminho de escrita que
+    alguém teria de manter em sincronia com o primeiro.
     """
     guard = _check_v2()
     if guard:
         return guard
 
     requisicao = _requisicao_do_tenant(requisicao_id)
+
+    if requisicao.emergencial and requisicao.ratificada_em is None and \
+            requisicao.estado == EstadoRequisicao.APROVADA:
+        return _ratificar_emergencia(requisicao)
 
     permitido, motivo = pode_aprovar(requisicao, current_user)
     if not permitido:
@@ -2141,6 +2218,48 @@ def requisicao_aprovar(requisicao_id):
 
     return redirect(url_for('compras.requisicao_detalhe',
                             requisicao_id=requisicao_id))
+
+
+def _ratificar_emergencia(requisicao):
+    """A ratificação *ex post* de uma requisição aprovada pelo rito (A6).
+
+    Não é rota: é o ramo de `requisicao_aprovar`, para que exista UM ponto de
+    entrada de assinatura de alçada. `registrar_ratificacao` só carimba
+    `ratificada_em` quando a alçada fecha INTEIRA — numa faixa de duas
+    aprovações, uma assinatura *ex post* não fecha nada, e a mensagem tem de
+    dizer isso a quem assinou.
+    """
+    vencida = ratificacao_vencida(requisicao)
+    try:
+        registrar_ratificacao(
+            requisicao, current_user,
+            observacao=(request.form.get('observacao') or '').strip() or None)
+        db.session.commit()
+    except EmergenciaInvalida as e:
+        db.session.rollback()
+        flash(str(e), 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao.id))
+    except Exception as e:
+        db.session.rollback()
+        logger.error('[fase3] falha ao ratificar requisicao %s: %s',
+                     requisicao.id, e, exc_info=True)
+        flash('Não foi possível registrar a ratificação. Tente novamente.',
+              'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao.id))
+
+    if requisicao.ratificada_em is not None:
+        extra = (' A conta a pagar desta compra volta a poder ser liberada.'
+                 if vencida else '')
+        flash(f'Emergência da requisição {requisicao.numero} RATIFICADA.'
+              f'{extra}', 'success')
+    else:
+        faltando = '; '.join(pendencias_de_aprovacao(requisicao))
+        flash(f'Sua ratificação foi registrada, mas a alçada desta requisição '
+              f'ainda não fechou. Falta: {faltando}.', 'warning')
+    return redirect(url_for('compras.requisicao_detalhe',
+                            requisicao_id=requisicao.id))
 
 
 @compras_bp.route('/requisicoes/<int:requisicao_id>/rejeitar', methods=['POST'])

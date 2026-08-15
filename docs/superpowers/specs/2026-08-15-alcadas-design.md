@@ -336,6 +336,23 @@ O que a emergência **dispensa**: a aprovação *ex ante*. A requisição vai de
 direto a APROVADA, sem votos, e pode virar pedido na hora. É o ponto inteiro do rito —
 material que a obra precisa hoje.
 
+> 📌 **15/08, A6: "direto" é o efeito, não o caminho — a máquina de estados NÃO ganhou
+> a aresta.** `TRANSICOES_VALIDAS` (📖 `services/requisicao_compra.py`) não tem
+> RASCUNHO → APROVADA, e `aprovar_emergencial` **não a acrescenta**: ela chama
+> `transicionar()` duas vezes na mesma transação (RASCUNHO → AGUARDANDO_APROVACAO →
+> APROVADA), as duas com o motivo marcado `[emergencia]`. Acrescentar a aresta abriria o
+> atalho que dispensa aprovação para **todo mundo** — para `requisicao_enviar`, para
+> qualquer rota futura —, e não só para o rito; a régua deixaria de dizer a verdade sobre
+> o que o sistema permite. A requisição nunca **repousa** em AGUARDANDO_APROVACAO, e o
+> passo intermediário paga um segundo dividendo: ele é a *entrada da rodada* que
+> `_inicio_da_rodada_atual` procura, sem a qual os votos da ratificação, 40 horas depois,
+> não contariam para nada.
+>
+> Na mesma linha, o rito só é **marcado** em requisição de regime `'avancado'`
+> (`requisicao_nova_post` e a primeira validação de `aprovar_emergencial`). Marcar
+> `emergencial` numa linha `'simples'` deixaria no banco uma requisição esperando uma
+> ratificação que nenhum código iria cobrar.
+
 O que a emergência **não** dispensa: nada mais. A alçada continua sendo a mesma, só que
 *ex post*: os mesmos `aprovacoes_necessarias` da faixa efetiva, contados pelos mesmos
 `votos_de_aprovacao`, dentro de **48 horas corridas** a partir da aprovação emergencial.
@@ -348,6 +365,42 @@ não libera**.
 > `conta_pagar.situacao_liberacao` (📖 migration 288), e `pagar_conta` já tem **uma** porta
 > que a consulta. Emergência não ratificada vira conta que ninguém paga até alguém assinar
 > embaixo. Não inventamos punição nova: reusamos a que existe, que é onde o dinheiro para.
+
+> 📌 **15/08, A6: por onde a ponte com a Fase 2 encostou — `pernas_faltantes`, e
+> `financeiro_views.py` não foi tocado.** O spec diz "reusamos a que existe" sem dizer
+> qual função. Ao executar, o único ponto que satisfaz as três exigências ao mesmo tempo
+> foi `services.financeiro_compra.pernas_faltantes`, que ganhou uma quarta perna
+> (`_emergencia_nao_ratificada`). Ela é a função que a Fase 2 já usava para responder "por
+> que esta conta não libera", e é lida pelos **três** consumidores que importam:
+> `liberar()` recusa por ela, `fechar_lote()` pula a conta por ela, e a mensagem da recusa
+> da baixa em `pagar_conta` é montada com ela. Uma perna a mais é uma frase a mais na
+> mesma resposta — nenhuma linha nova em `financeiro_views.py`, e há teste-guarda que
+> conta as portas daquele arquivo (`test_pagar_conta_continua_com_uma_porta_so`) e recusa
+> a segunda.
+>
+> Três consequências, e as três são desenho, não acidente:
+>
+> 1. **A assimetria sai de graça.** `pernas_faltantes` já devolve `[]` quando a conta não
+>    nasce `bloqueada` — isto é, sempre que `financeiro_dois_fluxos_ativo` está OFF, e
+>    também no Fluxo B (adiantamento nasce liberado por definição). A sanção não morde
+>    exatamente onde o spec diz que ela não morde, sem um único `if` sobre a flag.
+> 2. **Ratificar em ATRASO libera.** `registrar_ratificacao` não consulta
+>    `ratificacao_vencida`: vencer fecha a porta, ratificar a reabre. Sem isso a única
+>    saída de uma conta bloqueada seria pagar por fora — o contorno que a fase existe para
+>    evitar.
+> 3. ⚠️ **Fica uma janela residual, e ela é conhecida.** A sanção age sobre conta que
+>    **ainda está bloqueada**. Se a tríade fechar e alguém liberar a conta *dentro* das
+>    48h, e só depois o prazo vencer, aquela conta já está `liberada` e nada a rebloqueia:
+>    reescrever `situacao_liberacao` de fora de `liberar()` seria o segundo caminho de
+>    escrita que a Fase 2 recusou, e a segunda porta que o 📌 do F5 proíbe. É estreita na
+>    prática (nota + atesto + liberação em menos de 48h) e, o que importa mais, é
+>    **visível**: `scripts/verificar_consistencia_financeiro.py` já a apanha hoje, porque
+>    ele reavalia `pernas_faltantes` sobre conta liberada e passa a encontrar a perna da
+>    emergência (sob o rótulo `conta_liberada_sem_triade`, que é o nome errado para o
+>    achado certo). O sensor da A8 a nomeia direito, com o achado "emergencial vencida com
+>    conta **não** bloqueada" que o plano já prevê. Fechá-la de verdade exigiria a conta
+>    consultar a requisição no momento da baixa — a segunda porta —, e por isso ela fica
+>    registrada em vez de fechada.
 
 Consequência de acoplamento, e ela é assimétrica: **se `financeiro_dois_fluxos_ativo`
 estiver OFF, a sanção não tem onde morder** (a conta nasce `liberada`). Por isso o
@@ -487,6 +540,35 @@ task cortável** — o passo 1 do runbook e o UPDATE da D6 dependem dela.
 - **Ratificação por quem invocou** — recusada. `pode_aprovar` já barra o solicitante (📖
   `services/alcada_compras.py:206-208`) e a ratificação passa pelo mesmo caminho, de
   propósito.
+
+> 📌 **15/08, A6: "o mesmo caminho" custou duas mudanças em `pode_aprovar`, e uma
+> barreira que ele NÃO tinha.**
+>
+> 1. **`pode_aprovar` ganhou o parâmetro `estados`** (padrão: só
+>    AGUARDANDO_APROVACAO, o comportamento de sempre). A ratificação é cobrada sobre uma
+>    requisição **já APROVADA**, e sem isso a primeira checagem da função a recusaria. A
+>    alternativa — um `pode_ratificar` com as regras copiadas — seria a mesma regra de
+>    autorização em dois lugares, e o dia em que uma mudasse seria o dia em que a outra
+>    ficaria errada em silêncio.
+> 2. **`pode_aprovar` e `papel_para_alcada` passaram a resolver o papel por
+>    `papel_de_usuario_na_obra(usuario, …, tenant=requisicao.admin_id)`**, e não por
+>    `papel_na_obra(obra_id)`, que lê a sessão. Nas rotas os dois são a mesma pessoa
+>    (`current_user`) e o resultado não muda — o que muda é que as funções passam a servir
+>    **fora de um request**, que é o que a ratificação por serviço, o sensor da A8 e um
+>    eventual job precisam. Era também uma inconsistência latente: `pode_aprovar(req,
+>    outra_pessoa)` conferia o papel de quem estava na sessão, não o do argumento.
+> 3. **"Quem invocou não ratifica" é barreira NOVA, e não a do solicitante.** O spec as
+>    trata como a mesma; não são. O gestor que abre a requisição no canteiro e invoca o
+>    rito é, com frequência, o solicitante — aí a barreira antiga já basta. Mas ele pode
+>    invocar a emergência de uma requisição de **outra** pessoa, e nesse caso
+>    `pode_aprovar` o deixaria assinar a própria dispensa. `pode_ratificar` lê o
+>    `usuario_id` da transição `[emergencia]` e o barra antes de chamar `pode_aprovar`.
+>    Sem isso o rito seria uma declaração unilateral com 48 horas de cerimônia.
+>
+> E o outro lado, que é deliberado: **`pode_invocar_emergencia` NÃO barra o solicitante.**
+> O gestor com a bomba queimada na frente é exatamente quem deve abrir e liberar a compra
+> na mesma hora — a separação de funções não some, ela é cobrada 48 horas depois, onde
+> ela ainda pode significar alguma coisa.
 - **Fornecedor novo emitido duas vezes no mesmo dia** — a segunda já não é novo. É o
   comportamento certo e o teste registra que é intencional.
 - **`valor_ate` NULL** — o acumulado nunca cruza um teto que não existe; a faixa aberta
