@@ -187,6 +187,16 @@ Flag `alcadas_avancadas_ativa` em `configuracao_empresa`, nasce OFF, no molde de
 → `escopo_obra_ativo`. O `--ligar` **recusa tenant sem `compras_governanca_ativa`**, e a
 recusa imprime o comando exato da flag que falta.
 
+> 📌 **15/08, A8: a frase acima nomeia TRÊS elos e diz cinco — os cinco, conferidos
+> `pode_ligar` por `pode_ligar`, são estes, e eles formam duas pernas e não uma corrente
+> única.** A perna DURA é `escopo_obra_ativo` → `compras_governanca_ativa` →
+> `alcadas_avancadas_ativa`: cada uma recusa sem a anterior (📖 `flag_compras_governanca.
+> main`, `flag_alcadas_avancadas.pode_ligar`). A perna PARCIAL é `recebimento_atesto_ativo`
+> → `financeiro_dois_fluxos_ativo` (📖 `flag_financeiro_dois_fluxos.pode_ligar`, que recusa
+> sem o atesto), e ela só sustenta **uma** das quatro regras: a sanção da emergência. É por
+> isso que a falta dela AVISA e não recusa. Desenhar como corrente única faria parecer que
+> ligar as alçadas exige a Fase 2, o que o próprio `pode_ligar` desmente.
+
 ⚠️ **A dependência é dura, não estética.** Com `escopo_obra_ativo` OFF,
 `papel_de_usuario_na_obra` devolve GESTOR a **todo** autenticado do tenant (📖
 `utils/autorizacao.py:147-160`) — qualquer um aprova, e só o ADMIN emite. Foi o achado
@@ -402,6 +412,19 @@ não libera**.
 >    consultar a requisição no momento da baixa — a segunda porta —, e por isso ela fica
 >    registrada em vez de fechada.
 
+> ✅ **15/08, A8: a janela residual tem nome no sensor — e virou DOIS achados, não um.**
+> A foto é a mesma (emergência vencida, conta não bloqueada) e as causas são opostas, o
+> que faz do achado único uma pista errada: mandaria o operador procurar um defeito onde
+> houve uma liberação legítima, ou tratar como conhecido um `UPDATE` feito à mão. O que os
+> separa é **`conta_pagar.liberada_em`**: quem o tem preenchido passou por `liberar()`,
+> que recusa por `pernas_faltantes` — logo a emergência ainda não havia vencido quando ela
+> liberou. Ficaram `janela_residual_emergencia` (liberação legítima dentro das 48h; a
+> saída é cobrar a ratificação pela tela) e `emergencia_vencida_com_conta_liberada`
+> (`liberada_em` nulo: a conta nunca passou pelo chokepoint, e aí é escrita por fora).
+> O recorte dos dois é o de `pernas_faltantes`, `situacao_liberacao_inicial(pedido) ==
+> 'bloqueada'` — sem ele o sensor gritaria em todo tenant sem a Fase 2 ligada, onde a
+> conta nasce liberada e sempre nasceu.
+
 Consequência de acoplamento, e ela é assimétrica: **se `financeiro_dois_fluxos_ativo`
 estiver OFF, a sanção não tem onde morder** (a conta nasce `liberada`). Por isso o
 `--ligar` da flag nova **avisa** — sem recusar — quando o tenant não tem os dois fluxos.
@@ -447,6 +470,32 @@ uma condição da linha.
 > quantas requisições dos últimos 30 dias disparariam) e, se o volume assustar, deixar a
 > condição fora de `condicoes_ativas` no primeiro tenant e ligá-la depois. É a razão de as
 > condições serem lista editável e não quatro colunas.
+
+> 📌 **15/08, A8: o volume foi medido, e ele assusta — `fora_do_orcamento` não entra
+> ligada no primeiro tenant.** `--simular` rodado sobre o dev inteiro (3.471 tenants com
+> faixa e requisição na janela de 30 dias, **3.864 requisições**):
+>
+> | condição | dispara em | leitura |
+> |---|---|---|
+> | `fora_do_orcamento` | **3.854 (100%)** | é o ⚠️ acima, confirmado no extremo: quase nenhuma requisição do dev aponta etapa |
+> | `sem_cotacao` | 201 (5%) | só nas faixas com `minimo_cotacoes > 0`, que são poucas — o backfill deixou 2 só onde já se exigia mapa |
+> | `nao_menor_preco` | 0 | nenhuma requisição do dev tem mapa vinculado com escolha; a condição é a mais rara das quatro por construção |
+> | `fornecedor_novo` | **não avaliável nas 3.864** | é desenho, não falha da medição: a requisição não tem fornecedor, e só a emissão a avalia (📖 o 📌 da A4) |
+> | `fracionamento` | 239 (6%) | não é condição — é o acumulado da janela movendo a faixa de partida |
+>
+> **2.107 (55%) mudariam de faixa de fato** com as quatro ligadas; as outras 45% disparam
+> e saturam, porque já estão na faixa de topo — a trilha registra, a exigência não muda
+> (📖 "Casos de borda"). A recomendação que sai daí é a do próprio ⚠️, agora com número:
+> **ligar as três primeiras e deixar `fora_do_orcamento` para a segunda volta**, depois de
+> o tenant preencher etapa, e medir de novo com o mesmo comando. Ligá-la junto subiria um
+> degrau em praticamente toda requisição do tenant — que é o degrau virando ruído de
+> fundo, e não controle.
+>
+> ⚠️ **O que este número NÃO é.** O dev não tem tenant com volume de produção: as 3.864
+> requisições são a soma de milhares de tenants efêmeros de teste, com no máximo 7 linhas
+> cada. Ele mede bem a FORMA do problema (etapa em branco domina; mapa é raro) e não mede
+> a operação de nenhuma empresa. Rodar o `--simular` no tenant real antes de ligar
+> continua sendo o passo 0a, e é ele que decide — não esta tabela.
 
 **D2 — a janela do anti-fracionamento. ✅ 30 dias corridos.**
 Por tenant, em `configuracao_empresa.janela_fracionamento_dias`. Mês é a unidade em que a
@@ -647,42 +696,75 @@ Os que não podem faltar:
 
 ## Runbook — ligar a flag num tenant
 
-```bash
-# 0a. Medir ANTES de decidir: quantas requisições dos últimos 30 dias
-#     subiriam de faixa, e por qual condição. Roda com a flag desligada.
-python scripts/verificar_consistencia_alcadas.py <ADMIN_ID> --simular
+> ✅ **15/08, A8: este runbook foi conferido comando por comando contra o código, e o que
+> não rodava foi corrigido aqui.** Um runbook que não roda é pior que nenhum — quem o
+> segue no meio de uma virada não tem como saber se o erro é dele ou do texto. As
+> correções estão marcadas com `# ← A8` na primeira vez que aparecem.
 
-# 0b. Onde o tenant está. A cadeia tem cinco elos e ligar fora de ordem
-#     produz requisição travada sem caminho para destravar.
-python scripts/flag_escopo_obra.py <ADMIN_ID>
+```bash
+# 0a. Medir ANTES de decidir: quantas requisições dos últimos N dias
+#     subiriam de faixa, e por qual condição. Roda COM A FLAG DESLIGADA,
+#     não consulta a flag e não escreve nada. Sai 0 sempre — medir não é
+#     achar, e misturar os dois faria um cron gritar por causa do normal.
+python scripts/verificar_consistencia_alcadas.py <ADMIN_ID> --simular
+python scripts/verificar_consistencia_alcadas.py <ADMIN_ID> --simular --dias 90   # ← A8: janela maior
+#     Leia a linha `fora_do_orcamento` primeiro: é ela que decide o passo 1c.
+
+# 0b. Onde o tenant está. São cinco flags, em duas pernas (ver o 📌 de
+#     "Regime de virada"), e ligar fora de ordem produz requisição travada
+#     sem caminho para destravar.
+python scripts/flag_escopo_obra.py <ADMIN_ID> --status   # ← A8: este exige --status;
+                                                         #   os outros quatro consultam sem
 python scripts/flag_compras_governanca.py <ADMIN_ID>     # precisa estar ON
 python scripts/flag_recebimento_atesto.py <ADMIN_ID>
 python scripts/flag_financeiro_dois_fluxos.py <ADMIN_ID> # OFF só tira o dente da emergência
 
 # 1. Conferir as faixas ANTES de ligar, na tela (A7): Configurações ›
-#    Alçadas de compra. Três coisas, nesta ordem:
-#    a. os tetos (5k / 30k / aberto) continuam valendo para este tenant?
-#    b. subir a faixa de topo para minimo_cotacoes = 3 — é a decisão D6, e
+#    Alçadas de Compra  →  /configuracoes/alcadas.  Quatro coisas, nesta ordem:
+#    a. ← A8  O tenant TEM faixa? A tela diz por escrito quando não tem. Tenant
+#       com zero faixas cai na `_FaixaSeguranca` (2 aprovações + ADMIN), que é
+#       falha fechada e não aparece em tela nenhuma — não há o que conferir nos
+#       passos seguintes. Use o botão Semear (POST /configuracoes/alcadas/semear,
+#       idempotente) e só então siga.
+#    b. os tetos (5k / 30k / aberto) continuam valendo para este tenant? O topo
+#       da tela mostra os invariantes quebrados, se houver (é o mesmo texto que
+#       o sensor do passo 4 imprime).
+#    c. subir a faixa de topo para minimo_cotacoes = 3 — é a decisão D6, e
 #       ela é UPDATE aqui, não migration. O backfill deixou 2.
-#    c. quais condições ficam ativas. Se o tenant ainda não preenche etapa
+#    d. quais condições ficam ativas. Se o tenant ainda não preenche etapa
 #       com disciplina, deixe fora_do_orcamento de fora nesta primeira
-#       volta (ver o ⚠️ da D1) e ligue depois de medir com o sensor.
+#       volta (ver o ⚠️ da D1) e ligue depois de medir com o 0a de novo.
 
 # 2. Ligar.
 python scripts/flag_alcadas_avancadas.py <ADMIN_ID> --ligar
+#    ← A8: LEIA A SAÍDA. Uma linha começando por `AVISO (não impede ligar):`
+#    significa que falta `financeiro_dois_fluxos_ativo` e que o rito de
+#    emergência vai existir SEM sanção (o passo 3e não vai reproduzir). A
+#    ausência dessa linha é o que significa cadeia inteira ligada.
+#    `RECUSADO:` (exit 1) só acontece por falta de `compras_governanca_ativa`,
+#    e a mensagem traz o comando exato que falta.
 
 # 3. Ciclo completo numa obra piloto, conferindo em ordem:
 #    a. requisição comum, valor baixo → mesma exigência de antes
 #    b. requisição com fornecedor novo → uma aprovação a mais, e o motivo
-#       aparece em degrau_aplicado
+#       aparece em degrau_aplicado.  ← A8: a cobrança é na EMISSÃO, não no
+#       envio — a requisição não tem fornecedor, e é a guarda 2 de
+#       `requisicao_emitir_pedido` que descobre que ele é novo (📖 o 📌 da A4)
 #    c. três requisições pequenas na mesma etapa → a terceira sobe de faixa
 #    d. requisição acima de 30k com mapa de 3 fornecedores → emite (o
 #       bloqueio permanente da faixa 3 tem que ter morrido aqui)
 #    e. requisição emergencial → aprova na hora; sem ratificar em 48h, a
-#       conta derivada não paga
+#       conta derivada não paga.  ← A8: esta conferência SÓ reproduz com
+#       `financeiro_dois_fluxos_ativo` ON. Com ela OFF a ContaPagar nasce
+#       `liberada`, `pernas_faltantes` volta vazia e não há o que bloquear —
+#       é a assimetria decidida, não defeito. Sem os dois fluxos, confira até
+#       "aprova na hora" e pare aí.
 
 # 4. Sensor.
 python scripts/verificar_consistencia_alcadas.py <ADMIN_ID>
+#    ← A8: exit 0 = sem drift; exit 1 = achado, e cada achado é impresso em
+#    português com o número da requisição ou da conta. `--json` para máquina.
+#    Rode-o de novo depois de cada volta do passo 3.
 ```
 
 ### Rollback
@@ -691,6 +773,28 @@ python scripts/verificar_consistencia_alcadas.py <ADMIN_ID>
 o que exigia — de propósito: rebaixar alçada de requisição em curso é o contrário do que a
 fase faz. Emergência pendente continua contando as 48h. O que volta ao normal é a
 requisição **nova**.
+
+> 📌 **15/08, A8: o que o `--desligar` NÃO faz — conferido no código, e é a metade que o
+> operador precisa ler antes de chamá-lo de rollback.**
+>
+> 1. **Não reescreve `regime_alcada`.** `definir_flag` toca uma coluna só, em
+>    `configuracao_empresa`. Toda requisição `'avancado'` segue avançada, e
+>    `decisao_de_alcada` lê o regime da linha — nunca a flag.
+> 2. **Não apaga `degrau_aplicado`.** A trilha só cresce, por decisão da A4: ela explica
+>    uma exigência que a compra já cumpriu.
+> 3. **Não desarma emergência nenhuma.** `ratificacao_vencida` não consulta flag: a
+>    contagem das 48h continua, e a `ContaPagar` que já está `bloqueada` continua
+>    bloqueada. A saída dela é ratificar pela tela da requisição — ratificar em atraso
+>    libera, de propósito (📖 o 📌 da A6), e é isso que impede a conta presa de virar
+>    pagamento por fora.
+> 4. **Não tem guarda.** Ao contrário do `--ligar`, o `--desligar` não consulta
+>    `pode_ligar` nem recusa nada. Ele é sempre aceito, e as três linhas acima são o
+>    motivo de isso ser seguro.
+>
+> Consequência prática: desligar interrompe a **entrada** de requisições no regime novo e
+> nada mais. O tenant só está de fato de volta ao regime de ontem quando a última
+> requisição `'avancado'` tiver saído do ciclo — e é o sensor do passo 4, não o
+> `--desligar`, que diz quando isso aconteceu.
 
 ---
 

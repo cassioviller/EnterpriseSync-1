@@ -2488,3 +2488,503 @@ def test_ratificacao_pela_tela_passa_pela_mesma_rota_de_aprovacao():
         assert req.ratificada_em is not None
         assert req.estado == EstadoRequisicao.APROVADA, (
             'ratificar não move o estado — a requisição já estava APROVADA')
+
+
+# ---------------------------------------------------------------------------
+# A8 — Sensor, teste-guarda e runbook
+#
+# 📖 spec 2026-08-15-alcadas-design.md, "Testes" e "Runbook — ligar a flag num
+# tenant".
+#
+# Duas coisas diferentes moram aqui, e elas olham para lados opostos do tempo:
+#
+#   * o TESTE-GUARDA olha para o futuro do código — ele existe para o dia em
+#     que o ponto que cria requisição for dois, e não um (padrão da C9 da
+#     Fase 1);
+#   * o SENSOR olha para o passado do banco — ele existe para achar estado que
+#     só poderia ter chegado ali por fora do serviço, e para MEDIR (`--simular`)
+#     antes de alguém ligar a flag num tenant real.
+#
+# O sensor reusa as MESMAS funções que decidem (`faixa_efetiva`,
+# `pernas_faltantes`, `diagnosticar`, `condicoes_disparadas`). Um sensor que
+# reimplementa a regra que vigia não vigia nada: ele passa a ter os próprios
+# defeitos, e os dois erram juntos exatamente onde erram igual.
+# ---------------------------------------------------------------------------
+
+# A lista POR ESCRITO dos pontos que criam `RequisicaoCompra` em produção.
+# Está aqui, e não só no assert, porque é ela o conteúdo do teste-guarda: um
+# ponto novo obriga quem o escreveu a vir até aqui e DECIDIR sobre o regime,
+# em vez de herdar o default da coluna por descuido.
+PONTOS_QUE_CRIAM_REQUISICAO = {
+    'compras_views.py': (
+        'requisicao_nova_post — o formulário de nova requisição, hoje o único '
+        'ponto de criação. Carimba `regime_alcada=_regime_alcada(admin_id)`, '
+        'lido UMA vez fora do laço de retry de numeração.'),
+}
+
+
+def test_todo_ponto_que_cria_requisicao_carimba_o_regime_alcada():
+    """Guarda de fonte: nenhum `RequisicaoCompra(...)` sem `regime_alcada`.
+
+    Os testes de cima exercitam `regime_alcada_do_tenant`, não a LIGAÇÃO dele
+    na rota — o carimbo poderia sumir num refactor e nada ficaria vermelho.
+    Uma requisição criada sem carimbo nasce `'simples'` pelo default da coluna:
+    silenciosamente, aquele caminho volta ao motor de ontem, sem condição, sem
+    acumulado e sem rito de emergência, e ninguém descobre até a compra grande
+    passar com uma aprovação.
+
+    Mesmo formato do teste-guarda da C9 (📖
+    `tests/test_recebimento_atesto.test_todo_ponto_que_cria_pedido_carimba_o_regime`),
+    e pelo mesmo motivo: aquele teste varria um arquivo só e afirmava proteger
+    contra um terceiro ponto de criação que JÁ EXISTIA, noutro arquivo, com o
+    teste verde. Este varre o repositório inteiro e por `ast`, não por regex:
+    `RequisicaoCompra(` seguido de fecha-parênteses na coluna certa é uma
+    aposta sobre formatação, não uma leitura do código.
+
+    Hoje o ponto é um só. O teste existe para o dia em que for dois.
+    """
+    import ast
+
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ignorados = {'tests', '.pythonlibs', 'archive', 'node_modules',
+                 '__pycache__', '.git', 'backups', 'attached_assets',
+                 'migrations_backup', '.local', 'obra_kabod'}
+
+    construcoes = []
+    sem_carimbo = []
+    arquivos_com_criacao = set()
+    for pasta, subpastas, arquivos in os.walk(raiz):
+        subpastas[:] = [d for d in subpastas if d not in ignorados]
+        for nome in arquivos:
+            if not nome.endswith('.py'):
+                continue
+            caminho = os.path.join(pasta, nome)
+            try:
+                with open(caminho, encoding='utf-8') as f:
+                    arvore = ast.parse(f.read(), filename=caminho)
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            for no in ast.walk(arvore):
+                if not isinstance(no, ast.Call):
+                    continue
+                alvo = no.func
+                chamado = getattr(alvo, 'id', None) or getattr(
+                    alvo, 'attr', None)
+                if chamado != 'RequisicaoCompra':
+                    continue
+                relativo = os.path.relpath(caminho, raiz)
+                onde = f'{relativo}:{no.lineno}'
+                construcoes.append(onde)
+                arquivos_com_criacao.add(relativo)
+                if not any(kw.arg == 'regime_alcada' for kw in no.keywords):
+                    sem_carimbo.append(onde)
+
+    assert construcoes, 'nenhuma construção de RequisicaoCompra encontrada'
+
+    assert not sem_carimbo, (
+        f'{len(sem_carimbo)} de {len(construcoes)} construções de '
+        f'RequisicaoCompra não carimbam `regime_alcada`, e requisição sem '
+        f'carimbo nasce no regime SIMPLES pelo default da coluna — as quatro '
+        f'condições, o acumulado da janela e o rito de emergência deixam de '
+        f'valer para aquele caminho, sem aviso. Decida o regime: '
+        f'`_regime_alcada(admin_id)` (ou `regime_alcada_do_tenant`) para '
+        f'requisição de usuário, `\'simples\'` explícito para dado histórico '
+        f'ou de demonstração.\n  ' + '\n  '.join(sem_carimbo))
+
+    assert arquivos_com_criacao == set(PONTOS_QUE_CRIAM_REQUISICAO), (
+        f'a lista escrita de pontos que criam requisição saiu de sincronia '
+        f'com o código.\n'
+        f'  no código: {sorted(arquivos_com_criacao)}\n'
+        f'  na lista:  {sorted(PONTOS_QUE_CRIAM_REQUISICAO)}\n'
+        f'Acrescente o ponto novo a PONTOS_QUE_CRIAM_REQUISICAO, com uma '
+        f'frase dizendo de onde ele tira o regime. A lista é o conteúdo deste '
+        f'teste: ela obriga quem cria o ponto a DECIDIR sobre o regime em vez '
+        f'de herdar o default.')
+
+
+# ---------------------------------------------------------------------------
+# O sensor — `scripts/verificar_consistencia_alcadas.py`
+# ---------------------------------------------------------------------------
+
+def _tipos(achados):
+    return sorted(a['tipo'] for a in achados)
+
+
+def test_sensor_nao_grita_em_tenant_saudavel():
+    """Sensor que grita sempre não é lido nunca.
+
+    A escada semeada, uma requisição comum e uma emergência DENTRO do prazo
+    são o estado normal. Nenhum deles é drift.
+    """
+    from scripts.verificar_consistencia_alcadas import inconsistencias
+    from services.alcada_compras import aprovar_emergencial
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        _req_na_etapa(adm.id, obra.id, gestor.id)
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+
+        assert inconsistencias(adm.id) == []
+
+
+def test_sensor_acha_aprovada_com_menos_aprovacoes_que_a_faixa_exige():
+    """APROVADA sem a alçada fechada só chega ali por fora do serviço.
+
+    A rota confere `esta_totalmente_aprovada` antes de transicionar. Uma
+    requisição APROVADA com menos votos que a faixa EFETIVA exige significa
+    UPDATE na marra, script de correção, ou rota nova que esqueceu do
+    chokepoint — e o sensor compara com a efetiva, não com a do valor, porque
+    é a efetiva que a fase passou a cobrar.
+    """
+    from scripts.verificar_consistencia_alcadas import inconsistencias
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        req = _req_na_etapa(adm.id, obra.id, gestor.id, valor='29000.00',
+                            estado=EstadoRequisicao.APROVADA)
+        db.session.commit()
+
+        achados = inconsistencias(adm.id)
+        assert 'aprovada_sem_a_alcada_fechada' in _tipos(achados)
+        achado = [a for a in achados
+                  if a['tipo'] == 'aprovada_sem_a_alcada_fechada'][0]
+        assert achado['requisicao_numero'] == req.numero
+        assert achado['pendencias'], 'o achado tem de dizer o que falta'
+
+
+def test_sensor_acha_emergencia_vencida_sem_ratificacao():
+    """As 48h passaram e ninguém assinou. É o achado central da A6."""
+    from scripts.verificar_consistencia_alcadas import inconsistencias
+    from services.alcada_compras import aprovar_emergencial
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+        _envelhecer_a_emergencia(req, horas=72)
+
+        achados = inconsistencias(adm.id)
+        assert 'emergencia_vencida_sem_ratificacao' in _tipos(achados)
+        achado = [a for a in achados
+                  if a['tipo'] == 'emergencia_vencida_sem_ratificacao'][0]
+        assert achado['requisicao_numero'] == req.numero
+        assert achado['horas_de_atraso'] >= 24
+
+
+def test_sensor_acha_a_janela_residual_da_emergencia():
+    """⚠️ A janela residual, que a A6 deixou NOMEADA e não fechada.
+
+    Conta liberada DENTRO das 48h (tríade fechada, `liberar()` chamado
+    legitimamente) cuja emergência vence DEPOIS: ela já está `liberada` e nada
+    a rebloqueia. Rebloquear de fora de `liberar()` seria o segundo caminho de
+    escrita que a Fase 2 recusou, e a segunda porta em `pagar_conta` que o
+    desenho proíbe — por isso a janela fica REGISTRADA em vez de fechada, e o
+    sensor é o lugar em que ela aparece.
+
+    O achado é diferente de "a sanção não pegou": aqui a liberação foi legítima
+    e o sensor tem de dizer isso, senão o operador procura um defeito que não
+    existe.
+    """
+    from scripts.verificar_consistencia_alcadas import inconsistencias
+    from services.alcada_compras import aprovar_emergencial
+    from services.financeiro_compra import liberar
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        forn = _fornecedor(adm.id)
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+
+        pedido, contas = _pedido_da_emergencia(req, forn.id)
+        _fechar_a_triade(pedido, adm)
+        # Dentro das 48h a emergência ainda não venceu: `liberar()` passa.
+        liberar(pedido, usuario=adm)
+        db.session.commit()
+        assert contas[0].situacao_liberacao == 'liberada'
+
+        # E só DEPOIS o prazo vence.
+        _envelhecer_a_emergencia(req, horas=72)
+
+        achados = inconsistencias(adm.id)
+        assert 'janela_residual_emergencia' in _tipos(achados), (
+            'a janela residual precisa aparecer com nome próprio — o sensor '
+            'da Fase 2 a apanha sob o rótulo errado (conta_liberada_sem_triade)')
+        achado = [a for a in achados
+                  if a['tipo'] == 'janela_residual_emergencia'][0]
+        assert achado['requisicao_numero'] == req.numero
+        assert achado['conta_pagar_id'] == contas[0].id
+
+
+def test_sensor_separa_a_janela_residual_da_sancao_que_nao_pegou():
+    """Conta liberada SEM `liberada_em` é outra coisa, e o sensor a separa.
+
+    A janela residual tem uma liberação legítima e datada, anterior ao prazo.
+    Uma conta que aparece `liberada` sem nunca ter passado por `liberar()` é
+    escrita por fora — e chamá-la de janela residual esconderia justamente o
+    defeito.
+    """
+    from scripts.verificar_consistencia_alcadas import inconsistencias
+    from services.alcada_compras import aprovar_emergencial
+    with app.app_context():
+        adm, obra, gestor = _tenant_emergencia()
+        forn = _fornecedor(adm.id)
+        req = _req_emergencial(adm.id, obra.id, gestor.id)
+        aprovar_emergencial(req, gestor)
+        db.session.commit()
+
+        pedido, contas = _pedido_da_emergencia(req, forn.id)
+        _envelhecer_a_emergencia(req, horas=72)
+        contas[0].situacao_liberacao = 'liberada'   # na marra
+        db.session.commit()
+
+        tipos = _tipos(inconsistencias(adm.id))
+        assert 'emergencia_vencida_com_conta_liberada' in tipos
+        assert 'janela_residual_emergencia' not in tipos
+
+
+def test_sensor_acha_faixa_com_minimo_de_uma_cotacao():
+    """1 é o número que alguém digita achando que exige "pelo menos uma".
+
+    Uma cotação não é concorrência, é orçamento. A tela da A7 recusa; um SQL
+    manual continua sendo possível, e é ele que este achado apanha.
+    """
+    from scripts.verificar_consistencia_alcadas import inconsistencias
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id)
+        faixas = _escada(adm.id)
+        faixas[2].minimo_cotacoes = 1
+        db.session.commit()
+
+        achados = inconsistencias(adm.id)
+        assert 'faixa_com_uma_cotacao' in _tipos(achados)
+        assert [a for a in achados
+                if a['tipo'] == 'faixa_com_uma_cotacao'][0]['faixa_id'] == \
+            faixas[2].id
+
+
+def test_sensor_le_a_escada_pelo_diagnostico_da_a7_e_nao_a_reimplementa():
+    """Zero ou duas faixas de teto aberto — o julgamento é o da tela.
+
+    `services.faixa_alcada_admin.diagnosticar` já devolve as violações de
+    invariante em português, e é o mesmo texto que o operador lê na tela de
+    faixas. Reimplementar aqui seria ter dois juízes que um dia discordam.
+    """
+    from scripts.verificar_consistencia_alcadas import inconsistencias
+    from services.faixa_alcada_admin import diagnosticar
+    with app.app_context():
+        # Zero teto aberto: a faixa de topo ganha um teto.
+        adm = _admin()
+        _cfg_tenant(adm.id)
+        faixas = _escada(adm.id)
+        faixas[2].valor_ate = Decimal('90000.00')
+        db.session.commit()
+
+        achados = [a for a in inconsistencias(adm.id)
+                   if a['tipo'] == 'escada_fora_do_invariante']
+        assert achados
+        assert achados[0]['violacao'] in diagnosticar(adm.id)
+
+        # Duas: a de 30k também abre.
+        faixas[1].valor_ate = None
+        faixas[2].valor_ate = None
+        db.session.commit()
+        achados = [a for a in inconsistencias(adm.id)
+                   if a['tipo'] == 'escada_fora_do_invariante']
+        assert achados
+        assert 'teto aberto' in achados[0]['violacao']
+
+
+def test_sensor_acha_degrau_citando_condicao_que_a_faixa_nao_ativa():
+    """`degrau_aplicado` é trilha; trilha que cita regra inexistente mente.
+
+    Duas origens possíveis, e as duas importam: alguém escreveu o campo por
+    fora, ou alguém removeu a condição de `condicoes_ativas` depois — caso em
+    que a requisição carrega a explicação de uma exigência que o tenant já não
+    faz. `fracionamento` NUNCA conta como citação indevida: ele é a regra do
+    acumulado e por desenho não mora em `condicoes_ativas` (📖 spec, D1).
+    """
+    from scripts.verificar_consistencia_alcadas import inconsistencias
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id)
+        obra = _obra(adm.id)
+        gestor = _operador(adm.id, 'Gestor')
+        _escada(adm.id, condicoes='sem_cotacao')
+
+        req = _req_na_etapa(adm.id, obra.id, gestor.id)
+        req.degrau_aplicado = 'fracionamento,sem_cotacao'
+        db.session.commit()
+        assert _tipos(inconsistencias(adm.id)) == [], (
+            'fracionamento e condição ativa não são drift')
+
+        req.degrau_aplicado = 'fracionamento,fornecedor_novo'
+        db.session.commit()
+        achados = [a for a in inconsistencias(adm.id)
+                   if a['tipo'] == 'degrau_cita_condicao_inativa']
+        assert achados
+        assert achados[0]['codigos'] == ['fornecedor_novo']
+
+
+def test_sensor_sai_com_codigo_diferente_de_zero_quando_acha():
+    """Exit ≠ 0 com achado — é o que faz o sensor servir num cron."""
+    from scripts.verificar_consistencia_alcadas import main
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id)
+        faixas = _escada(adm.id)
+        aid, topo_id = adm.id, faixas[2].id
+
+    argv = sys.argv[:]
+    try:
+        sys.argv = ['verificar_consistencia_alcadas.py', str(aid)]
+        assert main() == 0
+        with app.app_context():
+            db.session.get(FaixaAlcada, topo_id).minimo_cotacoes = 1
+            db.session.commit()
+        assert main() == 1
+    finally:
+        sys.argv = argv
+
+
+def test_sensor_so_olha_o_proprio_tenant():
+    """Isolamento: o drift do vizinho não é achado deste tenant."""
+    from scripts.verificar_consistencia_alcadas import inconsistencias
+    with app.app_context():
+        vizinho = _admin()
+        _cfg_tenant(vizinho.id)
+        faixas = _escada(vizinho.id)
+        faixas[2].minimo_cotacoes = 1
+        db.session.commit()
+
+        adm = _admin()
+        _cfg_tenant(adm.id)
+        _escada(adm.id)
+        assert inconsistencias(adm.id) == []
+
+
+# ---------------------------------------------------------------------------
+# `--simular` — o passo 0a do runbook
+# ---------------------------------------------------------------------------
+
+def test_simular_conta_quantas_subiriam_e_por_qual_condicao():
+    """A resposta operacional ao ⚠️ da D1, com a flag DESLIGADA.
+
+    `fora_do_orcamento` dispara em toda requisição sem etapa apontada, e em
+    tenant que ainda não preenche etapa com disciplina isso sobe quase tudo um
+    degrau. O número na mão é o que transforma "ligar ou adiar a condição" de
+    palpite em decisão — e é por isso que a simulação mede as QUATRO condições,
+    e não só as que a faixa já ativa: medir o que já está ligado não ajuda
+    ninguém a decidir o que ligar.
+    """
+    from scripts.verificar_consistencia_alcadas import simular
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id, alcadas_avancadas_ativa=False)
+        obra = _obra(adm.id)
+        gestor = _operador(adm.id, 'Gestor')
+        _escada(adm.id)
+        etapa = _etapa(obra, orcado='100000.00')
+
+        # Duas sem etapa: as duas disparam fora_do_orcamento.
+        _req_na_etapa(adm.id, obra.id, gestor.id, valor='4000.00')
+        _req_na_etapa(adm.id, obra.id, gestor.id, valor='100.00')
+        # Uma com etapa e dentro do previsto: não dispara nada.
+        _req_na_etapa(adm.id, obra.id, gestor.id, etapa_id=etapa.id,
+                      valor='1000.00')
+        # E uma fora da janela dos 30 dias: não entra na conta.
+        _req_na_etapa(adm.id, obra.id, gestor.id, etapa_id=etapa.id,
+                      valor='1000.00', dias_atras=60)
+
+        r = simular(adm.id, dias=30)
+
+        assert r['total'] == 3, 'a de 60 dias atrás está fora da janela'
+        assert r['por_condicao']['fora_do_orcamento'] == 2
+        assert r['por_condicao']['sem_cotacao'] == 0
+        assert r['nao_avaliaveis']['fornecedor_novo'] == 3, (
+            'fornecedor_novo só é avaliável na emissão — a requisição não tem '
+            'fornecedor, e a resposta honesta é "não dá para saber"')
+        assert r['subiriam'] == 2
+        assert r['flag_ligada'] is False
+
+
+def test_simular_nao_escreve_nada_nem_precisa_da_flag():
+    """Medir não pode mudar o que se está medindo.
+
+    A simulação NÃO passa por `decisao_de_alcada`, que grava `degrau_aplicado`
+    na sessão: ela usa os primitivos (`faixa_para_valor`, `valor_para_alcada`,
+    `condicoes_disparadas`), que por contrato não consultam flag nem regime e
+    não escrevem. É o que permite rodar antes de ligar, num tenant de produção,
+    sem deixar rastro.
+    """
+    from scripts.verificar_consistencia_alcadas import simular
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id, alcadas_avancadas_ativa=False)
+        obra = _obra(adm.id)
+        gestor = _operador(adm.id, 'Gestor')
+        _escada(adm.id)
+        req = _req_na_etapa(adm.id, obra.id, gestor.id, regime='simples')
+        rid = req.id
+
+        simular(adm.id, dias=30)
+        db.session.rollback()
+
+        depois = db.session.get(RequisicaoCompra, rid)
+        assert depois.degrau_aplicado == '', (
+            'simular gravou degrau numa requisição de regime simples')
+        assert depois.regime_alcada == 'simples'
+
+
+def test_simular_conta_o_fracionamento_separado_das_condicoes():
+    """O acumulado da janela move a BASE; ele não é uma quinta condição.
+
+    Três requisições de R$ 4.900 na mesma etapa: a terceira cruza o teto de 5k
+    pelo acumulado. A simulação tem de contá-la como fracionamento, e não
+    diluí-la nas quatro condições — quem lê o número decide sobre
+    `condicoes_ativas`, e o fracionamento não é ligável por tenant.
+    """
+    from scripts.verificar_consistencia_alcadas import simular
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id, alcadas_avancadas_ativa=False)
+        obra = _obra(adm.id)
+        gestor = _operador(adm.id, 'Gestor')
+        _escada(adm.id)
+        etapa = _etapa(obra, orcado='1000000.00')
+        for _ in range(3):
+            _req_na_etapa(adm.id, obra.id, gestor.id, etapa_id=etapa.id,
+                          valor='4900.00')
+
+        r = simular(adm.id, dias=30)
+        assert r['fracionamento'] == 3, (
+            'as três somam 14.700 na mesma (obra, etapa) e as três passam a '
+            'ser olhadas pela faixa de 30k')
+        assert r['subiriam'] == 3
+
+
+def test_simular_sai_com_zero_porque_medir_nao_e_achar():
+    """`--simular` é medição, não drift: exit 0 sempre.
+
+    Misturar os dois faria um cron que roda o sensor gritar por causa de um
+    tenant que simplesmente tem requisição sem etapa — que é o normal antes de
+    ligar, e é justamente o que se está medindo.
+    """
+    from scripts.verificar_consistencia_alcadas import main
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id)
+        obra = _obra(adm.id)
+        gestor = _operador(adm.id, 'Gestor')
+        faixas = _escada(adm.id)
+        _req_na_etapa(adm.id, obra.id, gestor.id)
+        faixas[2].minimo_cotacoes = 1     # drift que o sensor normal acharia
+        db.session.commit()
+        aid = adm.id
+
+    argv = sys.argv[:]
+    try:
+        sys.argv = ['verificar_consistencia_alcadas.py', str(aid), '--simular']
+        assert main() == 0
+    finally:
+        sys.argv = argv

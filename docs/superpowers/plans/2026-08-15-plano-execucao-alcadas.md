@@ -274,27 +274,35 @@ ligada em tenant real antes de A8**, porque o sensor é o que enxerga emergênci
 
 ## A8 — Sensor, teste-guarda e runbook
 
-- [ ] **Step 1 (red):** o teste-guarda que varre o repositório atrás de pontos que criam
+- [x] **Step 1 (red):** o teste-guarda que varre o repositório atrás de pontos que criam
   `RequisicaoCompra` e confere que todos carimbam `regime_alcada`, carregando por escrito a
   lista de pontos conhecidos (padrão da C9). Hoje é um; o teste existe para o dia em que for
-  dois.
-- [ ] **Step 2:** `scripts/verificar_consistencia_alcadas.py`, molde de
+  dois. — verde de nascença, como os dois teste-guarda da A6; o vermelho foi demonstrado
+  removendo `regime_alcada=regime` de `compras_views.py` (falhou nomeando
+  `compras_views.py:1824`) e restaurando em seguida. A lista por escrito é
+  `PONTOS_QUE_CRIAM_REQUISICAO`, e o assert de igualdade com ela é o que obriga um ponto
+  novo a **decidir** sobre o regime.
+- [x] **Step 2:** `scripts/verificar_consistencia_alcadas.py`, molde de
   `verificar_consistencia_financeiro.py`. Aponta: requisição APROVADA com menos aprovações
   que a faixa efetiva exige; emergencial vencida sem ratificação; emergencial vencida com
   conta **não** bloqueada (a que prova que a A6 está ligada de verdade); faixa com
   `minimo_cotacoes = 1`; tenant com zero ou duas faixas de teto aberto; `degrau_aplicado`
-  citando condição que a faixa não ativa. Exit ≠ 0 com achado.
-- [ ] **Step 2b:** o mesmo script ganha `--simular`, que roda **sem a flag ligada** e
+  citando condição que a faixa não ativa. Exit ≠ 0 com achado. — a terceira virou **duas**
+  (`janela_residual_emergencia` × `emergencia_vencida_com_conta_liberada`, separadas por
+  `liberada_em`); 📌 no spec.
+- [x] **Step 2b:** o mesmo script ganha `--simular`, que roda **sem a flag ligada** e
   responde uma pergunta só: das requisições dos últimos 30 dias deste tenant, quantas
   subiriam de faixa, e por qual condição. É o que o runbook manda rodar antes do passo 1 —
   e é a resposta operacional ao ⚠️ da D1, porque `fora_do_orcamento` dispara em toda
   requisição sem etapa apontada. Número na mão, ligar a condição ou adiá-la deixa de ser
-  palpite.
-- [ ] **Step 3:** o runbook no fim do spec conferido contra o que o código realmente faz —
+  palpite. — medido no dev: 3.864 requisições, `fora_do_orcamento` em **100%**; a tabela
+  inteira está no 📌 da D1.
+- [x] **Step 3:** o runbook no fim do spec conferido contra o que o código realmente faz —
   a ordem dos cinco elos, as cinco conferências do passo 3 e o que o `--desligar` faz **e
-  não faz**.
-- [ ] **Step 4 (green):** rodar. Verdes, sensor exit 0.
-- [ ] **Step 5:** commit — `feat(compras): sensor de consistencia das alcadas e o teste-guarda do carimbo`
+  não faz**. — cinco divergências corrigidas, marcadas `# ← A8` no próprio runbook.
+- [x] **Step 4 (green):** rodar. Verdes, sensor exit 0. — 88 em
+  `tests/test_alcadas_avancadas.py` (73 + 15 da A8).
+- [x] **Step 5:** commit — `feat(compras): sensor de consistencia das alcadas e o teste-guarda do carimbo`
 
 ---
 
