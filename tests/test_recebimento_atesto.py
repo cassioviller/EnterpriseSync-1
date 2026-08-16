@@ -914,8 +914,22 @@ def _cenario_de_rota(exige_atesto=True, qtd=50):
 
 
 def _recebimentos_de(pedido_id):
+    # ORDEM FIXA, e ela é load-bearing. Sem `order_by` o Postgres não promete
+    # ordem nenhuma, e quem faz `[0]` acreditando pegar o PRIMEIRO recebimento
+    # às vezes pega o segundo. Foi essa a causa da intermitente aberta em 14/08
+    # (`test_rota_de_exclusao_repassa_a_recusa_do_servico`): na seleção larga do
+    # gate o `[0]` calhava de ser o ÚLTIMO, aí excluir era legítimo, a recusa não
+    # vinha e o assert quebrava; em seleção menor a ordem física coincidia com a
+    # de inserção e passava. 🔬 16/08, quinta ocorrência, resolvida pela
+    # instrumentação que o próprio assert carregava.
+    # A `sequencia` é a mesma chave que o serviço usa para decidir qual é o
+    # último (services/recebimento_pedido.py:591) — o teste passa a perguntar
+    # pela mesma ordem que a produção responde. Produção nunca teve o defeito.
     from models import RecebimentoPedido
-    return RecebimentoPedido.query.filter_by(pedido_id=pedido_id).all()
+    return (RecebimentoPedido.query
+            .filter_by(pedido_id=pedido_id)
+            .order_by(RecebimentoPedido.sequencia)
+            .all())
 
 
 def test_tela_de_recebimento_abre_para_quem_tem_papel():
