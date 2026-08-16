@@ -265,6 +265,23 @@ def test_backfill_isola_a_obra_que_falha_e_depois_levanta(ambiente_baias):
               GROUP BY t.obra_id, o.admin_id) x""")).scalar()
         assert n_obras >= 2, (
             f'o teste precisa de ao menos 2 obras pendentes, achei {n_obras}')
+
+        # A premissa do contador: a obra RUIM é a última do laço. Ela vale
+        # porque `_backfill_versao_inicial` ordena por `obra_id` e a ruim
+        # acabou de ser criada — mas a premissa fica ASSERTADA, porque
+        # enquanto ela era implícita o teste media a falha na obra errada
+        # sempre que o Postgres mudava a ordem do GROUP BY (🔬 16/08).
+        ultima_pendente = db.session.execute(sa_text("""
+            SELECT t.obra_id FROM tarefa_cronograma t
+            JOIN obra o ON o.id = t.obra_id
+            WHERE NOT EXISTS (SELECT 1 FROM cronograma_versao v
+                              WHERE v.obra_id = t.obra_id)
+            GROUP BY t.obra_id, o.admin_id
+            ORDER BY t.obra_id DESC LIMIT 1""")).scalar()
+        assert ultima_pendente == obra_ruim, (
+            f'a falha seria injetada na obra {ultima_pendente}, não na ruim '
+            f'({obra_ruim}) — o teste mediria outra coisa')
+
         begin_que_falha_na_obra_ruim.restantes = n_obras - 1
         begin_que_falha_na_obra_ruim.ja_falhou = False
 

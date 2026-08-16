@@ -16879,6 +16879,17 @@ def _backfill_versao_inicial(tag, colunas_snapshot, select_snapshot,
        (`_aplicar` só fotografa o estado anterior quando existe versão ativa).
        Por isso o `raise` no fim: as obras boas ficam commitadas (transação
        por obra), e a migração volta a ser tentada para as que faltaram.
+
+    4. **`ORDER BY t.obra_id`.** Um `GROUP BY` sem ordenação devolve as linhas
+       na ordem que o Postgres achar melhor, e ela MUDA com o volume da tabela
+       — o plano vira hash agregado e a ordem física passa a mandar. Isso
+       deixava `test_backfill_isola_a_obra_que_falha_e_depois_levanta` flaky:
+       ele injeta a falha na última transação, e quando a obra da fixture caía
+       por último o teste media a falha na obra errada (🔬 16/08, gate do CI,
+       depois que a suíte de alçadas acrescentou obras ao banco). Ordem fixa
+       também torna o log do backfill reproduzível entre execuções. É o mesmo
+       defeito do commit b420122 ("a etapa era escolhida por sorteio do
+       Postgres").
     """
     from sqlalchemy import text as sa_text
     with db.engine.connect() as conn:
@@ -16890,6 +16901,7 @@ def _backfill_versao_inicial(tag, colunas_snapshot, select_snapshot,
                 SELECT 1 FROM cronograma_versao v WHERE v.obra_id = t.obra_id
             ) {filtro_obras}
             GROUP BY t.obra_id, o.admin_id
+            ORDER BY t.obra_id
         """)).fetchall()
 
     falhas = []
