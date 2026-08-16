@@ -1698,6 +1698,17 @@ def requisicao_nova_post():
     except ValueError:
         data_necessidade = None
 
+    # Urgência (spec 2026-08-16): urgente SOBE um degrau de alçada, então
+    # exige justificativa — quem aprova precisa saber por quê.
+    from services.requisicao_compra import DadosInvalidos, validar_urgencia
+    try:
+        urgencia, justificativa_urgencia = validar_urgencia(
+            request.form.get('urgencia'),
+            request.form.get('justificativa_urgencia'))
+    except DadosInvalidos as e:
+        flash(str(e), 'danger')
+        return redirect(url_for('compras.requisicao_nova'))
+
     # Tenants criados depois da migration 243 não têm faixa; semeia aqui,
     # antes de existir requisição que dependa delas. COMMIT próprio: se o
     # loop de numeração abaixo der rollback numa colisão, o seed não pode ir
@@ -1723,6 +1734,8 @@ def requisicao_nova_post():
                 justificativa=(request.form.get('justificativa') or '').strip() or None,
                 data_necessidade=data_necessidade,
                 valor_estimado=0,
+                urgencia=urgencia,
+                justificativa_urgencia=justificativa_urgencia,
             )
             db.session.add(requisicao)
             db.session.flush()

@@ -41,6 +41,19 @@
                 <textarea name="justificativa" rows="2" class="form-control"
                           placeholder="Para que serve, e por que agora"></textarea>
               </div>
+              <div class="col-md-4">
+                <label class="form-label">Urgência</label>
+                <select name="urgencia" id="urgencia" class="form-select">
+                  <option value="normal" selected>Normal</option>
+                  <option value="urgente">Urgente</option>
+                </select>
+              </div>
+              <div class="col-md-8" id="bloco-justificativa-urgencia" style="display:none">
+                <label class="form-label">Justificativa da urgência</label>
+                <input type="text" name="justificativa_urgencia" class="form-control"
+                       placeholder="Por que não pode esperar o fluxo normal?">
+                <div class="form-text">Urgente sobe um degrau de alçada.</div>
+              </div>
             </div>
           </div>
         </div>
@@ -113,6 +126,15 @@
 <script>
 (function () {
   var tabela = document.querySelector('#tabelaItens tbody');
+
+  // Justificativa da urgência: só aparece (e só é exigida) quando urgente.
+  var selUrgencia = document.getElementById('urgencia');
+  var blocoUrgencia = document.getElementById('bloco-justificativa-urgencia');
+  if (selUrgencia && blocoUrgencia) {
+    selUrgencia.addEventListener('change', function () {
+      blocoUrgencia.style.display = this.value === 'urgente' ? '' : 'none';
+    });
+  }
 
   document.getElementById('btnAddItem').addEventListener('click', function () {
     var modelo = tabela.rows[0].cloneNode(true);

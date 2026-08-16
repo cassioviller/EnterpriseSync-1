@@ -56,6 +56,32 @@ def proximo_numero(admin_id, ano=None):
     return f'{prefixo}{seq:04d}'
 
 
+class DadosInvalidos(ValueError):
+    """Dado de formulário que a regra recusa. A rota transforma em flash."""
+
+
+URGENCIAS = ('normal', 'urgente')
+
+
+def validar_urgencia(urgencia, justificativa):
+    """Urgente exige justificativa escrita. Devolve a dupla normalizada.
+
+    A validação é do serviço e não do schema: `NOT NULL` obrigaria backfill em
+    SC legada que nunca teve urgência, e um default inventado ('—') seria pior
+    do que a ausência. Urgente SOBE um degrau de alçada (spec 2026-08-16) — não
+    afrouxa nada —, e quem aprova precisa saber por quê.
+    """
+    urgencia = (urgencia or 'normal').strip().lower()
+    if urgencia not in URGENCIAS:
+        raise DadosInvalidos(f'Urgência inválida: {urgencia!r}.')
+    justificativa = (justificativa or '').strip()
+    if urgencia == 'urgente' and not justificativa:
+        raise DadosInvalidos(
+            'Requisição urgente exige justificativa — ela sobe a alçada, e '
+            'quem aprova precisa saber por quê.')
+    return urgencia, (justificativa or None)
+
+
 class TransicaoInvalida(Exception):
     """Transição de estado não permitida pela máquina."""
 

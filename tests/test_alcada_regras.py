@@ -330,3 +330,19 @@ def test_reenvio_depois_de_rejeicao_recarimba():
 
         assert sc.alcada_carimbada_em >= primeiro
         assert sc.alcada_motivos['valor_efetivo'] == 29000.0
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Urgência na SC
+# ═══════════════════════════════════════════════════════════════════════
+
+def test_urgente_sem_justificativa_e_recusado():
+    from services.requisicao_compra import DadosInvalidos, validar_urgencia
+    with app.app_context():
+        with pytest.raises(DadosInvalidos):
+            validar_urgencia('urgente', '')
+        assert validar_urgencia('urgente', 'concretagem parada') == \
+            ('urgente', 'concretagem parada')
+        assert validar_urgencia('normal', '') == ('normal', None)
+        with pytest.raises(DadosInvalidos):
+            validar_urgencia('urgentissimo', 'qualquer coisa')
