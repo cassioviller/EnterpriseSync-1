@@ -142,3 +142,41 @@ def test_exportacao_nao_leva_dado_do_outro_tenant(_par, formato):
 def test_os_ja_corrigidos_seguem_isolados(_par, tipo):
     a, b = _par
     assert b.marca not in _texto(_gerar(a, tipo))
+
+
+def test_relatorio_de_veiculos_so_mostra_a_frota_do_proprio_tenant(_par):
+    """`veiculos` NÃO estava escopado, ao contrário do que o docstring do topo
+    deste arquivo afirmava — `Veiculo.query.all()` servia a frota do banco
+    inteiro.
+
+    O teste acima não pegava isso por dois motivos que se somavam:
+    `dois_tenants` não semeia veículo (então não havia o que vazar), e a rota
+    estourava 500 em `veiculo.status` — atributo que o modelo não tem — assim
+    que QUALQUER tenant do banco tivesse um veículo. Como a query era global, o
+    resultado dependia de a suíte ter criado veículo antes: verde falso em
+    13/08, `AttributeError` no gate de 16/08.
+
+    Aqui a frota é semeada nos dois lados, de propósito, para que o isolamento
+    tenha o que provar.
+    """
+    from models import Veiculo
+    from app import db
+
+    a, b = _par
+    criados = []
+    try:
+        for t in (a, b):
+            v = Veiculo(placa=f'{t.marca[:7]}', marca=t.marca, modelo='Modelo',
+                        ano=2024, tipo='Van', km_atual=1000, ativo=True,
+                        admin_id=t.admin_id)
+            db.session.add(v)
+            criados.append(v)
+        db.session.commit()
+
+        corpo = _texto(_gerar(a, 'veiculos'))
+        assert a.marca in corpo, 'o tenant perdeu a própria frota'
+        assert b.marca not in corpo, 'a frota do tenant B vazou para o A'
+    finally:
+        for v in criados:
+            db.session.delete(v)
+        db.session.commit()
