@@ -296,8 +296,22 @@ def _relatorio_custos_obra(data_inicio, data_fim, obra_id=None):
     })
 
 def _relatorio_veiculos():
-    """Relatório de veículos"""
-    veiculos = Veiculo.query.all()
+    """Relatório de veículos — escopado por tenant.
+
+    Ficou de fora do p1 Step A por um engano de classificação: o docstring de
+    `tests/test_p1_isolamento_relatorios.py` o lista entre os "já escopados
+    (Fase 0 / R3)", e ele nunca foi — `Veiculo.query.all()` servia a frota de
+    TODAS as empresas a qualquer admin.
+
+    O vazamento vinha escondido atrás de um 500: `veiculo.status` não existe no
+    modelo (o campo é `ativo`, Boolean — `models.py:5054`), então a rota
+    estourava sempre que houvesse UM veículo em qualquer tenant do banco. Como
+    a query é global, o teste de isolamento passava ou quebrava conforme o
+    resto da suíte tivesse ou não criado veículo antes dele: verde falso em
+    13/08, `AttributeError` em 16/08.
+    """
+    admin_id = _tenant_id()
+    veiculos = Veiculo.query.filter_by(admin_id=admin_id).all()
     
     html = '<div class="table-responsive"><table class="table table-striped">'
     html += '<thead><tr><th>Placa</th><th>Marca/Modelo</th><th>Ano</th><th>Tipo</th><th>KM Atual</th><th>Status</th><th>Próxima Manutenção</th></tr></thead><tbody>'
@@ -308,7 +322,9 @@ def _relatorio_veiculos():
         html += f'<td>{veiculo.ano or "-"}</td>'
         html += f'<td>{veiculo.tipo}</td>'
         html += f'<td>{veiculo.km_atual or 0:,} km</td>'
-        html += f'<td><span class="badge bg-info">{veiculo.status}</span></td>'
+        situacao = 'Ativo' if veiculo.ativo else 'Inativo'
+        html += (f'<td><span class="badge bg-{"info" if veiculo.ativo else "secondary"}">'
+                 f'{situacao}</span></td>')
         html += f'<td>{veiculo.data_proxima_manutencao.strftime("%d/%m/%Y") if veiculo.data_proxima_manutencao else "-"}</td></tr>'
     
     html += '</tbody></table></div>'
