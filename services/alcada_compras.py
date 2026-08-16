@@ -27,10 +27,12 @@ MARCA_APROVACAO = '[aprovacao]'
 # importa desta constante, e `garantir_faixas_do_tenant` também — assim
 # mudar a recomendação é mudar uma lista.
 FAIXAS_RECOMENDADAS = [
-    # (ordem, valor_ate, aprovacoes, exige_admin, exige_mapa)
-    (1, Decimal('5000.00'), 1, False, False),
-    (2, Decimal('30000.00'), 2, True, False),
-    (3, None, 2, True, True),
+    # (ordem, valor_ate, aprovacoes, exige_admin, exige_mapa, fornecedores_min)
+    (1, Decimal('5000.00'), 1, False, False, 2),
+    (2, Decimal('30000.00'), 2, True, False, 2),
+    # A faixa aberta pede TRÊS cotações — é onde mora o corte de 3 do pedido
+    # original (spec 2026-08-16). Trocar é UPDATE em `faixa_alcada`.
+    (3, None, 2, True, True, 3),
 ]
 
 
@@ -60,11 +62,13 @@ def garantir_faixas_do_tenant(admin_id):
     """
     if FaixaAlcada.query.filter_by(admin_id=admin_id).count() > 0:
         return False
-    for ordem, valor_ate, aprov, exige_admin, exige_mapa in FAIXAS_RECOMENDADAS:
+    for (ordem, valor_ate, aprov, exige_admin, exige_mapa,
+         forn_min) in FAIXAS_RECOMENDADAS:
         db.session.add(FaixaAlcada(
             admin_id=admin_id, ordem=ordem, valor_ate=valor_ate,
             aprovacoes_necessarias=aprov, exige_admin=exige_admin,
-            exige_mapa_concorrencia=exige_mapa, ativo=True))
+            exige_mapa_concorrencia=exige_mapa,
+            fornecedores_minimos=forn_min, ativo=True))
     db.session.flush()
     logger.info('faixas de alçada semeadas para o tenant %s', admin_id)
     return True

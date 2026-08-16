@@ -1517,3 +1517,51 @@ git push origin main
 - [ ] Gate completo verde no CI.
 - [ ] Runbook do spec executado à mão em dev: duas SCs de R$ 4 mil na mesma etapa e a
       segunda subindo de faixa, com a primeira nomeada na tela.
+
+---
+
+## Status da execução — 2026-08-16
+
+Todas as 8 tasks executadas na mesma sessão em que o plano foi escrito, em TDD:
+teste vermelho pelo motivo certo antes de cada implementação.
+
+| Task | Commit | Testes |
+|---|---|---|
+| 1 — Migração 287 e colunas | `8dfa25a` | 1 |
+| 2 — Soma da janela | `44e26e5` | 11 |
+| 3 — As quatro condições | `4afc412` | 16 (+63 da Fase 3) |
+| 4 — O carimbo | `9756e38` | 83 com a regressão junto |
+| 5 — Urgência na SC | `9544021` | 21 |
+| 6 — Rito de emergência | `832c22b` | 26 (+85 da Fase 3) |
+| 7 — A tela diz por quê | `7ccdbe6` | 29 |
+| 8 — Semente e gate | — | ver abaixo |
+
+### Três desvios do plano, todos achados executando
+
+1. **`migrations.py:4589` desempacotava a tupla das faixas em cinco.** A
+   migração 243 importa `FAIXAS_RECOMENDADAS` do serviço, então acrescentar
+   `fornecedores_minimos` à constante quebraria a 243 **em banco novo** — que é
+   exatamente o caminho do CI. Virou `*_`, com o comentário de que a tupla
+   cresce a cada fase e a 243 não pode gravar coluna que a 287 ainda vai criar.
+   Provado rodando a cadeia inteira num banco criado do zero: 0 falhas.
+
+2. **A rota do detalhe montava a faixa com `faixa_para_valor(valor_estimado)`.**
+   A tela contaria uma história diferente da do motor a partir do primeiro
+   carimbo. Passou a usar `faixa_exigida`, e ganhou teste próprio
+   (`test_detalhe_mostra_a_faixa_CARIMBADA_e_nao_a_do_valor`).
+
+3. **Teste de emergência precisava de um segundo ADMIN no MESMO tenant.**
+   O helper `_admin()` cria admin de tenant próprio; sem o
+   `_admin_do_tenant(admin_id)`, `pode_aprovar` recusava por "requisição de
+   outra empresa" e o teste passaria pelo motivo errado — a mesma armadilha
+   registrada no D1 da Fase 0.6.
+
+### Testes acrescentados além do plano
+
+- `test_reenvio_depois_de_rejeicao_recarimba` — rodada nova, régua nova, com um
+  fato novo entrando entre as duas rodadas.
+- `test_detalhe_mostra_a_faixa_CARIMBADA_e_nao_a_do_valor` — o desvio 2.
+- `test_rota_de_emergencia_aciona_e_recusa_nao_admin` — a rota, não só o
+  serviço.
+- Em `test_divida_vencida_...`, a asserção de que **outra obra do mesmo tenant
+  não é contaminada** pela dívida.

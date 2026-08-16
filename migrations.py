@@ -4586,7 +4586,10 @@ def migration_243_faixa_alcada():
     # essa volumetria de suíte — ESTADO-ATUAL.md, armadilha 1).
     from services.alcada_compras import FAIXAS_RECOMENDADAS
 
-    for ordem, valor_ate, aprov, exige_admin, exige_mapa in FAIXAS_RECOMENDADAS:
+    # `*_` porque a tupla CRESCE com as fases: a 287 acrescentou
+    # `fornecedores_minimos`, que esta migração não pode gravar — a coluna
+    # ainda não existe no ponto do histórico em que ela roda.
+    for ordem, valor_ate, aprov, exige_admin, exige_mapa, *_ in FAIXAS_RECOMENDADAS:
         db.session.execute(text("""
             INSERT INTO faixa_alcada
                 (admin_id, ordem, valor_ate, aprovacoes_necessarias,
