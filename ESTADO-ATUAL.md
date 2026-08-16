@@ -34,9 +34,23 @@ dez pacotes do núcleo **estão no GitHub**; o aviso do commit `6942d043`
 ("parados atrás de um push sem credencial") **envelheceu no mesmo dia**: o
 push saiu depois dele. O `gh` CLI continua deslogado *nesta máquina*
 (🔬 03/08: `gh auth status` → "not logged into any GitHub hosts";
-`GH_TOKEN`/`GITHUB_TOKEN` também ausentes), o que é outra coisa: `git push`
+`GH_TOKEN`/`GITHUB_TOKEN` também ausentes), o que é outra coisa: ~~`git push`
 funciona, o que falta é a API do GitHub (abrir PR, fetch de branch de
-triagem). Refazer o login é interativo — item humano, restrito ao `gh`.
+triagem). Refazer o login é interativo — item humano, restrito ao `gh`.~~
+
+> 🔴 **16/08: isto envelheceu e virou falso. `git push origin` NÃO funciona.**
+> 🔬 tentativa real: `remote: Invalid username or token. Password authentication
+> is not supported for Git operations.` Não há `credential.helper`, não há
+> `~/.git-credentials`, e `GH_TOKEN`/`GITHUB_TOKEN`/`GIT_TOKEN`/`GITHUB_PAT`
+> estão todos ausentes. O item humano **não** é restrito ao `gh`: sem login,
+> nada sai para o GitHub. Este parágrafo é o sexto caso do defeito de
+> fabricação que abre o documento — verdade quando escrita, sem data no
+> qualificador que importava.
+>
+> 🔬 16/08: o remote **`gitsafe-backup`** (`git://gitsafe:5418/backup.git`)
+> aceita push sem credencial, e `main` foi para lá (`dd6df21e..1b4ab0c1`).
+> É backup, não é o GitHub — mas tira os 37 commits de cima de uma máquina só.
+> As branches de feature seguem **apenas locais**.
 
 > ⚠️ **O que continua parado não é o push, é a produção.** Os dez pacotes
 > mexem em custo, medição, progresso e contrato — números que o cliente vê — e
