@@ -49,6 +49,20 @@ PAPEIS_QUE_APONTAM = (PapelObra.GESTOR, PapelObra.APONTADOR)
 PAPEIS_QUE_REQUISITAM = (PapelObra.GESTOR, PapelObra.COMPRADOR)
 PAPEIS_QUE_COMPRAM = (PapelObra.COMPRADOR,)
 
+# Fase 4 — quem ATESTA o recebimento na obra.
+#
+# A lista é deliberadamente LARGA: todo papel de obra menos LEITOR, e sem
+# nenhuma checagem de "foi você que pediu" ou "foi você que emitiu". Não é
+# esquecimento — é decisão registrada no spec de 2026-08-11: em obra de equipe
+# pequena quem pede é quem recebe o caminhão, e exigir uma terceira pessoa
+# deixaria material parado no portão. O controle compensatório é a trilha do
+# `RecebimentoPedido` (autoria e data por entrega), não a separação de pessoas.
+#
+# LEITOR fica de fora porque é só leitura em toda a Fase 1, e atestar é escrita
+# que libera pagamento na fase seguinte.
+PAPEIS_QUE_RECEBEM = (PapelObra.GESTOR, PapelObra.APONTADOR,
+                      PapelObra.COMPRADOR)
+
 
 def _e_admin_do_tenant():
     try:
@@ -99,24 +113,35 @@ def obras_visiveis(admin_id=None):
     )
 
 
-def papel_na_obra(obra_id):
-    """`PapelObra` do usuário logado nesta obra, ou None.
+def papel_de_usuario_na_obra(usuario, obra_id, tenant=None):
+    """`PapelObra` de UM usuário nesta obra, ou None — sem `current_user`.
 
-    ADMIN/SUPER_ADMIN devolvem GESTOR implicitamente — sem precisar de
-    linha em usuario_obra.
+    Mesma regra de `papel_na_obra`, com a identidade passada em vez de lida
+    da sessão. Existe porque a Fase 4 tem um serviço (`registrar_recebimento`)
+    que precisa da regra fora de um request: um `flask_login.current_user`
+    embutido tornaria o serviço inchamável por CLI, por job e por teste — e a
+    alternativa, reimplementar a checagem lá dentro, seria a MESMA regra de
+    autorização em dois lugares.
+
+    `tenant` explícito preserva o caminho de `papel_na_obra`, que resolve o
+    tenant pela sessão (`get_tenant_admin_id`) e pode diferir do `admin_id`
+    gravado no usuário. Sem ele, o tenant é derivado do próprio usuário:
+    ADMIN responde por si, funcionário responde pelo seu admin.
     """
-    try:
-        if not current_user.is_authenticated:
-            return None
-    except Exception:
+    if usuario is None or not getattr(usuario, 'id', None):
         return None
 
+    if tenant is None:
+        tenant = (usuario.id
+                  if usuario.tipo_usuario in (TipoUsuario.ADMIN,
+                                              TipoUsuario.SUPER_ADMIN)
+                  else getattr(usuario, 'admin_id', None))
+
     obra = db.session.get(Obra, obra_id)
-    tenant = get_tenant_admin_id()
     if obra is None or tenant is None or obra.admin_id != tenant:
         return None
 
-    if _e_admin_do_tenant():
+    if usuario.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
         return PapelObra.GESTOR
 
     if not _escopo_ativo(tenant):
@@ -135,11 +160,31 @@ def papel_na_obra(obra_id):
         return PapelObra.GESTOR
 
     vinculo = UsuarioObra.query.filter_by(
-        usuario_id=current_user.id, obra_id=obra_id, ativo=True).first()
+        usuario_id=usuario.id, obra_id=obra_id, ativo=True).first()
     if vinculo:
         return vinculo.papel
 
     return None
+
+
+def papel_na_obra(obra_id):
+    """`PapelObra` do usuário logado nesta obra, ou None.
+
+    ADMIN/SUPER_ADMIN devolvem GESTOR implicitamente — sem precisar de
+    linha em usuario_obra.
+
+    Casca sobre `papel_de_usuario_na_obra`: aqui mora só a resolução da
+    IDENTIDADE (sessão + tenant da sessão); a regra em si mora lá, num lugar
+    só.
+    """
+    try:
+        if not current_user.is_authenticated:
+            return None
+    except Exception:
+        return None
+
+    return papel_de_usuario_na_obra(current_user, obra_id,
+                                    tenant=get_tenant_admin_id())
 
 
 def pode_ver_obra(obra_id):
@@ -179,6 +224,79 @@ def pode_comprar_na_obra(obra_id):
     if _e_admin_do_tenant():
         return True
     return papel in PAPEIS_QUE_COMPRAM
+
+
+def usuario_pode_receber_na_obra(usuario, obra_id):
+    """Atestar recebimento nesta obra, com a identidade EXPLÍCITA. Fase 4.
+
+    É esta que o serviço chama (`services/recebimento_pedido`), para poder
+    rodar fora de um request. `pode_receber_na_obra` é a casca de sessão.
+
+    `obra_id` None é pedido SEM obra — material de escritório, caso legítimo
+    que `compras_views.nova_post` aceita de propósito. Aí não há eixo de obra
+    para aplicar, e quem decide é o tenant (ver `_pode_receber_sem_obra`).
+    """
+    if obra_id is None:
+        return _pode_receber_sem_obra(usuario)
+
+    papel = papel_de_usuario_na_obra(usuario, obra_id)
+    if papel is None:
+        return False
+    if usuario.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
+        return True
+    return papel in PAPEIS_QUE_RECEBEM
+
+
+def _tenant_de(usuario):
+    """O `admin_id` pelo qual este usuário responde, ou None.
+
+    ADMIN responde por si; funcionário responde pelo seu admin. Mesma regra
+    que `papel_de_usuario_na_obra` deriva quando o tenant não vem explícito —
+    extraída porque a decisão de "sem obra" precisa dela sem precisar de obra.
+    """
+    if usuario is None or not getattr(usuario, 'id', None):
+        return None
+    if usuario.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
+        return usuario.id
+    return getattr(usuario, 'admin_id', None)
+
+
+def _pode_receber_sem_obra(usuario):
+    """Atestar pedido SEM obra — não há vínculo de obra a consultar. Fase 4/C5.
+
+    Antes desta função, `usuario_pode_receber_na_obra(u, None)` caía em
+    `db.session.get(Obra, None)` → None → papel None → recusa para todo mundo,
+    inclusive para o ADMIN dono do tenant. Como o regime novo também não lança
+    estoque na emissão, o material do pedido sem obra não entrava em lugar
+    nenhum — e a única explicação que o usuário via era um 403.
+
+    A regra segue a do eixo de obra, que só pode ESTREITAR:
+
+    * ADMIN/SUPER_ADMIN do tenant atestam — já enxergam tudo por definição;
+    * com `escopo_obra_ativo` DESLIGADA, qualquer usuário do tenant atesta —
+      é o comportamento pré-Fase 1, permissivo, que a flag existe para
+      preservar;
+    * com a flag LIGADA, mais ninguém: sem obra não há vínculo em
+      `usuario_obra` que autorize, e inventar uma permissão aqui abriria uma
+      porta lateral mais larga que a da obra — exatamente o que o escopo
+      existe para fechar.
+    """
+    tenant = _tenant_de(usuario)
+    if tenant is None:
+        return False
+    if usuario.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
+        return True
+    return not _escopo_ativo(tenant)
+
+
+def pode_receber_na_obra(obra_id):
+    """Atestar recebimento de material nesta obra, pelo usuário logado. Fase 4."""
+    try:
+        if not current_user.is_authenticated:
+            return False
+    except Exception:
+        return False
+    return usuario_pode_receber_na_obra(current_user, obra_id)
 
 
 def obra_required(papel_minimo=None):

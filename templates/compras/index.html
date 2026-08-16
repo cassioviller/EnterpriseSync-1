@@ -87,6 +87,7 @@
               <th>Tipo</th>
               <th>Obra</th>
               <th>Pagamento</th>
+              <th>Recebimento</th>
               <th class="text-end">Total (R$)</th>
               <th>Anexo</th>
               <th></th>
@@ -120,6 +121,21 @@
                   {{ CONDICOES.get(p.condicao_pagamento, p.condicao_pagamento) }}
                   {% if p.parcelas > 1 %} ({{ p.parcelas }}x){% endif %}
                 </span>
+              </td>
+              {# Fase 4 — só o regime novo tem situação de recebimento para
+                 mostrar. Em pedido legado a coluna fica vazia de propósito:
+                 inventar "Não recebido" ali seria mentir sobre estoque que
+                 entrou na emissão. #}
+              <td>
+                {% if p.exige_atesto %}
+                  <span class="badge bg-{{ {'recebido': 'success', 'parcial': 'warning text-dark',
+                                            'encerrado_com_saldo': 'secondary'}.get(
+                                            p.situacao_recebimento, 'light text-dark border') }}">
+                    {{ SITUACOES_RECEBIMENTO.get(p.situacao_recebimento, '—') }}
+                  </span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
               </td>
               <td class="text-end fw-semibold text-dark">{{ p.valor_total|brl_raw }}</td>
               <td>

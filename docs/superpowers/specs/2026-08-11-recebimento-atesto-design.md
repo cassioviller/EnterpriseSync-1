@@ -113,7 +113,8 @@ RecebimentoPedidoItem
   id, admin_id, recebimento_id → recebimento_pedido (ondelete=CASCADE)
   pedido_item_id           → pedido_compra_item
   quantidade_recebida      Numeric(12,3)   # > 0
-  almoxarifado_movimento_id → almoxarifado_movimento (ondelete=SET NULL)
+  almoxarifado_movimento_id       → almoxarifado_movimento (ondelete=SET NULL)
+  almoxarifado_saida_movimento_id → almoxarifado_movimento (ondelete=SET NULL)
 
   UNIQUE (recebimento_id, pedido_item_id)   # uma linha por item por recebimento
   INDEX  (pedido_item_id)
@@ -133,7 +134,10 @@ rastreabilidade pedida já vem da cadeia `RC-2026-0001 → PC-1234 → PC-1234/2
 **`almoxarifado_movimento_id` guarda o movimento que aquela linha gerou.** É o que
 permite auditar "esta entrada de estoque veio deste atesto" e o que torna o estorno
 possível sem adivinhação. Item de texto livre fica com `NULL`: tem atesto, não tem
-movimento.
+movimento. `almoxarifado_saida_movimento_id` (C2, migration 285) guarda a SAÍDA pareada
+pela mesma razão, e por uma a mais: a saída que o atesto gerou e a saída que alguém
+lançou depois apontam para o mesmo lote, e só a primeira pode ser desfeita — sem o id,
+o estorno teria de adivinhar qual é qual.
 
 **`situacao_recebimento` é persistida, não derivada em tempo de leitura.** Derivar por
 soma a cada listagem seria N+1 na tela de pedidos. Persistir cobra uma consistência, e
@@ -159,9 +163,27 @@ Com `exige_atesto=True`:
 ```
 emissão ──> nenhum movimento de estoque
 atesto 1 (30 sacos)                          ──> ENTRADA 30 + lote   situação: parcial
+                                                 + SAÍDA 30
 atesto 2 (18 sacos, encerra saldo: "forne-   ──> ENTRADA 18          situação: encerrado_com_saldo
-          cedor não entrega o resto")
+          cedor não entrega o resto")            + SAÍDA 18
 ```
+
+**A SAÍDA pareada** (correção C2, 12/08). A emissão não gerava só a ENTRADA: para
+pedido com obra ela gerava também a SAÍDA imediata de consumo, reconhecendo o material
+no centro de custo da obra. A primeira versão desta fase suprimiu a emissão inteira e
+gerou só a ENTRADA no atesto — o lote ficava `DISPONIVEL` para sempre, e o mesmo
+material podia sair uma segunda vez pela tela do almoxarifado.
+
+O atesto gera o mesmo par que a emissão gerava. Só o instante mudou:
+
+| Pedido | Emissão (regime antigo) | Atesto (regime novo) |
+|---|---|---|
+| normal **com** obra | ENTRADA + SAÍDA "Consumo direto na obra" | idem, na quantidade recebida |
+| normal **sem** obra | só ENTRADA (fica em estoque) | idem |
+| `aprovacao_cliente` | ENTRADA + SAÍDA "Consumo faturamento direto" | idem |
+
+`data_movimento` dos dois movimentos é a **data do recebimento**, não a do registro: o
+caminhão que chega no sábado e é lançado na segunda pertence ao sábado.
 
 ### Caminho único de escrita
 
@@ -175,8 +197,9 @@ registrar_recebimento(pedido, usuario, linhas, data,
 ```
 
 Numa única transação: valida, cria o `RecebimentoPedido` e seus itens, gera
-`AlmoxarifadoMovimento` + `AlmoxarifadoEstoque` (lote FIFO) para cada item de catálogo,
-grava o `almoxarifado_movimento_id` de volta na linha, e atualiza
+`AlmoxarifadoMovimento` + `AlmoxarifadoEstoque` (lote FIFO) para cada item de catálogo
+— mais a SAÍDA pareada quando ela existe —, grava os ids dos movimentos de volta na
+linha (`almoxarifado_movimento_id` e `almoxarifado_saida_movimento_id`), e atualiza
 `situacao_recebimento`.
 
 `permitir_sobre_entrega` não é invenção deste spec: é o mesmo par
@@ -198,12 +221,19 @@ viva onde as outras vivem.
 
 ### Derivação da situação
 
-| Condição | Situação |
-|---|---|
-| Nenhum recebimento | `nao_recebido` |
-| Algum item com soma recebida < quantidade pedida | `parcial` |
-| Todos os itens com soma ≥ quantidade pedida | `recebido` |
-| `encerra_saldo=True` em algum recebimento e ainda falta quantidade | `encerrado_com_saldo` |
+A ordem das perguntas é a regra:
+
+| # | Condição | Situação |
+|---|---|---|
+| 1 | Todos os itens com soma ≥ quantidade pedida | `recebido` |
+| 2 | `encerra_saldo=True` em algum recebimento | `encerrado_com_saldo` |
+| 3 | Nenhuma quantidade recebida | `nao_recebido` |
+| 4 | Resto | `parcial` |
+
+O encerramento vem **antes** de "nada recebido" (correção C6, 12/08): pedido cancelado
+pelo fornecedor antes da primeira entrega tem zero recebido *e* um encerramento gravado,
+e responder `nao_recebido` ali descreveria como "ainda esperando o caminhão" um pedido
+que já foi fechado por escrito.
 
 ### O que a rota antiga faz
 
@@ -232,6 +262,8 @@ Os movimentos nascem com `pedido_compra_id` preenchido, então a dedup do handle
 | Recebeu mais que o pedido | Recusa, salvo `permitir_sobre_entrega` com justificativa |
 | Saldo já encerrado | Recusa novo recebimento, dizendo quem encerrou e quando |
 | `encerra_saldo` sem motivo | Recusa — o motivo é o que torna o encerramento auditável |
+| `encerra_saldo` sem item nenhum | **Aceita** (C6): é o atesto do que NÃO vai chegar, e o motivo é o conteúdo do documento. Sem esta porta, quem ouviu do fornecedor que o resto não vem teria de registrar material que nunca chegou |
+| Recebimento vazio **sem** encerrar | Recusa — submeter tudo zerado é engano de dedo |
 | Quantidade ≤ 0 | Recusa. Devolução não é recebimento negativo, e não entra nesta fase |
 | Dois recebimentos simultâneos | `SELECT … FOR UPDATE` no pedido dentro da transação; sem isso duas telas abertas furam o limite de quantidade |
 | Errou a quantidade | Pode excluir **o último** recebimento do pedido, estornando os movimentos que gerou — e recusando se algum lote já teve saída, porque aí o material já foi consumido |
@@ -263,14 +295,61 @@ Os testes de integração seguem o padrão de `tests/test_fase3_portal_seguranca
 
 ## Migrations
 
-- **267** — cria `recebimento_pedido` e `recebimento_pedido_item`; acrescenta
+- **283** — cria `recebimento_pedido` e `recebimento_pedido_item`; acrescenta
   `pedido_compra.exige_atesto` (default False) e `pedido_compra.situacao_recebimento`
   (default `nao_recebido`). Backfill: nenhum. Pedido histórico é legado por definição, e
   `exige_atesto=False` é exatamente o que descreve o que aconteceu com ele.
-- **268** — `configuracao_empresa.recebimento_atesto_ativo`, default False.
+- **284** — `configuracao_empresa.recebimento_atesto_ativo`, default False.
 
 Registradas na lista de `migrations.py:6505` no formato existente. A última migration do
-repositório é a 266.
+repositório é a 282.
+
+---
+
+## Runbook — ligar a flag num tenant
+
+A flag é por tenant e o regime é carimbado **no pedido**, na criação. Ligar não mexe em
+nada do que já existe: os pedidos de ontem continuam sendo pedidos de ontem.
+
+```bash
+# 1. Conferir onde o tenant está hoje
+python scripts/flag_recebimento_atesto.py <admin_id>
+
+# 2. Ligar. Recusa tenant sem nenhum AlmoxarifadoItem cadastrado — ligar ali
+#    criaria pedido que ninguém consegue receber. Use --forcar só sabendo disso.
+python scripts/flag_recebimento_atesto.py <admin_id> --ligar
+
+# 3. Emitir um pedido de teste e conferir que o estoque NÃO entrou na emissão
+#    (o antes/depois da virada, num pedido só)
+psql "$DATABASE_URL" -c "
+  SELECT p.numero, p.exige_atesto, p.situacao_recebimento,
+         count(m.id) AS movimentos
+  FROM pedido_compra p
+  LEFT JOIN almoxarifado_movimento m
+         ON m.pedido_compra_id = p.id AND m.tipo_movimento = 'ENTRADA'
+  WHERE p.admin_id = <admin_id>
+  GROUP BY p.id ORDER BY p.id DESC LIMIT 5;"
+```
+
+**O que conferir depois de ligar**, em ordem:
+
+| Passo | Esperado |
+|---|---|
+| Emitir pedido novo | `exige_atesto = true`, `situacao_recebimento = 'nao_recebido'`, **zero** movimentos |
+| Abrir o pedido | O botão leva para `/compras/<id>/recebimento`, não para o POST antigo |
+| Receber parcial (30 de 50) | Um `ENTRADA` de 30 **e uma `SAIDA` de 30** (o pedido tem obra), lote `PC-.../1` `CONSUMIDO`, situação `parcial` |
+| Receber o resto (20) | Segundo par `ENTRADA`/`SAIDA` de 20, lote `PC-.../2`, situação `recebido` |
+| Conferir a data | `data_movimento` dos movimentos = a data informada no recebimento, não a de hoje |
+| Pedido emitido **antes** de ligar | Continua `exige_atesto = false` e recebendo pela rota antiga |
+| `verificar_consistencia_recebimento.py <admin_id>` | Exit 0, sem drift |
+
+**Desligar** (`--desligar`) só afeta pedido que nascer daí em diante. Os que já
+carimbaram `exige_atesto = true` continuam recebendo por atesto — é intencional:
+desfazer o regime de um pedido em curso deixaria o estoque dele sem dono, com metade
+lançada pelo atesto e o resto por lugar nenhum.
+
+**Se algo ficar estranho**, o primeiro comando é o sensor: ele compara a situação
+persistida com a derivada dos recebimentos e nomeia os pedidos divergentes.
 
 ---
 
