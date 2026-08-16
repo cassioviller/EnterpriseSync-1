@@ -658,7 +658,22 @@ SQL cru, zero falhas.
 > desligar a flag não reescreve pedido já emitido, de propósito.
 > (4) Migration **296 e não 290** — 290-295 é faixa da Fase 8, 300-307 da Fase 9.
 
-> 🔴 **Falha intermitente não explicada, aberta em 14/08.**
+> ✅ **RESOLVIDA em 16/08 — era leitura sem ordem no helper do teste.** A causa não
+> era nenhuma das duas hipóteses abertas: 🔬 o log da quinta ocorrência mostra os
+> **dois** POSTs gravando e a exclusão sendo **aceita** no `PC-72818B/2`.
+> `_recebimentos_de` fazia `.all()` **sem `order_by`** — o Postgres não promete
+> ordem, então o `[0]` que o teste chama de "primeiro recebimento" às vezes era o
+> **segundo**, e aí excluir o último era legítimo e a recusa não vinha. Em seleção
+> menor a ordem física coincidia com a de inserção; na larga, não. **Produção nunca
+> teve o defeito**: `excluir_recebimento` acha o último por
+> `order_by(sequencia.desc())` (`services/recebimento_pedido.py:591`) e recusa
+> qualquer outro. Conserto em `7808caae`: o helper passa a perguntar pela mesma
+> chave que a produção responde. Mesma classe do achado nº 3 de 23/07 (preço
+> trocando de item por ordenação divergente). 🔬 gate completo de 16/08 sem ela.
+>
+> O registro original, mantido porque a instrumentação é o que a resolveu:
+>
+> 🔴 ~~**Falha intermitente não explicada, aberta em 14/08.**~~
 > `test_recebimento_atesto.py::test_rota_de_exclusao_repassa_a_recusa_do_servico`
 > falha em ~metade das corridas da **seleção larga** do gate e passa em toda
 > seleção menor (isolado; Fase 1 + Fase 2 = 141 passed; b5/b6 + Fase 1 = 140
@@ -683,22 +698,33 @@ davam todos a mesma exigência. 10 commits, migrations **297/298/299**, flag
 `alcadas_avancadas_ativa` (nasce OFF). 🔬 15/08: **89 testes** no arquivo da fase +
 **24** na tela de faixas; regressão dirigida de 342 verdes, exit 0.
 
-**Gate completo — 🟡 3 falhas, nenhuma desta fase.** 🔬 15/08, sobre `2f3df5cc`:
-`pytest tests/ -m "not browser"` → **2398 passed, 3 failed, 6 skipped, 2 xfailed** em
-33min06s. As três foram investigadas, e **as três reproduzem em `main`** (conferido em
-worktree separado, mesmo banco):
+**Gate completo — 🟡 2 falhas, ambas anteriores à fase.** 🔬 16/08, sobre `7808caae`:
+`pytest tests/ -m "not browser"` → **2400 passed, 2 failed, 6 skipped, 2 xfailed** em
+33min09s. Foram três corridas do gate, e a terceira é a que vale:
+
+| Corrida | Sobre | Resultado |
+|---|---|---|
+| 1 | `2f3df5cc` | 2398 passed, 3 failed |
+| 2 | `095adf0f` (após o conserto do runbook) | 2399 passed, 3 failed — e o log **inteiro**, que resolveu a intermitente |
+| 3 | `7808caae` (após o conserto dela) | **2400 passed, 2 failed** |
+
+⚠️ A corrida 1 foi pipada por `tail -30` e perdeu os tracebacks — foi o que atrasou a
+intermitente em uma corrida inteira. **Gate se redireciona para arquivo, não se pipa.**
+
+As falhas foram investigadas uma a uma, e **as duas remanescentes reproduzem em `main`**
+(conferido em worktree separado, mesmo banco):
 
 | Teste | O que ele diz | Veredito |
 |---|---|---|
 | `test_excluir_obra::test_lista_cobre_toda_fk_no_action_para_obra` | `notificacao_cliente` tem FK NO ACTION para `obra` e ficou fora de `TABELAS_DEPENDENTES_OBRA` — **excluir obra vai estourar nela** | 🔴 defeito real, **anterior**. Sensor funcionando |
 | `test_fase5_rdo_ciclo_vida::test_backfill_marcou_os_rdos_historicos_como_preenchido` | 23 RDOs assinados **sem trilha de transição** — autoria forjada por backfill ou escrita fora da máquina | 🔴 dado do banco de **dev**, **anterior**. ⚠️ dev |
-| `test_recebimento_atesto::test_rota_de_exclusao_repassa_a_recusa_do_servico` | a intermitente aberta em 14/08 | 🟡 **apareceu de novo** na seleção larga e **passou isolada** — o padrão já registrado. Sem informação nova |
+| `test_recebimento_atesto::test_rota_de_exclusao_repassa_a_recusa_do_servico` | a intermitente aberta em 14/08 | ✅ **causa raiz achada e consertada** (`7808caae`) — leitura sem `order_by` no helper do teste; produção nunca teve o defeito. Ver o bloco da Fase 1 acima |
 
-⚠️ **As duas primeiras não são desta fase e também não estavam registradas aqui.** Elas
-apareceram agora porque este é o primeiro gate completo desde 14/08. A da `notificacao_cliente`
-é a mais séria das duas: é caminho de exclusão de obra que estoura, e o conserto é
-uma linha na lista — mas conferir se a tabela deve ser apagada, anulada ou barrar a
-exclusão é decisão de produto, não de digitação.
+⚠️ **As duas não são desta fase e também não estavam registradas aqui.** Elas apareceram
+agora porque este é o primeiro gate completo desde 14/08. A da `notificacao_cliente` é a
+mais séria: é caminho de exclusão de obra que estoura, e o conserto é uma linha na lista —
+mas conferir se a tabela deve ser apagada, anulada ou barrar a exclusão é decisão de
+produto, não de digitação.
 
 ⚠️ **O requisito desta fase é desenho nosso, ratificado — não levantamento.** Os
 quatro elementos ("as 4 condições", anti-fracionamento, emergência 48h, corte de 3
