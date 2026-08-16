@@ -464,3 +464,94 @@ def test_regularizar_fecha_a_divida_e_libera_a_proxima():
         db.session.commit()
         assert sc.emergencia_regularizada_em is not None
         assert pode_ativar_emergencia(obra.id, admin.id)[0] is True
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# A tela diz por quê
+# ═══════════════════════════════════════════════════════════════════════
+
+def test_detalhe_mostra_o_porque_da_exigencia():
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        antiga = _sc(admin.id, obra.id, 28000, dias_atras=3)
+        sc = _sc(admin.id, obra.id, 4000, estado=EstadoRequisicao.RASCUNHO)
+        _enviar(sc, admin)
+        sc_id, numero_antiga, admin_id = sc.id, antiga.numero, admin.id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(admin_id)
+            s['_fresh'] = True
+        r = c.get(f'/compras/requisicoes/{sc_id}')
+        assert r.status_code == 200
+        html = r.get_data(as_text=True)
+        assert numero_antiga in html            # a SC somada aparece nomeada
+        assert 'sem mapa de concorrência' in html
+
+
+def test_detalhe_mostra_a_faixa_CARIMBADA_e_nao_a_do_valor():
+    """A tela tem de contar a mesma história que o motor: a faixa que vale é a
+    carimbada, não a que o valor estimado sozinho indicaria."""
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        sc = _sc(admin.id, obra.id, 1000, estado=EstadoRequisicao.RASCUNHO)
+        _enviar(sc, admin)                       # sobe para a faixa 2
+        sc_id, admin_id = sc.id, admin.id
+        carimbada = sc.faixa_exigida_id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(admin_id)
+            s['_fresh'] = True
+        r = c.get(f'/compras/requisicoes/{sc_id}')
+        assert r.status_code == 200
+    with app.app_context():
+        from services.alcada_compras import faixa_exigida
+        from models import RequisicaoCompra as RC
+        assert faixa_exigida(db.session.get(RC, sc_id)).id == carimbada
+
+
+def test_rota_de_emergencia_aciona_e_recusa_nao_admin():
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        outro = _admin_do_tenant(admin.id)
+        sc = _sc(admin.id, obra.id, 40000, estado=EstadoRequisicao.RASCUNHO,
+                 solicitante_id=outro.id)
+        _enviar(sc, outro)
+        sc_id, admin_id = sc.id, admin.id
+
+        suf = uuid.uuid4().hex[:8]
+        comum = Usuario(username=f'cr_{suf}', email=f'cr_{suf}@t.local',
+                        nome='Comum', tipo_usuario=TipoUsuario.FUNCIONARIO,
+                        password_hash=generate_password_hash('Senha@2026'),
+                        ativo=True, admin_id=admin.id, versao_sistema='v2')
+        db.session.add(comum)
+        db.session.commit()
+        comum_id = comum.id
+
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(comum_id)
+            s['_fresh'] = True
+        c.post(f'/compras/requisicoes/{sc_id}/emergencia',
+               data={'motivo': 'preciso agora'}, follow_redirects=True)
+    with app.app_context():
+        from models import RequisicaoCompra as RC
+        assert db.session.get(RC, sc_id).emergencia_ativada_em is None
+
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(admin_id)
+            s['_fresh'] = True
+        r = c.post(f'/compras/requisicoes/{sc_id}/emergencia',
+                   data={'motivo': 'obra parada'}, follow_redirects=True)
+        assert r.status_code == 200
+    with app.app_context():
+        from models import RequisicaoCompra as RC
+        sc = db.session.get(RC, sc_id)
+        assert sc.emergencia_ativada_em is not None
+        assert sc.emergencia_por_id == admin_id

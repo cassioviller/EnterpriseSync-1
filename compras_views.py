@@ -1785,7 +1785,11 @@ def requisicao_detalhe(requisicao_id):
     if not pode_ver_obra(requisicao.obra_id):
         abort(404)
 
-    faixa = faixa_para_valor(requisicao.admin_id, requisicao.valor_estimado)
+    # A faixa que vale é a CARIMBADA (spec 2026-08-16) — a do valor estimado
+    # sozinho contaria outra história que a do motor.
+    from services.alcada_compras import dividas_de_emergencia, faixa_exigida
+    from services.alcada_regras import divida_vencida
+    faixa = faixa_exigida(requisicao)
     pode, motivo_recusa = pode_aprovar(requisicao, current_user)
 
     pedidos = PedidoCompra.query.filter_by(
@@ -1799,6 +1803,9 @@ def requisicao_detalhe(requisicao_id):
         transicoes=requisicao.transicoes.all(),
         faixa=faixa,
         pendencias=pendencias_de_aprovacao(requisicao),
+        alcada_motivos=requisicao.alcada_motivos or {},
+        dividas=dividas_de_emergencia(requisicao),
+        divida_vencida=divida_vencida(requisicao),
         pode_aprovar=pode,
         motivo_recusa=motivo_recusa,
         pode_emitir=pode_comprar_na_obra(requisicao.obra_id),
@@ -1871,6 +1878,40 @@ def requisicao_cancelar(requisicao_id):
         db.session.rollback()
         flash(str(e), 'danger')
 
+    return redirect(url_for('compras.requisicao_detalhe',
+                            requisicao_id=requisicao_id))
+
+
+@compras_bp.route('/requisicoes/<int:requisicao_id>/emergencia', methods=['POST'])
+@login_required
+def requisicao_emergencia(requisicao_id):
+    """Aciona o rito de emergência: um admin assume a compra agora.
+
+    A checagem dura (ser ADMIN do tenant, motivo escrito, obra sem dívida
+    vencida) mora no serviço — aqui só se traduz a recusa em flash.
+    """
+    from services.alcada_regras import EmergenciaRecusada, ativar_emergencia
+
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    requisicao = _requisicao_do_tenant(requisicao_id)
+    try:
+        ativar_emergencia(requisicao, current_user, request.form.get('motivo'))
+        db.session.commit()
+        flash(f'Emergência acionada na requisição {requisicao.numero}. '
+              f'Regularize em 48h — enquanto a dívida estiver vencida, esta '
+              f'obra não aciona outra emergência.', 'warning')
+    except EmergenciaRecusada as e:
+        db.session.rollback()
+        flash(str(e), 'danger')
+    except Exception as e:
+        db.session.rollback()
+        logger.error('[alcadas] falha ao acionar emergencia na requisicao '
+                     '%s: %s', requisicao_id, e, exc_info=True)
+        flash('Não foi possível acionar a emergência. Tente novamente.',
+              'danger')
     return redirect(url_for('compras.requisicao_detalhe',
                             requisicao_id=requisicao_id))
 

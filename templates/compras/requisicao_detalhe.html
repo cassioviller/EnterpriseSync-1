@@ -126,8 +126,48 @@
               <i class="fas fa-check me-1"></i>Requisitos de alçada atendidos.
             </p>
           {% endif %}
+
+          {% if alcada_motivos %}
+            <hr class="my-3">
+            <h6 class="fw-bold small">Por que esta requisição exige isso</h6>
+            <p class="small text-muted mb-2">
+              Valor estimado R$ {{ '%.2f'|format(alcada_motivos.valor_estimado or 0) }};
+              considerado para a faixa
+              R$ {{ '%.2f'|format(alcada_motivos.valor_efetivo or 0) }}.
+            </p>
+            {% if alcada_motivos.somadas %}
+              <p class="small mb-1">
+                Somadas (mesma obra e etapa, últimos 30 dias):
+              </p>
+              <ul class="small text-muted mb-2">
+                {% for s in alcada_motivos.somadas %}
+                  <li>{{ s.numero }} — R$ {{ '%.2f'|format(s.valor) }}
+                      {% if s.data %}em {{ s.data }}{% endif %}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+            {% if alcada_motivos.condicoes %}
+              <p class="small mb-1">Condições que subiram a alçada:</p>
+              <ul class="small text-muted mb-0">
+                {% for c in alcada_motivos.condicoes %}<li>{{ c.texto }}</li>{% endfor %}
+              </ul>
+            {% endif %}
+          {% endif %}
         </div>
       </div>
+
+      {% if dividas %}
+        <div class="alert {{ 'alert-danger' if divida_vencida else 'alert-warning' }} small">
+          <strong>Emergência acionada.</strong>
+          {% if requisicao.emergencia_prazo %}
+            Falta regularizar até
+            {{ requisicao.emergencia_prazo.strftime('%d/%m/%Y %H:%M') }}{% if divida_vencida %}
+            — <strong>prazo vencido</strong>, e esta obra não aciona outra
+            emergência enquanto isso{% endif %}:
+          {% endif %}
+          <ul class="mb-0">{% for d in dividas %}<li>{{ d }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
 
       <div class="card border-0 shadow-sm">
         <div class="card-body d-grid gap-2">
@@ -137,6 +177,20 @@
                   action="{{ url_for('compras.requisicao_enviar', requisicao_id=requisicao.id) }}">
               <button class="btn btn-primary w-100">
                 <i class="fas fa-paper-plane me-1"></i> Enviar para aprovação
+              </button>
+            </form>
+          {% endif %}
+
+          {% if requisicao.estado == EstadoRequisicao.AGUARDANDO_APROVACAO
+                and current_user.tipo_usuario.name in ('ADMIN', 'SUPER_ADMIN')
+                and not requisicao.emergencia_ativada_em %}
+            <form method="POST"
+                  action="{{ url_for('compras.requisicao_emergencia', requisicao_id=requisicao.id) }}"
+                  onsubmit="return confirm('Acionar emergência? Você assume a compra agora, e a regularização vence em 48h.');">
+              <input type="text" name="motivo" class="form-control form-control-sm mb-2"
+                     placeholder="Motivo da emergência" required>
+              <button class="btn btn-outline-danger w-100">
+                <i class="fas fa-bolt me-1"></i> Acionar emergência
               </button>
             </form>
           {% endif %}
