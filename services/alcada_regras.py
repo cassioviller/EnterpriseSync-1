@@ -241,3 +241,105 @@ def carimbar_alcada(requisicao, agora=None):
     logger.info('alçada carimbada: requisicao=%s faixa=%s degraus=%s',
                 requisicao.numero, requisicao.faixa_exigida_id, av.degraus)
     return av
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# O rito de emergência — o único caminho que AFROUXA, e por isso o mais
+# vigiado. Ele troca número de aprovações por autoria: sempre há um admin
+# com nome assumindo a compra agora, e uma dívida com prazo.
+# ═══════════════════════════════════════════════════════════════════════
+
+HORAS_DE_PRAZO = 48
+
+
+class EmergenciaRecusada(Exception):
+    """O rito não pode ser acionado. A mensagem é exibida ao usuário."""
+
+
+def emergencia_ativa(requisicao):
+    return (getattr(requisicao, 'emergencia_ativada_em', None) is not None
+            and requisicao.emergencia_regularizada_em is None)
+
+
+def divida_vencida(requisicao, agora=None):
+    agora = agora or datetime.utcnow()
+    return (emergencia_ativa(requisicao)
+            and requisicao.emergencia_prazo is not None
+            and requisicao.emergencia_prazo < agora)
+
+
+def pode_ativar_emergencia(obra_id, admin_id, agora=None):
+    """(bool, motivo). Recusa quando a obra tem dívida de emergência vencida.
+
+    Só a NOVA emergência é travada: a SC em curso anda, e a compra normal da
+    obra segue livre. Ataca o abuso — usar emergência como rotina — sem parar
+    o trabalho de quem não deve nada.
+    """
+    abertas = (RequisicaoCompra.query
+               .filter(RequisicaoCompra.obra_id == obra_id,
+                       RequisicaoCompra.admin_id == admin_id,
+                       RequisicaoCompra.emergencia_ativada_em.isnot(None),
+                       RequisicaoCompra.emergencia_regularizada_em.is_(None))
+               .all())
+    vencidas = [r for r in abertas if divida_vencida(r, agora)]
+    if vencidas:
+        numeros = ', '.join(r.numero for r in vencidas)
+        return False, (f'Esta obra tem emergência não regularizada fora do '
+                       f'prazo ({numeros}). Regularize antes de acionar outra.')
+    return True, ''
+
+
+def ativar_emergencia(requisicao, usuario, motivo, agora=None):
+    """Um admin assume a compra agora; o resto vira dívida com prazo.
+
+    NÃO commita — quem chama decide a transação, como no resto da casa.
+    """
+    from models import RequisicaoTransicao, TipoUsuario
+
+    agora = agora or datetime.utcnow()
+    if getattr(usuario, 'tipo_usuario', None) not in (
+            TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
+        raise EmergenciaRecusada(
+            'Só um administrador aciona o rito de emergência.')
+    if usuario.id != requisicao.admin_id and \
+            getattr(usuario, 'admin_id', None) != requisicao.admin_id:
+        raise EmergenciaRecusada('Requisição de outra empresa.')
+    motivo = (motivo or '').strip()
+    if not motivo:
+        raise EmergenciaRecusada('Não há emergência sem explicação escrita.')
+
+    ok, recusa = pode_ativar_emergencia(requisicao.obra_id,
+                                        requisicao.admin_id, agora)
+    if not ok:
+        raise EmergenciaRecusada(recusa)
+
+    requisicao.emergencia_ativada_em = agora
+    requisicao.emergencia_prazo = agora + timedelta(hours=HORAS_DE_PRAZO)
+    requisicao.emergencia_por_id = usuario.id
+    db.session.add(RequisicaoTransicao(
+        requisicao_id=requisicao.id, admin_id=requisicao.admin_id,
+        de_estado=requisicao.estado, para_estado=requisicao.estado,
+        usuario_id=usuario.id, papel_aplicado='ADMIN',
+        valor_no_momento=requisicao.valor_estimado,
+        motivo=f'[emergencia] {motivo}'))
+    db.session.flush()
+    logger.info('emergencia acionada: requisicao=%s por=%s prazo=%s',
+                requisicao.numero, usuario.id, requisicao.emergencia_prazo)
+    return requisicao
+
+
+def regularizar_se_couber(requisicao, agora=None):
+    """Fecha a dívida quando as pendências da FAIXA somem.
+
+    Não é ação de tela: é consequência de a 2ª aprovação chegar ou o mapa ser
+    vinculado. Chamada ao fim de `registrar_aprovacao`.
+    """
+    from services.alcada_compras import pendencias_da_faixa
+    if not emergencia_ativa(requisicao):
+        return False
+    if pendencias_da_faixa(requisicao):
+        return False
+    requisicao.emergencia_regularizada_em = agora or datetime.utcnow()
+    db.session.flush()
+    logger.info('emergencia regularizada: requisicao=%s', requisicao.numero)
+    return True

@@ -346,3 +346,121 @@ def test_urgente_sem_justificativa_e_recusado():
         assert validar_urgencia('normal', '') == ('normal', None)
         with pytest.raises(DadosInvalidos):
             validar_urgencia('urgentissimo', 'qualquer coisa')
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# O rito de emergência
+# ═══════════════════════════════════════════════════════════════════════
+
+def _admin_do_tenant(admin_id):
+    """Um segundo ADMIN dentro do MESMO tenant, para haver quem aprovar."""
+    suf = uuid.uuid4().hex[:8]
+    u = Usuario(username=f'alc2_{suf}', email=f'alc2_{suf}@test.local',
+                nome=f'Adm2 {suf}',
+                password_hash=generate_password_hash('Senha@2026'),
+                tipo_usuario=TipoUsuario.ADMIN, ativo=True,
+                admin_id=admin_id, versao_sistema='v2')
+    db.session.add(u)
+    db.session.commit()
+    return u
+
+
+def test_emergencia_deixa_um_admin_aprovar_sozinho():
+    from services.alcada_compras import (esta_totalmente_aprovada,
+                                         registrar_aprovacao)
+    from services.alcada_regras import ativar_emergencia
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        outro = _admin_do_tenant(admin.id)
+        sc = _sc(admin.id, obra.id, 40000, estado=EstadoRequisicao.RASCUNHO,
+                 solicitante_id=outro.id)
+        _enviar(sc, outro)
+        assert not esta_totalmente_aprovada(sc)   # faixa 3: 2 votos + admin + mapa
+
+        ativar_emergencia(sc, admin, 'obra parada, betoneira a caminho')
+        registrar_aprovacao(sc, admin)
+        db.session.commit()
+        assert esta_totalmente_aprovada(sc)
+        assert sc.emergencia_prazo > sc.emergencia_ativada_em
+
+
+def test_nao_admin_nao_aciona_emergencia():
+    from services.alcada_regras import EmergenciaRecusada, ativar_emergencia
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        suf = uuid.uuid4().hex[:8]
+        comum = Usuario(username=f'c_{suf}', email=f'c_{suf}@t.local',
+                        nome='Comum',
+                        password_hash=generate_password_hash('Senha@2026'),
+                        tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+                        admin_id=admin.id)
+        db.session.add(comum)
+        db.session.commit()
+        sc = _sc(admin.id, obra.id, 40000)
+        with pytest.raises(EmergenciaRecusada):
+            ativar_emergencia(sc, comum, 'preciso agora')
+
+
+def test_emergencia_exige_motivo():
+    from services.alcada_regras import EmergenciaRecusada, ativar_emergencia
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        sc = _sc(admin.id, obra.id, 40000)
+        with pytest.raises(EmergenciaRecusada):
+            ativar_emergencia(sc, admin, '   ')
+
+
+def test_divida_vencida_trava_nova_emergencia_e_nao_trava_o_resto():
+    from services.alcada_compras import pendencias_de_aprovacao
+    from services.alcada_regras import (ativar_emergencia,
+                                        pode_ativar_emergencia)
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        devedora = _sc(admin.id, obra.id, 40000)
+        ativar_emergencia(devedora, admin, 'primeira urgência')
+        devedora.emergencia_prazo = datetime.utcnow() - timedelta(hours=1)
+        db.session.commit()
+
+        ok, motivo = pode_ativar_emergencia(obra.id, admin.id)
+        assert ok is False and devedora.numero in motivo
+
+        # a compra normal da obra continua andando
+        normal = _sc(admin.id, obra.id, 1000)
+        assert isinstance(pendencias_de_aprovacao(normal), list)
+
+        # e outra obra do mesmo tenant não é contaminada
+        outra_obra = _obra(admin.id)
+        assert pode_ativar_emergencia(outra_obra.id, admin.id)[0] is True
+
+
+def test_regularizar_fecha_a_divida_e_libera_a_proxima():
+    from services.alcada_compras import registrar_aprovacao
+    from services.alcada_regras import (ativar_emergencia,
+                                        pode_ativar_emergencia)
+    with app.app_context():
+        admin = _admin()
+        db.session.add(FaixaAlcada(admin_id=admin.id, ordem=1, valor_ate=None,
+                                   aprovacoes_necessarias=2, exige_admin=True,
+                                   exige_mapa_concorrencia=False,
+                                   fornecedores_minimos=2, ativo=True))
+        db.session.commit()
+        obra = _obra(admin.id)
+        outro = _admin_do_tenant(admin.id)
+        sc = _sc(admin.id, obra.id, 40000, solicitante_id=outro.id)
+        ativar_emergencia(sc, admin, 'obra parada')
+        sc.emergencia_prazo = datetime.utcnow() - timedelta(hours=1)
+        db.session.commit()
+        assert pode_ativar_emergencia(obra.id, admin.id)[0] is False
+
+        registrar_aprovacao(sc, admin)
+        registrar_aprovacao(sc, outro)
+        db.session.commit()
+        assert sc.emergencia_regularizada_em is not None
+        assert pode_ativar_emergencia(obra.id, admin.id)[0] is True

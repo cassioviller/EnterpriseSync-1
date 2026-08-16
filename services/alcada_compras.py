@@ -187,8 +187,11 @@ def faixa_exigida(requisicao):
     return faixa_para_valor(requisicao.admin_id, requisicao.valor_estimado)
 
 
-def pendencias_de_aprovacao(requisicao):
-    """Lista de textos do que ainda falta. Vazia = pode ir para APROVADA.
+def pendencias_da_faixa(requisicao):
+    """O que a FAIXA exige e ainda não foi atendido — ignora a emergência.
+
+    É o que o rito de emergência transforma em dívida, e o que
+    `regularizar_se_couber` consulta para saber se a dívida foi paga.
 
     Devolve texto porque é o que a tela mostra — e porque o motivo de uma
     requisição estar parada tem que ser legível sem ler código.
@@ -212,6 +215,31 @@ def pendencias_de_aprovacao(requisicao):
                         f'{minimo} fornecedores vinculado a esta requisição')
 
     return faltando
+
+
+def pendencias_de_aprovacao(requisicao):
+    """O que BLOQUEIA a aprovação AGORA. Vazia = pode ir para APROVADA.
+
+    Com emergência ativa, a faixa inteira dá lugar a uma exigência só — um
+    administrador assumindo a compra. O resto segue devido, com prazo, em
+    `dividas_de_emergencia`, mas não trava a SC: na emergência real o que
+    precisa sair é justamente o pedido.
+    """
+    from services.alcada_regras import emergencia_ativa
+
+    if emergencia_ativa(requisicao):
+        if _tem_aprovacao_de_admin(requisicao):
+            return []
+        return ['emergência acionada: falta a aprovação de um administrador']
+    return pendencias_da_faixa(requisicao)
+
+
+def dividas_de_emergencia(requisicao):
+    """O que a emergência adiou, para a tela mostrar junto com o prazo."""
+    from services.alcada_regras import emergencia_ativa
+    if not emergencia_ativa(requisicao):
+        return []
+    return pendencias_da_faixa(requisicao)
 
 
 def esta_totalmente_aprovada(requisicao):
@@ -291,4 +319,9 @@ def registrar_aprovacao(requisicao, usuario, papel=None, observacao=None):
     logger.info('voto de aprovacao: requisicao=%s usuario=%s papel=%s valor=%s',
                 requisicao.numero, usuario.id, voto.papel_aplicado,
                 requisicao.valor_estimado)
+
+    # A dívida de emergência se fecha sozinha quando as exigências da faixa
+    # são atendidas — não há ação de tela para "regularizar".
+    from services.alcada_regras import regularizar_se_couber
+    regularizar_se_couber(requisicao)
     return voto
