@@ -5912,6 +5912,31 @@ class RequisicaoCompra(db.Model):
     data_necessidade = db.Column(db.Date, nullable=True)
     valor_estimado = db.Column(db.Numeric(15, 2), nullable=False, default=0)
 
+    # ── Alçadas avançadas (spec 2026-08-16) ──────────────────────────
+    # Urgência é da SC, não da faixa: ela SOBE um degrau (não afrouxa).
+    urgencia = db.Column(db.String(10), nullable=False, default='normal')
+    justificativa_urgencia = db.Column(db.Text, nullable=True)
+
+    # O CARIMBO. Gravado ao entrar em AGUARDANDO_APROVACAO, para a barra
+    # não se mover debaixo de quem aprova. NULL = SC anterior à fase, e
+    # nesse caso `pendencias_de_aprovacao` recalcula na leitura.
+    faixa_exigida_id = db.Column(
+        db.Integer, db.ForeignKey('faixa_alcada.id', ondelete='SET NULL'),
+        nullable=True)
+    alcada_degraus = db.Column(db.SmallInteger, nullable=False, default=0)
+    alcada_motivos = db.Column(db.JSON, nullable=True)
+    alcada_carimbada_em = db.Column(db.DateTime, nullable=True)
+
+    # Rito de emergência: um admin aprova sozinho AGORA, o resto vira
+    # dívida com prazo. O prazo é GRAVADO, não derivado — se as 48h
+    # virarem 72h amanhã, a SC já acionada mantém o prazo dela.
+    emergencia_ativada_em = db.Column(db.DateTime, nullable=True)
+    emergencia_prazo = db.Column(db.DateTime, nullable=True)
+    emergencia_por_id = db.Column(
+        db.Integer, db.ForeignKey('usuario.id', ondelete='SET NULL'),
+        nullable=True)
+    emergencia_regularizada_em = db.Column(db.DateTime, nullable=True)
+
     # Mapa de concorrência opcional. FK, NÃO reparentagem: os mapas
     # existentes continuam pendurados na obra (models.py:5604) e continuam
     # funcionando. Faixas de alçada altas podem exigir que esta FK esteja
@@ -6066,6 +6091,11 @@ class FaixaAlcada(db.Model):
     aprovacoes_necessarias = db.Column(db.Integer, nullable=False, default=1)
     exige_admin = db.Column(db.Boolean, nullable=False, default=False)
     exige_mapa_concorrencia = db.Column(db.Boolean, nullable=False, default=False)
+    # Quantos fornecedores o mapa precisa ter para servir de concorrência
+    # NESTA faixa. É onde mora o "corte de 3 cotações": a faixa aberta pede
+    # 3, as de baixo pedem 2. Não existe um segundo conceito de corte por
+    # valor — as faixas já SÃO o corte por valor (spec 2026-08-16).
+    fornecedores_minimos = db.Column(db.SmallInteger, nullable=False, default=2)
     ativo = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

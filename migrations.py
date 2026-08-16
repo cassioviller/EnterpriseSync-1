@@ -6335,6 +6335,57 @@ def _migration_286_timbre_pdf():
                 "(timbre dos PDFs por tenant, importável por JSON).")
 
 
+def _migration_287_alcadas_avancadas():
+    """Alçadas avançadas — carimbo, urgência, emergência e o piso de cotações.
+
+    Todas as colunas são ADITIVAS e o default descreve o legado: SC existente
+    é 'normal', sem carimbo (e por isso continua sendo avaliada na leitura) e
+    sem emergência; faixa existente continua pedindo 2 fornecedores, que é o
+    número fixo que `_mapa_serve_de_concorrencia` usava antes desta fase.
+
+    Sem backfill de propósito: carimbar SC que já está em aprovação mudaria a
+    régua de uma rodada em curso, que é exatamente o que o carimbo existe para
+    impedir.
+
+    Alocação: 287. Conferido em `migration_history` em 16/08 — a última
+    aplicada é a 286 (timbre dos PDFs), depois do merge que trouxe 283-285 do
+    recebimento.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        for coluna, tipo in [
+            ("urgencia", "VARCHAR(10) NOT NULL DEFAULT 'normal'"),
+            ("justificativa_urgencia", "TEXT"),
+            ("faixa_exigida_id",
+             "INTEGER REFERENCES faixa_alcada(id) ON DELETE SET NULL"),
+            ("alcada_degraus", "SMALLINT NOT NULL DEFAULT 0"),
+            ("alcada_motivos", "JSONB"),
+            ("alcada_carimbada_em", "TIMESTAMP"),
+            ("emergencia_ativada_em", "TIMESTAMP"),
+            ("emergencia_prazo", "TIMESTAMP"),
+            ("emergencia_por_id",
+             "INTEGER REFERENCES usuario(id) ON DELETE SET NULL"),
+            ("emergencia_regularizada_em", "TIMESTAMP"),
+        ]:
+            conn.execute(sa_text(
+                f"ALTER TABLE requisicao_compra ADD COLUMN IF NOT EXISTS "
+                f"{coluna} {tipo}"))
+
+        conn.execute(sa_text(
+            "ALTER TABLE faixa_alcada ADD COLUMN IF NOT EXISTS "
+            "fornecedores_minimos SMALLINT NOT NULL DEFAULT 2"))
+
+        # Índice para a soma do fracionamento: a consulta é sempre
+        # (admin, obra, etapa, created_at) e roda a cada carimbo.
+        conn.execute(sa_text(
+            "CREATE INDEX IF NOT EXISTS ix_requisicao_fracionamento "
+            "ON requisicao_compra (admin_id, obra_id, obra_servico_custo_id, "
+            "created_at)"))
+
+    logger.info("[Migration 287] requisicao_compra ganhou urgência, carimbo de "
+                "alçada e emergência; faixa_alcada ganhou fornecedores_minimos.")
+
+
 def _migration_282_backfill_dropdown_crm():
     """D-CRM.1 — o backfill que a 174 pulou: grupo de dropdown para TODO
     tenant com dado nas tabelas legadas `crm_*`.
@@ -6695,6 +6746,7 @@ def executar_migracoes():
             (284, "Fase 4 — configuracao_empresa.recebimento_atesto_ativo: a virada do recebimento é por tenant (default FALSE)", _migration_284_flag_recebimento_atesto),
             (285, "Fase 4/C2 — recebimento_pedido_item.almoxarifado_saida_movimento_id: a saída de consumo pareada do atesto, para o estorno saber o que desfazer", _migration_285_saida_do_atesto),
             (286, "Timbre dos PDFs — configuracao_empresa.timbre_pdf (JSONB): logo, dados da empresa e cores num JSON importável pela tela", _migration_286_timbre_pdf),
+            (287, "Alçadas avançadas — urgência na SC, carimbo da faixa exigida (com motivos), rito de emergência 48h e fornecedores_minimos por faixa", _migration_287_alcadas_avancadas),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
