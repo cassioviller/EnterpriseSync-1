@@ -148,6 +148,13 @@ def transicionar(requisicao, novo_estado, usuario, motivo=None):
     requisicao.updated_at = datetime.utcnow()
     db.session.flush()
 
+    # Alçadas avançadas (spec 2026-08-16): a exigência é decidida AQUI, na
+    # entrada da rodada de aprovação, e não muda mais até um reenvio abrir
+    # rodada nova. É a mesma fronteira que o motor de votos usa.
+    if novo_estado == EstadoRequisicao.AGUARDANDO_APROVACAO:
+        from services.alcada_regras import carimbar_alcada
+        carimbar_alcada(requisicao)
+
     logger.info('requisicao %s %s → %s por usuario=%s valor=%s',
                 requisicao.numero, atual.name, novo_estado.name,
                 getattr(usuario, 'id', None), requisicao.valor_estimado)

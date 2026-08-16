@@ -172,13 +172,28 @@ def mapa_serve_de_concorrencia(requisicao, minimo=2):
     return len(mapa.fornecedores) >= minimo
 
 
+def faixa_exigida(requisicao):
+    """A faixa CARIMBADA; recalculada na leitura quando não houver carimbo.
+
+    O fallback é o que mantém a SC anterior às alçadas avançadas funcionando
+    sem backfill — carimbar retroativamente mudaria a régua de rodadas em
+    curso, que é justamente o que o carimbo existe para impedir.
+    """
+    if getattr(requisicao, 'alcada_carimbada_em', None) and \
+            getattr(requisicao, 'faixa_exigida_id', None):
+        faixa = db.session.get(FaixaAlcada, requisicao.faixa_exigida_id)
+        if faixa is not None:
+            return faixa
+    return faixa_para_valor(requisicao.admin_id, requisicao.valor_estimado)
+
+
 def pendencias_de_aprovacao(requisicao):
     """Lista de textos do que ainda falta. Vazia = pode ir para APROVADA.
 
     Devolve texto porque é o que a tela mostra — e porque o motivo de uma
     requisição estar parada tem que ser legível sem ler código.
     """
-    faixa = faixa_para_valor(requisicao.admin_id, requisicao.valor_estimado)
+    faixa = faixa_exigida(requisicao)
     faltando = []
 
     registradas = aprovacoes_registradas(requisicao)

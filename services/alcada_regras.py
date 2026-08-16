@@ -218,3 +218,26 @@ def avaliar_alcada(requisicao, agora=None):
                                      len(condicoes))
     return Avaliacao(_d(requisicao.valor_estimado), valor_efetivo, somadas,
                      faixa_base, condicoes, faixa_final)
+
+
+def carimbar_alcada(requisicao, agora=None):
+    """Grava na SC a faixa exigida, os degraus e o porquê. NÃO commita.
+
+    Roda na entrada em AGUARDANDO_APROVACAO — a mesma fronteira que o motor de
+    votos usa para abrir rodada, para que carimbo e rodada nasçam juntos, sem
+    uma terceira noção de "quando começou".
+
+    O que ele protege, concretamente: entre a 1ª e a 2ª aprovação, um custo
+    lançado na etapa poderia fazer `estoura_orcamento` deixar de disparar, e a
+    SC fecharia com uma aprovação a menos do que foi pedido a quem aprovou
+    primeiro.
+    """
+    av = avaliar_alcada(requisicao, agora=agora)
+    requisicao.faixa_exigida_id = getattr(av.faixa_final, 'id', None)
+    requisicao.alcada_degraus = av.degraus
+    requisicao.alcada_motivos = av.motivos_para_carimbo()
+    requisicao.alcada_carimbada_em = agora or datetime.utcnow()
+    db.session.flush()
+    logger.info('alçada carimbada: requisicao=%s faixa=%s degraus=%s',
+                requisicao.numero, requisicao.faixa_exigida_id, av.degraus)
+    return av

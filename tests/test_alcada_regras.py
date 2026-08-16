@@ -255,3 +255,78 @@ def test_tenant_sem_faixa_continua_na_faixa_de_seguranca():
         av = avaliar_alcada(sc)
         assert av.faixa_final.aprovacoes_necessarias == 2
         assert av.faixa_final.exige_admin is True
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# O carimbo
+# ═══════════════════════════════════════════════════════════════════════
+
+def _enviar(sc, usuario):
+    from services.requisicao_compra import transicionar
+    transicionar(sc, EstadoRequisicao.AGUARDANDO_APROVACAO, usuario,
+                 motivo='envio de teste')
+    db.session.commit()
+    return sc
+
+
+def test_envio_carimba_a_faixa_e_o_porque():
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        sc = _sc(admin.id, obra.id, 1000, estado=EstadoRequisicao.RASCUNHO)
+        _enviar(sc, admin)
+        assert sc.alcada_carimbada_em is not None
+        assert sc.alcada_degraus == 1                    # sem concorrência
+        assert sc.faixa_exigida_id is not None
+        assert sc.alcada_motivos['condicoes'][0]['codigo'] == 'sem_concorrencia'
+
+
+def test_carimbo_nao_muda_por_fato_posterior():
+    """Uma SC de R$ 28 mil criada DEPOIS não pode mudar a régua de quem já
+    está em aprovação."""
+    from services.alcada_compras import pendencias_de_aprovacao
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        sc = _sc(admin.id, obra.id, 1000, estado=EstadoRequisicao.RASCUNHO)
+        _enviar(sc, admin)
+        antes = list(pendencias_de_aprovacao(sc))
+
+        _sc(admin.id, obra.id, 28000)      # fato novo na mesma obra/etapa
+        assert list(pendencias_de_aprovacao(sc)) == antes
+
+
+def test_sc_sem_carimbo_continua_avaliada_na_leitura():
+    """SC anterior à fase (sem carimbo) não pode quebrar."""
+    from services.alcada_compras import pendencias_de_aprovacao
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        sc = _sc(admin.id, obra.id, 1000)   # criada crua, sem passar pelo envio
+        assert sc.alcada_carimbada_em is None
+        assert pendencias_de_aprovacao(sc)   # não levanta, e cobra algo
+
+
+def test_reenvio_depois_de_rejeicao_recarimba():
+    """Rodada nova, régua nova: o que mudou entre uma e outra vale agora."""
+    from services.requisicao_compra import transicionar
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        sc = _sc(admin.id, obra.id, 1000, estado=EstadoRequisicao.RASCUNHO)
+        _enviar(sc, admin)
+        primeiro = sc.alcada_carimbada_em
+        assert sc.alcada_motivos['valor_efetivo'] == 1000.0
+
+        transicionar(sc, EstadoRequisicao.REJEITADA, admin, motivo='faltou dado')
+        transicionar(sc, EstadoRequisicao.RASCUNHO, admin, motivo='corrigindo')
+        db.session.commit()
+        _sc(admin.id, obra.id, 28000)       # fato novo, entre as rodadas
+        _enviar(sc, admin)
+
+        assert sc.alcada_carimbada_em >= primeiro
+        assert sc.alcada_motivos['valor_efetivo'] == 29000.0
