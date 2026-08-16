@@ -60,6 +60,12 @@ dev = [
     "ruff>=0.6",
     "mpxj>=16.5.0",
     "jpype1>=1.7.1",
+    # Leitura de PDF nos testes (ciência do cliente, manual, cronograma,
+    # importação). Não é dependência de runtime: nada fora de `tests/` a
+    # importa. Estava ausente daqui e o gate quebrava com
+    # `ModuleNotFoundError: No module named 'pypdf'` — passava local porque
+    # já estava instalada na máquina de desenvolvimento.
+    "pypdf>=5.1.0",
 ]
 
 [project.optional-dependencies]
@@ -71,6 +77,7 @@ dev = [
     "ruff>=0.6",
     "mpxj>=16.5.0",
     "jpype1>=1.7.1",
+    "pypdf>=5.1.0",
 ]
 
 [tool.pytest.ini_options]

@@ -231,6 +231,7 @@ def test_e2e_obra_nova_fluxo_completo(tmp_path):
 @pytest.mark.integration
 def test_e2e_obra_em_andamento_protege_o_que_existe(tmp_path):
     from models import RDO, RDOFoto
+    from services.rdo_ciclo_vida import transicionar
 
     with app.app_context():
         admin, obra, _ = _tenant_obra(codigo='E2E-B')
@@ -244,9 +245,11 @@ def test_e2e_obra_em_andamento_protege_o_que_existe(tmp_path):
             db.session.add(r)
             db.session.commit()
             if estado != 'preenchido':
-                db.session.execute(db.text(
-                    'UPDATE rdo SET estado = :e WHERE id = :i'),
-                    {'e': estado, 'i': r.id})
+                # Pela máquina de estados, não por UPDATE cru: assinar no braço
+                # deixa RDO assinado SEM trilha, que
+                # test_backfill_marcou_os_rdos_historicos_como_preenchido varre
+                # o banco inteiro para proibir (test_atualizacao_rdos.py:184).
+                transicionar(r, estado, detalhes={'origem': 'teste_e2e_carga_obra'})
                 db.session.commit()
             return r
 

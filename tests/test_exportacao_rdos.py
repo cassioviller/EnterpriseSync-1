@@ -179,14 +179,17 @@ def test_obra_sem_mpp_uid_usa_chave_negativa_e_mapa_resolve():
 def test_rdo_imutavel_exporta_estado_e_reimport_pula():
     from services.atualizacao_rdos import atualizar_rdos
     from services.exportacao_rdos import exportar_obra
+    from services.rdo_ciclo_vida import ASSINADO, transicionar
     from models import RDO
     with app.app_context():
         admin_id, obra, tarefas = _ambiente()
         _criar_rdo_via_updater(obra, admin_id, tarefas)
         rdo = RDO.query.filter_by(obra_id=obra.id).one()
-        db.session.execute(
-            db.text('UPDATE rdo SET estado = :e WHERE id = :i'),
-            {'e': 'assinado', 'i': rdo.id})
+        # Pela máquina de estados, não no braço: o UPDATE cru deixava um RDO
+        # assinado SEM trilha, e é isso que
+        # test_backfill_marcou_os_rdos_historicos_como_preenchido varre o banco
+        # inteiro para proibir (mesma lição de test_atualizacao_rdos.py:184).
+        transicionar(rdo, ASSINADO, detalhes={'origem': 'teste_exportacao_rdos'})
         db.session.commit()
         db.session.expire_all()
 

@@ -79,12 +79,17 @@ def test_importa_cria_obra_com_contrato():
     from models import Obra
     with app.app_context():
         admin_id = _novo_admin()
-        res = importar_fisico_financeiro(_carregar_json(), admin_id)
+        payload = _carregar_json()
+        res = importar_fisico_financeiro(payload, admin_id)
         obra = Obra.query.get(res['obra_id'])
         assert obra.admin_id == admin_id
         assert abs(float(obra.valor_contrato) - 1505613.76) < 0.01
         assert obra.data_inicio == date(2026, 6, 8)
-        assert obra.data_previsao_fim == date(2026, 10, 19)
+        # A previsão de fim é o `data_fim_cronograma` do contrato, e ela ANDA a
+        # cada replanejamento do .mpp (19/10 até 11/08; 20/10 no de 12/08). O
+        # que o import tem de garantir é o mapeamento, não a data do dia.
+        fim_esperado = date.fromisoformat(payload['contrato']['data_fim_cronograma'])
+        assert obra.data_previsao_fim == fim_esperado
         assert obra.endereco == 'Fazenda Santa Mônica'  # exibido no portal
 
 
@@ -689,8 +694,8 @@ def test_import_rdos_idempotente_e_opcional():
 
 
 def test_fixture_baia_traz_rdos_do_relatorio():
-    """A fixture canônica da Baia contém os RDOs diários do relatório (22/06–13/07) e o
-    import reproduz o físico acumulado: solo 100%, projetos 65%,
+    """A fixture canônica da Baia contém os RDOs diários do relatório (22/06 em
+    diante) e o import reproduz o físico acumulado: solo 100%, projetos 65%,
     nivelamento do platô 100%, gabarito 100% (Galpões A e B), ferragens 100%
     (48 de 48 brocas — modo quantitativo), escavação de baldrames e brocas 100%
     (fundações profundas dos dois galpões concluídas)."""
@@ -702,9 +707,14 @@ def test_fixture_baia_traz_rdos_do_relatorio():
         caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
                                'cronograma_fisico_financeiro_baias.json')
         payload = json.load(open(caminho, encoding='utf-8'))
-        assert len(payload.get('rdos', [])) == 37
+        # A fixture é um symlink para o canônico da Baia, que CRESCE a cada
+        # carga de RDOs do WhatsApp (37 em 13/07, 42 em 11/08). Contar contra o
+        # próprio payload testa o que importa — um RDO importado por RDO do
+        # arquivo — em vez de re-declarar um número que envelhece a cada carga.
+        esperados = len(payload.get('rdos', []))
+        assert esperados > 0
         oid = importar_fisico_financeiro(payload, aid)['obra_id']
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 37
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == esperados
         por_nome = {t.nome_tarefa: float(t.percentual_concluido or 0) for t in
                     TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
         assert por_nome['Estudo de Solo SPT'] == 100.0
@@ -908,7 +918,7 @@ def test_fixture_rdos_sem_mao_de_obra():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(d, aid)['obra_id']
         rdo_ids = [r.id for r in RDO.query.filter_by(obra_id=oid, admin_id=aid).all()]
-        assert len(rdo_ids) == 37
+        assert len(rdo_ids) == len(d['rdos'])
         assert RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).count() == 0
 
 
@@ -1218,7 +1228,7 @@ def test_reimport_limpa_custo_obra_referenciando_rdo():
         # reimporta — não deve levantar IntegrityError de FK
         oid2 = importar_fisico_financeiro(payload, aid)['obra_id']
         assert oid2 == oid
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 37
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == len(payload['rdos'])
         assert CustoObra.query.filter_by(obra_id=oid, tipo='mao_obra').count() == 0
 
 
