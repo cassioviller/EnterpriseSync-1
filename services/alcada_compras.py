@@ -70,6 +70,19 @@ def garantir_faixas_do_tenant(admin_id):
     return True
 
 
+def faixas_ordenadas(admin_id):
+    """As faixas ativas do tenant, da menor para a maior. Teto aberto por último.
+
+    Extraída de `faixa_para_valor` quando a fase de alçadas avançadas ganhou um
+    segundo consumidor: subir N degraus é andar nesta mesma lista.
+    """
+    return (FaixaAlcada.query
+            .filter_by(admin_id=admin_id, ativo=True)
+            .order_by(FaixaAlcada.valor_ate.asc().nullslast(),
+                      FaixaAlcada.ordem.asc())
+            .all())
+
+
 def faixa_para_valor(admin_id, valor):
     """A faixa ativa de menor teto que ainda cobre `valor`.
 
@@ -78,11 +91,7 @@ def faixa_para_valor(admin_id, valor):
     devolve `_FaixaSeguranca`.
     """
     valor = Decimal(str(valor or 0))
-    faixas = (FaixaAlcada.query
-              .filter_by(admin_id=admin_id, ativo=True)
-              .order_by(FaixaAlcada.valor_ate.asc().nullslast(),
-                        FaixaAlcada.ordem.asc())
-              .all())
+    faixas = faixas_ordenadas(admin_id)
     if not faixas:
         logger.warning('tenant %s sem faixa de alçada ativa — faixa de '
                        'segurança aplicada', admin_id)
@@ -143,9 +152,14 @@ def _tem_aprovacao_de_admin(requisicao):
     return any(v.papel_aplicado == 'ADMIN' for v in votos_de_aprovacao(requisicao))
 
 
-def _mapa_serve_de_concorrencia(requisicao):
-    """Mapa V2 concluído, do mesmo tenant e da mesma obra, com >= 2
-    fornecedores. Um fornecedor só não é concorrência — é orçamento."""
+def mapa_serve_de_concorrencia(requisicao, minimo=2):
+    """Mapa V2 concluído, do mesmo tenant e da mesma obra, com >= `minimo`
+    fornecedores. Um fornecedor só não é concorrência — é orçamento.
+
+    `minimo` virou parâmetro na fase de alçadas avançadas: a condição que sobe
+    degrau usa o piso fixo de 2 ("houve concorrência?") e a pendência da faixa
+    usa o `fornecedores_minimos` dela — que é onde mora o corte de 3 cotações.
+    """
     if not requisicao.mapa_v2_id:
         return False
     mapa = db.session.get(MapaConcorrenciaV2, requisicao.mapa_v2_id)
@@ -155,7 +169,7 @@ def _mapa_serve_de_concorrencia(requisicao):
         return False
     if mapa.status != 'concluido':
         return False
-    return len(mapa.fornecedores) >= 2
+    return len(mapa.fornecedores) >= minimo
 
 
 def pendencias_de_aprovacao(requisicao):
@@ -176,9 +190,11 @@ def pendencias_de_aprovacao(requisicao):
     if faixa.exige_admin and not _tem_aprovacao_de_admin(requisicao):
         faltando.append('falta a aprovação de um administrador')
 
-    if faixa.exige_mapa_concorrencia and not _mapa_serve_de_concorrencia(requisicao):
-        faltando.append('falta mapa de concorrência concluído com pelo menos '
-                        '2 fornecedores vinculado a esta requisição')
+    minimo = getattr(faixa, 'fornecedores_minimos', 2) or 2
+    if faixa.exige_mapa_concorrencia and not mapa_serve_de_concorrencia(
+            requisicao, minimo=minimo):
+        faltando.append(f'falta mapa de concorrência concluído com pelo menos '
+                        f'{minimo} fornecedores vinculado a esta requisição')
 
     return faltando
 

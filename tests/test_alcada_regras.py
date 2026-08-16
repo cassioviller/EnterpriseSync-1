@@ -169,3 +169,89 @@ def test_soma_nao_mistura_etapas_nem_obras_nem_tenants():
         alvo = _sc(admin.id, obra.id, 500)
         soma, _ = soma_da_janela(alvo)
         assert soma == Decimal('8000.00')
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# As quatro condições, os degraus e o teto
+# ═══════════════════════════════════════════════════════════════════════
+
+def _faixas(admin_id):
+    """As três faixas recomendadas, com o piso de cotações da fase nova."""
+    for ordem, ate, aprov, adm, mapa, forn in [
+            (1, Decimal('5000.00'), 1, False, False, 2),
+            (2, Decimal('30000.00'), 2, True, False, 2),
+            (3, None, 2, True, True, 3)]:
+        db.session.add(FaixaAlcada(
+            admin_id=admin_id, ordem=ordem, valor_ate=ate,
+            aprovacoes_necessarias=aprov, exige_admin=adm,
+            exige_mapa_concorrencia=mapa, fornecedores_minimos=forn,
+            ativo=True))
+    db.session.commit()
+
+
+def test_sem_concorrencia_sobe_um_degrau():
+    from services.alcada_regras import avaliar_alcada
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        sc = _sc(admin.id, obra.id, 1000)          # faixa 1 pelo valor
+        av = avaliar_alcada(sc)
+        assert [c['codigo'] for c in av.condicoes] == ['sem_concorrencia']
+        assert av.degraus == 1
+        assert av.faixa_final.ordem == 2
+
+
+def test_urgente_soma_com_sem_concorrencia_e_sobe_dois():
+    from services.alcada_regras import avaliar_alcada
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        sc = _sc(admin.id, obra.id, 1000, urgencia='urgente')
+        av = avaliar_alcada(sc)
+        assert sorted(c['codigo'] for c in av.condicoes) == \
+            ['sem_concorrencia', 'urgente']
+        assert av.degraus == 2
+        assert av.faixa_final.ordem == 3
+
+
+def test_degraus_nao_passam_da_faixa_mais_alta():
+    """Teto: dois degraus a partir da faixa 2 não apontam para faixa 4."""
+    from services.alcada_regras import avaliar_alcada
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        sc = _sc(admin.id, obra.id, 10000, urgencia='urgente')   # faixa 2
+        av = avaliar_alcada(sc)
+        assert av.degraus == 2
+        assert av.faixa_final.ordem == 3
+        assert av.faixa_final.valor_ate is None
+
+
+def test_fracionamento_leva_a_faixa_da_soma():
+    """R$ 4 mil que fecham R$ 32 mil no mês são julgados pela faixa de 30 mil+."""
+    from services.alcada_regras import avaliar_alcada
+    with app.app_context():
+        admin = _admin()
+        _faixas(admin.id)
+        obra = _obra(admin.id)
+        _sc(admin.id, obra.id, 28000, dias_atras=3)
+        sc = _sc(admin.id, obra.id, 4000)
+        av = avaliar_alcada(sc)
+        assert av.valor_efetivo == Decimal('32000.00')
+        assert av.faixa_base.ordem == 3
+        assert len(av.somadas) == 1
+
+
+def test_tenant_sem_faixa_continua_na_faixa_de_seguranca():
+    """Falha fechada: nenhuma condição pode afrouxar o tenant sem configuração."""
+    from services.alcada_regras import avaliar_alcada
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        sc = _sc(admin.id, obra.id, 1000)
+        av = avaliar_alcada(sc)
+        assert av.faixa_final.aprovacoes_necessarias == 2
+        assert av.faixa_final.exige_admin is True
