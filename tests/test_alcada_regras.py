@@ -92,3 +92,80 @@ def test_colunas_da_migracao_287_existem_com_o_default_do_legado():
         db.session.add(faixa)
         db.session.commit()
         assert faixa.fornecedores_minimos == 2
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Anti-fracionamento: a soma da janela
+# ═══════════════════════════════════════════════════════════════════════
+
+def test_soma_do_fracionamento_junta_a_mesma_obra_e_etapa_na_janela():
+    from services.alcada_regras import soma_da_janela
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        _sc(admin.id, obra.id, 4000, dias_atras=5)
+        _sc(admin.id, obra.id, 3000, dias_atras=29)
+        alvo = _sc(admin.id, obra.id, 2000)
+        soma, somadas = soma_da_janela(alvo)
+        assert soma == Decimal('7000.00')
+        assert len(somadas) == 2
+
+
+def test_soma_ignora_a_propria_sc():
+    """No carimbo a SC já está em AGUARDANDO — sem a exclusão ela se somaria
+    a si mesma e todo valor contaria em dobro."""
+    from services.alcada_regras import soma_da_janela
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        alvo = _sc(admin.id, obra.id, 2000)
+        soma, somadas = soma_da_janela(alvo)
+        assert soma == Decimal('0')
+        assert somadas == []
+
+
+def test_soma_respeita_a_borda_de_30_dias():
+    from services.alcada_regras import soma_da_janela
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        _sc(admin.id, obra.id, 1000, dias_atras=29)   # dentro
+        _sc(admin.id, obra.id, 9000, dias_atras=31)   # fora
+        alvo = _sc(admin.id, obra.id, 500)
+        soma, _ = soma_da_janela(alvo)
+        assert soma == Decimal('1000.00')
+
+
+@pytest.mark.parametrize('estado,conta', [
+    (EstadoRequisicao.AGUARDANDO_APROVACAO, True),
+    (EstadoRequisicao.APROVADA, True),
+    (EstadoRequisicao.CONVERTIDA, True),
+    (EstadoRequisicao.RASCUNHO, False),
+    (EstadoRequisicao.REJEITADA, False),
+    (EstadoRequisicao.CANCELADA, False),
+])
+def test_soma_conta_so_o_que_e_compromisso(estado, conta):
+    from services.alcada_regras import soma_da_janela
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        _sc(admin.id, obra.id, 1000, estado=estado, dias_atras=2)
+        alvo = _sc(admin.id, obra.id, 500)
+        soma, _ = soma_da_janela(alvo)
+        assert soma == (Decimal('1000.00') if conta else Decimal('0'))
+
+
+def test_soma_nao_mistura_etapas_nem_obras_nem_tenants():
+    from services.alcada_regras import soma_da_janela
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        outra = _obra(admin.id)
+        alheio = _admin()
+        obra_alheia = _obra(alheio.id)
+        _sc(admin.id, outra.id, 8000, dias_atras=1)          # outra obra
+        _sc(alheio.id, obra_alheia.id, 8000, dias_atras=1)   # outro tenant
+        _sc(admin.id, obra.id, 8000, dias_atras=1)           # balde da obra
+        alvo = _sc(admin.id, obra.id, 500)
+        soma, _ = soma_da_janela(alvo)
+        assert soma == Decimal('8000.00')
