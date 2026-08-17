@@ -620,7 +620,7 @@ sem atesto não existe a tríade do Fluxo A nem a baixa do adiantamento do Fluxo
 |---|---|---|
 | 1 | Recebimento e atesto | ✅ **mesclada em `main` em 14/08** (`9c997bf8`) |
 | 2 | Financeiro em dois fluxos | ✅ **mesclada em `main` em 14/08** (`e74360cb`) — F1-F7 |
-| 3 | Alçadas (as 4 condições, anti-fracionamento, emergência 48h, corte de 3 cotações) | ✅ **A1-A8 completas em 15/08**, em `feat/alcadas-avancadas` — não mesclada |
+| 3 | Alçadas (as 4 condições, anti-fracionamento, emergência 48h, corte de 3 cotações) | ✅ **mesclada em `main` em 17/08** (`84ae487c`) — A1-A8, fast-forward após o gate |
 | 4 | Status unificado (régua de 9 etapas) | ⬜ sem spec |
 | 5 | Relatórios (os 5) | ⬜ sem spec |
 
@@ -689,7 +689,7 @@ SQL cru, zero falhas.
 > foi pipada por `tail -30` e os tracebacks se perderam. **Na próxima corrida, não pipar:
 > redirecionar o log inteiro para arquivo.** É o que separa as duas hipóteses.
 
-### ✅ Fase 3 do ciclo — alçadas, em 15/08 (em branch)
+### ✅ Fase 3 do ciclo — alçadas, em 15/08 (mesclada em 17/08)
 
 **A3 fez o valor deixar de ser a única pergunta.** Até aqui a faixa recebia
 `requisicao.valor_estimado` e mais nada: fornecedor novo, preço que não é o menor,
