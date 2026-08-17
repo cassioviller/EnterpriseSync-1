@@ -1025,8 +1025,39 @@ def detalhe(pedido_id):
     fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
 
+    # ── Fecho da Fase 2 — o painel da tríade ──────────────────────────────
+    #
+    # `pernas_faltantes` já faz o recorte do regime: devolve lista vazia para
+    # quem não está no Fluxo A do regime novo. Por isso a tela não pergunta a
+    # flag por conta própria — perguntar em dois lugares é criar duas chances
+    # de divergirem, que é o defeito que `_regime_recebimento` e
+    # `_fluxo_pagamento` existem para não ter.
+    #
+    # `triade_visivel` é o que decide se o bloco aparece, e ele NÃO é
+    # "faltam == []": a tríade fechada também tem de aparecer, senão o botão
+    # de liberar some justamente quando ele é utilizável.
+    from services.financeiro_compra import (FATURADO, fluxo_do_tenant,
+                                            pernas_faltantes)
+    from utils.autorizacao import _e_admin_do_tenant
+
+    triade_visivel = (
+        getattr(pedido, 'fluxo_pagamento', FATURADO) == FATURADO
+        and fluxo_do_tenant(admin_id))
+    faltam_triade = pernas_faltantes(pedido) if triade_visivel else []
+    conta_liberada = None
+    if triade_visivel:
+        conta_liberada = ContaPagar.query.filter_by(
+            pedido_compra_id=pedido.id, admin_id=admin_id).filter(
+                ContaPagar.situacao_liberacao == 'liberada').first()
+
     return render_template(
         'compras/detalhe.html',
+        triade_visivel=triade_visivel,
+        faltam_triade=faltam_triade,
+        conta_liberada=conta_liberada,
+        # Consultada AQUI e não no template, como o `pode_receber` abaixo:
+        # botão que responde 403 é pior que botão ausente.
+        pode_liberar=_e_admin_do_tenant(),
         pedido=pedido,
         itens=itens,
         custos_gestao=custos_gestao,
@@ -1508,6 +1539,53 @@ def excluir_nota(pedido_id, nota_id):
     db.session.commit()
     flash(f'Nota {rotulo} excluída — o número volta a ser aceito.', 'success')
     return redirect(url_for('compras.nota', pedido_id=pedido_id))
+
+
+@compras_bp.route('/<int:pedido_id>/liberar', methods=['POST'])
+@login_required
+def liberar_pagamento(pedido_id):
+    """Vira a chave que faltava: a conta bloqueada passa a ser pagável.
+
+    Até 17/08 `liberar()` existia, estava testado e **não tinha chamador de
+    produção nenhum** — a `ContaPagar` do Fluxo A nascia bloqueada e o
+    financeiro recusava a baixa mandando completar a tríade, sem que houvesse
+    onde.
+
+    O campo `justificativa` é a ressalva do D6: com uma perna aberta a
+    liberação ainda sai, mas o motivo fica gravado e a conta aparece no sensor.
+    Ela NÃO dispensa a ratificação da emergência 48h — essa recusa vem do
+    serviço e é intencional (ver o docstring de `liberar`).
+    """
+    from services.financeiro_compra import (RessalvaInvalida, TriadeIncompleta,
+                                            liberar)
+
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    pedido, recusa = _pedido_do_fluxo_a(pedido_id)
+    if recusa:
+        return recusa
+
+    justificativa = (request.form.get('justificativa') or '').strip() or None
+    try:
+        contas = liberar(pedido, usuario=current_user,
+                         justificativa=justificativa)
+        db.session.commit()
+    except (TriadeIncompleta, RessalvaInvalida) as e:
+        db.session.rollback()
+        # A mensagem do serviço já nomeia a perna que falta — repassá-la é o
+        # que impede o usuário de sair procurando o caminho de fora do sistema.
+        flash(str(e), 'warning')
+        return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
+    if justificativa:
+        flash(f'{len(contas)} conta(s) liberada(s) COM RESSALVA — o motivo '
+              f'ficou registrado e a conta vai aparecer no relatório de '
+              f'exceções.', 'warning')
+    else:
+        flash(f'{len(contas)} conta(s) liberada(s) para pagamento.', 'success')
+    return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
 
 
 # ─────────────────────────────────────────────

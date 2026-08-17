@@ -66,6 +66,87 @@
     {% endif %}
   </div>
 
+  {#
+    Fecho da Fase 2 — a tríade, dita ANTES de alguém tentar pagar.
+
+    Até 17/08 a única forma de descobrir o que faltava era ir ao financeiro,
+    tentar a baixa e ler o flash da recusa. Quem está nesta tela é quem tem a
+    nota na mão — descobrir a pendência lá é descobrir tarde.
+
+    O botão nunca some por estar bloqueado: com perna aberta ele vira "Liberar
+    com ressalva" e pede o motivo. Sumir é o que empurra o operador para o
+    caminho de fora do sistema.
+  #}
+  {% if triade_visivel %}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-transparent fw-semibold py-3 d-flex justify-content-between align-items-center">
+      <span>Liberação para pagamento</span>
+      {% if conta_liberada %}
+        <span class="badge bg-success">Liberada</span>
+      {% elif faltam_triade %}
+        <span class="badge bg-warning text-dark">Bloqueada</span>
+      {% else %}
+        <span class="badge bg-info text-dark">Pronta para liberar</span>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      <ul class="list-unstyled mb-3 small">
+        <li class="mb-1">
+          <i class="fas fa-check-circle text-success me-1"></i>
+          Pedido emitido
+        </li>
+        {% for f in faltam_triade %}
+        <li class="mb-1">
+          <i class="fas fa-circle-xmark text-warning me-1"></i> {{ f }}
+        </li>
+        {% endfor %}
+        {% if not faltam_triade and not conta_liberada %}
+        <li class="mb-1">
+          <i class="fas fa-check-circle text-success me-1"></i>
+          Nota lançada e recebimento atestado
+        </li>
+        {% endif %}
+      </ul>
+
+      {% if conta_liberada and conta_liberada.liberacao_justificativa %}
+      <div class="alert alert-warning border-0 py-2 small mb-3">
+        <strong>Liberada com ressalva.</strong>
+        {{ conta_liberada.liberacao_justificativa }}
+      </div>
+      {% endif %}
+
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('compras.nota', pedido_id=pedido.id) }}"
+           class="btn btn-outline-primary btn-sm">
+          <i class="fas fa-file-invoice me-1"></i> Notas fiscais
+        </a>
+
+        {% if pode_liberar and not conta_liberada %}
+          {% if faltam_triade %}
+          <form method="POST"
+                action="{{ url_for('compras.liberar_pagamento', pedido_id=pedido.id) }}"
+                class="d-flex gap-2 flex-grow-1">
+            <input type="text" name="justificativa" class="form-control form-control-sm"
+                   placeholder="Por que liberar mesmo com pendência?" required
+                   minlength="15">
+            <button class="btn btn-warning btn-sm text-nowrap">
+              Liberar com ressalva
+            </button>
+          </form>
+          {% else %}
+          <form method="POST"
+                action="{{ url_for('compras.liberar_pagamento', pedido_id=pedido.id) }}">
+            <button class="btn btn-success btn-sm">
+              <i class="fas fa-unlock me-1"></i> Liberar para pagamento
+            </button>
+          </form>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="row g-3">
     <!-- Dados gerais -->
     <div class="col-lg-6">

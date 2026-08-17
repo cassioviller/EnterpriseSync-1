@@ -544,3 +544,174 @@ def test_excluir_nota_de_conta_ja_liberada_e_recusado():
     assert 'liberada' in _flashes(cli).lower()
     with app.app_context():
         assert NotaFiscalPedido.query.filter_by(pedido_id=ped_id).count() == 1
+
+
+# ---------------------------------------------------------------------------
+# N4 — o painel da tríade e o botão de liberar
+# ---------------------------------------------------------------------------
+
+def test_liberar_pela_tela_e_entao_a_baixa_passa():
+    """⭐ O gate de merge desta fase.
+
+    Emitir → atestar → lançar nota → liberar → pagar, tudo por rota. É o ciclo
+    que a Fase 2 nunca conseguiu executar sem shell, e é o motivo de esta fase
+    existir. Se só um teste daqui sobreviver, é este.
+    """
+    from helpers_tenant import cliente_de
+    from services.financeiro_compra import criar_obrigacao
+    with app.app_context():
+        adm, _o, _f, ped = _tenant_regime_novo()
+        criar_obrigacao(ped)
+        db.session.commit()
+        _atestar(ped, adm)
+        adm_id, ped_id = adm.id, ped.id
+        conta_id = ContaPagar.query.filter_by(pedido_compra_id=ped_id).first().id
+
+    cli = cliente_de(adm_id)
+
+    # 1. a nota, pela tela
+    assert cli.post(f'/compras/{ped_id}/nota',
+                    data={'numero': '5150', 'serie': '1',
+                          'valor_total': '1625,00',
+                          'data_emissao': '2026-08-10'}).status_code == 302
+
+    # 2. a liberação, pela tela
+    assert cli.post(f'/compras/{ped_id}/liberar').status_code == 302
+    with app.app_context():
+        cp = db.session.get(ContaPagar, conta_id)
+        assert cp.situacao_liberacao == 'liberada'
+        assert cp.liberada_por_id == adm_id
+        assert cp.liberacao_justificativa is None, 'não houve exceção nenhuma'
+
+    # 3. a baixa, que até 17/08 era impossível de alcançar
+    cli.post(f'/financeiro/contas-pagar/{conta_id}/pagar',
+             data={'valor_pago': '1625.00', 'data_pagamento': '2026-08-20',
+                   'forma_pagamento': 'PIX'})
+    with app.app_context():
+        cp = db.session.get(ContaPagar, conta_id)
+        assert float(cp.valor_pago or 0) == 1625.00, (
+            'o ciclo não fechou: a baixa não foi gravada')
+
+
+def test_liberar_sem_a_triade_recusa_nomeando_a_perna():
+    from helpers_tenant import cliente_de
+    from services.financeiro_compra import criar_obrigacao
+    with app.app_context():
+        adm, _o, _f, ped = _tenant_regime_novo()
+        criar_obrigacao(ped)
+        db.session.commit()
+        _atestar(ped, adm)          # sem nota
+        adm_id, ped_id = adm.id, ped.id
+        conta_id = ContaPagar.query.filter_by(pedido_compra_id=ped_id).first().id
+
+    cli = cliente_de(adm_id)
+    resposta = cli.post(f'/compras/{ped_id}/liberar')
+
+    assert resposta.status_code == 302
+    assert 'nota' in _flashes(cli).lower()
+    with app.app_context():
+        assert db.session.get(
+            ContaPagar, conta_id).situacao_liberacao == 'bloqueada'
+
+
+def test_liberar_com_ressalva_pela_tela():
+    """A porta de escape do D6, do jeito que o operador a encontra."""
+    from helpers_tenant import cliente_de
+    from services.financeiro_compra import criar_obrigacao
+    with app.app_context():
+        adm, _o, _f, ped = _tenant_regime_novo()
+        criar_obrigacao(ped)
+        db.session.commit()
+        _atestar(ped, adm)
+        adm_id, ped_id = adm.id, ped.id
+        conta_id = ContaPagar.query.filter_by(pedido_compra_id=ped_id).first().id
+
+    cli = cliente_de(adm_id)
+    resposta = cli.post(f'/compras/{ped_id}/liberar',
+                        data={'justificativa': RESSALVA})
+
+    assert resposta.status_code == 302
+    with app.app_context():
+        cp = db.session.get(ContaPagar, conta_id)
+        assert cp.situacao_liberacao == 'liberada'
+        assert cp.liberacao_justificativa == RESSALVA
+
+
+def test_ressalva_curta_pela_tela_devolve_o_texto_e_nao_libera():
+    """`RessalvaInvalida` existe para que esta tela seja diferente da outra.
+
+    "Faltou perna" OFERECE o campo; "a justificativa não serve" devolve o campo
+    preenchido com o que a pessoa escreveu. Com uma exceção só, as duas telas
+    seriam a mesma e o texto se perderia.
+    """
+    from helpers_tenant import cliente_de
+    from services.financeiro_compra import criar_obrigacao
+    with app.app_context():
+        adm, _o, _f, ped = _tenant_regime_novo()
+        criar_obrigacao(ped)
+        db.session.commit()
+        _atestar(ped, adm)
+        adm_id, ped_id = adm.id, ped.id
+        conta_id = ContaPagar.query.filter_by(pedido_compra_id=ped_id).first().id
+
+    cli = cliente_de(adm_id)
+    resposta = cli.post(f'/compras/{ped_id}/liberar',
+                        data={'justificativa': 'ok'})
+
+    assert resposta.status_code == 302
+    assert 'caracteres' in _flashes(cli).lower()
+    with app.app_context():
+        assert db.session.get(
+            ContaPagar, conta_id).situacao_liberacao == 'bloqueada'
+
+
+def test_nao_admin_nao_libera():
+    from helpers_tenant import cliente_de
+    from services.financeiro_compra import criar_obrigacao
+    with app.app_context():
+        adm, _o, _f, ped = _tenant_regime_novo()
+        criar_obrigacao(ped)
+        db.session.commit()
+        _atestar(ped, adm)
+        _notar(ped, adm)
+        func = _funcionario_do_tenant(adm.id)
+        ped_id, func_id = ped.id, func.id
+        conta_id = ContaPagar.query.filter_by(pedido_compra_id=ped_id).first().id
+
+    assert cliente_de(func_id).post(
+        f'/compras/{ped_id}/liberar').status_code == 403
+    with app.app_context():
+        assert db.session.get(
+            ContaPagar, conta_id).situacao_liberacao == 'bloqueada'
+
+
+def test_paridade_com_a_flag_desligada():
+    """A fronteira nº 4 do plano: esta fase não tem flag própria.
+
+    Com `financeiro_dois_fluxos_ativo` DESLIGADA nada pode mudar — a conta
+    nasce liberada, o painel não aparece na tela do pedido, e a baixa passa
+    como sempre passou. Conferido por SELECT, não pela ORM.
+    """
+    from sqlalchemy import text as sa_text
+    from helpers_tenant import cliente_de
+    from services.financeiro_compra import criar_obrigacao
+    with app.app_context():
+        adm = _admin()
+        _cfg_tenant(adm.id, recebimento_atesto_ativo=False,
+                    financeiro_dois_fluxos_ativo=False)
+        obra = _obra(adm.id)
+        forn = _fornecedor(adm.id)
+        ped = _pedido(adm.id, obra.id, forn.id)
+        criar_obrigacao(ped)
+        db.session.commit()
+        adm_id, ped_id = adm.id, ped.id
+        linha = db.session.execute(sa_text(
+            'SELECT situacao_liberacao, liberacao_justificativa '
+            'FROM conta_pagar WHERE pedido_compra_id = :p'),
+            {'p': ped_id}).fetchone()
+        assert linha[0] == 'liberada' and linha[1] is None
+
+    cli = cliente_de(adm_id)
+    corpo = cli.get(f'/compras/{ped_id}').get_data(as_text=True)
+    assert 'Liberar para pagamento' not in corpo, (
+        'o botão apareceu num tenant que não ligou a Fase 2')
