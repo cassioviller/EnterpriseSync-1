@@ -638,7 +638,7 @@ sem atesto não existe a tríade do Fluxo A nem a baixa do adiantamento do Fluxo
 | 1 | Recebimento e atesto | ✅ **mesclada em `main` em 14/08** (`9c997bf8`) |
 | 2 | Financeiro em dois fluxos | ✅ **mesclada em `main` em 14/08** (`e74360cb`) — F1-F7 |
 | 3 | Alçadas (as 4 condições, anti-fracionamento, emergência 48h, corte de 3 cotações) | ✅ **mesclada em `main` em 17/08** (`84ae487c`) — A1-A8, fast-forward após o gate |
-| — | **Fecho da Fase 2: a nota e a liberação ganham tela** | ✅ **N1-N5 executados em 17/08**, em `feat/nota-e-liberacao` — 5 commits, gate **2425/2**, **não mesclada**. 🔴 Falta o runbook rodado pela tela. Furou a fila da Fase 4: ver abaixo |
+| — | **Fecho da Fase 2: a nota e a liberação ganham tela** | ✅ **mesclada em `main` em 17/08** (`9aa29a59`) — N1-N5, 7 commits, gate **2425/2**. 🔴 Falta o runbook rodado pela tela. Furou a fila da Fase 4: ver abaixo |
 | 4 | Status unificado (régua de 9 etapas) | ⬜ sem spec |
 | 5 | Relatórios (os 5) | ⬜ sem spec |
 
@@ -856,7 +856,8 @@ como pendência, e quem executou contornou pelo shell. Mesma classe do 🔴 de 1
 
 ### ✅ 17/08 — o fecho executado: N1 a N5, em `feat/nota-e-liberacao`
 
-`c06e995c` → `6ab02b8e`, **5 commits**, não mesclada. Spec
+`c06e995c` → `9aa29a59`, **7 commits**, ✅ **mesclada em `main` em 17/08** por
+fast-forward, depois do gate. Spec
 `2026-08-17-nota-e-liberacao-design.md` + plano
 `2026-08-17-plano-execucao-nota-e-liberacao.md`; as cinco decisões ratificadas em 17/08,
 todas na recomendação.
