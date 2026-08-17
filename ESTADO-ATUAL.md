@@ -51,6 +51,14 @@ triagem). Refazer o login é interativo — item humano, restrito ao `gh`.~~
 > aceita push sem credencial, e `main` foi para lá (`dd6df21e..1b4ab0c1`).
 > É backup, não é o GitHub — mas tira os 37 commits de cima de uma máquina só.
 > As branches de feature seguem **apenas locais**.
+>
+> 🔬 17/08: repetido após o merge das alçadas — `1b4ab0c1..b7c2dd35`, e
+> `gitsafe-backup/main == main == b7c2dd35` conferido em `git fetch`, não só no
+> ref local. São **52 commits** à frente de `origin/main` agora. Das branches
+> locais, só **duas** não estão contidas em `main` (`fix/gate-41min-para-6min` e
+> `replit-agent`); tudo o mais que era feature já entrou e portanto está no
+> backup. **Isto não substitui o item humano nº 2** — nada disso está no GitHub,
+> e o backup é uma máquina na mesma rede.
 
 > ⚠️ **O que continua parado não é o push, é a produção.** Os dez pacotes
 > mexem em custo, medição, progresso e contrato — números que o cliente vê — e
