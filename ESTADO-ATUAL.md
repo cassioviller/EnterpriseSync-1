@@ -912,22 +912,48 @@ achado inteiro tem.
 **A fase furou a fila da Fase 4** de propósito: a régua de 9 etapas teria de representar
 dois passos que até 17/08 não existiam em tela nenhuma.
 
-Três achados menores da conferência de 17/08, registrados no "Fora de escopo" do spec e
-**ainda abertos**:
+Os **três achados menores** da conferência de 17/08 estão todos **fechados**:
 
-1. 📖 **`REJEITADA` não tem volta pela tela.** Três camadas discordam:
-   `services/requisicao_compra.py:78` permite `REJEITADA → RASCUNHO` com o desenho
-   explicado (*"rejeitar não é matar"*), `models.py:89` diz que é **terminal**, e
-   `requisicao_detalhe.html:385` só oferece "Cancelar". Quem manda é a tela. A aresta é
-   testada (`test_fase3_requisicao.py:287`) e nenhuma rota a usa.
-2. 📖 **Não há como editar item de requisição.** `RequisicaoCompraItem` só nasce em
-   `compras_views.py:1846`, dentro do `nova_post` — nem em RASCUNHO dá para corrigir. Os
-   dois são a mesma fase pequena e devem vir juntos: ligar a volta sem a edição devolve a
-   requisição a um estado que ninguém consegue mudar.
-3. ~~🔴 `lancar_nota` com `usuario=None` contra coluna NOT NULL.~~ ✅ **Consertado no
-   próprio fecho** (`0a343ed0`): virou keyword obrigatório com guarda explícita, e o
-   defeito foi reproduzido em teste antes do conserto. Os dois de cima **seguem abertos**
-   — são da requisição, não do financeiro, e o spec os deixa fora de escopo por isso.
+1. ~~🔴 `REJEITADA` não tem volta pela tela.~~ ✅ **`e1e5dc63`** — ver a seção abaixo.
+2. ~~🔴 Não há como editar item de requisição.~~ ✅ **`e1e5dc63`**, no mesmo commit e de
+   propósito.
+3. ~~🔴 `lancar_nota` com `usuario=None` contra coluna NOT NULL.~~ ✅ **`0a343ed0`**, no
+   próprio fecho: virou keyword obrigatório com guarda explícita, e o defeito foi
+   reproduzido em teste antes do conserto.
+
+### ✅ 17/08 — a requisição rejeitada volta a ser corrigível (`e1e5dc63`)
+
+Os dois primeiros achados eram **um só**: ligar a volta sem a edição devolveria a
+requisição a um estado que ninguém consegue mudar. Entregou duas rotas
+(`/requisicoes/<id>/corrigir` e `/requisicoes/<id>/itens`), os dois botões, e o conserto do
+docstring do enum. **12 testes**, red-first de verdade — 8 vermelhos antes do código.
+🔬 Gate completo sobre ela: **2437 passed, 2 failed** em 36min23s — as duas conhecidas e
+anteriores, e a aritmética fecha (2425 + 12 = 2437, zero falhas novas). Regressão
+dirigida: 186 passed, exit 0.
+
+> ⚠️ **Desvio de processo, registrado porque o risco era real:** este commit foi feito
+> **direto em `main`**, não em branch, e o gate completo rodou **depois** dele já estar lá.
+> Há precedente para rodada pequena ir direto (a de 28/07 foi assim), mas a ordem estava
+> invertida: se o gate tivesse acusado falha nova, `main` teria ficado vermelha até o
+> conserto. O correto é branch → gate → merge, como as três fases do ciclo fizeram.
+
+**O caminho já era esperado pelo resto do sistema.** 📖 `_inicio_da_rodada_atual`
+(`services/alcada_compras.py`) cita `REJEITADA→RASCUNHO→AGUARDANDO` por escrito e escopa
+os votos à rodada nova, justamente para que a reenviada não feche a alçada com votos
+velhos. Esse conserto é o achado nº 2 da revisão de 23/07 — **existia desde antes de haver
+caminho para chegar lá**. O sistema estava pronto para um fluxo que a tela não oferecia.
+
+> 📖 **O padrão que estes três achados têm em comum, e vale mais que os consertos.** Nos
+> três, o comportamento certo estava **decidido e escrito** — em `TRANSICOES_VALIDAS`, no
+> D6 da Fase 2, na docstring de `lancar_nota` — e o que faltava era a última perna: rota,
+> botão, parâmetro. Nenhum apareceu em gate, porque **suíte que testa serviço chamando
+> serviço não vê rota faltando**. Os dois teste-guarda criados em 17/08 (o que varre
+> chamadores de `lancar_nota`/`liberar` e o que segura o docstring do enum) existem para
+> essa classe, não para esses três casos.
+
+⚠️ **Também aqui o runbook não foi rodado pela tela por um humano** — os três testes de
+render provam que os botões aparecem e que o item existente vem preenchido no formulário,
+o que não é a mesma coisa que alguém clicar.
 
 
 ## O plano aprovado
