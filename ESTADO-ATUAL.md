@@ -734,7 +734,7 @@ As falhas foram investigadas uma a uma, e **as duas remanescentes reproduzem em 
 
 | Teste | O que ele diz | Veredito |
 |---|---|---|
-| `test_excluir_obra::test_lista_cobre_toda_fk_no_action_para_obra` | `notificacao_cliente` tem FK NO ACTION para `obra` e ficou fora de `TABELAS_DEPENDENTES_OBRA` — **excluir obra vai estourar nela** | 🔴 defeito real, **anterior**. Sensor funcionando |
+| ~~`test_excluir_obra::test_lista_cobre_toda_fk_no_action_para_obra`~~ | `notificacao_cliente` tem FK NO ACTION para `obra` — **excluir obra vai estourar nela** | ✅ **RESOLVIDO em 17/08** (`e6434d7e`) — e **não era decisão de produto**, como esta linha e duas sessões supuseram. Ver abaixo |
 | `test_fase5_rdo_ciclo_vida::test_backfill_marcou_os_rdos_historicos_como_preenchido` | 23 RDOs assinados **sem trilha de transição** — autoria forjada por backfill ou escrita fora da máquina | 🔴 dado do banco de **dev**, **anterior**. ⚠️ dev |
 | `test_recebimento_atesto::test_rota_de_exclusao_repassa_a_recusa_do_servico` | a intermitente aberta em 14/08 | ✅ **causa raiz achada e consertada** (`7808caae`) — leitura sem `order_by` no helper do teste; produção nunca teve o defeito. Ver o bloco da Fase 1 acima |
 
@@ -954,6 +954,59 @@ caminho para chegar lá**. O sistema estava pronto para um fluxo que a tela não
 ⚠️ **Também aqui o runbook não foi rodado pela tela por um humano** — os três testes de
 render provam que os botões aparecem e que o item existente vem preenchido no formulário,
 o que não é a mesma coisa que alguém clicar.
+
+
+### ✅ 17/08 — a `notificacao_cliente` órfã, e a migração que gravou sucesso sem pegar
+
+Uma das duas falhas que o gate acusava desde 16/08. Foi lida como *"defeito real anterior,
+o conserto é uma linha mas a decisão é de produto"* — em **duas sessões**. Não era decisão
+nenhuma: a decisão já tinha sido tomada em **05/08** (aposentar o modelo, dropar a tabela,
+migração **279**) e simplesmente **não pegou**.
+
+🔬 17/08: `migration_history` diz 279 = `success`, e a tabela estava lá, vazia, com a FK
+`NO ACTION` para `obra`.
+
+**A causa é a ordem do boot, e ela vale para toda migração destrutiva futura:**
+📖 `app.py:563` roda `create_all()` **antes** de `executar_migracoes()` (`:684`). A 279
+dropou a tabela num boot em que o modelo `NotificacaoCliente` **ainda existia**, e o
+`create_all()` do boot seguinte a **recriou**. Como a 279 já constava `success`,
+`is_migration_executed` nunca mais a deixou rodar — e a tabela ficou órfã quando a B4.8
+finalmente removeu o modelo.
+
+> 🔴 **A regra que sai daqui:** *dropar tabela cujo modelo ainda existe é no-op com registro
+> de sucesso.* Ou o modelo sai **antes** da migração, ou o drop não é confiável. É a mesma
+> classe do **fantasma da migração 270** — migração registrada como feita cujo efeito não
+> está no banco —, com a diferença de que aquela some sem dano e esta deixou um caminho de
+> exclusão de obra quebrado por doze dias.
+
+Conserto: migração **309**, com a guarda de contagem da 279 mantida na íntegra, e
+**verificada com DOIS boots** — o `create_all()` do segundo não recriou nada, que era
+exatamente o modo de falha da primeira. Saiu junto a entrada de `notificacao_cliente` no
+backfill da migração 48: inerte neste banco, mas num banco **novo** produziria
+`relation does not exist` engolido pelo `except` do laço.
+
+🔬 **Gate completo: 2439 passed, 1 failed** em 35min13s. **Sobrou uma só** —
+`test_fase5_rdo_ciclo_vida` (23 RDOs assinados sem trilha, ⚠️ dado de dev). A aritmética
+fecha: 2437 + 2 testes novos = 2439.
+
+### 📄 17/08 — o SIGE medido contra o método RFA
+
+`docs/maturidade-financeira-rfa.md`, a partir do `regras-financeiro.pdf` deixado na raiz.
+⚠️ **O arquivo não contém regras financeiras** — é um ebook institucional de 10 páginas
+apresentando um método de maturidade, sem nada implementável. Serve como régua, não como
+spec.
+
+O mapa, conferido com `caminho:linha`: tesouraria tem fluxo de caixa e **não tem DFC**;
+custo é forte **por obra** e ausente **por empresa** (🔬 gasto fixo × variável e margem de
+contribuição = **zero ocorrências**); balanço e DRE são publicados e **nenhum indicador é
+derivado deles**; controladoria e finanças estratégicas não existem.
+
+**O que trava é a Fase 8, que já estava no plano** — os quatro planos de contas
+concorrentes. 📖 A confirmação mais forte veio do próprio DRE, que só classifica prefixos
+*"cujo significado é o MESMO nos planos que os definem"* (`contabilidade_utils.py:536-540`).
+O documento propõe a Fase 8 com escopo maior (fixo × variável, DFC, indicadores — todas
+**leitura** sobre dado que já existe) e deixa três decisões em aberto, a primeira sendo se
+a consultoria foi contratada.
 
 
 ## O plano aprovado
