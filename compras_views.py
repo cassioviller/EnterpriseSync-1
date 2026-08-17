@@ -2382,6 +2382,128 @@ def requisicao_enviar(requisicao_id):
                             requisicao_id=requisicao_id))
 
 
+@compras_bp.route('/requisicoes/<int:requisicao_id>/corrigir', methods=['POST'])
+@login_required
+def requisicao_corrigir(requisicao_id):
+    """REJEITADA → RASCUNHO. O caminho que o desenho previa e ninguém tinha.
+
+    📖 `services/requisicao_compra.TRANSICOES_VALIDAS` permite esta aresta
+    desde a Fase 3, com o motivo escrito ao lado: *"rejeitar não é matar. O
+    gestor rejeita '3 chapas é pouco, peça 5'; o solicitante corrige e reenvia,
+    e o histórico guarda os dois momentos."* Faltava a rota — e sem ela a
+    requisição rejeitada só tinha "Cancelar", que joga fora a justificativa, os
+    itens e a trilha.
+
+    Vem junto com `requisicao_itens` de propósito: devolver a requisição para
+    RASCUNHO sem poder editá-la seria devolvê-la a um estado que ninguém
+    consegue mudar.
+
+    A rodada de aprovação nova não herda voto nenhum — 📖
+    `_inicio_da_rodada_atual` escopa os votos à entrada REAL em AGUARDANDO, e
+    esse conserto (achado nº 2 da revisão de 23/07) já existia antes de haver
+    caminho para chegar aqui.
+    """
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    requisicao = _requisicao_do_tenant(requisicao_id)
+
+    if not pode_requisitar_na_obra(requisicao.obra_id):
+        flash('Você não pode movimentar requisições desta obra.', 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    # A máquina recusaria de qualquer forma; recusar ANTES evita que um
+    # duplo-clique vire `TransicaoInvalida` subindo como 500.
+    if requisicao.estado != EstadoRequisicao.REJEITADA:
+        flash('Só requisição rejeitada volta para rascunho. Esta está em '
+              f'{requisicao.estado.value}.', 'warning')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    try:
+        transicionar(requisicao, EstadoRequisicao.RASCUNHO, current_user,
+                     motivo=(request.form.get('motivo') or '').strip()
+                     or 'devolvida para correção')
+        db.session.commit()
+        flash(f'Requisição {requisicao.numero} voltou para rascunho — corrija '
+              f'os itens e envie de novo. A aprovação recomeça do zero.',
+              'success')
+    except TransicaoInvalida as e:
+        db.session.rollback()
+        flash(str(e), 'danger')
+
+    return redirect(url_for('compras.requisicao_detalhe',
+                            requisicao_id=requisicao_id))
+
+
+@compras_bp.route('/requisicoes/<int:requisicao_id>/itens', methods=['POST'])
+@login_required
+def requisicao_itens(requisicao_id):
+    """Substitui os itens da requisição em RASCUNHO.
+
+    Substituir e não editar linha a linha: o formulário desta tela é o mesmo
+    `item_*[]` do `requisicao_nova`, lido pelo mesmo `_itens_do_form()`. Um
+    parser só para os dois caminhos é o que impede que "criar" e "corrigir"
+    aceitem coisas diferentes.
+
+    **Só em RASCUNHO.** Mexer em item de requisição já enviada mudaria o valor
+    debaixo de quem está aprovando — e a alçada foi decidida sobre o valor de
+    então. É a mesma razão pela qual `requisicao_vincular_mapa` recusa fora de
+    RASCUNHO/AGUARDANDO.
+    """
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    requisicao = _requisicao_do_tenant(requisicao_id)
+
+    if not pode_requisitar_na_obra(requisicao.obra_id):
+        flash('Você não pode movimentar requisições desta obra.', 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    if requisicao.estado != EstadoRequisicao.RASCUNHO:
+        flash('Os itens só podem ser corrigidos enquanto a requisição está em '
+              'rascunho. Depois de enviada, o valor é o que a alçada usou para '
+              'decidir quantas aprovações ela precisa.', 'warning')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    itens = _itens_do_form()
+    if not itens:
+        # Zerar os itens deixaria uma requisição que a guarda do envio recusa e
+        # que não tem como voltar a ter conteúdo pela mesma tela.
+        flash('A requisição precisa de pelo menos um item. Nada foi alterado.',
+              'warning')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    RequisicaoCompraItem.query.filter_by(
+        requisicao_id=requisicao.id, admin_id=requisicao.admin_id).delete()
+    for item in itens:
+        db.session.add(RequisicaoCompraItem(
+            requisicao_id=requisicao.id,
+            admin_id=requisicao.admin_id,
+            almoxarifado_item_id=item['almoxarifado_item_id'],
+            descricao=item['descricao'],
+            unidade=item['unidade'],
+            quantidade=item['quantidade'],
+            preco_estimado=item['preco'],
+        ))
+    db.session.flush()
+    # O valor é a base da alçada — item mexido sem recálculo cai na faixa
+    # errada, e é o que a docstring de `recalcular_valor` avisa.
+    recalcular_valor(requisicao)
+    db.session.commit()
+
+    flash(f'{len(itens)} item(ns) gravado(s). Valor estimado agora: '
+          f'R$ {requisicao.valor_estimado:.2f}.', 'success')
+    return redirect(url_for('compras.requisicao_detalhe',
+                            requisicao_id=requisicao_id))
+
+
 @compras_bp.route('/requisicoes/<int:requisicao_id>/cancelar', methods=['POST'])
 @login_required
 def requisicao_cancelar(requisicao_id):

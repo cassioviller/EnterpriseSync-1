@@ -86,9 +86,22 @@ class EstadoRequisicao(Enum):
     `transicionar` no modelo de propósito — ele vive em
     services/requisicao_compra.py, para que exista UM caminho de escrita.
 
-    Terminais: REJEITADA, CONVERTIDA e CANCELADA. De CONVERTIDA não se
-    volta: o PedidoCompra já existe e já gerou GestaoCustoPai e
-    ContaPagar (compras_views.py:193-254).
+    Terminais: **CONVERTIDA e CANCELADA**. De CONVERTIDA não se volta: o
+    PedidoCompra já existe e já gerou GestaoCustoPai e ContaPagar.
+
+    **REJEITADA NÃO é terminal** — dela se volta para RASCUNHO, porque
+    rejeitar não é matar: o gestor rejeita "3 chapas é pouco, peça 5", o
+    solicitante corrige e reenvia, e a trilha guarda os dois momentos. A
+    fonte da verdade sobre o que é permitido é `TRANSICOES_VALIDAS`, em
+    services/requisicao_compra.py; este parágrafo é resumo dela.
+
+    ⚠️ Até 17/08 este docstring dizia que REJEITADA era terminal, e a
+    máquina dizia o contrário desde a Fase 3. A contradição durou porque
+    nenhuma rota exercia a volta — quem lesse o modelo para decidir se
+    precisava de uma tela concluiria que não precisava, que é exatamente o
+    que aconteceu. Documentação que contradiz o código é pior que
+    documentação ausente, e há um teste que segura este parágrafo agora
+    (tests/test_requisicao_correcao.py).
     """
     RASCUNHO = "rascunho"
     AGUARDANDO_APROVACAO = "aguardando_aprovacao"

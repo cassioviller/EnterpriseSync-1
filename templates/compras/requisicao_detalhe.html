@@ -61,6 +61,78 @@
             </tfoot>
           </table>
         </div>
+
+        {#
+          17/08 — corrigir os itens em RASCUNHO.
+
+          Até aqui `RequisicaoCompraItem` só nascia dentro do `nova_post`: nem
+          em rascunho dava para acrescentar, corrigir ou remover. Quem errava
+          uma quantidade tinha de cancelar a requisição e digitar tudo de novo,
+          perdendo número, justificativa e trilha.
+
+          Substitui a lista inteira, pelo mesmo `item_*[]` que a tela de criar
+          usa — um parser só (`_itens_do_form`) para os dois caminhos.
+        #}
+        {% if requisicao.estado == EstadoRequisicao.RASCUNHO %}
+        <div class="card-footer bg-white">
+          <details>
+            <summary class="small fw-semibold text-primary" style="cursor:pointer">
+              Corrigir itens
+            </summary>
+            <form method="POST"
+                  action="{{ url_for('compras.requisicao_itens', requisicao_id=requisicao.id) }}"
+                  class="mt-3">
+              <div id="linhas-itens">
+                {% for i in itens %}
+                <div class="row g-2 mb-2 linha-item">
+                  <div class="col-5">
+                    <input type="text" name="item_descricao[]" class="form-control form-control-sm"
+                           value="{{ i.descricao }}" placeholder="Descrição">
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="item_unidade[]" class="form-control form-control-sm"
+                           value="{{ i.unidade }}" placeholder="un">
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="item_quantidade[]" class="form-control form-control-sm"
+                           value="{{ '%.3f'|format(i.quantidade or 0) }}" placeholder="Qtd">
+                  </div>
+                  <div class="col-3">
+                    <input type="text" name="item_preco[]" class="form-control form-control-sm"
+                           value="{{ '%.2f'|format(i.preco_estimado or 0) }}" placeholder="Preço">
+                  </div>
+                </div>
+                {% endfor %}
+                <div class="row g-2 mb-2 linha-item">
+                  <div class="col-5">
+                    <input type="text" name="item_descricao[]" class="form-control form-control-sm"
+                           placeholder="Nova linha — deixe em branco para ignorar">
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="item_unidade[]" class="form-control form-control-sm"
+                           value="un">
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="item_quantidade[]" class="form-control form-control-sm"
+                           value="1">
+                  </div>
+                  <div class="col-3">
+                    <input type="text" name="item_preco[]" class="form-control form-control-sm"
+                           value="0">
+                  </div>
+                </div>
+              </div>
+              <div class="small text-muted mb-2">
+                Apagar a descrição remove a linha. A lista inteira é substituída
+                pelo que estiver aqui, e o valor estimado é recalculado — é ele
+                que a alçada usa para decidir quantas aprovações a requisição
+                precisa.
+              </div>
+              <button class="btn btn-outline-primary btn-sm">Gravar itens</button>
+            </form>
+          </details>
+        </div>
+        {% endif %}
       </div>
 
       <div class="card border-0 shadow-sm">
@@ -379,6 +451,28 @@
               <button class="btn btn-primary w-100 mt-2">
                 <i class="fas fa-file-invoice-dollar me-1"></i> Emitir pedido
               </button>
+            </form>
+          {% endif %}
+
+          {#
+            17/08 — a saída que REJEITADA não tinha.
+
+            A máquina de estados permite REJEITADA → RASCUNHO desde a Fase 3,
+            com o desenho escrito ao lado ("rejeitar não é matar"), e nenhuma
+            rota a exercia: aqui só havia "Cancelar", que joga fora número,
+            justificativa, itens e trilha. Quem manda numa aresta de máquina de
+            estados é a tela que a oferece.
+          #}
+          {% if requisicao.estado == EstadoRequisicao.REJEITADA %}
+            <form method="POST"
+                  action="{{ url_for('compras.requisicao_corrigir', requisicao_id=requisicao.id) }}">
+              <button class="btn btn-primary w-100">
+                <i class="fas fa-rotate-left me-1"></i> Voltar para correção
+              </button>
+              <div class="form-text mb-2">
+                Volta para rascunho com os itens preservados. A aprovação
+                recomeça do zero — os votos da rodada anterior não contam.
+              </div>
             </form>
           {% endif %}
 
