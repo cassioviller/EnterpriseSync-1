@@ -989,6 +989,32 @@ backfill da migração 48: inerte neste banco, mas num banco **novo** produziria
 `test_fase5_rdo_ciclo_vida` (23 RDOs assinados sem trilha, ⚠️ dado de dev). A aritmética
 fecha: 2437 + 2 testes novos = 2439.
 
+### 📄 17/08 — spec da Fase 8, e a medição que mudou o diagnóstico
+
+`docs/superpowers/specs/2026-08-17-fase-8-financeiro-design.md`. 🔬 **A consultoria do
+método RFA NÃO foi contratada** (decisão do Cássio, 17/08) — a régua é escolha nossa, e o
+spec abre dizendo isso: as lacunas são reais no código, que elas importem para quem usa é
+hipótese nossa.
+
+**O que a medição mudou.** O diagnóstico de julho dizia "quatro planos de contas
+concorrentes" — verdade no código, enganoso no dado. 🔬⚠️ dev 17/08: **3.168 tenants (94%)
+já estão só no `_V2_CONTAS_SEED`**, 112 estão misturados, 91 não têm nenhum dos dois. Das
+partidas, **741 estão em `6.x` e só 164 em `5.x`**; partidas órfãs = **zero**. Não é
+unificar quatro iguais — é **reconhecer um vencedor** e aposentar os perdedores, com um
+de-para para a minoria.
+
+**O mecanismo, que o diagnóstico de julho não tinha:** 📖 são **três semeadores vivos**, e
+quem chega primeiro decide. Abrir `/contabilidade/plano-contas` semeia um; o botão em
+`/financeiro/plano-contas/inicializar` semeia outro; qualquer lançamento automático semeia
+o terceiro. Os três são idempotentes por `(admin_id, codigo)` — então, para cada código, o
+primeiro vence e os outros são **descartados em silêncio**. É por isso que dois tenants
+podem ter `5.1.01` significando coisas opostas.
+
+Sete tasks, migrations **310-311** (⚠️ a spec **libera a faixa 290-295**: numerar em 290
+com a maior aplicada em 309 seria repetir a origem do fantasma do 270). Cinco decisões
+esperando o Cássio. **A Task 1 é bloqueante e é humana** — medir em produção antes de
+escrever código, porque os números acima são ⚠️ dev.
+
 ### 📄 17/08 — o SIGE medido contra o método RFA
 
 `docs/maturidade-financeira-rfa.md`, a partir do `regras-financeiro.pdf` deixado na raiz.
@@ -1024,7 +1050,7 @@ a consultoria foi contratada.
 | **5** | RDO com ciclo de vida e assinatura | ✅ **24/07** — 16/16 tasks (Task 15: código pronto, execução espera infra) | `fase-5-rdo-ciclo-vida-assinatura.md` + `docs/fase-5-rollout.md` |
 | **6** | Orçamento versionado e aditivo | ⬜ — mas o **p9 já abriu a porta**: `definir_valor_contrato()` é o escritor único e os 5 chamadores passam por ele. A fase deixou de ser caça a chamadores; virou gravar `ObraContratoVersao` dentro de função que já existe | `fase-6-orcamento-versionado-aditivo.md` |
 | **7** | Planejamento avançado (CPM, baseline, EVM) | ❌ **obsoleta como escrita — reescrita pelo p10.** O editor v2 já entregou `TarefaVinculo`, o motor com passe direto/inverso, folga total, caminho crítico e `CronogramaBaseline`; implementá-la ao pé da letra criaria uma **segunda** rede de predecessoras e uma **segunda** baseline. O que sobrou dela era o EVM, entregue em `e86ab635` + `3612db6b` | ~~`fase-7-planejamento-avancado-cpm-evm.md`~~ → `PLANO-NUCLEO.md` §p10 |
-| **8** | Financeiro avançado + exportação Domínio | ⬜ | `fase-8-financeiro-avancado-dominio.md` |
+| **8** | Financeiro avançado + exportação Domínio | ⬜ — **spec reescrita em 17/08** com escopo maior (fixo × variável, DFC, indicadores), a partir da régua do método RFA. 🔬 A medição mudou o diagnóstico: não são quatro planos iguais, o `_V2_CONTAS_SEED` **já venceu** (94% dos tenants em dev) | **`2026-08-17-fase-8-financeiro-design.md`** (a antiga `fase-8-financeiro-avancado-dominio.md` fica como referência) |
 | **9a/9b** | Portal, assinatura de medição, contratos, Drive | ⬜ | `fase-9-portal-assinatura-contratos.md` |
 
 Todos em `docs/superpowers/plans/2026-07-21-*`. Faixas de migration reservadas
