@@ -20,6 +20,12 @@ reais no código e todas foram conferidas com `caminho:linha`; que elas importem
 usa o sistema é hipótese nossa.** Mesma classe de ressalva do spec das alçadas — requisito
 de desenho próprio, ratificado, não levantado com o usuário.
 
+> 📄 **Material de aprovação:** `caminho-do-dinheiro.pdf`, na raiz, gerado por
+> `scripts/gerar_pdf_caminho_dinheiro.py`. É este spec traduzido para quem decide — dois
+> fluxogramas, os campos novos e as cinco decisões, sem jargão de código. **Ele é gerado
+> por comando de propósito:** quando a medição da Task 1 mudar os números, eles mudam no
+> script e o PDF é refeito. PDF anexado à mão é PDF que envelhece calado.
+
 ---
 
 ## O que a medição mudou no diagnóstico
