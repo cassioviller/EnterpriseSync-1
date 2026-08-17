@@ -74,6 +74,33 @@ class TriadeIncompleta(ErroFinanceiroCompra):
     """Falta pelo menos uma das três pernas para liberar o pagamento."""
 
 
+class RessalvaInvalida(ErroFinanceiroCompra):
+    """A justificativa da liberação excepcional não serve.
+
+    Exceção própria e não reuso de `TriadeIncompleta`: a rota precisa
+    distinguir "faltou perna" — que OFERECE o campo de justificativa — de "a
+    justificativa não serve", que devolve o campo preenchido com o que a
+    pessoa escreveu. Uma exceção só faria as duas telas serem a mesma, e a
+    segunda perderia o texto.
+    """
+
+
+class AutoriaAusente(ErroFinanceiroCompra):
+    """Ato que exige autoria foi chamado sem usuário.
+
+    Existe porque `lancada_por_id` é NOT NULL: sem esta guarda o INSERT estoura
+    `IntegrityError` e **aborta a transação inteira**, que é exatamente o que a
+    conferência de duplicidade de `lancar_nota` existe para evitar. Erro de
+    domínio aborta o ato; erro de integridade aborta o trabalho de quem estava
+    no meio de outra coisa.
+    """
+
+
+# O mínimo da ressalva (D3). Campo vazio e "ok" são a mesma coisa para quem for
+# auditar, e o número existe para separar exceção explicada de clique a mais.
+MINIMO_RESSALVA = 15
+
+
 def _d(valor):
     from decimal import Decimal
     if valor is None:
@@ -165,19 +192,31 @@ def criar_obrigacao(pedido):
     return criadas
 
 
-def lancar_nota(pedido, *, numero, serie='1', valor_total, data_emissao,
-                data_vencimento=None, chave_acesso=None, arquivo_path=None,
-                usuario=None):
-    """Registra uma nota do pedido. Levanta `NotaDuplicada`.
+def lancar_nota(pedido, *, numero, valor_total, data_emissao, usuario,
+                serie='1', data_vencimento=None, chave_acesso=None,
+                arquivo_path=None):
+    """Registra uma nota do pedido. Levanta `NotaDuplicada`, `AutoriaAusente`.
 
     A duplicidade é conferida ANTES do INSERT, e não só pelo UNIQUE do banco:
     `IntegrityError` aborta a transação inteira, e quem está no meio de um
     lançamento perderia o resto do trabalho por causa de um número repetido.
     O UNIQUE continua lá como última linha de defesa — o que não pode é ele ser
     a PRIMEIRA.
+
+    `usuario` é **keyword obrigatório** desde 17/08, e a mudança tem motivo:
+    até aqui o default era `None` enquanto `lancada_por_id` é NOT NULL, então
+    chamar sem usuário caía no `IntegrityError` — o mesmo defeito que o
+    parágrafo acima descreve, por outra porta. A guarda explícita existe além
+    da assinatura porque `usuario=None` passado de propósito também tem de
+    parar aqui.
     """
     from app import db
     from models import NotaFiscalPedido
+
+    if getattr(usuario, 'id', None) is None:
+        raise AutoriaAusente(
+            'não dá para lançar nota sem saber quem a lançou — `lancada_por_id` '
+            'é metade da segregação entre quem lança e quem libera.')
 
     ja_existe = NotaFiscalPedido.query.filter_by(
         admin_id=pedido.admin_id, fornecedor_id=pedido.fornecedor_id,
@@ -307,8 +346,10 @@ def divergencia_nota_atestado(pedido):
     return diferenca, pct, pct <= limite
 
 
-def liberar(pedido, *, usuario=None):
-    """Libera as contas do pedido para pagamento. Levanta `TriadeIncompleta`.
+def liberar(pedido, *, usuario=None, justificativa=None):
+    """Libera as contas do pedido para pagamento.
+
+    Levanta `TriadeIncompleta` e `RessalvaInvalida`.
 
     **Aqui o valor da conta é reajustado para o que CHEGOU** — é o momento em
     que `valor_atestado` (Fase 1) finalmente é lido por alguém. Entrega parcial
@@ -317,17 +358,58 @@ def liberar(pedido, *, usuario=None):
 
     Conta já paga NÃO é reajustada nem retocada: reescrever obrigação liquidada
     é reescrever o passado financeiro, e o estorno é outro caminho.
+
+    ── A RESSALVA (D6 da Fase 2, construída em 17/08) ──────────────────────
+    `justificativa` é a porta de escape decidida em 14/08 e que faltava: com
+    ela, uma perna aberta da TRÍADE não impede a liberação — o texto fica em
+    `conta_pagar.liberacao_justificativa`, a conta sai no sensor e alguém a lê
+    uma vez por mês. Fornecedor pequeno que emite a nota semanas depois existe;
+    o que não pode é a exceção ser silenciosa.
+
+    Três coisas que a ressalva NÃO faz, e cada uma tem motivo:
+
+    1. **Não passa por cima da emergência 48h não ratificada.** Aquela perna
+       não é da tríade — é a sanção da Fase 3 (D5 das alçadas), e o dinheiro é
+       o único ponto onde ainda dá para parar um ato administrativo que não
+       aconteceu. Dispensá-la por escrito apagaria o único lugar onde o rito
+       morde. A checagem chama `_emergencia_nao_ratificada` em vez de casar por
+       string na lista de `pernas_faltantes`: casar por texto quebraria no dia
+       em que alguém melhorasse a mensagem, e a mensagem é feita para ser
+       melhorada.
+    2. **Não é gravada quando a tríade fechou.** Não houve exceção, e gravar
+       sugeriria uma — o relatório passaria a contar liberação normal, e
+       relatório que conta o normal deixa de apontar o anormal.
+    3. **Não aceita texto curto.** `MINIMO_RESSALVA` caracteres, porque campo
+       vazio e "ok" são a mesma coisa para quem for auditar.
     """
     from datetime import datetime
     from app import db
     from models import ContaPagar
     from services.recebimento_pedido import valor_atestado
 
+    ressalva = None
     faltam = pernas_faltantes(pedido)
     if faltam:
-        raise TriadeIncompleta(
-            f'não dá para liberar o pagamento do pedido '
-            f'{pedido.numero or pedido.id}: ' + '; '.join(faltam) + '.')
+        emergencia = _emergencia_nao_ratificada(pedido)
+        if emergencia:
+            raise TriadeIncompleta(
+                f'não dá para liberar o pagamento do pedido '
+                f'{pedido.numero or pedido.id}: ' + '; '.join(faltam) +
+                '. A ratificação da emergência não se dispensa por escrito — '
+                'ela é a sanção, não uma perna da tríade.')
+        texto = (justificativa or '').strip()
+        if not texto:
+            raise TriadeIncompleta(
+                f'não dá para liberar o pagamento do pedido '
+                f'{pedido.numero or pedido.id}: ' + '; '.join(faltam) + '.')
+        if len(texto) < MINIMO_RESSALVA:
+            raise RessalvaInvalida(
+                f'a justificativa da liberação excepcional precisa de pelo '
+                f'menos {MINIMO_RESSALVA} caracteres dizendo POR QUE a conta '
+                f'está sendo liberada com pendência ({"; ".join(faltam)}). '
+                f'Quem for auditar isto daqui a seis meses não vai ter a quem '
+                f'perguntar.')
+        ressalva = texto
 
     contas = ContaPagar.query.filter_by(
         pedido_compra_id=pedido.id, admin_id=pedido.admin_id).order_by(
@@ -361,6 +443,11 @@ def liberar(pedido, *, usuario=None):
         cp.situacao_liberacao = 'liberada'
         cp.liberada_por_id = getattr(usuario, 'id', None)
         cp.liberada_em = agora
+        # `ressalva` só é não-None quando havia perna aberta — ver o item 2 do
+        # docstring. Atribuir incondicionalmente marcaria como exceção toda
+        # liberação em que alguém deixou o campo preenchido por engano.
+        if ressalva:
+            cp.liberacao_justificativa = ressalva
 
     db.session.flush()
     return abertas

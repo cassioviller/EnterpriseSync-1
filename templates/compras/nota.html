@@ -1,0 +1,158 @@
+{% extends "base_completo.html" %}
+{% block title %}Notas de {{ pedido.numero or '#' ~ pedido.id }}{% endblock %}
+
+{#
+  Fecho da Fase 2 — a tela que faltava para a perna da nota.
+
+  Até 17/08 esta perna da tríade só era alcançável por
+  `python -c "from services.financeiro_compra import lancar_nota"`. A conta do
+  Fluxo A nascia bloqueada, o financeiro recusava a baixa mandando "complete a
+  tríade e libere", e não havia onde.
+
+  Lista e formulário na MESMA tela, no molde de recebimento.html: quem lança
+  nota lança olhando o papel, e ir e voltar entre listar e criar é o que faz
+  alguém lançar o número errado.
+
+  Sem input de arquivo, e é decisão (D4): `arquivo_path` fica nulo até o volume
+  persistente existir. Anexo em static/uploads/ some no primeiro redeploy.
+#}
+
+{% block content %}
+<div class="container py-4" style="max-width: 760px;">
+
+  <div class="d-flex align-items-center mb-4">
+    <a href="{{ url_for('compras.detalhe', pedido_id=pedido.id) }}"
+       class="btn btn-outline-secondary me-3">
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <div class="flex-grow-1">
+      <h1 class="h4 mb-0 fw-bold">
+        Notas de {{ pedido.numero or '#' ~ pedido.id }}
+      </h1>
+      <small class="text-muted">
+        {{ pedido.obra.nome if pedido.obra else 'Sem obra' }}
+        · {{ pedido.fornecedor.nome if pedido.fornecedor else '—' }}
+      </small>
+    </div>
+  </div>
+
+  {#
+    O que falta para a conta liberar, dito aqui e não só na recusa da baixa.
+    Quem está nesta tela é quem tem o papel na mão — descobrir a pendência
+    depois, no financeiro, é descobrir tarde.
+  #}
+  {% if faltam %}
+  <div class="alert alert-warning border-0 shadow-sm">
+    <div class="fw-semibold mb-1">
+      <i class="fas fa-triangle-exclamation me-1"></i>
+      A conta deste pedido ainda não libera
+    </div>
+    <ul class="mb-0 small">
+      {% for f in faltam %}<li>{{ f }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% else %}
+  <div class="alert alert-success border-0 shadow-sm mb-4">
+    <i class="fas fa-check-circle me-1"></i>
+    A tríade está fechada — a conta pode ser liberada na tela do pedido.
+  </div>
+  {% endif %}
+
+  {% if notas %}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold py-3">Notas já lançadas</div>
+    <ul class="list-group list-group-flush">
+      {% for n in notas %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+          <span class="fw-semibold">{{ n.numero }}/{{ n.serie }}</span>
+          <small class="text-muted ms-2">
+            emitida em {{ n.data_emissao.strftime('%d/%m/%Y') }}
+            {%- if n.data_vencimento %} · vence em {{ n.data_vencimento.strftime('%d/%m/%Y') }}{% endif %}
+          </small>
+          <div class="small text-muted">
+            R$ {{ '%.2f'|format(n.valor_total|float) }}
+            {%- if n.lancada_por %} · lançada por {{ n.lancada_por.nome }}{% endif %}
+            {%- if n.chave_acesso %} · chave {{ n.chave_acesso[:8] }}…{% endif %}
+          </div>
+        </div>
+        <form method="POST"
+              action="{{ url_for('compras.excluir_nota', pedido_id=pedido.id, nota_id=n.id) }}"
+              onsubmit="return confirm('Excluir a nota {{ n.numero }}/{{ n.serie }}?')">
+          <button class="btn btn-outline-danger btn-sm">Excluir</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    <div class="card-footer bg-white small">
+      <div class="d-flex justify-content-between">
+        <span>Somam</span>
+        <span class="fw-semibold">R$ {{ '%.2f'|format(total_notas|float) }}</span>
+      </div>
+      <div class="d-flex justify-content-between text-muted">
+        <span>Atestado (o que de fato chegou)</span>
+        <span>R$ {{ '%.2f'|format(atestado|float) }}</span>
+      </div>
+      <div class="d-flex justify-content-between text-muted">
+        <span>Pedido</span>
+        <span>R$ {{ '%.2f'|format(pedido.valor_total|float) }}</span>
+      </div>
+      {#
+        Os três números juntos porque é a comparação que o conferente faz de
+        cabeça. Divergência acima da tolerância AVISA e não bloqueia (D1 da
+        Fase 2): frete, arredondamento e tributo por dentro produzem diferença
+        legítima toda semana.
+      #}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white fw-semibold py-3">Lançar nota</div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="row g-3">
+          <div class="col-8">
+            <label class="form-label">Número <span class="text-danger">*</span></label>
+            <input type="text" name="numero" class="form-control" required
+                   maxlength="20" autofocus>
+          </div>
+          <div class="col-4">
+            <label class="form-label">Série</label>
+            <input type="text" name="serie" class="form-control" value="1"
+                   maxlength="5">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Valor <span class="text-danger">*</span></label>
+            <input type="text" name="valor_total" class="form-control" required
+                   inputmode="decimal" placeholder="1625,00">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Emissão <span class="text-danger">*</span></label>
+            <input type="date" name="data_emissao" class="form-control" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Vencimento</label>
+            <input type="date" name="data_vencimento" class="form-control">
+            <div class="form-text">
+              É esta data que passa a valer para a conta a pagar.
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Chave de acesso</label>
+            <input type="text" name="chave_acesso" class="form-control"
+                   maxlength="44" placeholder="opcional">
+            <div class="form-text">
+              Opcional — recibo e nota de serviço não têm.
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary mt-3">
+          <i class="fas fa-file-invoice me-1"></i> Lançar nota
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

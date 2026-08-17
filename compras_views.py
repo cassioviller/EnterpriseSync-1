@@ -10,9 +10,10 @@ from werkzeug.utils import secure_filename
 from app import db
 from models import (AlmoxarifadoItem, AlmoxarifadoEstoque, AlmoxarifadoMovimento,
                     ContaPagar, EstadoRequisicao, Fornecedor, Funcionario,
-                    MapaConcorrenciaV2, Obra, ObraServicoCusto, PedidoCompra,
-                    PedidoCompraItem, RequisicaoCompra, RequisicaoCompraItem,
-                    GestaoCustoPai, GestaoCustoFilho, Usuario)
+                    MapaConcorrenciaV2, NotaFiscalPedido, Obra, ObraServicoCusto,
+                    PedidoCompra, PedidoCompraItem, RequisicaoCompra,
+                    RequisicaoCompraItem, GestaoCustoPai, GestaoCustoFilho,
+                    Usuario)
 from utils.tenant import get_tenant_admin_id, is_v2_active
 
 # Fase 3 — governança de compras. Imports no topo de propósito: estes
@@ -1335,6 +1336,178 @@ def excluir_recebimento(pedido_id, recebimento_id):
           f'{SITUACOES_RECEBIMENTO.get(pedido.situacao_recebimento, "—")}.',
           'success')
     return redirect(url_for('compras.recebimento', pedido_id=pedido_id))
+
+
+# ─────────────────────────────────────────────
+# NOTA FISCAL DO PEDIDO — fecho da Fase 2 do ciclo (N3)
+#
+# A Fase 2 entregou `lancar_nota()` e `liberar()` como serviço e não deu tela a
+# nenhum dos dois. Toda `ContaPagar` do Fluxo A nascia `bloqueada`, o financeiro
+# recusava a baixa mandando "complete a tríade e libere" — e das três pernas só
+# o atesto tinha por onde ser fechado. Estas rotas são o caminho que faltava.
+# ─────────────────────────────────────────────
+def _pedido_do_fluxo_a(pedido_id):
+    """O pedido do tenant, ou (None, resposta) quando não cabe tríade nele.
+
+    Devolve a dupla em vez de levantar porque as três rotas desta seção têm o
+    mesmo par de recusas e o mesmo destino — e recusa explicada é o padrão da
+    casa desde a Fase 1: um no-op silencioso é pior que uma recusa, porque quem
+    clicou acha que registrou.
+    """
+    from flask import abort
+    from utils.autorizacao import _e_admin_do_tenant
+    from services.financeiro_compra import FATURADO, fluxo_do_tenant
+
+    admin_id = _admin_id()
+    pedido = PedidoCompra.query.filter_by(
+        id=pedido_id, admin_id=admin_id).first_or_404()
+
+    if not _e_admin_do_tenant():
+        abort(403)
+
+    if getattr(pedido, 'fluxo_pagamento', FATURADO) != FATURADO or \
+            not fluxo_do_tenant(admin_id):
+        flash('Este pedido não está no Fluxo A do regime de dois fluxos: a '
+              'conta dele já nasce liberada e não há tríade para alimentar. '
+              'Nota lançada aqui seria uma linha que não bloqueia nem libera '
+              'nada.', 'warning')
+        return None, redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
+    return pedido, None
+
+
+@compras_bp.route('/<int:pedido_id>/nota', methods=['GET', 'POST'])
+@login_required
+def nota(pedido_id):
+    """A tela de quem tem a nota na mão.
+
+    GET e POST na mesma rota, no molde de `recebimento`: quem lança nota lança
+    olhando o papel, e ir e voltar entre listar e criar é o que faz alguém
+    lançar o número errado.
+
+    `chave_acesso` é opcional e não tem validação de dígito — decisão do modelo,
+    não economia daqui: metade das compras de obra chega com recibo ou nota de
+    serviço sem XML, e exigir a chave faria a tríade virar uma trava que o campo
+    aprende a contornar (📖 docstring de `NotaFiscalPedido`).
+
+    Sem input de arquivo (D4): `arquivo_path` continua nulo até o volume
+    persistente existir. Anexo em `static/uploads/` some no primeiro redeploy, e
+    nota fiscal que some é pior que nota fiscal que nunca foi anexada.
+    """
+    from services.financeiro_compra import (AutoriaAusente, NotaDuplicada,
+                                            lancar_nota, pernas_faltantes,
+                                            valor_das_notas)
+    from services.recebimento_pedido import valor_atestado
+
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    pedido, recusa = _pedido_do_fluxo_a(pedido_id)
+    if recusa:
+        return recusa
+
+    if request.method == 'POST':
+        numero = (request.form.get('numero') or '').strip()
+        serie = (request.form.get('serie') or '1').strip() or '1'
+        chave = (request.form.get('chave_acesso') or '').strip() or None
+        if not numero:
+            flash('O número da nota é obrigatório — é ele que identifica o '
+                  'papel que chegou.', 'warning')
+            return redirect(url_for('compras.nota', pedido_id=pedido_id))
+
+        try:
+            emissao = datetime.strptime(
+                request.form.get('data_emissao') or '', '%Y-%m-%d').date()
+        except ValueError:
+            flash('Data de emissão inválida.', 'warning')
+            return redirect(url_for('compras.nota', pedido_id=pedido_id))
+
+        vencimento = None
+        if (request.form.get('data_vencimento') or '').strip():
+            try:
+                vencimento = datetime.strptime(
+                    request.form['data_vencimento'], '%Y-%m-%d').date()
+            except ValueError:
+                flash('Data de vencimento inválida.', 'warning')
+                return redirect(url_for('compras.nota', pedido_id=pedido_id))
+
+        # `_quantidade_do_form` e não um `Decimal()` direto: é o parser que
+        # RECUSA "1.500" em vez de chutar entre mil e quinhentos e um e meio.
+        # Errar isso aqui erra o valor da nota por 1000× — e é justamente o
+        # achado nº 6 da revisão da Fase 3, que ficou em aberto porque consertar
+        # só num lugar criaria divergência. Aqui a tela é nova: nasce certa.
+        valor, erro = _quantidade_do_form(request.form.get('valor_total'))
+        if erro or valor <= 0:
+            flash(erro or 'O valor da nota precisa ser maior que zero.',
+                  'warning')
+            return redirect(url_for('compras.nota', pedido_id=pedido_id))
+
+        try:
+            lancar_nota(pedido, numero=numero, serie=serie,
+                        valor_total=valor,
+                        data_emissao=emissao, data_vencimento=vencimento,
+                        chave_acesso=chave, usuario=current_user)
+            db.session.commit()
+        except (NotaDuplicada, AutoriaAusente) as e:
+            db.session.rollback()
+            # Flash e não 500: a mensagem do serviço já é escrita para o
+            # operador ("se for outra nota, confira o número e a série no
+            # papel"), então a rota só a repassa.
+            flash(str(e), 'warning')
+            return redirect(url_for('compras.nota', pedido_id=pedido_id))
+
+        flash(f'Nota {numero}/{serie} lançada.', 'success')
+        return redirect(url_for('compras.nota', pedido_id=pedido_id))
+
+    notas = pedido.notas_fiscais.order_by(NotaFiscalPedido.id).all()
+    return render_template(
+        'compras/nota.html',
+        pedido=pedido,
+        notas=notas,
+        total_notas=valor_das_notas(pedido),
+        atestado=valor_atestado(pedido),
+        faltam=pernas_faltantes(pedido),
+    )
+
+
+@compras_bp.route('/<int:pedido_id>/nota/<int:nota_id>/excluir',
+                  methods=['POST'])
+@login_required
+def excluir_nota(pedido_id, nota_id):
+    """Nota lançada errada sai e o número volta a ser aceito (D5).
+
+    Só enquanto a conta estiver `bloqueada`: depois de liberada, a nota é
+    premissa de um ato financeiro já praticado, e apagá-la deixaria a liberação
+    apoiada em nada. Editar não existe de propósito — nota é documento externo,
+    e "editar" uma nota é reescrever o que o fornecedor emitiu.
+    """
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    pedido, recusa = _pedido_do_fluxo_a(pedido_id)
+    if recusa:
+        return recusa
+
+    nf = NotaFiscalPedido.query.filter_by(
+        id=nota_id, pedido_id=pedido.id, admin_id=pedido.admin_id).first_or_404()
+
+    ja_liberada = ContaPagar.query.filter_by(
+        pedido_compra_id=pedido.id, admin_id=pedido.admin_id).filter(
+            ContaPagar.situacao_liberacao == 'liberada').first()
+    if ja_liberada is not None:
+        flash('Esta conta já foi liberada para pagamento com base nesta nota. '
+              'Excluir a nota agora deixaria a liberação apoiada em nada — se '
+              'a nota estiver errada, o caminho é o estorno do pagamento.',
+              'warning')
+        return redirect(url_for('compras.nota', pedido_id=pedido_id))
+
+    rotulo = f'{nf.numero}/{nf.serie}'
+    db.session.delete(nf)
+    db.session.commit()
+    flash(f'Nota {rotulo} excluída — o número volta a ser aceito.', 'success')
+    return redirect(url_for('compras.nota', pedido_id=pedido_id))
 
 
 # ─────────────────────────────────────────────
