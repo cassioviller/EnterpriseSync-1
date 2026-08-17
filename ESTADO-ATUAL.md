@@ -52,6 +52,15 @@ triagem). Refazer o login é interativo — item humano, restrito ao `gh`.~~
 > É backup, não é o GitHub — mas tira os 37 commits de cima de uma máquina só.
 > As branches de feature seguem **apenas locais**.
 >
+> 🔴 **17/08: o backup NÃO aceita branch de feature, e agora sabemos por quê.**
+> `git push gitsafe-backup feat/nota-e-liberacao` →
+> `remote: Error: Only pushes to main branch are allowed` (pre-receive hook declined).
+> A frase "as branches de feature seguem apenas locais" era descrição de um hábito; é
+> **regra do servidor**. Consequência prática: **trabalho em branch existe numa máquina
+> só até ser mesclado em `main`** — não há como fazer backup dele antes disso. Quem
+> desenvolver em branch longa deve saber que o único jeito de tirá-la de cima desta
+> máquina é mesclar.
+>
 > 🔬 17/08: repetido após o merge das alçadas — `1b4ab0c1..b7c2dd35`, e
 > `gitsafe-backup/main == main == b7c2dd35` conferido em `git fetch`, não só no
 > ref local. São **52 commits** à frente de `origin/main` agora. Das branches
