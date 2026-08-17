@@ -629,6 +629,7 @@ sem atesto não existe a tríade do Fluxo A nem a baixa do adiantamento do Fluxo
 | 1 | Recebimento e atesto | ✅ **mesclada em `main` em 14/08** (`9c997bf8`) |
 | 2 | Financeiro em dois fluxos | ✅ **mesclada em `main` em 14/08** (`e74360cb`) — F1-F7 |
 | 3 | Alçadas (as 4 condições, anti-fracionamento, emergência 48h, corte de 3 cotações) | ✅ **mesclada em `main` em 17/08** (`84ae487c`) — A1-A8, fast-forward após o gate |
+| — | **Fecho da Fase 2: a nota e a liberação ganham tela** | 🔴 **spec escrito em 17/08**, não executado — `2026-08-17-nota-e-liberacao-design.md`. **Fura a fila**: ver abaixo |
 | 4 | Status unificado (régua de 9 etapas) | ⬜ sem spec |
 | 5 | Relatórios (os 5) | ⬜ sem spec |
 
@@ -820,6 +821,53 @@ contra a operação real, não contra o spec.**
 > legitimamente aprovada aparecer como "APROVADA sem a alçada fechada". Registrado no
 > runbook, **não consertado**: mudar o que o sensor vigia é decisão da fase, não da
 > execução.
+
+### 🔴 17/08 — a Fase 2 do ciclo está inoperável pela tela
+
+Conferência do fluxo de compras ponta a ponta, pedida depois do merge das alçadas. 📖
+varredura em todo `.py` fora de `archive/`: **`lancar_nota` e `liberar`
+(`services/financeiro_compra.py:168` e `:310`) não têm um único chamador de produção** —
+só `tests/`. `NotaFiscalPedido` não aparece em view, rota ou template nenhum.
+
+📖 `situacao_liberacao_inicial:95-99` faz **toda** `ContaPagar` do Fluxo A do regime novo
+nascer `bloqueada`, e `financeiro_views.py:518` recusa a baixa mandando *"complete a tríade
+e libere"*. Das três pernas só o atesto tem tela. **Ligar `financeiro_dois_fluxos_ativo` em
+qualquer tenant produz conta que ninguém consegue pagar pelo sistema.**
+
+Não é incidente: 🔬 14/08 a flag não está ligada em tenant real. É o motivo pelo qual ela
+não pode ser ligada — e **não estava registrado como pendência em lugar nenhum**.
+
+**Como passou por gate verde e por um runbook executado:** 📖 o plano da Fase 2 tem os steps
+F3 (serviço) e F4 (guarda) e **nenhum step de tela** para os dois atos — o Fluxo B ganhou o
+seu (F6 step 4), o Fluxo A não. Os testes chamam o serviço direto, que é o certo para testar
+regra e é por isso que não veem a rota ausente. E 📖 o runbook das alçadas **já dizia** *"a
+nota ainda não tem tela própria"* (passo 3e(ii)) — escrito como instrução de contorno, não
+como pendência, e quem executou contornou pelo shell. Mesma classe do 🔴 de 15/08
+(`pode_ratificar`): serviço completo, tela incompleta, suíte cega para a diferença.
+
+**Spec escrito em 17/08:** `docs/superpowers/specs/2026-08-17-nota-e-liberacao-design.md` —
+uma coluna (`conta_pagar.liberacao_justificativa`), migration **308**, três rotas, cinco
+decisões **aguardando ratificação**. Inclui a porta de escape do **D6 da Fase 2** (liberar
+sem nota com justificativa), que foi decidida em 14/08 e **nunca construída**.
+
+**Ele fura a fila da Fase 4** de propósito: a régua de 9 etapas teria de representar dois
+passos que hoje não existem em tela nenhuma.
+
+Três achados menores da mesma conferência, registrados no "Fora de escopo" do spec:
+
+1. 📖 **`REJEITADA` não tem volta pela tela.** Três camadas discordam:
+   `services/requisicao_compra.py:78` permite `REJEITADA → RASCUNHO` com o desenho
+   explicado (*"rejeitar não é matar"*), `models.py:89` diz que é **terminal**, e
+   `requisicao_detalhe.html:385` só oferece "Cancelar". Quem manda é a tela. A aresta é
+   testada (`test_fase3_requisicao.py:287`) e nenhuma rota a usa.
+2. 📖 **Não há como editar item de requisição.** `RequisicaoCompraItem` só nasce em
+   `compras_views.py:1846`, dentro do `nova_post` — nem em RASCUNHO dá para corrigir. Os
+   dois são a mesma fase pequena e devem vir juntos: ligar a volta sem a edição devolve a
+   requisição a um estado que ninguém consegue mudar.
+3. 🔴 📖 **`lancar_nota` tem `usuario=None` como default e `lancada_por_id` é NOT NULL**
+   (`models.py:6015`). Chamar sem usuário estoura `IntegrityError` e aborta a transação
+   inteira — o oposto do que o resto da função faz questão de evitar. A rota nova sempre
+   passa `current_user`; o default é que mente sobre o contrato.
 
 
 ## O plano aprovado
