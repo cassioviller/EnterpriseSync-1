@@ -167,6 +167,20 @@ soma delas contra o `valor_atestado` e contra o valor do pedido, e o formulário
 📖 a mensagem do serviço já é escrita para o operador (*"se for outra nota, confira o número
 e a série no papel"*), então a rota só a repassa.
 
+> 📌 **Acrescentado na execução, 17/08 — o valor usa `_quantidade_do_form`.** Este spec não
+> dizia como ler o valor do formulário, e um `Decimal(request.form[...])` direto teria
+> herdado a convenção defeituosa do app: 📖 o achado **nº 6** da revisão da Fase 3 registra
+> que o parser BR lê `'1.500'` como 1,5, e ele ficou **mantido de propósito** naquela
+> rodada — *"espelha a convenção de parsing do app inteiro; consertar só aqui criaria
+> comportamento divergente"*.
+>
+> Aqui o argumento se inverte, e é por isso que a decisão muda: `_quantidade_do_form`
+> (`compras_views.py`) **já existe** e já é a versão que **recusa o ambíguo** em vez de
+> chutar — nasceu no atesto da Fase 1 pelo mesmo motivo (uma quantidade lida errada some
+> da entrega). Usá-la aqui não é consertar um lugar só: é a tela nova nascendo na
+> convenção **certa**, que já tem dono e já tem teste. Num valor de nota fiscal, chutar
+> entre mil e quinhentos e um e meio erra por 1000× e ninguém vê.
+
 > 📌 **`chave_acesso` fica opcional, e isso não é economia de trabalho — é o desenho.**
 > 📖 O docstring de `NotaFiscalPedido` (`models.py:5963`) já responde: *"metade das compras
 > de obra chega com recibo, nota de serviço ou nota sem XML na mão do comprador: a tríade

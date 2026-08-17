@@ -64,27 +64,27 @@ exceção, e sensor que grita pelo esperado deixa de ser lido.
 
 ## N1 — A coluna e a migration 308
 
-- [ ] **Step 0:** conferir `migration_history` no dev **antes** de fixar o número. O spec diz
+- [x] **Step 0:** conferir `migration_history` no dev **antes** de fixar o número. O spec diz
   308 e o repositório termina em 299 — mas essa conferência já falhou duas vezes (B6.1 e
   R1). Se o dev estiver à frente, renumerar aqui **e no spec**, e não seguir com dois
   documentos discordando. ⚠️ 300-307 é faixa reservada da Fase 9 e 290-295 da Fase 8:
   **nenhuma das duas é vão livre**, é reserva não aplicada. Numerar dentro delas arma a
   colisão que a renumeração 270→277 existiu para evitar.
-- [ ] **Step 1 (red):** teste do esqueleto — `ContaPagar.liberacao_justificativa` nasce
+- [x] **Step 1 (red):** teste do esqueleto — `ContaPagar.liberacao_justificativa` nasce
   `None` em conta nova, e a conta histórica (criada antes da migration) também. Rodar e
   **ver vermelho**.
-- [ ] **Step 2:** a coluna em `models.py`, junto de `liberada_por_id`/`liberada_em`, que são
+- [x] **Step 2:** a coluna em `models.py`, junto de `liberada_por_id`/`liberada_em`, que são
   as irmãs dela. Docstring no padrão da casa: **por que uma coluna e não duas** (o booleano
   seria derivável do texto e os dois poderiam divergir) e **por que não `observacoes`**
   (📖 `liberar()` já escreve `[liberação]` e `[divergência]` lá como texto livre, e um
   relatório de exceções que faça `LIKE` numa coluna de 2000 caracteres é a definição de
   sensor em que ninguém confia).
-- [ ] **Step 3:** `_migration_308_liberacao_justificativa` — uma coluna, `TEXT NULL`, **sem
+- [x] **Step 3:** `_migration_308_liberacao_justificativa` — uma coluna, `TEXT NULL`, **sem
   backfill**: conta antiga não tem exceção a declarar. Registrar na lista de tuplas com a
   descrição explicando o salto de 299 para 308 e por que as duas faixas do meio seguem
   reservadas.
-- [ ] **Step 4 (green):** rodar. Verde.
-- [ ] **Step 5:** commit — `feat(financeiro): coluna da liberacao excepcional e migration 308`
+- [x] **Step 4 (green):** rodar. Verde.
+- [x] **Step 5:** commit — `feat(financeiro): coluna da liberacao excepcional e migration 308`
 
 ## N2 — O serviço: a ressalva, e `usuario` deixa de ser opcional
 
@@ -92,7 +92,7 @@ exceção, e sensor que grita pelo esperado deixa de ser lido.
 > levanta `TriadeIncompleta` sem exceção possível, e a porta de escape não existe na
 > assinatura.
 
-- [ ] **Step 1 (red):** os testes que definem a ressalva, um por regra do spec:
+- [x] **Step 1 (red):** os testes que definem a ressalva, um por regra do spec:
   - `liberar()` com `justificativa` e uma perna aberta **libera**, grava o texto em
     `liberacao_justificativa` e mantém `liberada_por_id`/`liberada_em`;
   - `liberar()` com `justificativa` de menos de **15 caracteres** recusa com
@@ -103,28 +103,28 @@ exceção, e sensor que grita pelo esperado deixa de ser lido.
     **não grava** a justificativa — não houve exceção, e gravar sugeriria uma;
   - **sem** `justificativa`, o comportamento de hoje é byte-idêntico (fronteira nº 5);
   - `lancar_nota` **sem** `usuario` recusa com erro de domínio, e não com `IntegrityError`.
-- [ ] **Step 2:** `liberar(pedido, *, usuario=None, justificativa=None)`. A recusa da
+- [x] **Step 2:** `liberar(pedido, *, usuario=None, justificativa=None)`. A recusa da
   emergência **não casa por string** na lista de `pernas_faltantes`: chama
   `_emergencia_nao_ratificada(pedido)`, que já existe e já é a fonte daquela frase. Casar
   por texto quebraria no dia em que alguém melhorar a mensagem — e a mensagem é feita para
   ser melhorada.
-- [ ] **Step 3:** `RessalvaInvalida(ErroFinanceiroCompra)`, ao lado de `TriadeIncompleta`.
+- [x] **Step 3:** `RessalvaInvalida(ErroFinanceiroCompra)`, ao lado de `TriadeIncompleta`.
   Exceção própria e não reuso: a rota precisa distinguir "faltou perna" (que oferece o
   campo de justificativa) de "a justificativa não serve" (que devolve o campo preenchido
   com o que a pessoa escreveu).
-- [ ] **Step 4:** `lancar_nota` passa a exigir `usuario` — **keyword obrigatório**, sem
+- [x] **Step 4:** `lancar_nota` passa a exigir `usuario` — **keyword obrigatório**, sem
   default. 🔴 Hoje o default é `None` e `lancada_por_id` é NOT NULL (`models.py:6015` +
   migration 287): chamar sem usuário estoura `IntegrityError` e **aborta a transação
   inteira**, que é exatamente o que o comentário de `:173-177` existe para evitar.
   📖 Conferido: os **6** chamadores em `tests/` já passam `usuario=`, então a mudança não
   quebra ninguém — é o contrato que passa a dizer a verdade.
-- [ ] **Step 5 (green + mutação):** verdes. Mutação de sanidade: fazer a ressalva aceitar
+- [x] **Step 5 (green + mutação):** verdes. Mutação de sanidade: fazer a ressalva aceitar
   justificativa vazia e confirmar que o teste dos 15 caracteres **mata** a mutação.
-- [ ] **Step 6:** commit — `feat(financeiro): a liberacao ganha a ressalva do D6, e lancar_nota exige quem lancou`
+- [x] **Step 6:** commit — `feat(financeiro): a liberacao ganha a ressalva do D6, e lancar_nota exige quem lancou`
 
 ## N3 — A tela da nota
 
-- [ ] **Step 1 (red):** os testes de rota:
+- [x] **Step 1 (red):** os testes de rota:
   - `GET /compras/<id>/nota` de pedido de **outro tenant** → **404**. Por filtro
     `filter_by(id=…, admin_id=…).first_or_404()`, nunca `get()` seguido de comparação —
     📖 é o padrão de `recebimento` e é o que o achado nº 2 de 03/08 (`detalhes_obra`)
@@ -135,13 +135,13 @@ exceção, e sensor que grita pelo esperado deixa de ser lido.
   - nota duplicada → flash `warning` e **200**, não 500;
   - excluir nota com a conta ainda `bloqueada` → some, e o número volta a ser aceito;
   - excluir nota com a conta já `liberada` → recusa com a razão.
-- [ ] **Step 2:** a rota `nota(pedido_id)` em `compras_views.py`, GET+POST na mesma view,
+- [x] **Step 2:** a rota `nota(pedido_id)` em `compras_views.py`, GET+POST na mesma view,
   no molde de `recebimento` (`compras_views.py:1181`) — inclusive na ordem das guardas:
   `_check_v2()` → tenant por filtro → permissão → recusa explicada do regime. A recusa do
   regime segue o argumento do `if not pedido.exige_atesto` de `:1214`: **um no-op silencioso
   é pior que uma recusa**, e nota lançada em pedido sem tríade é linha órfã que não bloqueia
   nem libera nada.
-- [ ] **Step 3:** `templates/compras/nota.html` — as notas já lançadas (número/série, valor,
+- [x] **Step 3:** `templates/compras/nota.html` — as notas já lançadas (número/série, valor,
   emissão, quem lançou, quando), a soma delas contra `valor_atestado(pedido)` e contra o
   valor do pedido, e o formulário. `chave_acesso` é campo **opcional, sem validação de
   dígito**: 📖 o docstring de `NotaFiscalPedido` (`models.py:5963`) já decidiu isso —
@@ -149,14 +149,14 @@ exceção, e sensor que grita pelo esperado deixa de ser lido.
   ⚠️ **Sem input de arquivo** (D4): `arquivo_path` continua nulo até o volume persistente
   existir. Anexo gravado em `static/uploads/` some no primeiro redeploy, e nota fiscal que
   some é pior que nota fiscal que nunca foi anexada.
-- [ ] **Step 4:** a rota de exclusão, `POST /compras/<pedido_id>/nota/<nota_id>/excluir`,
+- [x] **Step 4:** a rota de exclusão, `POST /compras/<pedido_id>/nota/<nota_id>/excluir`,
   com a guarda da conta `bloqueada` (D5).
-- [ ] **Step 5 (green):** rodar. Verdes.
-- [ ] **Step 6:** commit — `feat(compras): a nota fiscal do pedido ganha tela`
+- [x] **Step 5 (green):** rodar. Verdes.
+- [x] **Step 6:** commit — `feat(compras): a nota fiscal do pedido ganha tela`
 
 ## N4 — O painel da tríade e o botão de liberar
 
-- [ ] **Step 1 (red):**
+- [x] **Step 1 (red):**
   - `POST /compras/<id>/liberar` com a tríade fechada → conta vira `liberada` **e a baixa
     passa na mesma suíte**. Este é o teste que prova que o ciclo fecha ponta a ponta pela
     tela, e é exatamente o que faltou na Fase 2 — se só um teste desta fase sobreviver, é
@@ -167,29 +167,29 @@ exceção, e sensor que grita pelo esperado deixa de ser lido.
   - **paridade**: no tenant com `financeiro_dois_fluxos_ativo` **desligada**, a tela do
     pedido não mostra painel nem botão, e emitir → pagar produz exatamente os mesmos
     registros de antes — conferido por `SELECT`, não pela ORM.
-- [ ] **Step 2:** a rota `liberar_pedido(pedido_id)`. `TriadeIncompleta` e `RessalvaInvalida`
+- [x] **Step 2:** a rota `liberar_pedido(pedido_id)`. `TriadeIncompleta` e `RessalvaInvalida`
   viram flash `warning` com a mensagem do serviço, que já é escrita para o operador.
-- [ ] **Step 3:** o painel em `templates/compras/detalhe.html`, ao lado do bloco de
+- [x] **Step 3:** o painel em `templates/compras/detalhe.html`, ao lado do bloco de
   recebimento que já existe (`:26-50`) e com a mesma forma: badge + ação. Três linhas —
   pedido, nota, atesto —, cada uma verde ou com a frase que `pernas_faltantes` já devolve.
   **A tela não reimplementa a regra**: 📖 `pernas_faltantes` é função pura e a docstring
   dela diz que dá para chamar de dentro do template sem medo.
-- [ ] **Step 4:** o botão. Some para quem não pode liberar; com a tríade fechada é POST
+- [x] **Step 4:** o botão. Some para quem não pode liberar; com a tríade fechada é POST
   direto; com perna aberta abre o campo de justificativa e vira **"Liberar com ressalva"**.
   **Nunca some por estar bloqueado** — sumir é o que empurra o operador para o caminho de
   fora do sistema, que é a frase que a Fase 2 repete em três lugares.
-- [ ] **Step 5 (green + mutação):** verdes. Mutação: fazer a rota ignorar
+- [x] **Step 5 (green + mutação):** verdes. Mutação: fazer a rota ignorar
   `pernas_faltantes` e confirmar que o teste da tríade incompleta morre.
-- [ ] **Step 6:** commit — `feat(compras): a triade aparece na tela do pedido e a conta ganha botao de liberar`
+- [x] **Step 6:** commit — `feat(compras): a triade aparece na tela do pedido e a conta ganha botao de liberar`
 
 ## N5 — Sensor, teste-guarda e os dois runbooks
 
-- [ ] **Step 1 (red):** o **teste-guarda que teria pego este buraco em 14/08**: varre as
+- [x] **Step 1 (red):** o **teste-guarda que teria pego este buraco em 14/08**: varre as
   rotas registradas no app e falha se `lancar_nota` ou `liberar` voltarem a não ter chamador
   fora de `tests/`. Mesma ideia do guarda da C9 da Fase 2, que varre `.py` atrás de
   `ContaPagar(` criado fora do serviço. A mensagem de falha tem de ser legível para quem
   nunca leu este plano.
-- [ ] **Step 2:** ⚠️ **`scripts/verificar_consistencia_financeiro.py` — sai junto com N2, não
+- [x] **Step 2:** ⚠️ **`scripts/verificar_consistencia_financeiro.py` — sai junto com N2, não
   depois.** 📖 O achado 1 (`conta_liberada_sem_triade`, `:55`) marca toda conta `liberada`
   cujo `pernas_faltantes` não está vazio. **Conta liberada por ressalva é exatamente isso** —
   sem tocar o sensor, toda exceção legítima vira inconsistência e o sensor passa a gritar
@@ -197,17 +197,43 @@ exceção, e sensor que grita pelo esperado deixa de ser lido.
   preenchida, e nasce o achado `liberada_com_ressalva`, que **não é defeito** — lista as
   exceções para que alguém as leia uma vez por mês. Sensor que só grita erro nunca mostra o
   que foi decidido por fora da regra.
-- [ ] **Step 3 (green):** verdes. Rodar o sensor no tenant de dev: exit 0 antes da ressalva,
+- [x] **Step 3 (green):** verdes. Rodar o sensor no tenant de dev: exit 0 antes da ressalva,
   e depois de uma liberação excepcional ele lista **uma** linha, sem virar exit 1 por causa
   dela.
-- [ ] **Step 4:** as **duas correções de runbook**. Nenhuma é cosmética: as duas descrevem
+- [x] **Step 4:** as **duas correções de runbook**. Nenhuma é cosmética: as duas descrevem
   hoje um contorno que deixa de existir.
   - 📖 `2026-08-14-financeiro-dois-fluxos-design.md`, passo **2d** (*"lançar nota"*) —
     ganha o endereço da tela;
   - 📖 `2026-08-15-alcadas-design.md`, passo **3e(ii)** — a frase *"a nota ainda não tem
     tela própria"* fica **falsa**. Trocar pela tela, marcando a linha como as outras
     correções de execução daquele runbook.
-- [ ] **Step 5:** commit — `feat(financeiro): sensor enxerga a liberacao excepcional, e o guarda das duas rotas`
+- [x] **Step 5:** commit — `feat(financeiro): sensor enxerga a liberacao excepcional, e o guarda das duas rotas`
+
+---
+
+## Desvios da execução — 17/08
+
+Três, e nenhum silencioso. Ficam aqui porque o plano é o documento contra o qual a
+próxima rodada vai se comparar.
+
+1. 🔴 **O red-first do N3 foi furado.** Os testes de rota da tela da nota foram escritos
+   **depois** da rota, não antes: a regressão dirigida do N2 ocupava o banco por 5 minutos
+   e eu segui codando em vez de esperar. Eles nasceram **verdes**, que é exatamente o
+   sintoma contra o qual o red-first protege — teste que passa pelo motivo errado é a
+   lição do D1 da Fase 0.6 e da Task 7 da Fase 1. Recuperação: provei por **mutação** que
+   são load-bearing (removida a guarda de ADMIN morre o teste do 403; desligada a recusa
+   do regime morre o teste do Fluxo A). **Mutação não substitui red-first** — ela prova
+   que o teste vê o código, não que ele foi escrito antes dele.
+2. **N2 e N3 saíram num commit só** (`0a343ed0`), não em dois como o plano previa. Sem
+   consequência técnica; a mensagem cobre os dois.
+3. **A ordem N3/N4 foi serial**, não paralela. O plano as chamava de irmãs e estava certo
+   — nada nelas conflitou.
+
+**O que a execução acrescentou ao desenho** (e está registrado no spec como 📌):
+`_quantidade_do_form` em vez de `Decimal()` direto na tela da nota. É o parser que
+**recusa** `"1.500"` em vez de chutar entre mil e quinhentos e um e meio — o achado nº 6
+da revisão da Fase 3, que ficou aberto lá porque consertar num lugar só criaria
+divergência. A tela é nova: nasce certa, e não herda a convenção defeituosa.
 
 ---
 
