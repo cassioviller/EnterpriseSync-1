@@ -629,7 +629,7 @@ sem atesto não existe a tríade do Fluxo A nem a baixa do adiantamento do Fluxo
 | 1 | Recebimento e atesto | ✅ **mesclada em `main` em 14/08** (`9c997bf8`) |
 | 2 | Financeiro em dois fluxos | ✅ **mesclada em `main` em 14/08** (`e74360cb`) — F1-F7 |
 | 3 | Alçadas (as 4 condições, anti-fracionamento, emergência 48h, corte de 3 cotações) | ✅ **mesclada em `main` em 17/08** (`84ae487c`) — A1-A8, fast-forward após o gate |
-| — | **Fecho da Fase 2: a nota e a liberação ganham tela** | 🔴 **spec + plano escritos em 17/08**, decisões ratificadas, **execução não começou**. **Fura a fila**: ver abaixo |
+| — | **Fecho da Fase 2: a nota e a liberação ganham tela** | ✅ **N1-N5 executados em 17/08**, em `feat/nota-e-liberacao` — 5 commits, gate **2425/2**, **não mesclada**. 🔴 Falta o runbook rodado pela tela. Furou a fila da Fase 4: ver abaixo |
 | 4 | Status unificado (régua de 9 etapas) | ⬜ sem spec |
 | 5 | Relatórios (os 5) | ⬜ sem spec |
 
@@ -845,24 +845,65 @@ nota ainda não tem tela própria"* (passo 3e(ii)) — escrito como instrução 
 como pendência, e quem executou contornou pelo shell. Mesma classe do 🔴 de 15/08
 (`pode_ratificar`): serviço completo, tela incompleta, suíte cega para a diferença.
 
-**Spec e plano, 17/08:** `docs/superpowers/specs/2026-08-17-nota-e-liberacao-design.md` e
-`docs/superpowers/plans/2026-08-17-plano-execucao-nota-e-liberacao.md` — uma coluna
-(`conta_pagar.liberacao_justificativa`), migration **308**, três rotas, cinco tasks
-(N1-N5). 🔬 As cinco decisões foram **ratificadas em 17/08, todas na recomendação**;
-nenhuma task espera resposta. Inclui a porta de escape do **D6 da Fase 2** (liberar sem
-nota com justificativa), decidida em 14/08 e **nunca construída**.
+### ✅ 17/08 — o fecho executado: N1 a N5, em `feat/nota-e-liberacao`
 
-⚠️ **A dependência fora de ordem do plano, para quem for executar:** o passo do sensor
-(N5 Step 2) sai **junto com N2**, não depois. 📖 O achado 1 de
-`verificar_consistencia_financeiro.py:55` marca conta `liberada` cujo `pernas_faltantes`
-não está vazio — que é **exatamente** o que uma liberação por ressalva é. Sem tocar o
-sensor no mesmo commit, toda exceção legítima vira inconsistência e o sensor passa a
-gritar pelo esperado.
+`c06e995c` → `6ab02b8e`, **5 commits**, não mesclada. Spec
+`2026-08-17-nota-e-liberacao-design.md` + plano
+`2026-08-17-plano-execucao-nota-e-liberacao.md`; as cinco decisões ratificadas em 17/08,
+todas na recomendação.
 
-**Ele fura a fila da Fase 4** de propósito: a régua de 9 etapas teria de representar dois
-passos que hoje não existem em tela nenhuma.
+Entregou o caminho que faltava: **três rotas** (`/compras/<id>/nota` GET+POST, a exclusão
+da nota, e `/compras/<id>/liberar`), o painel da tríade na tela do pedido, a **ressalva do
+D6** — decidida em 14/08 e nunca construída — e migration **308**
+(`conta_pagar.liberacao_justificativa`, não-nulo = liberação excepcional).
 
-Três achados menores da mesma conferência, registrados no "Fora de escopo" do spec:
+🔬 **Gate completo: 2425 passed, 2 failed** em 32min58s, log em arquivo. **As duas falhas
+são as duas conhecidas e anteriores** — a aritmética fecha: 2400 (baseline de 16/08) + 25
+desta fase = 2425, **zero falhas novas**. Regressão dirigida: 296 passed, exit 0.
+
+**Três achados da execução:**
+
+1. 🔴 **`lancar_nota` tinha `usuario=None` por default contra uma coluna NOT NULL.**
+   Reproduzido em teste antes do conserto: estourava `IntegrityError` e **abortava a
+   transação inteira** — o mesmo defeito que a conferência de duplicidade da própria
+   função existe para evitar, por outra porta. Virou keyword obrigatório; 📖 os 6
+   chamadores já passavam `usuario=`.
+2. ⚠️ **A ressalva teria quebrado o sensor da Fase 2 se entrasse sozinha.** O achado 1 de
+   `verificar_consistencia_financeiro.py` marca conta `liberada` cujo `pernas_faltantes`
+   não está vazio — que é **literalmente** o que uma liberação por ressalva é. O sensor
+   saiu no mesmo commit, com achado próprio marcado `defeito=False`: aparece para ser
+   lido, não conta para o exit code.
+3. **A tela nasce com o parser certo.** 📖 O achado nº 6 da revisão da Fase 3 mantivera de
+   propósito o parser que lê `'1.500'` como 1,5, para não criar divergência consertando um
+   lugar só. Aqui o argumento se inverte: `_quantidade_do_form`, que **recusa** o ambíguo,
+   já existe e já tem dono. Num valor de nota fiscal, chutar entre mil e quinhentos e um e
+   meio erra por 1000× e ninguém vê.
+
+**Duas correções de runbook**, nenhuma cosmética: o da Fase 2 ganhou o endereço da tela e
+o **passo `d2` (liberar), que simplesmente não existia na lista** — ela pulava de "lançar
+nota" para "montar o lote", e foi por isso que o runbook nunca notou que a conta ficava
+bloqueada. O das alçadas dizia *"a nota ainda não tem tela própria"*: era **instrução de
+contorno escrita como instrução de uso**, então quem executou em 15/08 contornou o buraco
+em vez de reportá-lo. **Contorno em runbook é pendência disfarçada** — é o padrão que este
+achado inteiro tem.
+
+> 🔴 **O que NÃO foi feito, e é o primeiro item de quem retomar.** O runbook **não foi
+> rodado pela tela por um humano**. Todo o ciclo foi exercitado pelo `test_client`, que
+> percorre as rotas e renderiza os templates de verdade — mas ninguém abriu o navegador.
+> 🔬 Em 15/08 foi exatamente esse passo que achou o 🔴 que a suíte inteira não pegava
+> (`pode_ratificar`). Dois testes de render foram acrescentados no fim (as duas telas
+> devolvem 200 nos três estados do painel), o que **reduz** o risco sem eliminá-lo.
+
+> ⚠️ **O red-first foi furado no N3** e está registrado no plano: os testes de rota da tela
+> da nota vieram **depois** da rota, porque a regressão ocupava o banco. Nasceram verdes —
+> o sintoma exato contra o qual o red-first existe. Provados load-bearing por mutação, que
+> **não substitui** red-first: prova que o teste vê o código, não que veio antes dele.
+
+**A fase furou a fila da Fase 4** de propósito: a régua de 9 etapas teria de representar
+dois passos que até 17/08 não existiam em tela nenhuma.
+
+Três achados menores da conferência de 17/08, registrados no "Fora de escopo" do spec e
+**ainda abertos**:
 
 1. 📖 **`REJEITADA` não tem volta pela tela.** Três camadas discordam:
    `services/requisicao_compra.py:78` permite `REJEITADA → RASCUNHO` com o desenho
@@ -873,10 +914,10 @@ Três achados menores da mesma conferência, registrados no "Fora de escopo" do 
    `compras_views.py:1846`, dentro do `nova_post` — nem em RASCUNHO dá para corrigir. Os
    dois são a mesma fase pequena e devem vir juntos: ligar a volta sem a edição devolve a
    requisição a um estado que ninguém consegue mudar.
-3. 🔴 📖 **`lancar_nota` tem `usuario=None` como default e `lancada_por_id` é NOT NULL**
-   (`models.py:6015`). Chamar sem usuário estoura `IntegrityError` e aborta a transação
-   inteira — o oposto do que o resto da função faz questão de evitar. A rota nova sempre
-   passa `current_user`; o default é que mente sobre o contrato.
+3. ~~🔴 `lancar_nota` com `usuario=None` contra coluna NOT NULL.~~ ✅ **Consertado no
+   próprio fecho** (`0a343ed0`): virou keyword obrigatório com guarda explícita, e o
+   defeito foi reproduzido em teste antes do conserto. Os dois de cima **seguem abertos**
+   — são da requisição, não do financeiro, e o spec os deixa fora de escopo por isso.
 
 
 ## O plano aprovado

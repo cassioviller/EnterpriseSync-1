@@ -237,36 +237,45 @@ divergência. A tela é nova: nasce certa, e não herda a convenção defeituosa
 
 ---
 
-## Gate final
+## Gate final — 🟡 executado em 17/08, com UM item não cumprido
 
-- [ ] Suíte da fase verde: `pytest tests/test_nota_e_liberacao.py -q`
-- [ ] **Regressão dirigida** verde — é aqui que esta fase é mais arriscada do que parece,
-  porque muda a assinatura de duas funções que três fases já chamam:
-  `pytest tests/test_financeiro_dois_fluxos.py tests/test_recebimento_atesto.py
-  tests/test_alcadas_avancadas.py tests/test_fase3_alcada.py -q`
-- [ ] Gate completo: `pytest tests/ -m "not browser"` — ⚠️ **redirecionar o log inteiro para
-  arquivo, não pipar.** 🔬 Na rodada de 16/08 a corrida 1 foi pipada por `tail -30`, perdeu
-  os tracebacks e atrasou um diagnóstico em uma corrida inteira. **Esperado: 2 falhas
-  anteriores** (`test_excluir_obra::test_lista_cobre_toda_fk_no_action_para_obra` e
-  `test_fase5_rdo_ciclo_vida::test_backfill_marcou_os_rdos_historicos_como_preenchido`), as
-  duas reproduzindo em `main`. Falha **nova** é desta fase até prova em contrário.
-- [ ] **Ciclo em dev com a flag da Fase 2 desligada:** comportamento idêntico ao de hoje,
-  conferido por SQL cru — a rota da nota recusa, o painel não aparece, a conta nasce
-  `liberada` e paga como sempre pagou.
-- [ ] **Ciclo em dev com a flag ligada, pela tela, do começo ao fim:** emitir → atestar →
-  lançar a nota → liberar → pagar. É o passo que a Fase 2 nunca conseguiu executar sem
-  shell, e é o motivo de esta fase existir.
-- [ ] **A ressalva, pela tela:** pedido com atesto e **sem** nota → "Liberar com ressalva" →
-  a conta paga, `liberacao_justificativa` gravada, e a linha aparece no sensor.
-- [ ] **A recusa da ressalva:** requisição emergencial não ratificada → a ressalva **não**
-  destrava a conta, e a mensagem nomeia a emergência. É o teste de que esta fase não abriu
-  buraco na sanção da Fase 3.
-- [ ] As divergências entre spec e código registradas **no próprio spec**, como blockquote
-  📌 no ponto exato, e resumidas em `ESTADO-ATUAL.md`.
-- [ ] **O runbook da Fase 2 rodado de ponta a ponta num tenant de dev**, do passo 0 ao
-  Rollback, pela tela e conferido por SQL cru. 🔬 Foi este item que, em 15/08, achou o 🔴 que
-  a suíte inteira não pegava (`pode_ratificar` recusando a requisição já convertida). Não é
-  formalidade: é o único passo deste plano que exercita o sistema como o operador o usa.
+- [x] Suíte da fase verde: **25 passed** (`tests/test_nota_e_liberacao.py`)
+- [x] **Regressão dirigida** verde: **296 passed, exit 0** em 5min20s — a mudança de
+  assinatura de `lancar_nota` não quebrou nenhum dos 6 chamadores, como a conferência
+  prévia previa
+- [x] Gate completo: **2425 passed, 2 failed, 6 skipped, 2 xfailed** em 32min58s. Log
+  redirecionado para arquivo, não pipado — a lição de 16/08 foi seguida. **As duas falhas
+  são as duas conhecidas e anteriores**, as mesmas que reproduzem em `main`:
+  `test_excluir_obra::test_lista_cobre_toda_fk_no_action_para_obra` e
+  `test_fase5_rdo_ciclo_vida::test_backfill_marcou_os_rdos_historicos_como_preenchido`.
+  **Zero falhas novas.** A aritmética fecha: 2400 (baseline de 16/08) + 25 desta fase = 2425
+- [x] Ciclo com a flag **desligada**: paridade conferida por `SELECT` — conta nasce
+  `liberada`, `liberacao_justificativa` NULL, e o botão não aparece na tela do pedido
+- [x] Ciclo com a flag **ligada**, por rota, do começo ao fim: emitir → atestar → lançar
+  nota → liberar → **pagar**, com a baixa gravada. É o teste que dá nome ao gate de merge
+- [x] **A ressalva, pela rota:** pedido com atesto e sem nota → liberação com
+  justificativa → `liberacao_justificativa` gravada → a conta paga
+- [x] **A recusa da ressalva:** emergência 48h não ratificada não é destravada por
+  justificativa nenhuma, e a recusa nomeia a ratificação
+- [x] Sensor rodado pela **CLI** num tenant de dev com ressalva: lista a exceção com o
+  motivo, imprime "sem drift" e sai **exit 0** — a exceção não é contada como defeito
+- [x] As divergências entre spec e código registradas no próprio spec como 📌
+  (`_quantidade_do_form`) e os desvios de execução registrados acima
+- [ ] 🔴 **O runbook da Fase 2 rodado de ponta a ponta num tenant de dev, PELA TELA, por
+  um humano.** **NÃO foi feito.** Todo o ciclo acima foi exercitado pelo `test_client`,
+  que percorre as rotas e renderiza os templates de verdade — mas ninguém abriu o
+  navegador, clicou no botão e leu a tela.
+
+  Este item não é formalidade, e a própria história deste repositório é a prova: 🔬 em
+  15/08 foi exatamente ele que achou o 🔴 que a suíte inteira não pegava (`pode_ratificar`
+  recusando a requisição já convertida). Os testes da A6 não viam porque criavam o
+  `PedidoCompra` direto no banco; aqui os meus não veem o que quer que só apareça com um
+  humano na frente da tela.
+
+  **Fica em aberto e é o primeiro item de quem retomar.** O que reduz o risco — e não o
+  elimina — são os dois testes de render acrescentados no fim da execução, que provam que
+  as duas telas devolvem 200 nos três estados do painel (bloqueada, pronta, liberada com
+  ressalva) e que o texto da exceção aparece para quem lê.
 
 ---
 

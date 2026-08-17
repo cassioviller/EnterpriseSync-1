@@ -801,3 +801,84 @@ def test_sensor_nao_acusa_liberacao_com_ressalva_como_inconsistencia():
         assert 'liberada_com_ressalva' in tipos, (
             'a exceção sumiu do sensor — exceção que ninguém lê é exceção que '
             'vira rotina')
+
+
+# ---------------------------------------------------------------------------
+# As telas RENDERIZAM — a lacuna que os testes acima deixavam
+# ---------------------------------------------------------------------------
+#
+# Todo o resto desta suíte exercita POST e redirect. Um erro de Jinja em
+# `nota.html` ou no painel de `detalhe.html` (atributo que não existe, filtro
+# aplicado a None) só apareceria para o primeiro usuário — e apareceria como
+# 500 numa tela que existe justamente para destravar pagamento.
+#
+# É a mesma lacuna que o rollout do RDO em % registrou como pendência em 24/07
+# ("a conferência visual dos dois fluxos NÃO tem registro de ter sido feita").
+# Aqui ela custa dois testes.
+
+def test_a_tela_da_nota_renderiza():
+    from helpers_tenant import cliente_de
+    from services.financeiro_compra import criar_obrigacao
+    with app.app_context():
+        adm, _o, _f, ped = _tenant_regime_novo()
+        criar_obrigacao(ped)
+        db.session.commit()
+        _atestar(ped, adm)
+        _notar(ped, adm)
+        adm_id, ped_id = adm.id, ped.id
+
+    resposta = cliente_de(adm_id).get(f'/compras/{ped_id}/nota')
+
+    assert resposta.status_code == 200
+    corpo = resposta.get_data(as_text=True)
+    assert 'Lançar nota' in corpo
+    assert 'Notas já lançadas' in corpo, 'a nota lançada não apareceu na lista'
+    assert 'tríade está fechada' in corpo
+
+
+def test_o_painel_da_triade_renderiza_nos_tres_estados():
+    """Bloqueada, pronta para liberar e liberada — os três caminhos do Jinja.
+
+    O terceiro é o que mais escapa: só existe depois de `liberar()`, e é o
+    único que lê `conta_liberada.liberacao_justificativa`.
+    """
+    from helpers_tenant import cliente_de
+    from services.financeiro_compra import criar_obrigacao, liberar
+    with app.app_context():
+        adm, _o, _f, ped = _tenant_regime_novo()
+        criar_obrigacao(ped)
+        db.session.commit()
+        adm_id, ped_id = adm.id, ped.id
+
+    cli = cliente_de(adm_id)
+
+    # 1. bloqueada, com perna aberta → o campo da ressalva
+    corpo = cli.get(f'/compras/{ped_id}').get_data(as_text=True)
+    assert 'Liberar com ressalva' in corpo
+    assert 'sem atesto de recebimento' in corpo
+
+    # 2. tríade fechada → o botão normal
+    with app.app_context():
+        ped = db.session.get(PedidoCompra, ped_id)
+        adm = db.session.get(Usuario, adm_id)
+        _atestar(ped, adm)
+        _notar(ped, adm)
+    corpo = cli.get(f'/compras/{ped_id}').get_data(as_text=True)
+    assert 'Liberar para pagamento' in corpo
+
+    # 3. liberada com ressalva → o texto da exceção na tela
+    with app.app_context():
+        ped = db.session.get(PedidoCompra, ped_id)
+        adm = db.session.get(Usuario, adm_id)
+        cp = ContaPagar.query.filter_by(pedido_compra_id=ped_id).first()
+        cp.situacao_liberacao = 'bloqueada'
+        cp.liberacao_justificativa = None
+        db.session.commit()
+        from models import NotaFiscalPedido
+        NotaFiscalPedido.query.filter_by(pedido_id=ped_id).delete()
+        db.session.commit()
+        liberar(ped, usuario=adm, justificativa=RESSALVA)
+        db.session.commit()
+    corpo = cli.get(f'/compras/{ped_id}').get_data(as_text=True)
+    assert 'Liberada com ressalva' in corpo
+    assert RESSALVA in corpo, 'o motivo da exceção não aparece para quem lê a tela'
