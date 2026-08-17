@@ -629,7 +629,7 @@ sem atesto não existe a tríade do Fluxo A nem a baixa do adiantamento do Fluxo
 | 1 | Recebimento e atesto | ✅ **mesclada em `main` em 14/08** (`9c997bf8`) |
 | 2 | Financeiro em dois fluxos | ✅ **mesclada em `main` em 14/08** (`e74360cb`) — F1-F7 |
 | 3 | Alçadas (as 4 condições, anti-fracionamento, emergência 48h, corte de 3 cotações) | ✅ **mesclada em `main` em 17/08** (`84ae487c`) — A1-A8, fast-forward após o gate |
-| — | **Fecho da Fase 2: a nota e a liberação ganham tela** | 🔴 **spec escrito em 17/08**, não executado — `2026-08-17-nota-e-liberacao-design.md`. **Fura a fila**: ver abaixo |
+| — | **Fecho da Fase 2: a nota e a liberação ganham tela** | 🔴 **spec + plano escritos em 17/08**, decisões ratificadas, **execução não começou**. **Fura a fila**: ver abaixo |
 | 4 | Status unificado (régua de 9 etapas) | ⬜ sem spec |
 | 5 | Relatórios (os 5) | ⬜ sem spec |
 
@@ -845,10 +845,19 @@ nota ainda não tem tela própria"* (passo 3e(ii)) — escrito como instrução 
 como pendência, e quem executou contornou pelo shell. Mesma classe do 🔴 de 15/08
 (`pode_ratificar`): serviço completo, tela incompleta, suíte cega para a diferença.
 
-**Spec escrito em 17/08:** `docs/superpowers/specs/2026-08-17-nota-e-liberacao-design.md` —
-uma coluna (`conta_pagar.liberacao_justificativa`), migration **308**, três rotas, cinco
-decisões **aguardando ratificação**. Inclui a porta de escape do **D6 da Fase 2** (liberar
-sem nota com justificativa), que foi decidida em 14/08 e **nunca construída**.
+**Spec e plano, 17/08:** `docs/superpowers/specs/2026-08-17-nota-e-liberacao-design.md` e
+`docs/superpowers/plans/2026-08-17-plano-execucao-nota-e-liberacao.md` — uma coluna
+(`conta_pagar.liberacao_justificativa`), migration **308**, três rotas, cinco tasks
+(N1-N5). 🔬 As cinco decisões foram **ratificadas em 17/08, todas na recomendação**;
+nenhuma task espera resposta. Inclui a porta de escape do **D6 da Fase 2** (liberar sem
+nota com justificativa), decidida em 14/08 e **nunca construída**.
+
+⚠️ **A dependência fora de ordem do plano, para quem for executar:** o passo do sensor
+(N5 Step 2) sai **junto com N2**, não depois. 📖 O achado 1 de
+`verificar_consistencia_financeiro.py:55` marca conta `liberada` cujo `pernas_faltantes`
+não está vazio — que é **exatamente** o que uma liberação por ressalva é. Sem tocar o
+sensor no mesmo commit, toda exceção legítima vira inconsistência e o sensor passa a
+gritar pelo esperado.
 
 **Ele fura a fila da Fase 4** de propósito: a régua de 9 etapas teria de representar dois
 passos que hoje não existem em tela nenhuma.

@@ -216,10 +216,11 @@ flash `warning` com a mensagem do serviço — que já nomeia a perna.
 
 ---
 
-## Decisões — precisam de ratificação
+## Decisões — as cinco, fechadas em 17/08
 
-Nenhuma bloqueia; todas seguem com o `Recomendado:` se não houver objeção, como nas fases
-anteriores.
+🔬 **Ratificadas na sessão de 17/08, todas na recomendação.** Nenhuma task do plano de
+execução espera resposta. O que **não** fecha junto é se elas descrevem a operação real —
+quem for medir mede contra o campo, não contra este spec.
 
 **D1 — Quem lança a nota e quem libera?**
 *Recomendado:* **ADMIN do tenant para os dois atos**, ratificando o D2 da Fase 2 (*"fica
