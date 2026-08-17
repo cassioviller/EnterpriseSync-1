@@ -52,7 +52,7 @@ sempre: Onda 0 (medir) → Onda 1 (escopo num piloto) → Onda 3 (compras).
 
 > 🔬 27/07: as três últimas linhas eram lacunas desta revisão (runbook
 > inexistente; guard ausente ou *post-hoc*) e foram fechadas na mesma rodada.
-> Ver `RELATORIO-RODADA-2026-07-27.md`.
+> Ver `docs/archive/RELATORIO-RODADA-2026-07-27.md`.
 
 Duas fases **não têm flag**, de propósito, e por isso já estão valendo:
 
@@ -213,5 +213,5 @@ Nenhuma é bug de código; todas são prontidão.
 conversa inteira — hoje não dá para estimar nem priorizar sem eles.
 
 As lacunas 1, 2 e 3 já foram fechadas em 27/07 (runbooks escritos, guards
-postos, ver `RELATORIO-RODADA-2026-07-27.md`). As três restantes — 4, 5 e 6 —
+postos, ver `docs/archive/RELATORIO-RODADA-2026-07-27.md`). As três restantes — 4, 5 e 6 —
 **dependem de ação humana**, não de código.

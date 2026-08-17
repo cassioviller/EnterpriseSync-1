@@ -3,8 +3,8 @@
 > Snapshot de **2026-08-03** (6ª revisão, após o `PLANO-NUCLEO.md` — os dez
 > pacotes entregues, com três recortes explícitos).
 > Este é o documento a ler PRIMEIRO ao retomar. Os demais (`PLANO-NUCLEO.md`,
-> `DEVOLUTIVA.md`, `DOSSIE-REPO.md`, `FECHO-FASE-0.5.md`) são o detalhe; este é
-> o mapa.
+> `DEVOLUTIVA.md`, `DOSSIE-REPO.md`, `docs/archive/FECHO-FASE-0.5.md`) são o
+> detalhe; este é o mapa.
 
 ## Como ler os números deste documento
 
@@ -1455,8 +1455,8 @@ nenhum plano está bloqueado esperando resposta. Revise quando puder.
 | `docs/superpowers/specs/2026-08-{11,14,15}-*-design.md` | **os specs das três fases entregues do ciclo de compras** (recebimento e atesto, financeiro em dois fluxos, alçadas). Cada um traz o runbook no fim e as divergências como 📌 no ponto exato do texto — leia os 📌, são o que a execução descobriu contra o plano |
 | `DOSSIE-REPO.md` | as 29 respostas sobre arquitetura, dados, infra e qualidade |
 | `docs/anexos/A-rotas-sem-autenticacao.md` | censo AST das 724 rotas. ⚠️ `:16` classifica as rotas por token como "desenho correto" — foi o que produziu o "1 rota de escrita sem auth" |
-| `FECHO-FASE-0.5.md` | o que a Fase 0.5 entregou e o que não |
+| `docs/archive/FECHO-FASE-0.5.md` | o que a Fase 0.5 entregou e o que não |
 | `docs/integracao-dominio.md` | layout 11758. ⚠️ 11 lacunas mapeadas na F8 |
 | `docs/superpowers/plans/2026-07-17-modulo-*` | os 10 módulos do cronograma .mpp (M01–M10), fechados |
 | `docs/revisao-fases-1-5-PARCIAL.md` | 29 candidatos de revisão **não verificados** — pistas, não defeitos. Leia o topo: o workflow trocou de alvo ao ser retomado |
-| `docs/archive/` | documentos mortos |
+| `docs/archive/` | documentos mortos **e** os fechos/relatórios datados que saíram da raiz em 17/08 (`FECHO-*`, `RELATORIO-*`, `CONSULTAS-PRODUCAO-*`). Os fechos **não** são mortos: planos vivos ainda os citam pelo nome |
