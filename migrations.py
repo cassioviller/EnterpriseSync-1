@@ -6670,6 +6670,38 @@ def _migration_299_flag_e_janela():
                 "editavel) criadas.")
 
 
+def _migration_308_liberacao_justificativa():
+    """Fecho da Fase 2 do ciclo de compras — `conta_pagar.liberacao_justificativa`.
+
+    A porta de escape do D6, decidida em 14/08 e nunca construída: `liberar()`
+    levantava `TriadeIncompleta` sem exceção possível, e fornecedor pequeno que
+    emite a nota semanas depois travava o pagamento de material já conferido.
+    Não-nulo SIGNIFICA liberação excepcional — a conta foi liberada com uma
+    perna aberta, e o texto diz por quê.
+
+    **Sem backfill, e nullable.** Conta histórica não tem exceção a declarar; um
+    NOT NULL obrigaria a inventar texto para o parque inteiro, que é forjar
+    registro — o mesmo defeito que o detector da Fase 5 pega em RDO assinado sem
+    trilha.
+
+    Alocação: **308**, e não 300. A faixa 300-307 é reservada da Fase 9 e
+    290-295 da Fase 8; **nenhuma das duas é vão livre, é reserva não aplicada**.
+    Numerar dentro delas arma a colisão que a renumeração 270→277 existiu para
+    evitar — e aquela renumeração armou o fantasma que ainda está no histórico.
+    🔬 Conferido em `migration_history` do dev em 17/08: a maior aplicada é a
+    299, e entre 300 e 320 não há nada.
+
+    Idempotente: IF NOT EXISTS.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE conta_pagar ADD COLUMN IF NOT EXISTS "
+            "liberacao_justificativa TEXT"))
+    logger.info("[Migration 308] conta_pagar.liberacao_justificativa criada "
+                "(nao-nulo = liberacao excepcional; sem backfill).")
+
+
 def _migration_282_backfill_dropdown_crm():
     """D-CRM.1 — o backfill que a 174 pulou: grupo de dropdown para TODO
     tenant com dado nas tabelas legadas `crm_*`.
@@ -7042,6 +7074,7 @@ def executar_migracoes():
             (297, "Fase 3 — faixa_alcada.minimo_cotacoes (default 0) e condicoes_ativas (default ''); backfill minimo_cotacoes=2 onde exige_mapa_concorrencia e true (preserva o >= 2 de hoje; o 3 e a D6, por UPDATE)", _migration_297_faixa_condicoes),
             (298, "Fase 3 — requisicao_compra.regime_alcada/emergencial/ratificada_em/degrau_aplicado (defaults = o registro historico) + os dois indices do acumulado do anti-fracionamento", _migration_298_requisicao_alcada),
             (299, "Fase 3 — configuracao_empresa.alcadas_avancadas_ativa (default FALSE) + janela_fracionamento_dias (30 dias, decisao D2 editavel)", _migration_299_flag_e_janela),
+            (308, "Fecho da Fase 2 — conta_pagar.liberacao_justificativa: nao-nulo = liberacao excepcional, a porta de escape do D6. 308 e nao 300: 300-307 e faixa da Fase 9 e 290-295 da Fase 8, nenhuma aplicada", _migration_308_liberacao_justificativa),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

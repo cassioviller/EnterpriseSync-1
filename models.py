@@ -2458,6 +2458,29 @@ class ContaPagar(db.Model):
     liberada_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
                                 nullable=True)
     liberada_em = db.Column(db.DateTime, nullable=True)
+    # ── Fecho da Fase 2, migration 308 — a liberação excepcional ──
+    #
+    # NÃO-NULO SIGNIFICA EXCEÇÃO: a conta foi liberada com uma perna da tríade
+    # ainda aberta, e o texto diz por quê, escrito por quem liberou. É a porta
+    # de escape decidida no D6 da Fase 2 (14/08) e construída só agora —
+    # `liberar()` levantava `TriadeIncompleta` sem exceção possível, e
+    # fornecedor pequeno que emite a nota semanas depois travava o pagamento de
+    # material já conferido.
+    #
+    # **Uma coluna e não duas.** Um `liberada_sem_nota` booleano ao lado seria
+    # derivável deste texto, e os dois poderiam divergir. Quem pergunta "quais
+    # contas foram liberadas por exceção este mês" pergunta
+    # `WHERE liberacao_justificativa IS NOT NULL`, e a resposta não depende de
+    # ninguém ter lembrado de marcar a caixa.
+    #
+    # **E não é `observacoes`.** `liberar()` já escreve '[liberação]' e
+    # '[divergência]' lá como texto livre; um relatório de exceções que faça
+    # LIKE numa coluna de 2000 caracteres é a definição de sensor em que
+    # ninguém confia.
+    #
+    # NULL por default e sem backfill: conta histórica não tem exceção a
+    # declarar. Ver o spec 2026-08-17-nota-e-liberacao-design.md.
+    liberacao_justificativa = db.Column(db.Text, nullable=True)
     # B5.6 / D-B5.6(A), migração 280 — o banco DEBITADO na baixa. Antes disto
     # o débito de `banco.saldo_atual` era irrecuperável (nada persistia qual
     # banco foi) e o estorno virava catraca: devolvia a conta e engolia o
