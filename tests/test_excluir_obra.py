@@ -204,3 +204,37 @@ def test_falha_no_delete_da_obra_nao_destroi_os_filhos():
         assert CustoObra.query.filter_by(obra_id=oid).count() == 1
         assert GestaoCustoPai.query.filter_by(obra_id=oid).count() == 1, (
             'lançamento financeiro destruído numa exclusão que falhou')
+
+
+def test_notificacao_cliente_nao_voltou():
+    """A tabela aposentada em 05/08 não pode estar no banco — e ela estava.
+
+    História completa, porque o mecanismo vale mais que o caso:
+
+    * a B4.8 aposentou o modelo `NotificacaoCliente` (nenhum escritor, nenhum
+      leitor) e a **migração 279** existe para dropar a tabela, guardada por uma
+      contagem que aborta se houver linha;
+    * a 279 está gravada `success` — e a tabela **continuou lá**, vazia, com a
+      FK `NO ACTION` para `obra` que faz `excluir obra` estourar;
+    * 📖 a causa é a ordem do boot: `app.py:563` roda `create_all()` **antes** de
+      `executar_migracoes()` (`:684`). A 279 dropou a tabela num boot em que o
+      modelo ainda existia, e o `create_all()` do boot seguinte a **recriou**.
+      Como a 279 já constava `success`, `is_migration_executed` nunca mais a
+      deixou rodar.
+
+    É a mesma classe do fantasma da migração 270: **migração registrada como
+    feita cujo efeito não está no banco**. A diferença é que aquela some sem
+    dano e esta deixou um caminho de exclusão quebrado por doze dias.
+
+    ⚠️ **A lição para a próxima migração destrutiva:** dropar tabela cujo modelo
+    ainda existe é no-op com registro de sucesso. Ou o modelo sai antes, ou o
+    drop não é confiável.
+    """
+    with app.app_context():
+        existe = db.session.execute(text(
+            "SELECT to_regclass('public.notificacao_cliente')")).scalar()
+
+    assert existe is None, (
+        'notificacao_cliente voltou a existir. Se algum modelo a redeclarou, o '
+        '`create_all()` do boot a recria a cada subida e a migração que a dropa '
+        'nunca mais roda — confira models.py antes de escrever outra migração.')

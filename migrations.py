@@ -6670,6 +6670,65 @@ def _migration_299_flag_e_janela():
                 "editavel) criadas.")
 
 
+def _migration_309_drop_notificacao_cliente_de_novo():
+    """E02, segunda tentativa — a 279 rodou, gravou `success` e não pegou.
+
+    🔬 17/08: `migration_history` diz 279 = `success`, e
+    `to_regclass('public.notificacao_cliente')` responde que a tabela **está
+    lá**, vazia, com a FK `NO ACTION` para `obra` que faz `excluir obra`
+    estourar. `test_lista_cobre_toda_fk_no_action_para_obra` acusa isso desde
+    o gate de 16/08 e foi lido como "defeito anterior, decisão de produto" —
+    não era nem uma coisa nem outra.
+
+    **A causa é a ordem do boot**, e ela vale para toda migração destrutiva que
+    vier depois desta: 📖 `app.py:563` roda `create_all()` **antes** de
+    `executar_migracoes()` (`:684`). A 279 dropou a tabela num boot em que o
+    modelo `NotificacaoCliente` **ainda existia**; no boot seguinte o
+    `create_all()` a recriou a partir do modelo. Como a 279 já constava
+    `success`, `is_migration_executed` (`:83-85`) nunca mais a deixou rodar, e a
+    tabela ficou órfã quando a B4.8 finalmente removeu o modelo.
+
+    Mesma classe do fantasma da migração **270**: migração registrada como feita
+    cujo efeito não está no banco. A diferença é que aquela some sem dano e esta
+    deixou um caminho de exclusão quebrado por doze dias.
+
+    ⚠️ **Regra que sai daqui:** dropar tabela cujo modelo ainda existe é no-op
+    com registro de sucesso. Ou o modelo sai **antes** da migração, ou o drop
+    não é confiável. Agora é seguro — 📖 o modelo não existe mais em `models.py`
+    desde 05/08, então não há o que o `create_all()` recrie.
+
+    A guarda de contagem da 279 é mantida na íntegra, e não por simetria: se
+    alguém tiver escrito na tabela nesses doze dias, descartar aviso de cliente
+    volta a ser decisão humana. Falhar aqui deixa a migração `'failed'`, que
+    **retenta a cada boot** e grita no log — que é o comportamento certo.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            existe = conn.execute(sa_text(
+                "SELECT to_regclass('public.notificacao_cliente')")).scalar()
+            if existe is None:
+                logger.info("[Migration 309] notificacao_cliente já não existe "
+                            "— a 279 pegou desta vez. Nada a fazer.")
+                return
+
+            n = conn.execute(sa_text(
+                "SELECT count(*) FROM notificacao_cliente")).scalar() or 0
+            if n > 0:
+                raise RuntimeError(
+                    f"notificacao_cliente tem {n} linha(s) — DROP ABORTADO. "
+                    f"A tabela deveria estar morta desde 05/08; linha dentro "
+                    f"dela significa que apareceu um escritor que ninguém "
+                    f"mapeou. Ache o escritor ANTES de dropar.")
+
+            conn.execute(sa_text("DROP TABLE IF EXISTS notificacao_cliente"))
+        logger.info("[Migration 309] notificacao_cliente dropada — a FK NO "
+                    "ACTION para obra sai junto, e excluir obra volta a passar.")
+    except Exception as e:
+        logger.error(f"[Migration 309] Falha: {e}", exc_info=True)
+        raise
+
+
 def _migration_308_liberacao_justificativa():
     """Fecho da Fase 2 do ciclo de compras — `conta_pagar.liberacao_justificativa`.
 
@@ -7075,6 +7134,7 @@ def executar_migracoes():
             (298, "Fase 3 — requisicao_compra.regime_alcada/emergencial/ratificada_em/degrau_aplicado (defaults = o registro historico) + os dois indices do acumulado do anti-fracionamento", _migration_298_requisicao_alcada),
             (299, "Fase 3 — configuracao_empresa.alcadas_avancadas_ativa (default FALSE) + janela_fracionamento_dias (30 dias, decisao D2 editavel)", _migration_299_flag_e_janela),
             (308, "Fecho da Fase 2 — conta_pagar.liberacao_justificativa: nao-nulo = liberacao excepcional, a porta de escape do D6. 308 e nao 300: 300-307 e faixa da Fase 9 e 290-295 da Fase 8, nenhuma aplicada", _migration_308_liberacao_justificativa),
+            (309, "E02 segunda tentativa — a 279 gravou success e nao pegou: create_all roda antes das migrations e recriou a tabela enquanto o modelo existia. Drop guardado pela contagem, como a 279", _migration_309_drop_notificacao_cliente_de_novo),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -7617,15 +7677,13 @@ def _migration_48_adicionar_admin_id_modelos_faltantes():
                   AND o.admin_id IS NOT NULL
             """, "via rdo → obra"),
             
-            'notificacao_cliente': ("""
-                UPDATE notificacao_cliente nc
-                SET admin_id = o.admin_id
-                FROM obra o
-                WHERE nc.obra_id = o.id
-                  AND nc.admin_id IS NULL
-                  AND o.admin_id IS NOT NULL
-            """, "via obra_id"),
-            
+            # `notificacao_cliente` SAIU daqui em 17/08, junto com a migração 309.
+            # A tabela não existe mais (modelo aposentado em 05/08). Neste banco a
+            # 48 já rodou e a entrada era inerte; num banco NOVO ela produziria
+            # `relation does not exist`, que o `except` do laço engole e loga —
+            # exatamente o ruído que `test_lista_nao_tem_tabela_fantasma` existe
+            # para não ter, e que esconde o erro de verdade na subida.
+
             'proposta_itens': ("""
                 UPDATE proposta_itens pi
                 SET admin_id = p.admin_id
