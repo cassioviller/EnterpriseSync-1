@@ -14,6 +14,14 @@ por fora do serviço.
 3. **Lote `FECHADO` sem `fechado_por_id`.** Fechar é o ato que autoriza
    pagamento; sem autor não há segregação, só a aparência dela.
 
+E lista uma quarta coisa que **não é defeito**: a **liberação com ressalva**
+(D6, construída no fecho de 17/08). Ela é conta liberada com perna aberta —
+indistinguível do achado 1 pela consulta, e distinguível pela
+`liberacao_justificativa`. Aparece para ser lida uma vez por mês e **não conta
+para o exit code**: exceção que ninguém lê é exceção que vira rotina, e sensor
+que sai 1 pelo que o próprio desenho autoriza ensina o time a ignorar o exit
+code.
+
 O sensor reusa as MESMAS funções que gravam (`pernas_faltantes`,
 `valor_atestado`). Um sensor que reimplementa a regra que vigia não vigia nada:
 ele passa a ter os próprios defeitos, e os dois erram juntos exatamente onde
@@ -74,6 +82,31 @@ def inconsistencias(admin_id):
             # recorte acima já a deixou passar. Nada a dizer.
             continue
         if faltam:
+            # ⚠️ Fecho da Fase 2 (17/08) — a ressalva do D6 passa por AQUI.
+            #
+            # Conta liberada com perna aberta é EXATAMENTE o que este achado
+            # procura, e é também exatamente o que uma liberação por ressalva
+            # é. Sem esta separação, toda exceção legítima viraria
+            # inconsistência no dia em que a ressalva entrasse — e sensor que
+            # grita pelo esperado deixa de ser lido, que é o mesmo argumento
+            # do "só o regime novo entra na varredura" do docstring.
+            #
+            # A ressalva não é defeito e por isso NÃO conta para o exit 1. Ela
+            # aparece assim mesmo, porque exceção que ninguém lê é exceção que
+            # vira rotina — e a leitura mensal é metade do controle que o D6
+            # comprou ao abrir a porta.
+            if cp.liberacao_justificativa:
+                achados.append({
+                    'tipo': 'liberada_com_ressalva',
+                    'defeito': False,
+                    'conta_pagar_id': cp.id,
+                    'pedido_id': pedido.id,
+                    'pedido_numero': pedido.numero,
+                    'faltam': faltam,
+                    'justificativa': cp.liberacao_justificativa,
+                    'liberada_por_id': cp.liberada_por_id,
+                })
+                continue
             achados.append({
                 'tipo': 'conta_liberada_sem_triade',
                 'conta_pagar_id': cp.id,
@@ -127,13 +160,31 @@ def main():
     with app.app_context():
         achados = inconsistencias(args.admin_id)
 
+    # A ressalva do D6 é exceção declarada, não drift: ela é IMPRESSA para ser
+    # lida, e não conta para o exit code. Um sensor que sai 1 por causa do que
+    # o próprio desenho autoriza ensina o time a ignorar o exit code.
+    defeitos = [a for a in achados if a.get('defeito', True)]
+    ressalvas = [a for a in achados if a['tipo'] == 'liberada_com_ressalva']
+
     if args.json:
         print(json.dumps(achados, ensure_ascii=False, indent=2))
-    elif not achados:
+        return 1 if defeitos else 0
+
+    if ressalvas:
+        print(f'tenant {args.admin_id}: {len(ressalvas)} liberação(ões) COM '
+              f'RESSALVA — não são defeito, são para ler:\n')
+        for a in ressalvas:
+            print(f"  ContaPagar {a['conta_pagar_id']} (pedido "
+                  f"{a['pedido_numero'] or a['pedido_id']}) liberada faltando "
+                  f"{'; '.join(a['faltam'])}\n"
+                  f"    motivo: {a['justificativa']}")
+        print()
+
+    if not defeitos:
         print(f'tenant {args.admin_id}: sem drift no financeiro de compras.')
     else:
-        print(f'tenant {args.admin_id}: {len(achados)} inconsistência(s).\n')
-        for a in achados:
+        print(f'tenant {args.admin_id}: {len(defeitos)} inconsistência(s).\n')
+        for a in defeitos:
             if a['tipo'] == 'conta_liberada_sem_triade':
                 print(f"  ContaPagar {a['conta_pagar_id']} (pedido "
                       f"{a['pedido_numero'] or a['pedido_id']}) está LIBERADA "
@@ -149,7 +200,7 @@ def main():
         print('\nNenhum destes estados sai do serviço. Cada um significa uma '
               'escrita por fora dele.')
 
-    return 1 if achados else 0
+    return 1 if defeitos else 0
 
 
 if __name__ == '__main__':

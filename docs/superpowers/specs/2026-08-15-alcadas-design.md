@@ -817,9 +817,19 @@ python scripts/flag_alcadas_avancadas.py <ADMIN_ID> --ligar
 #            (📖 `ESTADOS_QUE_RATIFICAM`) — antes da execução não valia, e a
 #            conta bloqueada não tinha saída nenhuma;
 #       (ii) para isolar a emergência como ÚNICA perna, feche a tríade antes:
-#            atesto pela tela (`/compras/<pedido_id>/recebimento`) e nota por
-#            `services.financeiro_compra.lancar_nota` — a nota ainda não tem
-#            tela própria. Sem isso a recusa da baixa nomeia as três pernas;
+#            atesto pela tela (`/compras/<pedido_id>/recebimento`) e nota pela
+#            tela (`/compras/<pedido_id>/nota`). Sem isso a recusa da baixa
+#            nomeia as três pernas.
+#            ← 17/08: esta linha dizia "a nota ainda não tem tela própria" e
+#            mandava chamar `services.financeiro_compra.lancar_nota` no shell.
+#            Ficou FALSA no fecho da Fase 2 — e vale registrar como ela
+#            envelheceu: era instrução de CONTORNO escrita como se fosse
+#            instrução de USO, então quem executou este runbook em 15/08
+#            contornou o buraco em vez de reportá-lo. Contorno em runbook é
+#            pendência disfarçada.
+#            ⚠️ A ressalva do D6 NÃO serve para este passo: liberar com
+#            justificativa é recusado quando a perna aberta é a emergência —
+#            ela é a sanção, não uma perna da tríade;
 #       (iii) se a faixa efetiva subiu (fracionamento, por exemplo), a
 #            ratificação pede o MESMO número de assinaturas da faixa: a
 #            primeira volta "registrada, mas a alçada ainda não fechou".

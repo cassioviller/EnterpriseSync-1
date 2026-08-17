@@ -715,3 +715,89 @@ def test_paridade_com_a_flag_desligada():
     corpo = cli.get(f'/compras/{ped_id}').get_data(as_text=True)
     assert 'Liberar para pagamento' not in corpo, (
         'o botão apareceu num tenant que não ligou a Fase 2')
+
+
+# ---------------------------------------------------------------------------
+# N5 — o teste-guarda e o sensor
+# ---------------------------------------------------------------------------
+
+def test_os_dois_atos_da_triade_tem_chamador_de_producao():
+    """🔴 O guarda que teria pego este buraco em 14/08.
+
+    `lancar_nota` e `liberar` foram entregues pela Fase 2 com teste, com
+    docstring e **sem um único chamador fora de `tests/`**. A conta do Fluxo A
+    nascia bloqueada e não havia rota, template ou botão para destravá-la — e
+    nada na suíte notou, porque testar serviço chamando serviço é o certo e é
+    exatamente o que não vê a rota faltando.
+
+    Por `ast` e não regex: formatação não é contrato. Mesmo molde do guarda da
+    C9 (`test_so_o_servico_cria_conta_pagar_de_compra`).
+    """
+    import ast
+
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ignorados = {'tests', '.pythonlibs', 'archive', 'node_modules',
+                 '__pycache__', '.git', 'backups', 'attached_assets',
+                 'migrations_backup', '.local', 'obra_kabod'}
+    # O próprio serviço não conta: `liberar` chamando `pernas_faltantes` não é
+    # caminho de usuário nenhum. É a definição do buraco que este teste vigia.
+    NAO_CONTA = {'services/financeiro_compra.py'}
+
+    procurados = {'lancar_nota': [], 'liberar': []}
+    for pasta, subpastas, arquivos in os.walk(raiz):
+        subpastas[:] = [d for d in subpastas if d not in ignorados]
+        for nome in arquivos:
+            if not nome.endswith('.py'):
+                continue
+            caminho = os.path.join(pasta, nome)
+            rel = os.path.relpath(caminho, raiz)
+            if rel in NAO_CONTA:
+                continue
+            try:
+                with open(caminho, encoding='utf-8') as f:
+                    arvore = ast.parse(f.read(), filename=caminho)
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            for no in ast.walk(arvore):
+                if not isinstance(no, ast.Call):
+                    continue
+                chamado = (getattr(no.func, 'id', None)
+                           or getattr(no.func, 'attr', None))
+                if chamado in procurados:
+                    procurados[chamado].append(f'{rel}:{no.lineno}')
+
+    orfas = [nome for nome, locais in procurados.items() if not locais]
+    assert not orfas, (
+        'estes atos da tríade voltaram a não ter chamador de produção: '
+        + ', '.join(orfas)
+        + '.\n\nServiço sem rota é conta bloqueada sem caminho para liberar — '
+          'foi assim que a Fase 2 ficou inoperável de 14/08 a 17/08. Se a '
+          'chamada mudou de lugar, este teste é o lugar de registrar onde.')
+
+
+def test_sensor_nao_acusa_liberacao_com_ressalva_como_inconsistencia():
+    """⚠️ A dependência fora de ordem do plano, e o motivo de ela existir.
+
+    O achado 1 do sensor da Fase 2 marca conta `liberada` cujo
+    `pernas_faltantes` não está vazio — que é **literalmente** o que uma
+    liberação por ressalva é. Sem esta separação toda exceção legítima viraria
+    inconsistência, e sensor que grita pelo esperado deixa de ser lido.
+    """
+    from scripts.verificar_consistencia_financeiro import inconsistencias
+    from services.financeiro_compra import criar_obrigacao, liberar
+    with app.app_context():
+        adm, _o, _f, ped = _tenant_regime_novo()
+        criar_obrigacao(ped)
+        db.session.commit()
+        _atestar(ped, adm)
+        liberar(ped, usuario=adm, justificativa=RESSALVA)
+        db.session.commit()
+
+        achados = inconsistencias(adm.id)
+        tipos = [a['tipo'] for a in achados]
+
+        assert 'conta_liberada_sem_triade' not in tipos, (
+            'a ressalva foi contada como escrita por fora do serviço')
+        assert 'liberada_com_ressalva' in tipos, (
+            'a exceção sumiu do sensor — exceção que ninguém lê é exceção que '
+            'vira rotina')

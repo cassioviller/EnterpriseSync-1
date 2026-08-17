@@ -342,6 +342,19 @@ python scripts/flag_financeiro_dois_fluxos.py <ID> --ligar
 #      b) pagar   -> RECUSA, nomeando a perna que falta
 #      c) atestar -> valor_atestado > 0
 #      d) lançar nota
+#         ← 17/08: TEM TELA. /compras/<pedido_id>/nota, ou o botão "Notas
+#           fiscais" no painel de liberação da tela do pedido. Até o fecho
+#           desta data o passo só era executável por
+#           `services.financeiro_compra.lancar_nota` no shell, e quem rodou
+#           este runbook em 15/08 o contornou assim.
+#      d2) liberar -> botão na tela do pedido, quando a tríade fecha.
+#           ← 17/08: o passo que FALTAVA nesta lista. `liberar()` existia,
+#           estava testado e não tinha chamador de produção nenhum: a conta
+#           ficava bloqueada para sempre e o runbook não notava, porque
+#           pulava direto de "lançar nota" para "montar o lote".
+#           Com perna aberta o botão vira "Liberar com ressalva" e exige
+#           justificativa de 15+ caracteres (D6) — a conta sai no sensor,
+#           marcada, e NÃO conta como drift.
 #      e) montar o lote e pedir a OUTRA pessoa que feche
 #      f) o valor da conta caiu para o atestado, com a diferença na observação
 #      g) pagar   -> passa
