@@ -1035,6 +1035,72 @@ O documento propõe a Fase 8 com escopo maior (fixo × variável, DFC, indicador
 a consultoria foi contratada.
 
 
+### 🔴 18/08 — a tela do lote de pagamento estava quebrada desde 22/07
+
+Achado ao preparar o runbook pela tela — antes de qualquer clique humano.
+📖 `/financeiro/fechamento-pagamentos` devolvia **500 para qualquer tenant com uma conta
+pendente na janela do ciclo**, inclusive como admin. Precedência de filtro no Jinja: em
+`'%.2f' % valor | replace('.', ',')` o filtro liga mais forte que o `%`, então `replace`
+roda antes e `'%.2f' % '1625.00'` estoura `TypeError`. Duas ocorrências, ambas no mesmo
+template, ambas do commit `b30923b5` de **22/07**. Varredura do padrão em todo
+`templates/` não achou irmãs.
+
+🔬 **Por que nenhum gate viu:** `grep fechamento-pagamentos tests/` = **zero**. Nenhum
+teste da suíte chega a esta tela, com ou sem dado. Não é teste fraco — é ausência de
+cobertura, e é a classe exata que este documento previu em 17/08 ao registrar que ninguém
+tinha aberto o navegador.
+
+**O que isso travava:** é a tela do passo (e) do runbook da Fase 2 — *"montar o lote e
+pedir a OUTRA pessoa que feche"* —, o único lugar onde a segregação de função
+(`fechado_por_id`) é exercida. O controle não podia ser conferido porque a tela não abria.
+
+Corrigido em `0e423919`, com dois testes red-first (um por linha; os dois caminhos são
+alcançáveis de forma independente).
+
+### 📘 18/08 — manual visual do ciclo de compras, regenerável por comando
+
+`docs/manual_compras/` — 16 telas do fluxo inteiro (requisição → aprovação → pedido →
+atesto → nota → liberação → baixa → lote), ~48 campos marcados por caixa numerada, em PDF
+e em markdown. Cinco scripts em `scripts/`, plano em
+`docs/superpowers/plans/2026-08-18-plano-manual-requisicao-compras.md`.
+
+**A decisão de desenho:** as caixas são desenhadas no DOM, ancoradas ao **seletor** do
+campo, antes do screenshot — não coladas por pixel depois. O roteiro é uma lista só, e
+dela saem a caixa da figura E a legenda numerada: não existem duas listas para divergir.
+Seletor que não casa **derruba o processo**. 📖 A captura de 22/07
+(`capturar_manual_ciclo.py:76-79`) faz o oposto: engole o erro e segue, e como o gerador
+lê a pasta por nome de arquivo, o PDF sai montado com a foto velha.
+
+> 🔴 **A armadilha que este trabalho revelou, e que vale além dele: seed que constrói o
+> dado direto no modelo reproduz a FORMA e perde a REGRA.** O seed do manual errou isso
+> **três vezes**, e cada uma foi pega por um mecanismo diferente:
+>
+> 1. Gravou `compras_governanca_ativa` **direto na coluna**, passando por cima do guarda de
+>    📖 `scripts/flag_compras_governanca.py:98-105`, que RECUSA a governança em tenant com
+>    `escopo_obra_ativo` desligado. As primeiras capturas saíram de um estado **que a
+>    ferramenta recusa** — e nele só o ADMIN emite pedido. Quase virou uma afirmação errada
+>    no manual: a de que o papel COMPRADOR seria inerte e que haveria decisão pendente sobre
+>    isso. **Não havia**: a regra existe, está escrita na recusa do guarda e em
+>    📖 `models.py:4482` (a cadeia dos cinco elos). Pego por leitura de código.
+> 2. Criou `RequisicaoCompra(...)` pelo construtor, **sem `regime_alcada`** — que nasce
+>    `'simples'` pelo default e desliga em silêncio as condições, o acumulado da janela e o
+>    rito de emergência. Pego pelo **gate**, pelo teste-guarda de varredura por `ast`, com
+>    arquivo e linha.
+> 3. Errou o gênero do sufixo da flag (`_ativa` × `_ativo`), o que cria um atributo Python
+>    solto e deixa a flag como estava. Pego por conferência posterior à escrita.
+>
+> **Para quem for semear cenário daqui em diante:** use os scripts de flag (eles carregam
+> os guardas), carimbe o que a rota carimba, e confira depois de gravar. E note o meio pelo
+> qual cada um foi pego — só um dos três apareceria num gate.
+
+**O que a captura descobriu de sistema**, porque falha de seletor é informação:
+📖 o campo de banco **some inteiro** na tela de baixa (`{% if bancos %}`) num tenant sem
+banco cadastrado, e o bloco de mapa de cotação só existe quando a alçada pede cotação.
+
+> ⚠️ **O manual ainda não foi seguido por um humano.** Ele foi capturado por Playwright,
+> que percorre e renderiza de verdade — mas ninguém clicou. É o mesmo aviso de 17/08, e
+> continua sendo o item nº 1 de quem retomar. A diferença é que agora o runbook tem figura.
+
 ## O plano aprovado
 
 | Fase | Conteúdo | Estado | Plano |
