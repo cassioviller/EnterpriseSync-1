@@ -219,7 +219,7 @@
                           {% endif %}
                         </td>
                         <td class="text-end small fw-semibold">
-                          R$ {{ '%.2f' % (cp.saldo or cp.valor_original or 0)|float | replace('.', ',') }}
+                          R$ {{ ('%.2f' % (cp.saldo or cp.valor_original or 0)|float) | replace('.', ',') }}
                         </td>
                         <td class="text-center">
                           {% if futura %}
@@ -292,7 +292,7 @@
                         <span class="badge bg-secondary ms-1">{{ f.contas.count() }} contas</span>
                       </div>
                       <div class="small text-success fw-semibold mt-1">
-                        R$ {{ '%.2f' % f.total_selecionado | replace('.', ',') }}
+                        R$ {{ ('%.2f' % (f.total_selecionado or 0)|float) | replace('.', ',') }}
                       </div>
                     </div>
                     <div class="d-flex flex-column gap-1">
