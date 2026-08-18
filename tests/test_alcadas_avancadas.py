@@ -2594,9 +2594,15 @@ def test_ratificar_ainda_e_possivel_depois_de_a_emergencia_virar_pedido():
 # em vez de herdar o default da coluna por descuido.
 PONTOS_QUE_CRIAM_REQUISICAO = {
     'compras_views.py': (
-        'requisicao_nova_post — o formulário de nova requisição, hoje o único '
-        'ponto de criação. Carimba `regime_alcada=_regime_alcada(admin_id)`, '
+        'requisicao_nova_post — o formulário de nova requisição, o único ponto '
+        'de criação EM PRODUÇÃO. Carimba `regime_alcada=_regime_alcada(admin_id)`, '
         'lido UMA vez fora do laço de retry de numeração.'),
+    'scripts/seed_manual_compras.py': (
+        'o cenário do manual visual de compras (18/08). Não é produção, mas '
+        'carimba `regime_alcada_do_tenant(admin_id)` como a rota — e de '
+        'propósito: um manual capturado sobre requisição no regime errado '
+        'ensinaria a tela errada. Foi ESTE guarda que pegou a primeira versão '
+        'do seed, que construía a requisição pelo modelo e herdava o default.'),
 }
 
 
