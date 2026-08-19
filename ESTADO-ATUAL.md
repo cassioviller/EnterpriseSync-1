@@ -639,7 +639,7 @@ sem atesto não existe a tríade do Fluxo A nem a baixa do adiantamento do Fluxo
 | 2 | Financeiro em dois fluxos | ✅ **mesclada em `main` em 14/08** (`e74360cb`) — F1-F7 |
 | 3 | Alçadas (as 4 condições, anti-fracionamento, emergência 48h, corte de 3 cotações) | ✅ **mesclada em `main` em 17/08** (`84ae487c`) — A1-A8, fast-forward após o gate |
 | — | **Fecho da Fase 2: a nota e a liberação ganham tela** | ✅ **mesclada em `main` em 17/08** (`9aa29a59`) — N1-N5, 7 commits, gate **2425/2**. 🔴 Falta o runbook rodado pela tela. Furou a fila da Fase 4: ver abaixo |
-| 4 | Status unificado (régua de 9 etapas) | ⬜ sem spec |
+| 4 | Status unificado (régua de 9 etapas) | 📄 **spec em 19/08** (`2026-08-19-status-unificado-design.md`) — 3 decisões abertas. Desbloqueada: a nota e a liberação ganharam tela em 17/08 |
 | 5 | Relatórios (os 5) | ⬜ sem spec |
 
 **Fase 1** entregou o conserto de uma dupla escrita: havia **dois** pontos dando
@@ -1197,6 +1197,43 @@ Plano em `docs/superpowers/plans/2026-08-19-plano-fechar-lote-pela-tela.md`.
 > que o ciclo nunca foi percorrido por uma pessoa de verdade — e o que o script não
 > cobre é o julgamento de quem usa: se a tela faz sentido, se a mensagem se entende,
 > se o campo está onde a mão procura.
+
+### 📄 19/08 — spec da Fase 4 do ciclo: o status unificado
+
+`docs/superpowers/specs/2026-08-19-status-unificado-design.md`. Escrita depois que
+o conserto do lote destravou a fase — 📖 o fecho de 17/08 registra que a régua
+"teria de representar dois passos que até 17/08 não existiam em tela nenhuma".
+
+> 🔴 **As "9 etapas" nunca foram enumeradas.** A régua é citada como coisa sabida
+> em 📖 `2026-08-15-alcadas-design.md:469`, `:554`, `:895`, 📖
+> `2026-08-17-nota-e-liberacao-design.md:8`, `:398` e neste documento — e
+> 🔬 **nenhum lista os nove**. Não há enum, tabela nem spec. A fase não é
+> "implementar a régua escrita": é **decidir quais são as etapas**, e o 9 é
+> herança de conversa. É o defeito de fabricação que abre este documento, na forma
+> de um número que atravessou três specs sem procedência.
+
+🔬 **O inventário: seis portadores de estado em quatro tabelas** — `estado` da
+requisição (o único com máquina e trilha), `situacao_recebimento` (derivado),
+`status_aprovacao_cliente` (texto livre), `situacao_liberacao`, `status` da conta
+e `status` do lote — mais dois que não têm coluna: a nota é **presença**, e o
+adiantamento é `baixado_em`. 🔬 **Não existe hoje função nenhuma que agregue
+isso**: as telas põem os badges lado a lado (📖 `templates/compras/index.html:104-134`)
+e deixam a soma para a cabeça de quem olha. **A régua é código novo, não refatoração.**
+
+> 🔴 **São dois eixos, não um.** `status_aprovacao_cliente` (📖 `models.py:5757`) é
+> o rito do faturamento direto e é **ortogonal**: uma compra pode estar recebida e
+> atestada *e* aguardando o cliente. E há um terceiro eixo que a Fase 2 criou de
+> propósito — no Fluxo A o dinheiro sai depois do material, no B antes.
+
+**Três decisões abertas**, todas com recomendação na spec: régua **derivada** e não
+gravada (gravar cria um sétimo portador — a doença que a fase existe para curar);
+**uma** régua com as casas inaplicáveis apagadas, não ausentes; e o mapa das 9 casas,
+que fecha em nove sem forçar mas precisa ser conferido contra as saídas laterais
+(REJEITADA, CANCELADA, `encerrado_com_saldo`, e as duas exceções declaradas).
+
+**O critério de aceitação vem do dia de hoje:** a régua tem de aparecer numa tela e
+o runbook por script tem de achá-la no DOM. Função pura que ninguém chama passa em
+todo teste — foi assim que `fechar_lote()` ficou semanas testado e inalcançável.
 
 ## O plano aprovado
 
