@@ -8,18 +8,6 @@
 # falsas: o servidor em :5000 é subido pelo run_tests.sh antes da bifurcação
 # de flags, mas NENHUM teste do gate acessa localhost — então aqui chamamos
 # pytest direto. A dependência real é o PostgreSQL, que é um service nativo.
-#
-# 🔬 22/07 — os ~39 min também eram falsos, no sentido de que não eram custo
-# de teste: 88% do relógio estava num único arquivo. `test_painel_financeiro`
-# tem 50 testes, cada um materializava as 90 fotos de `fotos_rdos/` (21 MB)
-# com LANCZOS + WebP `method=6` a 536 ms por foto — e nenhuma das 50
-# asserções menciona foto. Com a fixture de isolamento que o arquivo irmão já
-# usava, o mesmo gate passou de 2.476 s para 357 s, com passed/skipped
-# IDÊNTICOS (1012/9): nada foi pulado para ganhar tempo.
-#
-# O `timeout-minutes: 60` abaixo fica de propósito, folgado: ele é a rede
-# contra travamento, não contra lentidão. O teto por teste é o
-# `--timeout=300 --timeout-method=thread` do pyproject.
 name: gate
 
 on:

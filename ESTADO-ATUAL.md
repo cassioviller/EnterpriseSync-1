@@ -1594,6 +1594,19 @@ correção, não velocidade:
   demonstrada no mesmo dia: com ela desligada consegui **consultar o banco no meio
   do gate** sem entrar na fila de lock.
 - 📖 `tests/conftest.py` — desliga DDL e demo seed por default na suíte.
+- 📖 `.github/workflows/gate.yml` — o **`timeout-minutes: 60`** fica folgado de
+  propósito: ele é a rede contra **travamento**, não contra lentidão. O teto por
+  teste é o `--timeout=300 --timeout-method=thread` do `pyproject.toml`.
+
+> 🔬 19/08 — **as 12 linhas de comentário que explicavam isso DENTRO do
+> `gate.yml` foram removidas**, e por dois motivos que se somam. O primeiro é de
+> conteúdo: elas afirmavam como fato que o gate "passou de 2.476 s para 357 s",
+> que é exatamente a alegação que a medição acima mostrou **não se reproduzir** —
+> comentário que envelheceu para falso dentro do arquivo que ele explica.
+> O segundo é de infraestrutura: o GitHub **recusa** um push de app OAuth sem o
+> escopo `workflow` quando qualquer commit dele toca `.github/workflows/`, e essas
+> 12 linhas eram a única coisa que segurava 68 commits fora do repositório. A
+> explicação viva mora aqui, onde é datada e reconferível.
 
 > ⚠️ **Trade-off:** com `SIGE_BOOT_DDL=0` a suíte não constrói mais o schema. Quem
 > criar migration nova e rodar teste local roda contra schema velho até aplicá-la
