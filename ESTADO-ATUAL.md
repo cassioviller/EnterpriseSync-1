@@ -1101,6 +1101,57 @@ banco cadastrado, e o bloco de mapa de cotação só existe quando a alçada ped
 > que percorre e renderiza de verdade — mas ninguém clicou. É o mesmo aviso de 17/08, e
 > continua sendo o item nº 1 de quem retomar. A diferença é que agora o runbook tem figura.
 
+### 🔴 19/08 — o dashboard em 500, e o `except` que engole registro de blueprint
+
+Sintoma: **toda página autenticada** em 500, com
+`BuildError: Could not build url for endpoint 'compras.index'`. A cadeia tem três
+elos, e o terceiro é o caro:
+
+1. 📖 `compras_views.py:10` faz `from app import db` no topo, e 📖 `app.py:912`
+   importa `compras_views` **dentro** do bloco de registro. É um ciclo. No boot
+   normal (`main` → `app`) ele se resolve por ordem: quando a linha do registro
+   roda, `db` já existe.
+2. Se algo importar `compras_views` **antes** de o `app.py` terminar — e um
+   `--reload` do gunicorn faz isso —, o `from app import db` reentra num módulo
+   pela metade e levanta `ImportError`.
+3. 📖 `app.py:915-918` captura, **loga WARNING e SEGUE**. O app sobe sem compras.
+
+E aí 📖 `base_completo.html:959` chama `url_for('compras.index')` **sem
+condição**: a falha "não fatal" derruba o sistema inteiro. 🔬 Medido no servidor
+vivo: `/compras/` em **404** enquanto `/propostas/` respondia 302, e o dashboard
+em 500. O diagnóstico era **uma** linha de WARNING no meio de sessenta linhas de
+`[OK]`.
+
+> 📌 **É a quarta aparição do mesmo padrão neste documento** — `except` que engole
+> e segue: na captura de 22/07 (foto velha no PDF), no `abort()` das rotas
+> (armadilha nº 14), no `record_migration` (coluna criada, histórico vazio). Aqui
+> ele é o mais caro dos quatro, porque o custo não fica no módulo que falhou.
+
+**O conserto: falhar alto no boot.** `_conferir_endpoints_do_layout` (definida em
+`app.py`) varre os três layouts base, extrai os `url_for('x.y')` **literais** e
+PARA o boot se algum não estiver registrado, dizendo quais e mandando procurar o
+`[WARN] Blueprint` logo acima. A lista sai dos templates, não da memória de
+ninguém — senão seria a segunda lista que diverge. 🔬 754 endpoints conferidos no
+boot real.
+
+> 🔬 **E a guarda achou o próprio erro dela na primeira execução:** posta no fim
+> do `app.py`, reprovou quatro endpoints (`cadastros_hub.index`, `catalogos.hub`,
+> `custos_escritorio.painel_mensal`, `importacao.index`) — porque esses blueprints
+> são registrados no **`main.py`**, não no `app.py`. **O app não está montado no
+> fim do `app.py`**, e conferir ali derrubaria a suíte inteira, que importa `app`
+> direto. A chamada mudou para o fim do `main.py`; a função ficou onde estava.
+
+🔬 Testes: **4 novos** em `tests/test_boot_endpoints_do_layout.py` — a guarda
+reprova endpoint ausente com o nome dele, não reprova layout completo, **não**
+finge conferir `url_for(variavel)` (o que não dá para conferir daqui não se finge
+que confere), e o layout de verdade é conferido contra o `url_map` do `main`.
+
+⚠️ **O que este conserto NÃO faz:** o ciclo de import continua lá, e o `except`
+que engole também. A guarda troca "500 em toda página, com a causa escondida" por
+"não sobe, e diz o que falta" — não impede o blueprint de falhar. Quebrar o ciclo
+exige tirar o `from app import db` do topo de dezenas de módulos de view: é
+refatoração própria, não gorjeta desta.
+
 ### 📘 19/08 — o manual da requisição em detalhe: 16 telas viram 22, e a captura aprendeu a AGIR
 
 Pedido: *"mais detalhes e prints o manual da requisição de material"*. O manual de

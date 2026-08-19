@@ -1115,5 +1115,65 @@ except Exception as _e_ciclo:
     logging.error("[ERRO] Fase 5: guarda de imutabilidade NÃO registrada: %s",
                   _e_ciclo)
 
+def _conferir_endpoints_do_layout(aplicacao):
+    """PARA o boot se o layout base referenciar endpoint que não existe.
+
+    🔬 19/08 — a cadeia que esta guarda quebra, medida num servidor vivo:
+
+      1. 📖 `compras_views.py:10` faz `from app import db` no topo, e este
+         arquivo importa `compras_views` DENTRO do bloco de registro. É um
+         ciclo. No boot normal ele se resolve por ordem: quando a linha do
+         registro roda, `db` já existe.
+      2. Se algo importar `compras_views` ANTES de este módulo terminar — e um
+         `--reload` do gunicorn faz isso —, o `from app import db` reentra num
+         módulo pela metade e levanta ImportError.
+      3. O `except` do registro loga WARNING e SEGUE. O app sobe sem compras.
+
+    E aí `base_completo.html` chama `url_for('compras.index')` sem condição:
+    **toda página autenticada morre em 500**, não só as de compras. Medido:
+    `/compras/` em 404 e o dashboard em 500, com uma linha de WARNING perdida
+    no meio de sessenta linhas de `[OK]`.
+
+    Registro que falha em silêncio não é degradação — é o app inteiro fora do
+    ar com o diagnóstico escondido. Melhor não subir, e dizer o que falta.
+
+    A lista NÃO é escrita à mão: sai dos próprios templates, senão ela seria a
+    segunda lista que diverge. Só literais entram — `url_for(variavel)` não é
+    conferível daqui, e o que não dá para conferir não se finge que confere.
+    """
+    import re
+    from pathlib import Path
+
+    registrados = {r.endpoint for r in aplicacao.url_map.iter_rules()}
+    padrao = re.compile(r"url_for\(\s*'([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z0-9_]+)'")
+    faltando = {}
+    for nome in ('base_completo.html', 'base.html', 'base_iframe.html'):
+        caminho = Path(aplicacao.root_path) / 'templates' / nome
+        if not caminho.exists():
+            continue
+        ausentes = sorted(set(padrao.findall(caminho.read_text(encoding='utf-8')))
+                          - registrados)
+        if ausentes:
+            faltando[nome] = ausentes
+
+    if faltando:
+        detalhe = '; '.join(f'{t}: {", ".join(e)}' for t, e in faltando.items())
+        raise RuntimeError(
+            'BOOT ABORTADO — o layout base referencia endpoints que não estão '
+            f'registrados: {detalhe}. Quase sempre isto é um blueprint que '
+            'falhou ao registrar e cujo erro foi logado como WARNING logo '
+            'acima (procure por "[WARN] Blueprint"). Subir assim serviria 500 '
+            'em TODA página autenticada.')
+    logging.info('[OK] Layout base: %d endpoints conferidos', len(registrados))
+
+
+# ⚠️ A CHAMADA NÃO MORA AQUI, e o motivo é o próprio achado de 19/08: quatro
+# blueprints do layout (`cadastros_hub`, `catalogos`, `custos_escritorio`,
+# `importacao`) são registrados no `main.py`, não neste arquivo. Conferir no fim
+# do `app.py` reprovaria um app que ainda está sendo montado — e derrubaria toda
+# a suíte, que importa `app` direto. Quem chama é o fim do `main.py`, que é onde
+# a montagem termina de verdade.
+
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

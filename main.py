@@ -295,5 +295,16 @@ except Exception as e:
     logger.error(f"[ERROR] Falha ao registrar cadastros_hub: {e}", exc_info=True)
 
 
+# A montagem termina aqui: `app.py` registra a maior parte dos blueprints e este
+# arquivo o resto. 📖 A guarda (definida em `app.py`) PARA o boot se o layout
+# base referenciar endpoint que não existe — porque registro de blueprint falha
+# com WARNING e segue, e o `base_completo.html` chama `url_for` sem condição:
+# uma falha "não fatal" serviria 500 em TODA página autenticada. 🔬 19/08 foi
+# exatamente o que aconteceu com o blueprint de compras.
+from app import _conferir_endpoints_do_layout as _conferir_layout
+
+_conferir_layout(app)
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
