@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from playwright.sync_api import sync_playwright
 
-from anotar_captura import MarcacaoQuebrada, marcar
+from anotar_captura import MarcacaoQuebrada, executar, marcar
 
 # ---------------------------------------------------------------------------
 # O Chromium do Playwright não sobe neste ambiente sem ajuda.
@@ -172,6 +172,12 @@ def main():
                 pg.wait_for_timeout(1600)  # Select2, gráficos e o que carrega por JS
                 pg.evaluate("""() => document.querySelectorAll(
                     '.modal.show, .modal-backdrop, .toast').forEach(e => e.remove())""")
+                # As ações vêm ANTES da marcação: metade destas telas só existe
+                # depois de um POST (a recusa do formulário, o aviso da alçada,
+                # o selo da emergência), e o que se fotografa é a resposta.
+                if tela.acoes:
+                    print(f'      {executar(pg, tela.acoes)} ação(ões) antes da foto')
+                    pg.wait_for_timeout(400)
                 marcar(pg, tela.campos)
                 if tela.recorte:
                     alvo = pg.query_selector(tela.recorte)

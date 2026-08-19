@@ -51,6 +51,31 @@ class Campo:
 
 
 @dataclass
+class Acao:
+    """Um passo executado na tela ANTES da foto.
+
+    Existe porque três das telas do manual não moram em rota nenhuma: a recusa
+    do formulário, o aviso de quantas aprovações a alçada vai exigir e o selo do
+    rito de emergência aparecem como **flash na resposta de um POST**. Sem ação,
+    a captura só sabe visitar — e essas três telas ficariam de fora justamente
+    por serem as que mais geram chamado: ninguém imagina um erro que nunca viu.
+
+    Fica no roteiro, e não no capturador, pelo motivo de sempre: a fonte é uma
+    só. Quem lê o roteiro vê a tela E o que foi feito para chegar nela.
+
+    tipo    — 'preencher' | 'escolher' (select) | 'marcar' (checkbox) | 'submeter'
+    seletor — CSS. Se não casar, a captura PARA, igual ao seletor de campo.
+    valor   — o texto a digitar, ou o `value` da opção. Ignorado pelos outros.
+    """
+    tipo: str
+    seletor: str
+    valor: str = ''
+
+
+TIPOS_DE_ACAO = ('preencher', 'escolher', 'marcar', 'submeter')
+
+
+@dataclass
 class Tela:
     slug: str
     titulo: str
@@ -64,6 +89,17 @@ class Tela:
     # tela que é um cartão no meio de uma área vazia (o login): fotografada
     # inteira, ela vira um retângulo escuro com as caixas ilegíveis no PDF.
     recorte: str = ''
+    # Os passos executados antes de marcar e fotografar. Vazio na maioria das
+    # telas: a tela que existe numa rota é só visitada.
+    acoes: list = _field(default_factory=list)
+    # O ato começa NESTA tela. Preenchido só na primeira de cada ato.
+    #
+    # 🔬 19/08 — por que isto saiu do gerador: lá as fronteiras dos atos eram um
+    # dicionário por prefixo de slug ('06': 'Ato 2', …), e acrescentar telas ao
+    # Ato 1 pôs o título do Ato 2 no meio dele. Era a SEGUNDA LISTA que diverge,
+    # dentro do desenho feito para não ter nenhuma. O ato é da tela.
+    ato: str = ''
+    ato_resumo: str = ''
 
 
 _JS_MARCAR = """
@@ -125,6 +161,35 @@ def marcar(page, campos):
                          + ', '.join(r['invisiveis']))
     if problemas:
         raise MarcacaoQuebrada('; '.join(problemas))
+
+
+def executar(page, acoes):
+    """Executa os passos na ordem e devolve quantos foram. Falhou, PARA.
+
+    O guarda é o mesmo do marcador, e pelo mesmo motivo: ação que erra o seletor
+    em silêncio deixa a página no estado ANTERIOR ao que se queria fotografar —
+    e o manual sai com a foto da tela certa no lugar da recusa, que é plausível
+    e errado. Plausível e errado é o pior resultado possível num manual.
+    """
+    for i, a in enumerate(acoes, start=1):
+        if a.tipo not in TIPOS_DE_ACAO:
+            raise MarcacaoQuebrada(
+                f'ação {i}: tipo desconhecido {a.tipo!r} '
+                f'(conhecidos: {", ".join(TIPOS_DE_ACAO)})')
+        if page.query_selector(a.seletor) is None:
+            raise MarcacaoQuebrada(
+                f'ação {i} ({a.tipo}): o seletor não existe na página: {a.seletor}')
+        if a.tipo == 'preencher':
+            page.fill(a.seletor, a.valor)
+        elif a.tipo == 'escolher':
+            page.select_option(a.seletor, a.valor)
+        elif a.tipo == 'marcar':
+            page.check(a.seletor)
+        else:                                  # submeter
+            page.click(a.seletor)
+            page.wait_for_load_state('domcontentloaded')
+            page.wait_for_timeout(900)         # o flash é renderizado no servidor
+    return len(acoes)
 
 
 def limpar(page):

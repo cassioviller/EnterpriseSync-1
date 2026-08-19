@@ -42,17 +42,11 @@ PAGE_W, PAGE_H = A4
 MARGEM = 1.7 * cm
 UTIL = PAGE_W - 2 * MARGEM
 
-ATOS = {
-    '01': ('Antes de tudo', 'Entrar no sistema.'),
-    '02': ('Ato 1 — Quem precisa, pede',
-           'O encarregado da obra abre a requisição. Nada foi comprado ainda.'),
-    '06': ('Ato 2 — Quem responde pela obra, decide',
-           'A gerência aprova, rejeita ou devolve para conserto.'),
-    '10': ('Ato 3 — Quem compra, negocia',
-           'A requisição aprovada vira pedido, com fornecedor e valor real.'),
-    '11': ('Ato 4 — Quem paga, confere',
-           'A conta só é paga quando pedido, atesto e nota fecham.'),
-}
+# 🔬 19/08 — o dicionário `ATOS` que morava aqui, indexado por prefixo de slug,
+# FOI REMOVIDO. Ele era a segunda lista que diverge: acrescentar telas ao Ato 1
+# empurrou o título do Ato 2 para o meio dele, e o PDF saiu com a fronteira no
+# lugar errado sem ninguém reclamar. O ato agora é um campo da própria `Tela`,
+# como o título e o resumo — uma lista só, no roteiro.
 
 est = getSampleStyleSheet()
 est.add(ParagraphStyle('Capa', parent=est['Title'], fontSize=28, leading=34,
@@ -154,13 +148,11 @@ def construir():
              PageBreak()]
 
     for i, tela in enumerate(roteiro):
-        chave = tela.slug.split('_')[0]
-        if chave in ATOS:
-            titulo, sub = ATOS[chave]
+        if tela.ato:
             if i:
                 fluxo.append(PageBreak())
-            fluxo.append(Paragraph(titulo, est['Ato']))
-            fluxo.append(Paragraph(sub, est['AtoSub']))
+            fluxo.append(Paragraph(tela.ato, est['Ato']))
+            fluxo.append(Paragraph(tela.ato_resumo, est['AtoSub']))
         elif i:
             fluxo.append(PageBreak())
 
@@ -201,10 +193,8 @@ def markdown(roteiro):
               '`scripts/roteiro_manual_compras.py` — **não edite este arquivo à '
               'mão**: edite o roteiro e gere de novo.', '']
     for i, t in enumerate(roteiro):
-        chave = t.slug.split('_')[0]
-        if chave in ATOS:
-            titulo, sub = ATOS[chave]
-            linhas += [f'## {titulo}', '', sub, '']
+        if t.ato:
+            linhas += [f'## {t.ato}', '', t.ato_resumo, '']
         linhas += [f'### {i + 1}. {t.titulo}', '',
                    f'**Quem faz:** {t.papel} · **Onde:** `{t.rota}`', '',
                    t.resumo, '',

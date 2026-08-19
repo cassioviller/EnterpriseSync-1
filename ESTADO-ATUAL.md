@@ -1101,6 +1101,86 @@ banco cadastrado, e o bloco de mapa de cotação só existe quando a alçada ped
 > que percorre e renderiza de verdade — mas ninguém clicou. É o mesmo aviso de 17/08, e
 > continua sendo o item nº 1 de quem retomar. A diferença é que agora o runbook tem figura.
 
+### 📘 19/08 — o manual da requisição em detalhe: 16 telas viram 22, e a captura aprendeu a AGIR
+
+Pedido: *"mais detalhes e prints o manual da requisição de material"*. O manual de
+18/08 dedicava **quatro** telas à requisição — lista, preencher, rascunho, enviar —
+e o resto era o que acontece depois que ela sai das mãos de quem pediu.
+
+🔴 **O problema não era escrever mais: era que metade do que faltava não existe em
+rota nenhuma.** A recusa do formulário, o aviso de quantas aprovações a alçada vai
+exigir e o selo do rito de emergência aparecem como **flash na resposta de um
+POST** — e a captura só sabia visitar (`goto` → marcar → foto).
+
+**A decisão:** `Acao(tipo, seletor, valor)` no roteiro — `preencher`, `escolher`,
+`marcar`, `submeter` —, executada antes da marcação. Rejeitado: funções de preparo
+dentro do capturador, que tirariam metade da verdade do roteiro e recriariam as duas
+listas que divergem. O guarda é o mesmo do marcador: **seletor de ação que não casa
+para o processo**, porque ação que erra em silêncio deixa a página no estado
+ANTERIOR ao que se queria fotografar — e o manual sai com a foto plausível e errada.
+
+> 🔬 **A sondagem que mudou o desenho, e é o motivo de serem 22 telas e não 24.**
+> Antes de escrever as telas de recusa, foram medidas as três: **só uma chega ao
+> servidor.**
+>
+> | Recusa | Chega? |
+> |---|---|
+> | sem obra | ❌ barrada no navegador (`required` no select) |
+> | sem item | ✅ *"Adicione pelo menos um item à requisição."* |
+> | emergência sem justificativa | ❌ barrada — o JS põe `required` no textarea |
+>
+> As duas barradas seriam **fotos impossíveis**. Em compensação a sondagem achou uma
+> tela melhor: ao marcar emergência, `#emergencialAviso` e o asterisco ficam
+> visíveis e a justificativa vira obrigatória **na hora**. Virou a tela `04` — a
+> regra agindo, em vez do castigo. Escrever as três sem medir teria produzido duas
+> telas que a captura não conseguiria tirar, e a descoberta só viria no fim.
+
+**As sete telas novas** (numeração nova do Ato 1): `04` a emergência muda o
+formulário · `05` a recusa por falta de item · `06` quantas aprovações vai precisar
+· `09` o que sobra para você depois de enviar · `10` quando o sistema soma o que
+você já pediu · `11` o rito de emergência do início ao fim · `16` aprovada — e
+agora? As telas `02` e `03` ganharam campos: filtros por estado, colunas, o selo da
+linha, adicionar/remover item e salvar.
+
+> 🔴 **E o guarda pegou um erro MEU, na captura.** A tela do anti-fracionamento
+> ("subiu de faixa") falhou com *"não existem na página: `.alert ~ .alert`"* — e a
+> razão é que 📖 a **decisão D2** do plano de 18/08 captura o manual com **alçadas
+> avançadas DESLIGADAS**, porque é como o tenant está: *"com elas ligadas entram
+> faixas, múltiplos aprovadores e anti-fracionamento — vira outro capítulo, não um
+> parágrafo"*. Sem a flag não há degrau, e a tela não podia existir neste cenário.
+> Escrevi-a sem reler a decisão. **22 de 23 capturaram; a que falhou foi a errada,
+> e falhou alto** — que é exatamente o comportamento pelo qual o motor foi
+> desenhado. A tela saiu; o aviso ficou, no lugar certo: o campo do selo
+> "acumulado" na lista e a atenção da tela do aviso de alçada dizem que ele só
+> aparece com a flag ligada.
+
+> 🔴 **E o gerador guardava a SEGUNDA LISTA que diverge — descoberta ao acrescentar
+> telas.** 📖 As fronteiras dos atos moravam num dicionário do
+> `gerar_manual_compras.py`, indexado por **prefixo de slug** (`'06': 'Ato 2'`).
+> Com o Ato 1 crescendo de 4 para 9 telas, o título do **Ato 2 saiu no meio do Ato
+> 1** — e o PDF saiu assim, sem nenhum aviso, porque nada conferia isso. É o mesmo
+> defeito que este desenho inteiro existe para evitar, escondido no único lugar que
+> não tinha sido convertido. **O ato virou campo da `Tela`**, ao lado do título e do
+> resumo, e um teste segura: ato não se repete, quem abre ato tem resumo, a primeira
+> tela abre um.
+
+⚠️ **O que continua faltando, e agora com nome:** o capítulo do anti-fracionamento —
+faixas, múltiplos aprovadores e degrau — exige capturar com `alcadas_avancadas_ativa`
+LIGADA. É decisão de quem lê o manual: ou o manual inteiro passa para o regime
+avançado (e ~6 telas mudam, entre elas a de aprovar), ou ganha um apêndice próprio
+capturado com a flag ligada.
+
+🔬 **Achado de produto, registrado por causa deste trabalho:** 📖 o formulário de
+nova requisição **não tem campo de etapa**, mas 📖 `compras_views.py:2005-2015` lê e
+valida `obra_servico_custo_id`. **Toda requisição criada pela tela cai no grupo de
+etapa NULA** — o agrupamento por etapa do anti-fracionamento é inalcançável por esse
+caminho. Ou a tela passa a oferecer a etapa, ou a leitura na rota é vestigial e sai.
+Foi por causa disso que o cenário ganhou uma **segunda obra** (`OB-LIMPA`): sem poder
+separar por etapa, as telas se separam por obra.
+
+📌 Spec em `docs/superpowers/specs/2026-08-19-manual-requisicao-detalhado-design.md`,
+plano em `docs/superpowers/plans/2026-08-19-plano-manual-requisicao-detalhado.md`.
+
 ### ✅ 19/08 — o runbook da Fase 2 rodado POR SCRIPT, e o controle que ele achou desligado
 
 **O runbook nunca tinha sido rodado.** Este documento registra desde 17/08 que

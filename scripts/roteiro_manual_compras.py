@@ -18,13 +18,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from anotar_captura import Campo, Tela
+from anotar_captura import Acao, Campo, Tela
 
 
 def resolver_ids():
     """Traduz os números estáveis do cenário nos ids desta rodada."""
     from app import app
-    from models import ContaPagar, PedidoCompra, RequisicaoCompra, Usuario
+    from models import ContaPagar, Obra, PedidoCompra, RequisicaoCompra, Usuario
     from seed_manual_compras import MARCA
 
     with app.app_context():
@@ -49,7 +49,22 @@ def resolver_ids():
         if not conta_c:
             raise SystemExit('a conta do PC-2026-0103 não existe — refaça o seed')
 
+        def obra(codigo):
+            o = Obra.query.filter_by(admin_id=adm.id, codigo=codigo).first()
+            if not o:
+                raise SystemExit(f'obra {codigo} não existe — refaça o seed')
+            return o.id
+
         return {
+            # As DUAS obras: as ações escolhem a obra pelo `value` do <select>,
+            # e QUAL delas decide o que a tela mostra. 📌 A obra limpa não tem
+            # requisição nenhuma; a `OB-MANUAL` chega com a janela do
+            # anti-fracionamento cheia. É essa diferença que separa a tela do
+            # aviso de alçada da tela do degrau — e não dá para separá-las por
+            # etapa, porque 📖 o formulário não tem campo de etapa (ver o
+            # comentário na tela `10_subiu_de_faixa`).
+            'obra_limpa': obra('OB-LIMPA'),
+            'obra_manual': obra('OB-MANUAL'),
             'rc_rascunho': rc('RC-2026-0001'),
             'rc_aguardando': rc('RC-2026-0002'),
             'rc_rejeitada': rc('RC-2026-0003'),
@@ -59,13 +74,20 @@ def resolver_ids():
         }
 
 
+# Os itens que as ações digitam. Saem do catálogo que o seed monta, para que a
+# figura mostre material de obra de verdade — e o preço vai com VÍRGULA, porque
+# 📖 `_itens_do_form` troca vírgula por ponto e é o parser leniente.
+ITEM = ('Cimento CP-II-Z-32 — saco 50 kg', '20', '39,90')
+
+
 def montar(ids):
-    """As 16 telas, na ordem em que a pessoa as encontra."""
+    """As 22 telas, na ordem em que a pessoa as encontra."""
     return [
 
         # ---------------- ATO 1 — o solicitante pede ----------------
         Tela(
             slug='01_login', titulo='Entrar no sistema', papel='anon',
+            ato='Antes de tudo', ato_resumo='Entrar no sistema.',
             rota='/login',
             resumo='Todo mundo entra por aqui. O que você vê depois depende do '
                    'seu perfil: quem pede vê a obra, quem aprova vê a fila.',
@@ -79,11 +101,28 @@ def montar(ids):
 
         Tela(
             slug='02_lista_requisicoes', titulo='A lista de requisições',
+            ato='Ato 1 — Quem precisa, pede',
+            ato_resumo='O encarregado da obra abre a requisição, e descobre o '
+                       'que a alçada vai exigir. Nada foi comprado ainda.',
             papel='solicitante', rota='/compras/requisicoes',
             resumo='O ponto de partida de toda compra. Aqui estão as suas '
                    'requisições e em que pé cada uma está.',
             campos=[
                 Campo(1, 'a[href*="/compras/requisicoes/nova"]', 'Nova requisição'),
+                Campo(2, 'a[href*="estado="]', 'Filtros por estado',
+                      nota='Cada botão traz a CONTAGEM do estado. É por aqui que '
+                           'se acha o que parou: o que está em RASCUNHO é seu, o '
+                           'que está AGUARDANDO está com quem aprova.'),
+                Campo(3, 'thead th:nth-child(5)', 'Valor estimado',
+                      nota='Estimado, não fechado — quem fecha é o comprador ao '
+                           'emitir o pedido.'),
+                Campo(4, 'thead th:nth-child(6)', 'Estado'),
+                Campo(5, 'tbody .badge', 'O selo do estado da linha',
+                      nota='Um selo amarelo "acumulado" pode aparecer ao lado do '
+                           'número: é o anti-fracionamento avisando que o somado '
+                           'da janela subiu a faixa daquela requisição. Ele só '
+                           'existe com as alçadas avançadas ligadas, e este '
+                           'manual foi feito com elas desligadas.'),
             ],
             atencao='Se você tentar ir direto em Compras → Nova compra, o sistema '
                     'traz você de volta para cá. Com a governança de compras ligada, '
@@ -103,10 +142,10 @@ def montar(ids):
                            'você quer que seja comprado.'),
                 Campo(3, 'textarea[name="justificativa"]', 'Justificativa',
                       nota='Opcional no dia a dia — MAS vira obrigatória se você '
-                           'marcar o campo 4.'),
+                           'marcar o campo 4. Ver a tela seguinte.'),
                 Campo(4, 'input[name="emergencial"]', 'Rito de emergência',
-                      nota='Marque só quando for. Ao marcar, a justificativa passa '
-                           'a ser exigida e a aprovação segue outro caminho.'),
+                      nota='Marque só quando for. Ao marcar, a tela muda na hora '
+                           '— é o que a tela 4 mostra.'),
                 Campo(5, 'select[name="mapa_v2_id"]', 'Mapa de concorrência',
                       nota='Se já existe cotação para este material, ligue aqui. '
                            'Quando a empresa exige cotação, este campo passa a '
@@ -117,16 +156,92 @@ def montar(ids):
                 Campo(8, 'input[name="item_quantidade[]"]', 'Quantidade', True),
                 Campo(9, 'input[name="item_preco[]"]', 'Preço estimado',
                       nota='Chute informado. Serve para a aprovação saber a ordem '
-                           'de grandeza.'),
+                           'de grandeza. Vírgula ou ponto, os dois servem.'),
                 Campo(10, 'select[name="item_almoxarifado_id[]"]', 'Catálogo',
                       nota='Ligando ao catálogo, a entrada no estoque sai automática '
-                           'quando o material chegar.'),
+                           'quando o material chegar. Item fora do catálogo '
+                           'atravessa o ciclo inteiro SEM movimentar estoque.'),
+                Campo(11, '#btnAddItem', 'Adicionar item',
+                      nota='Uma requisição pode ter quantas linhas precisar — e '
+                           'pedir tudo de uma vez é o que evita o fracionamento.'),
+                Campo(12, '.btn-remover', 'Remover a linha'),
+                Campo(13, 'button[type="submit"]', 'Salvar rascunho'),
             ],
             depois='A requisição nasce em RASCUNHO. Ela ainda é sua: ninguém '
-                   'foi avisado e nada foi comprado.'),
+                   'foi avisado e nada foi comprado.',
+            atencao='A obra é exigida pelo próprio navegador: sem ela o botão não '
+                    'envia. O servidor confere de novo (📖 compras_views.py:1987), '
+                    'e é essa segunda guarda que vale contra um envio forjado.'),
 
         Tela(
-            slug='04_rascunho_itens', titulo='Conferir e ajustar os itens',
+            slug='04_emergencia_exige', titulo='A emergência muda o formulário',
+            papel='solicitante', rota='/compras/requisicoes/nova',
+            resumo='Marcar o rito de emergência não é só um selo: a tela muda na '
+                   'hora, e a justificativa deixa de ser opcional.',
+            # 🔬 19/08 — medido: marcar o campo torna VISÍVEIS o aviso e o
+            # asterisco, e põe `required` no textarea. Por isso esta tela existe
+            # no lugar da recusa do servidor: o navegador barra antes, e a
+            # recusa de `compras_views.py:2049` é inalcançável pela tela.
+            acoes=[Acao('marcar', 'input[name="emergencial"]')],
+            campos=[
+                Campo(1, '#emergencialAviso', 'O aviso do rito',
+                      nota='Ele diz o que a emergência custa: a compra anda sem '
+                           'aprovação prévia, mas fica devendo ratificação em 48 h.'),
+                Campo(2, '#justificativaObrigatoria', 'O asterisco que apareceu'),
+                Campo(3, '#justificativaCampo', 'Justificativa — agora obrigatória',
+                      True,
+                      'É o preço da dispensa de aprovação, e é o que os '
+                      'ratificadores vão ler nas próximas 48 horas.'),
+            ],
+            atencao='Sem justificativa o botão não envia. Não é implicância da '
+                    'tela: requisição emergencial sem texto ficaria no banco '
+                    'marcada como emergência e ninguém conseguiria ratificá-la.'),
+
+        Tela(
+            slug='05_recusa_sem_item', titulo='O que acontece se faltar item',
+            papel='solicitante', rota='/compras/requisicoes/nova',
+            resumo='A recusa mais comum de todas, e a que mais confunde: a '
+                   'requisição precisa de pelo menos UMA linha de item.',
+            acoes=[
+                Acao('escolher', 'select[name="obra_id"]', '{obra_limpa}'),
+                Acao('submeter', 'button[type="submit"]'),
+            ],
+            campos=[
+                Campo(1, '.alert-danger', 'A recusa',
+                      nota='Linha em branco não conta como item. Se você digitou a '
+                           'descrição mas deixou quantidade ou preço vazios, a '
+                           'linha é descartada e cai aqui.'),
+            ],
+            atencao='Nada foi gravado. A requisição não chegou a existir — volte, '
+                    'preencha a linha e salve de novo.'),
+
+        Tela(
+            slug='06_alcada_no_sucesso', titulo='Quantas aprovações vai precisar',
+            papel='solicitante', rota='/compras/requisicoes/nova',
+            resumo='Ao salvar, o sistema já diz quantas assinaturas aquele valor '
+                   'exige. O número sai da faixa de alçada da empresa, não do acaso.',
+            acoes=[
+                Acao('escolher', 'select[name="obra_id"]', '{obra_limpa}'),
+                Acao('preencher', 'input[name="item_descricao[]"]', ITEM[0]),
+                Acao('preencher', 'input[name="item_quantidade[]"]', ITEM[1]),
+                Acao('preencher', 'input[name="item_preco[]"]', ITEM[2]),
+                Acao('submeter', 'button[type="submit"]'),
+            ],
+            campos=[
+                Campo(1, '.alert', 'O aviso da alçada'),
+                Campo(2, '.badge.fs-6', 'O estado: RASCUNHO'),
+            ],
+            depois='A requisição existe, em RASCUNHO. O número de aprovações '
+                   'sai da FAIXA em que o valor cai — trocar os valores das '
+                   'faixas é configuração, não é código.',
+            atencao='Com as alçadas avançadas ligadas este mesmo aviso ganha uma '
+                    'segunda linha quando o somado da janela sobe a faixa (o '
+                    'anti-fracionamento). 📌 Este manual foi capturado com elas '
+                    'DESLIGADAS, que é como o tenant está — ver a decisão D2 do '
+                    'plano de 18/08.'),
+
+        Tela(
+            slug='07_rascunho_itens', titulo='Conferir e ajustar os itens',
             papel='solicitante', rota='/compras/requisicoes/{rc_rascunho}',
             resumo='Enquanto está em RASCUNHO, tudo é editável. É aqui que você '
                    'corrige quantidade, acrescenta linha ou tira item.',
@@ -139,7 +254,7 @@ def montar(ids):
                     'cotação — ele só existe quando a regra de alçada pede.'),
 
         Tela(
-            slug='05_enviar', titulo='Enviar para aprovação',
+            slug='08_enviar', titulo='Enviar para aprovação',
             papel='solicitante', rota='/compras/requisicoes/{rc_rascunho}',
             resumo='O ato que tira a requisição das suas mãos.',
             campos=[
@@ -148,15 +263,58 @@ def montar(ids):
             depois='A requisição vai para AGUARDANDO APROVAÇÃO e aparece na fila '
                    'de quem aprova. A partir daqui você só acompanha.'),
 
+        Tela(
+            slug='09_aguardando', titulo='Depois de enviar, o que sobra para você',
+            papel='solicitante', rota='/compras/requisicoes/{rc_aguardando}',
+            resumo='A mesma requisição, agora fora do seu alcance. Esta tela existe '
+                   'para você reconhecer o estado — e não procurar um botão que '
+                   'deixou de existir.',
+            campos=[
+                Campo(1, '.badge.fs-6', 'O estado: AGUARDANDO APROVAÇÃO'),
+            ],
+            atencao='O bloco de itens não é mais editável e o botão de enviar '
+                    'sumiu. Não é falha: enviar é o ato que passa a requisição '
+                    'para outra pessoa. Se estiver errada, peça a quem aprova que '
+                    'REJEITE — a rejeição devolve a requisição para conserto.'),
+
+        Tela(
+            slug='10_emergencia', titulo='O rito de emergência, do início ao fim',
+            papel='solicitante', rota='/compras/requisicoes/nova',
+            resumo='Bomba quebrou, concretagem para. A emergência aprova na hora '
+                   '— e cria uma dívida: a ratificação em 48 horas.',
+            acoes=[
+                Acao('escolher', 'select[name="obra_id"]', '{obra_limpa}'),
+                Acao('marcar', 'input[name="emergencial"]'),
+                Acao('preencher', 'textarea[name="justificativa"]',
+                     'Bomba de recalque queimou; a concretagem da laje para '
+                     'amanhã cedo sem a bomba reserva.'),
+                Acao('preencher', 'input[name="item_descricao[]"]', ITEM[0]),
+                Acao('preencher', 'input[name="item_quantidade[]"]', ITEM[1]),
+                Acao('preencher', 'input[name="item_preco[]"]', ITEM[2]),
+                Acao('submeter', 'button[type="submit"]'),
+            ],
+            campos=[
+                Campo(1, '.alert', 'O que o sistema respondeu'),
+                Campo(2, '.badge.fs-6', 'O estado: APROVADA, sem passar pela fila'),
+            ],
+            depois='A requisição já pode virar pedido. Mas ela nasce DEVENDO: '
+                   'enquanto ninguém ratificar, a conta a pagar desta compra não '
+                   'é liberada.',
+            atencao='Quem ratifica é um gestor da obra ou um administrador — e a '
+                    'ratificação usa a mesma tela de aprovar. O prazo aparece no '
+                    'painel da própria requisição.'),
+
         # ---------------- ATO 2 — o gestor decide ----------------
         Tela(
-            slug='06_fila_aprovacao', titulo='A fila de aprovação',
+            slug='11_fila_aprovacao', titulo='A fila de aprovação',
+            ato='Ato 2 — Quem responde pela obra, decide',
+            ato_resumo='A gerência aprova, rejeita ou devolve para conserto.',
             papel='gestor', rota='/compras/aprovacao',
             resumo='Tudo que está esperando a sua decisão, em um lugar só.',
             campos=[]),
 
         Tela(
-            slug='07_aprovar', titulo='Aprovar',
+            slug='12_aprovar', titulo='Aprovar',
             papel='gestor', rota='/compras/requisicoes/{rc_aguardando}',
             resumo='Você vê o que foi pedido, para qual obra e quanto custa por '
                    'estimativa. Aprovar libera a compra — não a faz.',
@@ -170,7 +328,7 @@ def montar(ids):
             depois='A requisição vai para APROVADA e some da sua fila.'),
 
         Tela(
-            slug='08_rejeitar', titulo='Rejeitar',
+            slug='13_rejeitar', titulo='Rejeitar',
             papel='gestor', rota='/compras/requisicoes/{rc_aguardando}',
             resumo='Rejeitar não é matar o pedido. É devolver para conserto.',
             campos=[
@@ -184,7 +342,7 @@ def montar(ids):
                    'com o seu motivo à vista.'),
 
         Tela(
-            slug='09_corrigir', titulo='Corrigir e reenviar',
+            slug='14_corrigir', titulo='Corrigir e reenviar',
             papel='solicitante', rota='/compras/requisicoes/{rc_rejeitada}',
             resumo='Foi rejeitada. Você lê o motivo, conserta e manda de novo — '
                    'sem começar do zero.',
@@ -196,9 +354,28 @@ def montar(ids):
             atencao='Requisição rejeitada NÃO está perdida. Se você não achar este '
                     'botão, você está olhando a requisição de outra pessoa.'),
 
+        Tela(
+            slug='15_aprovada_emitir', titulo='Aprovada — e agora?',
+            papel='solicitante', rota='/compras/requisicoes/{rc_aprovada}',
+            resumo='A requisição voltou aprovada. Este é o ponto em que se '
+                   'descobre quem pode transformá-la em compra.',
+            campos=[
+                Campo(1, '.badge.fs-6', 'O estado: APROVADA'),
+                Campo(2, 'form[action*="emitir-pedido"]', 'O bloco de emitir pedido'),
+            ],
+            atencao='Se este bloco NÃO aparece para você, não é falha do sistema: '
+                    'é o seu papel NESTA obra. 📖 Emitir pedido é do COMPRADOR; '
+                    'quem é só Gestor aprova e não emite, e quem não tem vínculo '
+                    'nenhum com a obra não vê nem a requisição. Foi essa a '
+                    'confusão mais cara da implantação — a tela some inteira e '
+                    'parece defeito.'),
+
         # ---------------- ATO 3 — o comprador emite ----------------
         Tela(
-            slug='10_emitir_pedido', titulo='Emitir o pedido de compra',
+            slug='16_emitir_pedido', titulo='Emitir o pedido de compra',
+            ato='Ato 3 — Quem compra, negocia',
+            ato_resumo='A requisição aprovada vira pedido, com fornecedor e '
+                       'valor real.',
             papel='comprador', rota='/compras/requisicoes/{rc_aprovada}',
             resumo='A requisição vira pedido. Aqui entra o fornecedor escolhido e '
                    'o valor REAL negociado.',
@@ -232,7 +409,9 @@ def montar(ids):
 
         # ---------------- ATO 4 — o dinheiro ----------------
         Tela(
-            slug='11_pedido_triade', titulo='O painel das três pernas',
+            slug='17_pedido_triade', titulo='O painel das três pernas',
+            ato='Ato 4 — Quem paga, confere',
+            ato_resumo='A conta só é paga quando pedido, atesto e nota fecham.',
             papel='admin', rota='/compras/{ped_a}',
             resumo='A conta nasceu BLOQUEADA. Ela só pode ser paga quando as três '
                    'pernas fecham: o pedido, o recebimento com atesto e a nota '
@@ -242,7 +421,7 @@ def montar(ids):
                     'faltando. Não é travamento: é o controle funcionando.'),
 
         Tela(
-            slug='12_recebimento', titulo='Receber e atestar',
+            slug='18_recebimento', titulo='Receber e atestar',
             papel='admin', rota='/compras/{ped_a}/recebimento',
             resumo='O material chegou. Quem recebe confere e atesta a quantidade — '
                    'e é isso que autoriza o pagamento, não a nota.',
@@ -258,7 +437,7 @@ def montar(ids):
             depois='A perna do atesto fecha e o valor atestado aparece no painel.'),
 
         Tela(
-            slug='13_nota', titulo='Lançar a nota fiscal',
+            slug='19_nota', titulo='Lançar a nota fiscal',
             papel='admin', rota='/compras/{ped_b}/nota',
             resumo='A terceira perna. Sem ela a conta continua bloqueada.',
             campos=[
@@ -276,7 +455,7 @@ def montar(ids):
                     'para você, é o seu perfil.'),
 
         Tela(
-            slug='14_liberar', titulo='Liberar para pagamento',
+            slug='20_liberar', titulo='Liberar para pagamento',
             papel='admin', rota='/compras/{ped_b}',
             resumo='Tríade fechada. Este é o botão que destrava a conta.',
             campos=[
@@ -288,7 +467,7 @@ def montar(ids):
                     'exceção auditável — fica registrada com o seu nome.'),
 
         Tela(
-            slug='15_pagar', titulo='Dar baixa na conta',
+            slug='21_pagar', titulo='Dar baixa na conta',
             papel='admin', rota='/financeiro/contas-pagar/{conta_c}/pagar',
             resumo='A conta liberada finalmente aceita o pagamento.',
             campos=[
@@ -302,7 +481,7 @@ def montar(ids):
             depois='A conta vira PAGA e o saldo do banco desce.'),
 
         Tela(
-            slug='16_lote', titulo='Montar o lote de pagamento',
+            slug='22_lote', titulo='Montar o lote de pagamento',
             papel='admin', rota='/financeiro/fechamento-pagamentos',
             resumo='Em vez de pagar uma a uma, junte as contas do ciclo num lote. '
                    'Quem monta e quem fecha devem ser pessoas diferentes.',
@@ -321,6 +500,11 @@ def telas(ids=None):
     montadas = montar(ids)
     for t in montadas:
         t.rota = t.rota.format(**ids)
+        # O valor da ação passa pelo MESMO `format`: é assim que
+        # `Acao('escolher', 'select[name="obra_id"]', '{obra_limpa}')` vira o id
+        # desta rodada. Id fixo no roteiro é o que aposentou a captura de 22/07.
+        for a in t.acoes:
+            a.valor = str(a.valor).format(**ids)
     return montadas
 
 

@@ -283,6 +283,27 @@ def semear():
         db.session.add(obra)
         db.session.commit()
 
+    # A SEGUNDA obra, e ela existe por um motivo preciso: separar duas telas do
+    # manual que, na mesma obra, sairiam idênticas.
+    #
+    # 🔬 19/08 — 📖 o formulário de nova requisição NÃO tem campo de etapa (os
+    # campos são obra, data, justificativa, emergencial, mapa e os itens), mas
+    # 📖 `compras_views.py:2005-2015` lê e valida `obra_servico_custo_id`. Ou
+    # seja: toda requisição criada PELA TELA cai no grupo de etapa NULA, sempre.
+    # Como o anti-fracionamento acumula por (obra, etapa) e a janela de
+    # `OB-MANUAL` já chega cheia, a PRIMEIRA requisição criada durante a captura
+    # já subiria de faixa — e a tela "a alçada falando" seria uma cópia da tela
+    # "subiu de faixa". Não dá para separá-las por etapa; separam-se por OBRA.
+    #
+    # Aqui NÃO nasce requisição nenhuma: é isso que a torna a janela limpa.
+    obra_limpa = Obra.query.filter_by(admin_id=admin.id, codigo='OB-LIMPA').first()
+    if not obra_limpa:
+        obra_limpa = Obra(nome='Reforma da Sede — janela limpa', codigo='OB-LIMPA',
+                          data_inicio=date(2026, 5, 4), admin_id=admin.id,
+                          cliente_id=cliente.id, ativo=True)
+        db.session.add(obra_limpa)
+        db.session.commit()
+
     forn = Fornecedor.query.filter_by(admin_id=admin.id, cnpj='12.345.678/0001-90').first()
     if not forn:
         forn = Fornecedor(nome='Casa do Construtor Materiais Ltda',
@@ -302,14 +323,20 @@ def semear():
         'comprador': PapelObra.COMPRADOR,     # emite o pedido (PAPEIS_QUE_COMPRAM)
         'financeiro': PapelObra.LEITOR,
     }
+    # Os mesmos papéis NAS DUAS obras. A obra limpa precisa deles pelo mesmo
+    # motivo da outra: sem vínculo, o papel é None e a tela muda de
+    # comportamento — e aí a foto ensinaria o erro em vez do caminho.
     for chave, papel in PAPEIS.items():
         u = pessoas[chave]
-        vinculo = UsuarioObra.query.filter_by(usuario_id=u.id, obra_id=obra.id).first()
-        if not vinculo:
-            vinculo = UsuarioObra(usuario_id=u.id, obra_id=obra.id, admin_id=admin.id)
-            db.session.add(vinculo)
-        vinculo.papel = papel
-        vinculo.ativo = True
+        for alvo in (obra, obra_limpa):
+            vinculo = UsuarioObra.query.filter_by(
+                usuario_id=u.id, obra_id=alvo.id).first()
+            if not vinculo:
+                vinculo = UsuarioObra(usuario_id=u.id, obra_id=alvo.id,
+                                      admin_id=admin.id)
+                db.session.add(vinculo)
+            vinculo.papel = papel
+            vinculo.ativo = True
     db.session.commit()
 
     # Um banco, porque 📖 `templates/financeiro/pagar_conta.html:80` esconde o
@@ -435,6 +462,16 @@ def resumo(admin):
     for chave, username, nome, cargo in PESSOAS:
         u = Usuario.query.filter_by(username=username).first()
         print(f'    {chave:12s} {u.email:34s} {nome} — {cargo}')
+    # As DUAS obras aparecem aqui de propósito: a dependência de ordem do
+    # roteiro (a tela da alçada nasce na limpa, a do degrau nasce na cheia) fica
+    # ilegível se quem roda o seed não vir que são duas.
+    print('  obras:')
+    from models import Obra, UsuarioObra
+    for o in Obra.query.filter_by(admin_id=admin.id).order_by(Obra.codigo).all():
+        n_req = RequisicaoCompra.query.filter_by(obra_id=o.id).count()
+        n_vin = UsuarioObra.query.filter_by(obra_id=o.id, ativo=True).count()
+        janela = 'janela LIMPA' if n_req == 0 else f'{n_req} requisição(ões) na janela'
+        print(f'    {o.codigo:10s} {o.nome[:40]:40s} vinculos={n_vin}  {janela}')
     print('  requisições:')
     for r in RequisicaoCompra.query.filter_by(admin_id=admin.id).order_by(
             RequisicaoCompra.numero).all():

@@ -78,7 +78,7 @@ def _roteiro():
     # ids fictícios: `montar` não toca no banco, só formata a rota.
     return montar({'rc_rascunho': 1, 'rc_aguardando': 2, 'rc_rejeitada': 3,
                    'rc_aprovada': 4, 'ped_a': 5, 'ped_b': 6, 'ped_c': 7,
-                   'conta_c': 8})
+                   'conta_c': 8, 'obra_limpa': 9, 'obra_manual': 10})
 
 
 def test_numeracao_e_unica_e_contigua_em_cada_tela():
@@ -117,3 +117,58 @@ def test_campo_obrigatorio_sem_nota_ainda_diz_algo_na_legenda():
     for tela in _roteiro():
         for campo in tela.campos:
             assert campo.rotulo, f'{tela.slug}/{campo.numero} sem rótulo'
+
+
+# ── as ações, acrescentadas em 19/08 ────────────────────────────────────────
+# Três das telas do manual não moram em rota nenhuma: a recusa do formulário, o
+# aviso da alçada e o selo da emergência são flash na resposta de um POST. Elas
+# existem porque a `Tela` ganhou `acoes` — e estes testes são o que impede a
+# lista de ações de virar a segunda lista que diverge.
+
+
+def test_toda_acao_tem_tipo_conhecido_e_seletor():
+    from anotar_captura import TIPOS_DE_ACAO
+    for tela in _roteiro():
+        for i, acao in enumerate(tela.acoes, start=1):
+            assert acao.tipo in TIPOS_DE_ACAO, \
+                f'{tela.slug}: ação {i} com tipo {acao.tipo!r}'
+            assert acao.seletor.strip(), f'{tela.slug}: ação {i} sem seletor'
+
+
+def test_tela_com_acao_marca_pelo_menos_um_campo():
+    """Foto de recusa sem o flash marcado é print sem legenda: a página mostra
+    um aviso vermelho e o manual não diz qual é nem por quê."""
+    for tela in _roteiro():
+        if tela.acoes:
+            assert tela.campos, \
+                f'{tela.slug}: executa ação e não marca campo nenhum'
+
+
+def test_submeter_e_sempre_a_ultima_acao():
+    """Ação depois do POST agiria na página SEGUINTE — que não é a que está
+    sendo fotografada. O erro seria silencioso: a foto sai plausível e errada."""
+    for tela in _roteiro():
+        tipos = [a.tipo for a in tela.acoes]
+        if 'submeter' in tipos:
+            assert tipos.count('submeter') == 1, \
+                f'{tela.slug}: dois submetidos na mesma tela'
+            assert tipos[-1] == 'submeter', \
+                f'{tela.slug}: há ação depois do submeter: {tipos}'
+
+
+def test_os_atos_sao_do_roteiro_e_nao_se_repetem():
+    """🔬 19/08 — o gerador guardava as fronteiras dos atos num dicionário por
+    prefixo de slug. Acrescentar telas ao Ato 1 pôs o título do Ato 2 no meio
+    dele, e o PDF saiu errado SEM ninguém reclamar: era a segunda lista que
+    diverge, dentro do desenho feito para não ter nenhuma. Agora o ato é da
+    tela, e este teste é o que impede a lista de voltar."""
+    telas = _roteiro()
+    atos = [t.ato for t in telas if t.ato]
+    assert atos, 'nenhuma tela abre um ato — o manual sairia sem capítulos'
+    assert len(atos) == len(set(atos)), f'ato repetido: {atos}'
+    assert telas[0].ato, 'a primeira tela tem de abrir um ato'
+    for t in telas:
+        if t.ato:
+            assert t.ato_resumo, f'{t.slug}: abre "{t.ato}" sem uma linha de resumo'
+        else:
+            assert not t.ato_resumo, f'{t.slug}: resumo de ato sem ato'
