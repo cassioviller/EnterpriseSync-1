@@ -125,7 +125,20 @@ def _limpar(admin_id):
         db.session.execute(_sql(sql), kw)
 
     if peds:
-        # netos do recebimento, e o estoque que nasceu do movimento
+        # netos do recebimento, e o estoque que nasceu do movimento.
+        #
+        # 🔬 19/08 — A FK APONTA NOS DOIS SENTIDOS, e este bloco só conhecia um.
+        # `almoxarifado_estoque.entrada_movimento_id` aponta para o movimento
+        # (sabido), mas `almoxarifado_movimento.estoque_id` aponta de volta para
+        # o estoque — e é a SAIDA pareada do atesto que carrega esse vínculo.
+        # Apagar o estoque com a SAIDA ainda apontando estoura
+        # ForeignKeyViolation. Isto NUNCA tinha aparecido porque os itens do
+        # cenário eram texto livre, e 📖 `recebimento_pedido.py:304` não gera
+        # movimento nenhum para item sem `almoxarifado_item_id`: a idempotência
+        # deste caminho era ilusória. Apareceu na primeira rodada do
+        # `runbook_fase1.py`, depois que os itens ganharam vínculo com o catálogo.
+        _exec("""UPDATE almoxarifado_movimento SET estoque_id = NULL
+                 WHERE pedido_compra_id = ANY(:p)""", p=peds)
         _exec("""DELETE FROM almoxarifado_estoque WHERE entrada_movimento_id IN
                  (SELECT id FROM almoxarifado_movimento WHERE pedido_compra_id = ANY(:p))""", p=peds)
         _exec("""DELETE FROM recebimento_pedido_item WHERE recebimento_id IN
@@ -175,8 +188,18 @@ def _requisicao(admin_id, obra_id, solicitante_id, seq, justificativa,
     db.session.add(r)
     db.session.flush()
     for cod, desc, un, preco, qtd in itens:
+        # 🔬 19/08 — o VÍNCULO COM O CATÁLOGO, que faltava. Sem
+        # `almoxarifado_item_id` o item é texto livre, e 📖
+        # `services/recebimento_pedido.py:304` diz por escrito que "item de
+        # texto livre não chega aqui": o atesto não gera ENTRADA nem SAIDA de
+        # estoque. O cenário parecia completo e não exercia a perna de estoque
+        # da Fase 1 — que é a razão daquela fase existir. Achado rodando
+        # `scripts/runbook_fase1.py` pela primeira vez.
+        catalogo = AlmoxarifadoItem.query.filter_by(
+            admin_id=admin_id, codigo=cod).first()
         db.session.add(RequisicaoCompraItem(
             requisicao_id=r.id, admin_id=admin_id, descricao=desc,
+            almoxarifado_item_id=catalogo.id if catalogo else None,
             unidade=un, quantidade=Decimal(str(qtd)), preco_estimado=preco))
     db.session.flush()
     from services.requisicao_compra import recalcular_valor

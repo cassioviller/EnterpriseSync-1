@@ -53,14 +53,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from playwright.sync_api import sync_playwright
 
-# `preparar_bibliotecas` resolve as cinco .so do Chromium no nix store. Está lá
-# e não aqui porque a captura do manual a descobriu primeiro; duplicá-la seria
-# criar duas listas para divergir.
-from capturar_manual_compras import preparar_bibliotecas
-
-BASE = os.environ.get('SIGE_BASE', 'http://localhost:5000')
 RAIZ = Path(__file__).resolve().parent.parent
-VIEWPORT = {'width': 1440, 'height': 950}
 
 # Quanto do pedido é atestado. MENOR que o pedido de propósito: é o que faz o
 # passo (f) ter o que conferir — `liberar()` derruba a conta para o valor do que
@@ -69,125 +62,14 @@ QTD_PEDIDA = Decimal('120')
 QTD_ATESTADA = Decimal('100')
 
 
-# ── o registro da rodada ────────────────────────────────────────────────────
-class Runbook:
-    """Acumula o resultado de cada conferência, sem parar na primeira falha."""
+# A maquinaria (Runbook, entrar, abrir, avisos, submeter, frescos) mora em
+# `runbook_comum.py` desde 19/08, quando o runbook da Fase 1 passou a precisar
+# da mesma coisa. Copiar seria criar duas listas para divergir.
+from runbook_comum import (BASE, VIEWPORT, Runbook, _pessoas_e_obra, abrir,
+                           avisos, entrar, frescos, preparar_bibliotecas,
+                           rodar_python, semear, submeter)
 
-    def __init__(self):
-        self.linhas = []
-        self.passo_atual = '—'
-
-    def passo(self, nome):
-        self.passo_atual = nome
-        print(f'\n── {nome}')
-
-    def conferir(self, o_que, condicao, detalhe=''):
-        ok = bool(condicao)
-        self.linhas.append((self.passo_atual, o_que, ok, detalhe))
-        marca = 'ok  ' if ok else 'FALHA'
-        print(f'   [{marca}] {o_que}' + (f' — {detalhe}' if detalhe else ''))
-        return ok
-
-    def quebrou(self, o_que, erro):
-        self.linhas.append((self.passo_atual, o_que, False, f'{type(erro).__name__}: {erro}'))
-        print(f'   [FALHA] {o_que} — {type(erro).__name__}: {erro}')
-
-    @property
-    def falhas(self):
-        return [l for l in self.linhas if not l[2]]
-
-    def relatorio(self):
-        print('\n' + '=' * 72)
-        total, falhas = len(self.linhas), len(self.falhas)
-        print(f'RUNBOOK DA FASE 2 — {total - falhas} de {total} conferências passaram')
-        if falhas:
-            print(f'\n{falhas} FALHA(S):')
-            passo_anterior = None
-            for passo, o_que, _ok, detalhe in self.falhas:
-                if passo != passo_anterior:
-                    print(f'\n  {passo}')
-                    passo_anterior = passo
-                print(f'    - {o_que}')
-                if detalhe:
-                    print(f'      {detalhe}')
-        print('=' * 72)
-        return 1 if falhas else 0
-
-
-rb = Runbook()
-
-
-# ── o banco, lido de fora do servidor ───────────────────────────────────────
-# Processo separado do que atende as telas: por isso todo bloco de conferência
-# começa por `frescos()`. Sem isso a sessão desta ponta continuaria dentro da
-# transação em que abriu e leria o estado de antes do clique — o defeito que
-# faria este script aprovar uma tela que não gravou nada.
-def frescos():
-    from app import db
-    db.session.rollback()
-    db.session.expire_all()
-
-
-def _pessoas_e_obra():
-    from models import Obra, Usuario
-    from seed_manual_compras import MARCA, PESSOAS
-    pessoas = {}
-    for chave, username, _nome, _cargo in PESSOAS:
-        u = Usuario.query.filter_by(username=username).first()
-        if u is None:
-            raise SystemExit(f'cenário ausente: usuário {username} não existe. '
-                             f'Rode `python scripts/seed_manual_compras.py`.')
-        pessoas[chave] = u
-    admin = pessoas['admin']
-    obra = Obra.query.filter_by(admin_id=admin.id).order_by(Obra.id).first()
-    if obra is None:
-        raise SystemExit('cenário ausente: o tenant do manual não tem obra.')
-    return pessoas, obra
-
-
-# ── o navegador ─────────────────────────────────────────────────────────────
-def entrar(page, username, senha):
-    page.goto(f'{BASE}/login', wait_until='domcontentloaded', timeout=30000)
-    page.fill('input[name="username"]', username)
-    page.fill('input[name="password"]', senha)
-    page.click('button[type="submit"]')
-    page.wait_for_load_state('domcontentloaded')
-    if '/login' in page.url:
-        raise SystemExit(f'login falhou para {username} — URL final {page.url}')
-
-
-def abrir(page, rota):
-    """Vai até a rota e devolve o status. Cair no login é falha, não redirect."""
-    resp = page.goto(f'{BASE}{rota}', wait_until='domcontentloaded', timeout=30000)
-    page.wait_for_timeout(400)
-    status = resp.status if resp is not None else 0
-    if '/login' in page.url:
-        raise RuntimeError(f'{rota} devolveu o login — sem sessão ou sem permissão')
-    return status
-
-
-def avisos(page):
-    """O texto dos flashes da página. É por eles que a tela recusa."""
-    return ' | '.join(t.strip() for t in page.eval_on_selector_all(
-        '.alert, .toast-body', 'ns => ns.map(n => n.innerText)') if t.strip())
-
-
-def submeter(page, seletor_form):
-    """Clica o botão de submit DO formulário indicado.
-
-    Não é preciosismo de seletor: 📖 `templates/compras/nota.html:150` tem
-    `<button class="btn btn-primary">` SEM `type`, que é submit por default do
-    HTML mas não casa com `button[type="submit"]` — e a tela ainda tem um
-    segundo formulário (excluir nota) acima dele. Um seletor solto ou não acha
-    nada ou aperta o botão errado.
-    """
-    botao = page.query_selector(f'{seletor_form} button[type="submit"]') \
-        or page.query_selector(f'{seletor_form} button:not([type="button"])')
-    if botao is None:
-        raise RuntimeError(f'nenhum botão de submit em {seletor_form}')
-    botao.click()
-    page.wait_for_load_state('domcontentloaded')
-    page.wait_for_timeout(700)
+rb = Runbook('DA FASE 2 — FINANCEIRO EM DOIS FLUXOS')
 
 
 def main():
@@ -200,14 +82,9 @@ def main():
 
     # ── 0. o cenário ────────────────────────────────────────────────────────
     if not args.sem_semear:
-        print('semeando o cenário (scripts/seed_manual_compras.py)…')
-        p = subprocess.run([sys.executable, 'scripts/seed_manual_compras.py'],
-                           cwd=RAIZ, capture_output=True, text=True)
-        if p.returncode != 0:
-            print(p.stdout[-3000:])
-            print(p.stderr[-3000:])
-            raise SystemExit('o seed falhou — o runbook não roda sem cenário')
-        print('   cenário pronto')
+        print('semeando o cenário…')
+        if not semear(RAIZ, rb):
+            return rb.relatorio()
 
     from app import app, db
     from models import (ContaPagar, FechamentoPagamento, PedidoCompra,
@@ -579,9 +456,7 @@ def main():
 
     # ── 3. o sensor ─────────────────────────────────────────────────────────
     rb.passo('(3) o sensor de consistência, depois do piloto')
-    p = subprocess.run(
-        [sys.executable, 'scripts/verificar_consistencia_financeiro.py', str(admin_id)],
-        cwd=RAIZ, capture_output=True, text=True)
+    p = rodar_python([sys.executable, 'scripts/verificar_consistencia_financeiro.py', str(admin_id)], RAIZ)
     # O ruído de import (SAWarning, INFO de blueprint) enterra a saída do
     # sensor — e sensor que ninguém lê é sensor que não existe.
     RUIDO = ('SAWarning', 'return cls.query_class', 'INFO:', 'WARNING:', 'tensorflow')

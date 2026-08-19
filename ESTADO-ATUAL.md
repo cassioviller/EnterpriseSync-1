@@ -1235,6 +1235,63 @@ que fecha em nove sem forçar mas precisa ser conferido contra as saídas latera
 o runbook por script tem de achá-la no DOM. Função pura que ninguém chama passa em
 todo teste — foi assim que `fechar_lote()` ficou semanas testado e inalcançável.
 
+### ✅ 19/08 — o runbook da Fase 1 rodado por script: 36/36, e nenhum defeito de produção
+
+Segunda fase percorrida pela tela por script, depois da Fase 2. `scripts/runbook_fase1.py`,
+as 7 conferências do runbook de recebimento e atesto — 📖
+`2026-08-11-recebimento-atesto-design.md:309`.
+
+**🟢 O resultado importa por ser diferente do da Fase 2: aqui não há defeito de
+produção.** O ciclo inteiro passa — a conta do estoque nasce do ATESTO e não da
+emissão (zero ENTRADA na emissão, que é a dupla escrita que a fase existiu para
+matar), o par ENTRADA/SAIDA sai por lote, o lote fica `CONSUMIDO`, a data gravada é
+a informada e não a de hoje, e o pedido emitido **antes** de ligar a flag continua
+no regime antigo e é recusado pela tela de atesto **com a razão dita**.
+
+Duas rodadas, dois resultados opostos, e isso é o que dá confiança na medida: o
+runbook não é um carimbo.
+
+> 🔴 **O achado NÃO estava no sistema — estava no cenário, e é sério.** 📖 O seed do
+> manual criava os itens de requisição como **texto livre**, sem
+> `almoxarifado_item_id`. E 📖 `services/recebimento_pedido.py:304` diz por escrito:
+> *"item de texto livre não chega aqui"* — sem vínculo com o catálogo, o atesto **não
+> gera movimento de estoque nenhum**.
+>
+> Ou seja: **o cenário do manual visual de 18/08 não conseguia exercer a perna de
+> estoque da Fase 1**, que é a razão daquela fase existir. As 16 telas foram
+> fotografadas sobre um cenário que parecia completo e não era. Corrigido: os itens
+> passam a apontar para o catálogo que o próprio seed já monta.
+
+> 🔴 **E a correção destapou um segundo:** a limpeza do seed assumia a FK num sentido
+> só. `almoxarifado_estoque.entrada_movimento_id` aponta para o movimento (sabido),
+> mas `almoxarifado_movimento.estoque_id` aponta **de volta** — e é a SAIDA pareada
+> do atesto que carrega esse vínculo. Apagar o estoque com a SAIDA apontando estoura
+> `ForeignKeyViolation`. **Nunca tinha aparecido porque nunca houvera movimento**: a
+> idempotência daquele caminho era ilusória, e só ficou verdadeira agora.
+
+**Três armadilhas do próprio script, que valem para quem escrever o próximo:**
+
+1. 📖 **O lote mora no `AlmoxarifadoEstoque`, não na coluna do movimento.** A ENTRADA
+   aponta para a prateleira por `estoque_id` e só a SAIDA copia o rótulo. A primeira
+   rodada procurou `AlmoxarifadoMovimento.lote` na ENTRADA, achou NULL e **quase
+   reportou "saída sem entrada pareada"** — alarme falso grave.
+2. 🔬 **A tela recusou `"48.000"`** — 📖 `_quantidade_do_form` rejeita decimal ambíguo
+   (48 mil × 48,0), o guarda que a Fase 2 nasceu com. O script alimentou ambiguidade,
+   a rota recusou corretamente, e a rodada só percebeu porque passou a **ler o flash
+   depois de submeter**.
+3. 🔬 **O exit code do seed mente.** Ele roda inteiro, imprime o cenário e o processo
+   aborta no encerramento (`terminate called without an active exception`) porque o
+   caminho do recebimento puxa `ponto_views` → deepface → tensorflow.
+   **Intermitente.** O runbook passou a julgar pelo MARCADOR que o seed imprime, com
+   o abort registrado como conferência própria — visível, não ignorado.
+
+🔬 Regressão: com o seed corrigido, a **Fase 2 segue em 35/35**.
+
+`scripts/runbook_comum.py` passou a guardar a maquinaria comum das duas — inclusive
+`unico()`, que exige **exatamente um** elemento no seletor. 📖 A tela da requisição
+tem DOIS formulários para `/aprovar` (a ratificação da emergência usa a mesma rota),
+e o primeiro-match acertava por acidente num cenário não-emergencial.
+
 ### 🔬 19/08 — o gate "de 41 min para 6" NÃO se reproduz, e o que sobra é correção
 
 `fix/gate-41min-para-6min` (22/07) nunca foi mesclada e existia **só nesta
