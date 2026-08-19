@@ -9439,6 +9439,14 @@ class FechamentoPagamento(db.Model):
     # são conhecidos (ver services/financeiro_compra.fechar_lote).
     criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
                               nullable=True)
+    # Migration 310 — a saída da segregação, decidida em 19/08. Não-nulo
+    # SIGNIFICA fechamento excepcional: quem montou o lote o fechou, e o texto
+    # diz por quê. Espelha `conta_pagar.liberacao_justificativa` (308) e existe
+    # pelo mesmo motivo — sem saída, o financeiro de uma pessoa só fica com um
+    # lote que ninguém pode fechar, e regra que atrapalha sem proteger é regra
+    # que o time desliga. Nullable e sem backfill: lote histórico não tem
+    # exceção a declarar.
+    segregacao_justificativa = db.Column(db.Text, nullable=True)
 
     contas = db.relationship('ContaPagar', foreign_keys='ContaPagar.fechamento_id',
                              backref='fechamento', lazy='dynamic')

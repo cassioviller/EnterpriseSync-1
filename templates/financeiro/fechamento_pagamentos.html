@@ -290,6 +290,12 @@
                           <span class="badge bg-success"><i class="fas fa-lock me-1"></i>Fechado</span>
                         {% endif %}
                         <span class="badge bg-secondary ms-1">{{ f.contas.count() }} contas</span>
+                        {% if f.segregacao_justificativa %}
+                          <span class="badge bg-warning text-dark ms-1"
+                                title="{{ f.segregacao_justificativa }}">
+                            <i class="fas fa-triangle-exclamation me-1"></i>fechado por quem montou
+                          </span>
+                        {% endif %}
                       </div>
                       <div class="small text-success fw-semibold mt-1">
                         R$ {{ ('%.2f' % (f.total_selecionado or 0)|float) | replace('.', ',') }}
@@ -297,13 +303,39 @@
                     </div>
                     <div class="d-flex flex-column gap-1">
                       {% if f.status == 'ABERTO' %}
+                        {#
+                          19/08 — a segregação de função ganha tela.
+
+                          Quem montou o lote não o fecha: é o único controle que
+                          a Fase 2 acrescenta a este passo. Mas a regra precisa
+                          de saída, senão o financeiro de uma pessoa só fica com
+                          um lote que ninguém pode fechar — e regra sem saída é
+                          regra que o time contorna por fora do sistema.
+
+                          O BOTÃO NUNCA SOME. Some é o que faz alguém concluir
+                          que o sistema quebrou. Ele vira "fechar mesmo assim",
+                          com o motivo obrigatório — mesmo desenho de "Liberar
+                          com ressalva" na tela do pedido, que o time já viu.
+                        #}
+                        {% set eu_montei = f.criado_por_id and f.criado_por_id == current_user.id %}
                         <form method="POST" action="{{ url_for('financeiro.fechamento_pagamentos') }}"
-                              onsubmit="return confirm('Encerrar este fechamento?')">
+                              {% if not eu_montei %}onsubmit="return confirm('Encerrar este fechamento?')"{% endif %}
+                              class="{% if eu_montei %}d-flex flex-column gap-1{% endif %}">
                           <input type="hidden" name="action" value="fechar">
                           <input type="hidden" name="fechamento_id" value="{{ f.id }}">
-                          <button type="submit" class="btn btn-sm btn-danger" title="Fechar">
-                            <i class="fas fa-lock"></i>
-                          </button>
+                          {% if eu_montei %}
+                            <input type="text" name="justificativa" required minlength="15"
+                                   class="form-control form-control-sm"
+                                   style="min-width: 210px"
+                                   placeholder="Você montou este lote — por que não há uma segunda pessoa?">
+                            <button type="submit" class="btn btn-sm btn-warning text-nowrap">
+                              <i class="fas fa-lock me-1"></i>Fechar mesmo assim
+                            </button>
+                          {% else %}
+                            <button type="submit" class="btn btn-sm btn-danger" title="Fechar">
+                              <i class="fas fa-lock"></i>
+                            </button>
+                          {% endif %}
                         </form>
                       {% else %}
                         <form method="POST" action="{{ url_for('financeiro.fechamento_pagamentos') }}">

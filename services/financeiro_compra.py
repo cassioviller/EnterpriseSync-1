@@ -476,7 +476,7 @@ class LoteImutavel(ErroFinanceiroCompra):
 # controle: fechar o lote é justamente o que muda a situação para 'liberada'.
 # O estado mora num lugar só; o fechamento é quem o move.
 
-def fechar_lote(fechamento, *, usuario=None):
+def fechar_lote(fechamento, *, usuario=None, justificativa=None):
     """Fecha o lote e libera as contas dele. Levanta `SegregacaoViolada`.
 
     A segregação só é EXIGIDA quando os dois lados são conhecidos: lote
@@ -487,18 +487,49 @@ def fechar_lote(fechamento, *, usuario=None):
     Contas cujo pedido ainda não fechou a tríade são PULADAS, não estouram: um
     lote com dez contas não pode falhar inteiro porque uma delas está sem nota.
     O que fica de fora continua bloqueado, e é o sensor da F7 que o mostra.
+
+    ── A SAÍDA (decisão do Cássio, 19/08) ──────────────────────────────────
+    Até 19/08 este guarda **nunca mordeu**: a ação `fechar` da tela fechava o
+    lote sem passar por aqui (📖 `financeiro_views.fechamento_pagamentos`, antes
+    deste conserto), e nem `criado_por_id` nem `fechado_por_id` eram
+    carimbados — com um lado sempre nulo, a condição acima passa calada. Ligar o
+    carimbo liga a regra pela primeira vez, e aí ela encontra o caso que o spec
+    não tinha: **financeiro de uma pessoa só**, em que ninguém mais existe para
+    fechar.
+
+    `justificativa` é essa saída, no molde exato da ressalva do D6 em
+    `liberar()`: quem montou PODE fechar, desde que escreva por quê. O texto
+    fica em `fechamento_pagamento.segregacao_justificativa` (migration 310), o
+    lote sai marcado no sensor e alguém o lê uma vez por mês. O que não pode é
+    a exceção ser silenciosa — e é isso, não a recusa, que protege o controle:
+    regra sem saída é regra que o time contorna por fora do sistema.
+
+    Mesmo mínimo de caracteres da ressalva, e pelo mesmo motivo: campo vazio e
+    "ok" são a mesma coisa para quem for auditar daqui a seis meses.
     """
     from datetime import datetime
     from app import db
     from models import ContaPagar, PedidoCompra
 
+    ressalva = None
     criado_por = getattr(fechamento, 'criado_por_id', None)
     quem_fecha = getattr(usuario, 'id', None)
     if criado_por is not None and quem_fecha is not None and criado_por == quem_fecha:
-        raise SegregacaoViolada(
-            'quem montou este lote não pode fechá-lo. A separação entre quem '
-            'seleciona as contas e quem autoriza o pagamento é o que faz o '
-            'lote valer alguma coisa — peça a outra pessoa que feche.')
+        texto = (justificativa or '').strip()
+        if not texto:
+            raise SegregacaoViolada(
+                'quem montou este lote não pode fechá-lo. A separação entre quem '
+                'seleciona as contas e quem autoriza o pagamento é o que faz o '
+                'lote valer alguma coisa — peça a outra pessoa que feche. Se não '
+                'houver outra pessoa, feche mesmo assim escrevendo o motivo: a '
+                'exceção fica registrada.')
+        if len(texto) < MINIMO_RESSALVA:
+            raise RessalvaInvalida(
+                f'para fechar um lote que você mesmo montou, a justificativa '
+                f'precisa de pelo menos {MINIMO_RESSALVA} caracteres dizendo POR '
+                f'QUE não houve uma segunda pessoa. Quem for auditar isto daqui '
+                f'a seis meses não vai ter a quem perguntar.')
+        ressalva = texto
 
     contas = ContaPagar.query.filter_by(fechamento_id=fechamento.id).all()
     liberadas = []
@@ -517,6 +548,11 @@ def fechar_lote(fechamento, *, usuario=None):
     fechamento.status = 'FECHADO'
     fechamento.fechado_por_id = quem_fecha
     fechamento.fechado_em = datetime.utcnow()
+    # Só quando HOUVE exceção — atribuir sempre marcaria como excepcional todo
+    # lote em que alguém deixou o campo preenchido por engano, e o relatório
+    # passaria a contar o normal. Mesmo item 2 do docstring de `liberar`.
+    if ressalva:
+        fechamento.segregacao_justificativa = ressalva
     db.session.flush()
     return liberadas
 

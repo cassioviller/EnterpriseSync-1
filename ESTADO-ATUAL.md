@@ -1101,6 +1101,103 @@ banco cadastrado, e o bloco de mapa de cotação só existe quando a alçada ped
 > que percorre e renderiza de verdade — mas ninguém clicou. É o mesmo aviso de 17/08, e
 > continua sendo o item nº 1 de quem retomar. A diferença é que agora o runbook tem figura.
 
+### ✅ 19/08 — o runbook da Fase 2 rodado POR SCRIPT, e o controle que ele achou desligado
+
+**O runbook nunca tinha sido rodado.** Este documento registra desde 17/08 que
+ninguém abriu o navegador, e em 18/08 o preparo dessa rodada já tinha achado o 500
+da tela do lote. Em 19/08 ele rodou inteiro — **sem humano**, decisão do Cássio —
+por `scripts/runbook_fase2.py`: Chromium de verdade contra o app, quatro pessoas
+com sessões separadas, os passos (a) a (g) do spec mais o sensor.
+
+📖 O desenho que faz o script valer alguma coisa: **cada passo acha o controle no
+DOM antes de agir**, preenche o formulário que está na tela e confere no banco a
+coluna que a tabela do runbook nomeia. É o que separa esta medida da suíte —
+o `test_client` monta o POST no código do teste e responde *"a rota funciona
+quando chamada"*; a pergunta do runbook é **existe caminho pela tela?**. Botão não
+renderizado, formulário escondido por permissão e serviço sem chamador passam
+inteiros pela primeira e param na segunda.
+
+🔬 **Primeira rodada: 30 de 34 conferências. As 4 falhas eram um defeito só.**
+
+> 🔴 **A tela fechava o lote sem passar pelo serviço** — e com isso a segregação
+> de função, único controle que a Fase 2 acrescenta ao passo (e), nunca foi
+> exercida em produção.
+>
+> 📖 A ação `fechar` de `financeiro_views.fechamento_pagamentos` fazia
+> `fech.status = 'FECHADO'; db.session.commit()` e nada mais.
+> 🔬 `fechar_lote()` e `reabrir_lote()` tinham **zero chamadores de produção** —
+> o arquivo importava daquele módulo só `pernas_faltantes`. Medido com quatro
+> pessoas distintas: `criado_por_id` NULL, `fechado_por_id` NULL, quem montou o
+> lote fechando o próprio lote, e o sensor em exit 1.
+>
+> **Os dois carimbos ausentes eram duas metades do mesmo buraco:** o guarda é
+> `if criado_por is not None and quem_fecha is not None` — com um lado sempre nulo
+> ele passava **calado**. Não recusava, e não avisava que não estava recusando.
+>
+> Junto vinham dois efeitos que ninguém pediu: a liberação das contas bloqueadas
+> do lote nunca rodava pela tela, e o `reabrir` sem `reabrir_lote()` não aplicava
+> `LoteImutavel` — **lote com conta paga voltava a ABERTO**.
+>
+> 🔬 Por que a suíte não pegou: `test_financeiro_dois_fluxos.py` cobre o
+> **serviço** e `test_fechamento_pagamentos_render.py` cobre o **GET**. Ninguém
+> exercitava o POST, então o serviço podia perder o chamador sem nada ficar
+> vermelho. **É a terceira vez que este padrão aparece na Fase 2** — a primeira
+> foi `liberar()`, em 17/08.
+
+**O conserto, e a decisão que ele obrigou a tomar.** Carimbar `criado_por_id`
+**liga a segregação pela primeira vez** — e aí ela encontra o caso que o spec não
+tinha: financeiro de uma pessoa só, em que ninguém mais existe para fechar. O
+docstring do próprio `fechar_lote` avisa: *regra que atrapalha sem proteger é
+regra que morre*.
+
+🔴 **Decisão do Cássio, 19/08:** quem montou o lote **pode** fechá-lo com
+justificativa gravada, e o lote sai marcado no sensor — o molde exato da ressalva
+do D6 em `liberar()`. Migration **310** (`fechamento_pagamento.segregacao_justificativa`,
+não-nulo = fechamento excepcional). Rejeitadas: sem saída (trava tenant pequeno) e
+"ADMIN sempre pode" (dispensa justamente quem mais convém auditar).
+
+🔴 **Decisão do Cássio, 19/08 — o piso do sensor:** só entram no achado 3 os lotes
+com `criado_por_id`. É **auto-datante** — só nasce com autor o que foi montado
+depois deste conserto. 🔬 dev: **32 de 93 lotes fechados não têm autor**; sem piso
+o sensor acusaria drift para sempre pelo passado, e sensor que grita sempre não é
+lido nunca. **Sem backfill:** não há como saber quem fechou os 32, e inventar
+autor é forjar registro.
+
+🔬 **Segunda rodada: 34 de 34.** O script é o teste de aceitação do próprio
+conserto — mesma medida antes e depois. Testes: **7 de rota, red-first de verdade**
+(os 7 vermelhos antes do código, em `tests/test_fechamento_pagamentos_rota.py`),
+mais o de paridade com a flag desligada. Regressão dirigida: **357 passed**, exit 0.
+
+🔬 **Gate completo: 2457 passed, 1 failed, 6 skipped, 201 deselected, 2 xfailed** em
+35min18s, log em arquivo. **A única falha é conhecida e anterior:**
+`test_fase5_rdo_ciclo_vida::test_backfill_marcou_os_rdos_historicos_como_preenchido`,
+com os **mesmos 23 RDOs** de 16/08 — ⚠️ dev, e em RDO, sem relação com compras.
+São **duas conhecidas menos uma**: a da `notificacao_cliente` fechou em 17/08
+(`e6434d7e`). **Zero falhas novas.**
+
+> ⚠️ **A armadilha que esta rodada revelou, e que vale além dela: `migration_name`
+> é `VARCHAR(200)`, e ninguém documentou isso.** A descrição da 310 saiu com 254
+> caracteres: 📖 `record_migration` (`migrations.py:137`) **logou o erro e seguiu**,
+> então a coluna foi criada e o histórico **não registrou nada**. É o espelho do
+> defeito das migrações 279/309 — aquelas gravaram sucesso sem pegar; esta pegou
+> sem gravar. 🔬 As duas vizinhas estão na borda: a **308 tem 192** caracteres e a
+> **309 tem 180**. Quem escrever a 311 tem menos folga do que imagina.
+
+> ⚠️ **O que este trabalho NÃO fez, e está anotado no plano:** `fechar_lote` libera
+> as contas bloqueadas do lote; `reabrir_lote` **não as re-bloqueia**. Reabrir
+> deixa as contas pagáveis. Pode ser de propósito — a liberação fala da tríade, não
+> do lote —, mas hoje não está escrito em lugar nenhum nem coberto por teste. Fica
+> como **pergunta**, não como achado.
+
+Plano em `docs/superpowers/plans/2026-08-19-plano-fechar-lote-pela-tela.md`.
+
+> 📌 **O runbook da Fase 2 deixa de ser o item nº 1 de quem retomar.** Ele foi
+> rodado, por script, ponta a ponta, e o script fica: `python scripts/runbook_fase2.py`
+> semeia o cenário e mede as 34 conferências sozinho. O que **continua** valendo é
+> que o ciclo nunca foi percorrido por uma pessoa de verdade — e o que o script não
+> cobre é o julgamento de quem usa: se a tela faz sentido, se a mensagem se entende,
+> se o campo está onde a mão procura.
+
 ## O plano aprovado
 
 | Fase | Conteúdo | Estado | Plano |

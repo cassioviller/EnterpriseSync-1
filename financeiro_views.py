@@ -1513,12 +1513,17 @@ def fechamento_pagamentos():
                     cps_selecionados.append(cp)
                     total += Decimal(str(cp.saldo or cp.valor_original or 0))
 
+            # `criado_por_id` — sem ele a segregação de função não tem com
+            # quem comparar, e o guarda de `fechar_lote` passa CALADO (ele é
+            # `if criado_por is not None and quem_fecha is not None`). Faltava
+            # desde a migration 296: a coluna existia e ninguém a escrevia.
             fechamento = FechamentoPagamento(
                 data_fechamento=data_fechamento,
                 descricao=descricao,
                 status='ABERTO',
                 total_selecionado=total,
                 admin_id=admin_id,
+                criado_por_id=current_user.id,
             )
             db.session.add(fechamento)
             db.session.flush()
@@ -1534,21 +1539,63 @@ def fechamento_pagamentos():
             )
             return redirect(url_for('financeiro.fechamento_pagamentos'))
 
+        # ── Fase 2 do ciclo de compras — fechar e reabrir PASSAM pelo serviço ──
+        #
+        # Até 19/08 estas duas ações viravam o `status` na mão, aqui mesmo, e
+        # `services.financeiro_compra.fechar_lote` / `reabrir_lote` não tinham
+        # chamador de produção nenhum — escritos, testados e inalcançáveis pela
+        # tela. Três coisas se perdiam nesse caminho curto:
+        #
+        #   1. a SEGREGAÇÃO ("quem monta o lote não o fecha"), que é o único
+        #      controle que a Fase 2 acrescenta ao passo (e) do runbook;
+        #   2. o carimbo `fechado_por_id`/`fechado_em` — e a tabela do runbook
+        #      diz que NULL ali significa "alguém fechou por SQL". Era a tela;
+        #   3. a LIBERAÇÃO das contas bloqueadas do lote, que é o que faz o
+        #      fechamento ter efeito em vez de só mudar uma palavra na coluna.
+        #
+        # Achado rodando `scripts/runbook_fase2.py`, que é quem mede isto: 30 de
+        # 34 conferências passavam, e as 4 falhas eram este parágrafo.
         elif action == 'fechar':
+            from services.financeiro_compra import (RessalvaInvalida,
+                                                    SegregacaoViolada, fechar_lote)
             fech_id = request.form.get('fechamento_id')
             fech = FechamentoPagamento.query.filter_by(id=fech_id, admin_id=admin_id).first()
             if fech and fech.status == 'ABERTO':
-                fech.status = 'FECHADO'
-                db.session.commit()
-                flash('Fechamento encerrado com sucesso.', 'success')
+                justificativa = (request.form.get('justificativa') or '').strip() or None
+                try:
+                    liberadas = fechar_lote(fech, usuario=current_user,
+                                            justificativa=justificativa)
+                    db.session.commit()
+                except (SegregacaoViolada, RessalvaInvalida) as e:
+                    db.session.rollback()
+                    # A mensagem do serviço já diz o motivo E o que fazer.
+                    # Repassá-la é o que impede a pessoa de concluir que o
+                    # sistema quebrou e ir fechar o lote por fora.
+                    flash(str(e), 'warning')
+                    return redirect(url_for('financeiro.fechamento_pagamentos'))
+                if justificativa:
+                    flash('Fechamento encerrado POR QUEM O MONTOU — o motivo '
+                          'ficou registrado e o lote vai aparecer no relatório '
+                          'de exceções.', 'warning')
+                else:
+                    flash('Fechamento encerrado com sucesso.', 'success')
+                if liberadas:
+                    flash(f'{len(liberadas)} conta(s) do lote liberada(s) para '
+                          f'pagamento.', 'success')
             return redirect(url_for('financeiro.fechamento_pagamentos'))
 
         elif action == 'reabrir':
+            from services.financeiro_compra import LoteImutavel, reabrir_lote
             fech_id = request.form.get('fechamento_id')
             fech = FechamentoPagamento.query.filter_by(id=fech_id, admin_id=admin_id).first()
             if fech and fech.status == 'FECHADO':
-                fech.status = 'ABERTO'
-                db.session.commit()
+                try:
+                    reabrir_lote(fech, usuario=current_user)
+                    db.session.commit()
+                except LoteImutavel as e:
+                    db.session.rollback()
+                    flash(str(e), 'warning')
+                    return redirect(url_for('financeiro.fechamento_pagamentos'))
                 flash('Fechamento reaberto.', 'success')
             return redirect(url_for('financeiro.fechamento_pagamentos'))
 

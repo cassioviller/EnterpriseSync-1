@@ -6729,6 +6729,38 @@ def _migration_309_drop_notificacao_cliente_de_novo():
         raise
 
 
+def _migration_310_segregacao_justificativa():
+    """A saída da segregação do lote — `fechamento_pagamento.segregacao_justificativa`.
+
+    Achado de 19/08, rodando o runbook da Fase 2 por script: a tela fechava o
+    lote sem passar por `fechar_lote()`, então `criado_por_id` e `fechado_por_id`
+    nasciam NULL e a segregação de função nunca era exercida.
+
+    Ao ligar o carimbo, o guarda passa a morder pela PRIMEIRA vez — ele é
+    `if criado_por is not None and quem_fecha is not None`, e com um lado sempre
+    nulo nunca recusou nada. Num financeiro de uma pessoa só isso deixaria o
+    lote sem quem o feche. Esta coluna é a saída (decisão do Cássio, 19/08,
+    opção b): quem montou PODE fechar, desde que escreva por quê.
+
+    Não-nulo **significa** fechamento excepcional. Nullable e **sem backfill**:
+    lote histórico não tem exceção a declarar, e um NOT NULL obrigaria a
+    inventar texto para o parque inteiro — que é forjar registro, o mesmo
+    defeito que o detector da Fase 5 pega em RDO assinado sem trilha.
+
+    Alocação: **310**. 🔬 19/08, em `migration_history` do dev: a maior aplicada
+    é a **309**, e entre 310 e 325 não há nada.
+
+    Idempotente: IF NOT EXISTS.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE fechamento_pagamento ADD COLUMN IF NOT EXISTS "
+            "segregacao_justificativa TEXT"))
+    logger.info("[Migration 310] fechamento_pagamento.segregacao_justificativa "
+                "criada (nao-nulo = fechamento excepcional; sem backfill).")
+
+
 def _migration_308_liberacao_justificativa():
     """Fecho da Fase 2 do ciclo de compras — `conta_pagar.liberacao_justificativa`.
 
@@ -7135,6 +7167,7 @@ def executar_migracoes():
             (299, "Fase 3 — configuracao_empresa.alcadas_avancadas_ativa (default FALSE) + janela_fracionamento_dias (30 dias, decisao D2 editavel)", _migration_299_flag_e_janela),
             (308, "Fecho da Fase 2 — conta_pagar.liberacao_justificativa: nao-nulo = liberacao excepcional, a porta de escape do D6. 308 e nao 300: 300-307 e faixa da Fase 9 e 290-295 da Fase 8, nenhuma aplicada", _migration_308_liberacao_justificativa),
             (309, "E02 segunda tentativa — a 279 gravou success e nao pegou: create_all roda antes das migrations e recriou a tabela enquanto o modelo existia. Drop guardado pela contagem, como a 279", _migration_309_drop_notificacao_cliente_de_novo),
+            (310, "Saida da segregacao — fechamento_pagamento.segregacao_justificativa: nao-nulo = quem montou o lote o fechou e escreveu por que. Carimbar criado_por_id liga o guarda pela 1a vez", _migration_310_segregacao_justificativa),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
