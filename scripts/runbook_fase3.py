@@ -36,7 +36,6 @@ do manual visual diferente do que o manual mostra.
 import argparse
 import os
 import sys
-from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -46,8 +45,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from playwright.sync_api import sync_playwright
 
 from runbook_comum import (BASE, VIEWPORT, Runbook, _pessoas_e_obra, abrir,
-                           avisos, entrar, frescos, preparar_bibliotecas,
-                           rodar_python, semear, submeter, unico)
+                           entrar, frescos, nova_requisicao,
+                           preparar_bibliotecas, rodar_python, ligar_cadeia,
+                           semear, unico)
 
 RAIZ = Path(__file__).resolve().parent.parent
 rb = Runbook('DA FASE 3 — ALÇADAS AVANÇADAS')
@@ -63,45 +63,44 @@ def _flag(script, admin_id, *args):
     return p.returncode == 0, (p.stdout + p.stderr)
 
 
-def _nova_requisicao(pg, obra_id, justificativa, valor, emergencial=False):
-    """Cria uma requisição pela tela e devolve o número dela, ou None."""
-    abrir(pg, '/compras/requisicoes/nova')
-    pg.select_option('select[name="obra_id"]', str(obra_id))
-    pg.fill('textarea[name="justificativa"]', justificativa)
-    pg.fill('input[name="data_necessidade"]',
-            (date.today() + timedelta(days=10)).isoformat())
-    if emergencial:
-        pg.check('input[name="emergencial"]')
-    # Um item só, com o valor cheio — o que importa aqui é o VALOR da
-    # requisição, e quantidade 1 evita o parser de decimal ambíguo.
-    pg.fill('input[name="item_descricao[]"]', 'Material de obra')
-    pg.fill('input[name="item_quantidade[]"]', '1')
-    pg.fill('input[name="item_preco[]"]', f'{valor:.2f}'.replace('.', ','))
-    submeter(pg, 'form:has(textarea[name="justificativa"])')
-    return avisos(pg)
+# A criação de requisição pela tela mora em `runbook_comum` desde 19/08 — esta
+# cópia local era a original, e duas cópias divergem: a de lá aprendeu a vincular
+# o item ao catálogo e a de cá não teria aprendido. Aqui a quantidade continua 1,
+# que é o padrão: neste runbook o que importa é o VALOR da requisição.
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--sem-semear', action='store_true')
+    ap.add_argument('--piloto', action='store_true',
+                    help='roda contra o cenário do PILOTO (janela limpa, dois '
+                         'fornecedores) em vez do cenário do manual')
     args = ap.parse_args()
 
     preparar_bibliotecas()
     if not args.sem_semear:
         print('semeando o cenário…')
-        if not semear(RAIZ, rb):
+        if not semear(RAIZ, rb, 'seed_piloto_compras.py'
+                      if args.piloto else 'seed_manual_compras.py'):
             return rb.relatorio()
 
     from app import app, db
     from models import ConfiguracaoEmpresa, RequisicaoCompra
-    from seed_manual_compras import MARCA, SENHA
+    if args.piloto:
+        from seed_piloto_compras import MARCA, SENHA
+    else:
+        from seed_manual_compras import MARCA, SENHA
 
     with app.app_context():
-        pessoas, obra = _pessoas_e_obra()
+        pessoas, obra = (_pessoas_e_obra('piloto', 'PIL-A')
+                         if args.piloto else _pessoas_e_obra())
         admin_id, obra_id = pessoas['admin'].id, obra.id
         usuarios = {k: f'{MARCA}_{k}' for k in pessoas}
         cfg = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
         estado_original = bool(getattr(cfg, 'alcadas_avancadas_ativa', False))
+
+        if args.piloto:
+            ligar_cadeia(RAIZ, admin_id, rb)
 
         rb.passo('0 — as flags, na ordem da cadeia')
         ok, saida = _flag('flag_alcadas_avancadas.py', admin_id, '--ligar')
@@ -137,7 +136,7 @@ def main():
                     for i in (1, 2, 3):
                         antes = {r.id for r in RequisicaoCompra.query.filter_by(
                             admin_id=admin_id).all()}
-                        aviso = _nova_requisicao(
+                        aviso = nova_requisicao(
                             pg, obra_id,
                             f'Fatia {i} de material para o mesmo serviço.',
                             VALOR_FATIA)
@@ -181,15 +180,32 @@ def main():
                         # as eleva é o do fracionamento.
                         rb.conferir('o acumulado da janela CRESCE a cada fatia',
                                     a1 < a2 < a3,
-                                    f'{a1} → {a2} → {a3} (a janela já começou '
-                                    f'em {a1}, não em zero: o cenário do manual '
-                                    f'tem irmãs na mesma obra e etapa NULA)')
-                        rb.conferir('todas sobem POR FRACIONAMENTO, e não por valor',
-                                    all('fracionamento' in c for c in (c1, c2, c3))
-                                    and all(n > b for n, b in
-                                            ((n1, b1), (n2, b2), (n3, b3))),
-                                    f'base={b1} efetiva={n1}/{n2}/{n3} '
-                                    f'motivos={c1}|{c2}|{c3}')
+                                    f'{a1} → {a2} → {a3} (no cenário do manual '
+                                    f'a janela já começa cheia, por causa das '
+                                    f'irmãs na mesma obra e etapa NULA; no do '
+                                    f'piloto ela começa na primeira fatia)')
+                        # 🔬 19/08, e este é o achado do cenário de piloto: numa
+                        # janela LIMPA a primeira NÃO sobe, e quem sobe é a
+                        # SEGUNDA — 📖 exatamente a correção `← EXEC` do passo 3c
+                        # ("com 3 × R$ 4.900 quem sobe é a SEGUNDA, 9.800 > 5.000,
+                        # não a terceira"). No cenário do MANUAL isso é invisível,
+                        # porque a janela já chega cheia e as três sobem. A
+                        # conferência é portátil: vale nos dois.
+                        rb.conferir('a SEGUNDA sobe, e o motivo é FRACIONAMENTO',
+                                    n2 > b2 and 'fracionamento' in c2,
+                                    f'base={b2} efetiva={n2} motivos={c2}')
+                        rb.conferir('o degrau é monotônico — uma vez que sobe, '
+                                    'não desce',
+                                    n1 <= n2 <= n3,
+                                    f'{n1} → {n2} → {n3}')
+                        rb.conferir('fatia sem degrau tem motivo vazio, e com '
+                                    'degrau tem fracionamento',
+                                    all((('fracionamento' in c) == (n > b))
+                                        for n, b, c in ((n1, b1, c1), (n2, b2, c2),
+                                                        (n3, b3, c3))),
+                                    f'({n1},{c1}) ({n2},{c2}) ({n3},{c3}) — '
+                                    f'motivo sem degrau, ou degrau sem motivo, '
+                                    f'seria trilha mentindo sobre a decisão')
                         rb.conferir('a faixa BASE das três é a mesma (mesmo valor)',
                                     b1 == b2 == b3,
                                     f'{b1}/{b2}/{b3} — o degrau é do acumulado, '
@@ -208,7 +224,7 @@ def main():
                     pg = pagina('gestor')
                     antes = {r.id for r in RequisicaoCompra.query.filter_by(
                         admin_id=admin_id).all()}
-                    aviso = _nova_requisicao(
+                    aviso = nova_requisicao(
                         pg, obra_id, 'Bomba quebrou; concretagem para na obra.',
                         Decimal('2500.00'), emergencial=True)
                     frescos()

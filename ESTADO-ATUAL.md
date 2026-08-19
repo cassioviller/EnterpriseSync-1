@@ -1285,6 +1285,84 @@ e vínculos), **exit 0** no tenant do manual (5 logins, 4 vínculos).
 > pessoa é a de 19/08 — fechar o próprio lote **com justificativa gravada** —, e é
 > por isso que a saída (b) foi a decisão certa.
 
+### ✅ 19/08 — o tenant de PILOTO, e o rollout ensaiado ponta a ponta: 43 + 41 + 21
+
+A seção acima parou num bloqueio que não era de código: **ligar a cadeia num tenant
+de uma pessoa só produz um ciclo que não exerce nada.** `scripts/seed_piloto_compras.py`
+é a resposta, e ele existe para o OPOSTO do seed do manual — que monta requisições
+paradas em cada estado para fotografar telas, e por isso entrega a janela do
+anti-fracionamento já cheia e as flags já ligadas.
+
+🔬 O que ele monta (tenant `admin_id` **161137**): **cinco logins** com papéis
+distintos e **quatro vínculos `usuario_obra`**; a obra `PIL-A` com três etapas
+nomeadas; uma obra `PIL-H` que existe por um motivo só — dar passado a um
+fornecedor; **dois fornecedores de propósito**, um CONHECIDO (tem pedido emitido) e
+um NOVO (zero pedidos), porque 📖 `_cond_fornecedor_novo` julga por "nenhum pedido
+emitido neste tenant" e não por data; catálogo de almoxarifado, banco, e as faixas
+saindo de `garantir_faixas_do_tenant`, não do construtor. **Zero requisições e as
+cinco flags DESLIGADAS** — ligar a cadeia é o que está sendo ensaiado, e um seed que
+entrega tudo ligado prova que o ciclo roda, não que dá para chegar lá.
+
+> 🟢 **`ligar_cadeia` — o rollout virou passo de runbook, e passou nos três.** As
+> cinco flags ligam na ordem dos guardas, **pelas ferramentas** (`flag_*.py`), que é
+> onde as pré-condições moram: a governança recusa tenant sem escopo de obra, o
+> financeiro recusa sem atesto, a alçada recusa sem governança. 🔬 **5/5 nas três
+> fases.** É exatamente o que o ensaio do tenant de demonstração não conseguiu
+> fazer.
+
+**Os três runbooks passaram a rodar contra os DOIS cenários, com `--piloto`.** O que
+isso obrigou a consertar diz mais do que o placar: **nenhum dos defeitos era de
+produção, e todos os quatro eram do próprio instrumento** — runbook casado com um
+seed não roda no tenant de um cliente, que é o único tenant que importa.
+
+| # | O que estava casado com o seed do manual | Consequência |
+|---|---|---|
+| 1 | A Fase 1 procurava `RC-2026-0002` e `RC-2026-0004` **pelo número** | 🔬 primeira rodada: **6/8**, e o cenário limpo não tinha o que aprovar. As duas requisições passam a nascer **pela tela**, no passo 0b |
+| 2 | `nova_requisicao` não vinculava o item ao **catálogo** | 📖 `templates/compras/recebimento.html:96` marca item sem `almoxarifado_item_id` como *"fora do catálogo — não movimenta estoque"*: as conferências de ENTRADA/SAIDA da Fase 1 mediriam o vazio **passando** |
+| 3 | Quantidade cravada em **1** | 🔬 a Fase 2 atestou *"1 de 1.000"* — INTEGRAL. O passo (f) existe para medir o atesto **parcial**, e com item indivisível ele passava sem exercer. Agora são 120 unidades a R$ 39,90 (o cimento do catálogo do piloto) |
+| 4 | A Fase 2 tinha **"100 de 120"** cravado | Contra o piloto, tentou receber 100 de 1: a tela recusou por sobre-entrega e o passo (c) falhou **por culpa do script**. Virou fração |
+
+**O que a JANELA LIMPA provou e o cenário do manual não conseguia provar:**
+
+1. 🔬 **Fase 3 — quem sobe é a SEGUNDA fatia, não a primeira.** Com 3 × R$ 4.900 e
+   teto de 5.000, o acumulado vai `4.900 → 9.800 → 14.700`: a primeira fica na faixa
+   base e a segunda cruza. No cenário do manual **as três sobem**, porque a janela já
+   chega cheia com as irmãs da etapa NULA — e a conferência antiga ("todas sobem por
+   fracionamento") era verdadeira **por acidente do cenário**. A nova mede o que é
+   invariante nos dois: o degrau é monotônico, e **motivo e degrau andam sempre
+   juntos** (fatia sem degrau tem motivo vazio; com degrau, `fracionamento`) — motivo
+   sem degrau, ou degrau sem motivo, seria a trilha mentindo sobre a decisão.
+2. 🔬 **Fase 2 — a segregação de função exercida com três pessoas distintas.**
+   `criado_por_id` = Sônia Prado (financeiro), **ela é RECUSADA ao tentar fechar o
+   próprio lote**, `fechado_por_id` = Regina Alencar (admin). É exatamente o controle
+   que o ensaio do tenant de uma pessoa **não conseguiria exercer** — e o que a
+   decisão de hoje (fechar o próprio lote com justificativa gravada) preserva para
+   quem não tiver a segunda pessoa.
+3. 🔬 **Fase 1 — o estoque nasce do ATESTO, medido de verdade.** Recebimento parcial
+   de **72 de 120** e depois o resto (48), com ENTRADA e SAIDA **pareadas por lote**,
+   lote `CONSUMIDO`, e a data gravada sendo a informada. Zero ENTRADA na emissão. O
+   pedido emitido antes de ligar a flag continua `exige_atesto = FALSE` e a tela de
+   atesto o recusa **dizendo a razão**.
+4. 🔬 **Fase 2 — o atesto parcial deixou de ser tautologia.** 96 de 120: a conta cai
+   de R$ 4.788 para **R$ 3.830,40** e a diferença vai para a observação. Na rodada
+   anterior, com quantidade 1, o mesmo passo passava pelo ramo *"não havia o que
+   ajustar"* — placar idêntico, medida diferente.
+
+> ⚠️ **O QUE ISTO NÃO É, e a linha não mudou de lugar.** Continua 🔬 **não existindo
+> tenant de produção neste banco**. O piloto é cenário de desenvolvimento: ele prova
+> que **a cadeia liga e o ciclo roda inteiro quando há gente**, não que o rollout foi
+> feito. Para o tenant real o que se roda antes é
+> `scripts/prontidao_piloto_compras.py`, e o que ele confere — pessoas, vínculos,
+> catálogo, fornecedor, faixas — é exatamente a lista que este seed monta.
+
+🔬 **Regressão no cenário do manual, com o mesmo código:** Fase 1 **36/36**, Fase 2
+**35/35**, Fase 3 **16/16**. As duas primeiras são idênticas às da manhã. A Fase 3
+tinha **14** e agora tem 16 porque a conferência *"todas sobem por fracionamento"* —
+verdadeira só naquele cenário — virou três: a **segunda** sobe, o degrau é
+monotônico, e motivo e degrau andam juntos. **Os três runbooks passam a rodar contra
+os dois cenários**: com `--piloto` (janela limpa, com o rollout incluído no roteiro)
+e sem (o do manual, com as telas já paradas em cada estado).
+
 ### ✅ 19/08 — GATE VERDE: 2458 passed, 0 failed — o primeiro desde 16/08
 
 🔬 `pytest tests/ -m "not browser"` → **2458 passed, 6 skipped, 201 deselected,
@@ -1303,6 +1381,11 @@ o script abortaria se houvesse **um** forjado fora de fixture. 🔬 antes: 23 al
 > baratas.
 
 ### ✅ 19/08 — o runbook da Fase 3 (alçadas) por script: 14/14, como REGRESSÃO
+
+> 🔬 **Este 14/14 envelheceu no mesmo dia, e para melhor: hoje são 16/16** no
+> cenário do manual — a conferência *"todas sobem por fracionamento"* virou três
+> quando o cenário de janela limpa mostrou que ela era verdadeira **por acidente
+> do cenário**. Ver a seção do tenant de PILOTO, acima.
 
 > ⚠️ **Correção de uma afirmação minha, repetida mais de uma vez nesta sessão.** Eu
 > disse que "as Fases 1 e 3 nunca foram percorridas pela tela". 📖 O spec das

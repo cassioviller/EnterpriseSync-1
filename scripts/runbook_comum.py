@@ -17,6 +17,7 @@ precisa da lista inteira.
 """
 import os
 import sys
+from datetime import date as _date, timedelta as _timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -92,20 +93,31 @@ def frescos():
     db.session.expire_all()
 
 
-def _pessoas_e_obra():
+def _pessoas_e_obra(marca='manualcompras', codigo_obra=None):
+    """As pessoas e a obra de um cenário, achadas pela MARCA do username.
+
+    Os dois seeds nomeiam os logins como `{marca}_{chave}` — foi feito assim
+    para que o cenário seja encontrado por nome estável e nunca por id. É essa
+    convenção, e não uma lista importada, que deixa o mesmo runbook rodar contra
+    o cenário do manual e contra o do piloto.
+
+    `codigo_obra` escolhe a obra quando o cenário tem mais de uma: o piloto tem
+    a obra do teste e uma obra histórica, que existe só para dar passado a um
+    fornecedor e não deve ser palco de nada.
+    """
     from models import Obra, Usuario
-    from seed_manual_compras import MARCA, PESSOAS
-    pessoas = {}
-    for chave, username, _nome, _cargo in PESSOAS:
-        u = Usuario.query.filter_by(username=username).first()
-        if u is None:
-            raise SystemExit(f'cenário ausente: usuário {username} não existe. '
-                             f'Rode `python scripts/seed_manual_compras.py`.')
-        pessoas[chave] = u
+    users = Usuario.query.filter(Usuario.username.like(f'{marca}_%')).all()
+    pessoas = {u.username[len(marca) + 1:]: u for u in users}
+    if 'admin' not in pessoas:
+        raise SystemExit(f'cenário ausente: nenhum usuário `{marca}_admin`. '
+                         f'Rode o seed correspondente antes.')
     admin = pessoas['admin']
-    obra = Obra.query.filter_by(admin_id=admin.id).order_by(Obra.id).first()
+    q = Obra.query.filter_by(admin_id=admin.id)
+    obra = (q.filter_by(codigo=codigo_obra).first() if codigo_obra
+            else q.order_by(Obra.id).first())
     if obra is None:
-        raise SystemExit('cenário ausente: o tenant do manual não tem obra.')
+        raise SystemExit(f'cenário ausente: tenant `{marca}` sem obra'
+                         + (f' de código {codigo_obra}' if codigo_obra else ''))
     return pessoas, obra
 
 
@@ -161,10 +173,11 @@ def rodar_python(args, cwd):
                           env=ambiente)
 
 
-MARCA_SEED = 'cenário do manual de compras semeado'
+# Os dois seeds imprimem esta marca; o texto depois dela difere.
+MARCA_SEED = '[OK] cenário'
 
 
-def semear(raiz, rb):
+def semear(raiz, rb, script='seed_manual_compras.py'):
     """Roda o seed e julga pelo MARCADOR, não só pelo codigo de saida.
 
     🔬 19/08 — o seed roda inteiro, imprime o cenario completo e o processo
@@ -180,7 +193,7 @@ def semear(raiz, rb):
     abort VISIVEL no relatorio como conferencia propria. Quem ler sabe que houve
     abort e sabe que o cenario existe.
     """
-    p = rodar_python([sys.executable, 'scripts/seed_manual_compras.py'], raiz)
+    p = rodar_python([sys.executable, f'scripts/{script}'], raiz)
     saida = (p.stdout or '') + (p.stderr or '')
     fez = MARCA_SEED in saida
     abortou = 'terminate called' in saida
@@ -195,6 +208,145 @@ def semear(raiz, rb):
             f'tensorflow no encerramento, não falha do seed'
             if (fez and abortou) else f'exit {p.returncode}')
     return fez
+
+
+def nova_requisicao(page, obra_id, justificativa, valor, quantidade=1,
+                   emergencial=False, do_catalogo=True):
+    """Cria uma requisição PELA TELA. Devolve o texto dos avisos.
+
+    Vive aqui porque os runbooks de fase precisam dela por motivos diferentes:
+    a Fase 3 cria fatias para o anti-fracionamento — lá só o VALOR importa, e a
+    quantidade 1 é a certa —, e as Fases 1 e 2 precisam dela quando rodam sobre
+    um cenário de JANELA LIMPA, o do piloto, que de propósito não traz
+    requisição nenhuma.
+
+    `valor` é o TOTAL da linha; o preço unitário sai de `valor / quantidade`.
+
+    🔬 19/08 — POR QUE `do_catalogo` EXISTE, E POR QUE O PADRÃO É LIGADO. 📖
+    `templates/compras/recebimento.html:96` marca o item sem
+    `almoxarifado_item_id` como *"fora do catálogo — não movimenta estoque"*.
+    Item solto atravessa o ciclo inteiro sem gerar ENTRADA nem SAIDA, e as
+    conferências de estoque da Fase 1 mediriam o vazio **passando**. É o mesmo
+    defeito de 19/08 pelo avesso: lá o cenário não tinha estoque para exercer,
+    aqui o item é que não chegaria até ele.
+
+    O preço vai com VÍRGULA: 📖 `_itens_do_form` troca vírgula por ponto e é o
+    parser leniente. A quantidade vai INTEIRA e sem ponto: 📖
+    `_quantidade_do_form` RECUSA o decimal ambíguo.
+    """
+    from decimal import Decimal as _D
+    qtd = int(quantidade)
+    preco = (_D(str(valor)) / qtd).quantize(_D('0.01'))
+    abrir(page, '/compras/requisicoes/nova')
+    page.select_option('select[name="obra_id"]', str(obra_id))
+    page.fill('textarea[name="justificativa"]', justificativa)
+    page.fill('input[name="data_necessidade"]',
+              (_date.today() + _timedelta(days=10)).isoformat())
+    if emergencial:
+        page.check('input[name="emergencial"]')
+    page.fill('input[name="item_descricao[]"]', 'Material de obra')
+    page.fill('input[name="item_quantidade[]"]', str(qtd))
+    page.fill('input[name="item_preco[]"]', f'{preco:.2f}'.replace('.', ','))
+    if do_catalogo:
+        opcoes = page.eval_on_selector_all(
+            'select[name="item_almoxarifado_id[]"] option',
+            'ns => ns.map(n => n.value).filter(v => v)')
+        if opcoes:
+            page.select_option('select[name="item_almoxarifado_id[]"]', opcoes[0])
+    submeter(page, 'form:has(textarea[name="justificativa"])')
+    return avisos(page)
+
+
+def criar_requisicao(pagina_solicitante, admin_id, obra_id, justificativa,
+                     valor, quantidade=1, emergencial=False, do_catalogo=True):
+    """`nova_requisicao` mais a leitura de QUAL requisição nasceu. (id, aviso).
+
+    O id sai da DIFERENÇA antes/depois, e não de "a última do tenant": este
+    banco é o mesmo da suíte, e "a última" é corrida esperando acontecer.
+    """
+    from models import RequisicaoCompra
+    antes = {r.id for r in
+             RequisicaoCompra.query.filter_by(admin_id=admin_id).all()}
+    aviso = nova_requisicao(pagina_solicitante, obra_id, justificativa, valor,
+                            quantidade, emergencial, do_catalogo)
+    frescos()
+    novas = [r.id for r in
+             RequisicaoCompra.query.filter_by(admin_id=admin_id).all()
+             if r.id not in antes]
+    return (novas[0] if novas else None), aviso
+
+
+def enviar_e_aprovar(req_id, paginas_aprovadoras, pagina_solicitante):
+    """Envia a requisição e colhe assinaturas até a alçada fechar.
+
+    `paginas_aprovadoras` é uma lista ORDENADA de páginas já logadas. A alçada
+    deste tenant pode pedir mais de uma assinatura, e uma delas de administrador
+    — 🔬 19/08 o cenário do manual exigiu duas numa compra de R$ 2.336. Assinar
+    com uma pessoa só e seguir em frente foi como a primeira rodada do runbook
+    da Fase 1 descobriu, dois passos depois, que "o formulário de emitir não
+    está na tela": sintoma longe da causa.
+
+    Devolve o estado final da requisição, lido do banco.
+    """
+    from models import RequisicaoCompra
+    from app import db
+
+    abrir(pagina_solicitante, f'/compras/requisicoes/{req_id}')
+    if pagina_solicitante.query_selector('form[action*="/enviar"]') is not None:
+        submeter(pagina_solicitante, 'form[action*="/enviar"]')
+
+    for pg in paginas_aprovadoras:
+        abrir(pg, f'/compras/requisicoes/{req_id}')
+        if pg.query_selector('form[action*="/aprovar"]') is None:
+            continue
+        submeter(pg, 'form[action*="/aprovar"]')
+        frescos()
+        r = db.session.get(RequisicaoCompra, req_id)
+        if r.estado.name == 'APROVADA':
+            break
+
+    frescos()
+    return db.session.get(RequisicaoCompra, req_id)
+
+
+# A cadeia, na ordem em que os guardas a exigem. Cada elo recusa o tenant sem o
+# anterior, e a mensagem de recusa traz o comando que falta.
+CADEIA = [
+    ('flag_escopo_obra.py', 'escopo por obra'),
+    ('flag_compras_governanca.py', 'governança de compras'),
+    ('flag_recebimento_atesto.py', 'recebimento com atesto'),
+    ('flag_financeiro_dois_fluxos.py', 'financeiro em dois fluxos'),
+    ('flag_alcadas_avancadas.py', 'alçadas avançadas'),
+]
+
+
+def ligar_cadeia(raiz, admin_id, rb):
+    """Executa o ROLLOUT: liga as cinco flags na ordem, conferindo cada uma.
+
+    Isto é passo de runbook, não preparação de teste — e a diferença importa. O
+    cenário do piloto nasce com as cinco DESLIGADAS de propósito, porque **ligar
+    a cadeia é o que está sendo ensaiado**. Um seed que já entrega tudo ligado
+    prova que o ciclo roda; não prova que dá para chegar lá.
+
+    Pelas FERRAMENTAS, nunca pela coluna: é nelas que moram as pré-condições
+    (a governança recusa tenant sem escopo de obra, o financeiro recusa sem
+    atesto, a alçada recusa sem governança). Gravar a flag direto reproduz a
+    forma e perde a regra — a lição de 18/08, custada três vezes.
+    """
+    rb.passo('rollout — ligar a cadeia, na ordem dos guardas')
+    for script, rotulo in CADEIA:
+        args = [sys.executable, f'scripts/{script}', str(admin_id), '--ligar']
+        p = rodar_python(args, raiz)
+        saida = (p.stdout or '') + (p.stderr or '')
+        rb.conferir(f'{rotulo} ligada', p.returncode == 0,
+                    '' if p.returncode == 0 else
+                    next((l.strip() for l in saida.splitlines()
+                          if 'RECUSADO' in l or 'Ligue primeiro' in l),
+                         f'exit {p.returncode}'))
+        if 'AVISO (não impede ligar)' in saida:
+            rb.conferir(f'{rotulo}: sem AVISO de cadeia incompleta', False,
+                        'a flag ligou, mas há elo faltando — leia a saída')
+    return True
 
 
 def unico(page, seletor, o_que):

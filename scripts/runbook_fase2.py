@@ -58,16 +58,22 @@ RAIZ = Path(__file__).resolve().parent.parent
 # Quanto do pedido é atestado. MENOR que o pedido de propósito: é o que faz o
 # passo (f) ter o que conferir — `liberar()` derruba a conta para o valor do que
 # chegou e escreve a diferença na observação.
-QTD_PEDIDA = Decimal('120')
-QTD_ATESTADA = Decimal('100')
+# Fração do pedido que é atestada. FRAÇÃO e não número fixo: 🔬 19/08 este
+# runbook tinha "100 de 120" cravado — os números do cenário do manual — e ao
+# rodar contra o cenário do piloto, cujo item tem quantidade 1, tentou receber
+# 100 de 1. A tela recusou por sobre-entrega e o passo (c) falhou por culpa do
+# script. Runbook que carrega número do cenário não é portátil para tenant
+# nenhum, que é justamente o que ele precisa ser.
+FRACAO_ATESTADA = Decimal('0.8')
 
 
 # A maquinaria (Runbook, entrar, abrir, avisos, submeter, frescos) mora em
 # `runbook_comum.py` desde 19/08, quando o runbook da Fase 1 passou a precisar
 # da mesma coisa. Copiar seria criar duas listas para divergir.
 from runbook_comum import (BASE, VIEWPORT, Runbook, _pessoas_e_obra, abrir,
-                           avisos, entrar, frescos, preparar_bibliotecas,
-                           rodar_python, semear, submeter)
+                           avisos, criar_requisicao, enviar_e_aprovar, entrar,
+                           frescos, preparar_bibliotecas, rodar_python,
+                           ligar_cadeia, semear, submeter)
 
 rb = Runbook('DA FASE 2 — FINANCEIRO EM DOIS FLUXOS')
 
@@ -76,6 +82,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--sem-semear', action='store_true',
                     help='não recria o cenário antes de rodar')
+    ap.add_argument('--piloto', action='store_true',
+                    help='roda contra o cenário do PILOTO (janela limpa, '
+                         'dois fornecedores) em vez do cenário do manual')
     args = ap.parse_args()
 
     preparar_bibliotecas()
@@ -83,16 +92,21 @@ def main():
     # ── 0. o cenário ────────────────────────────────────────────────────────
     if not args.sem_semear:
         print('semeando o cenário…')
-        if not semear(RAIZ, rb):
+        if not semear(RAIZ, rb, 'seed_piloto_compras.py'
+                      if args.piloto else 'seed_manual_compras.py'):
             return rb.relatorio()
 
     from app import app, db
     from models import (ContaPagar, FechamentoPagamento, PedidoCompra,
-                        RequisicaoCompra)
-    from seed_manual_compras import MARCA, SENHA
+                        PedidoCompraItem, RequisicaoCompra)
+    if args.piloto:
+        from seed_piloto_compras import MARCA, SENHA
+    else:
+        from seed_manual_compras import MARCA, SENHA
 
     with app.app_context():
-        pessoas, obra = _pessoas_e_obra()
+        pessoas, obra = (_pessoas_e_obra('piloto', 'PIL-A')
+                         if args.piloto else _pessoas_e_obra())
         admin = pessoas['admin']
         admin_id = admin.id
         ids = {k: u.id for k, u in pessoas.items()}
@@ -102,18 +116,28 @@ def main():
         # 🔬 O runbook exige TRÊS pessoas diferentes. Conferido aqui, no início,
         # porque um cenário em que duas chaves apontam para a mesma linha faria
         # a segregação passar por acidente.
+        if args.piloto:
+            ligar_cadeia(RAIZ, admin_id, rb)
+
         rb.passo('0 — o cenário')
         rb.conferir('quem emite, quem monta e quem fecha são pessoas distintas',
                     len({ids['comprador'], ids['financeiro'], ids['admin']}) == 3,
                     f"{nomes['comprador']} / {nomes['financeiro']} / {nomes['admin']}")
 
-        req = RequisicaoCompra.query.filter_by(
-            admin_id=admin_id, numero='RC-2026-0004').first()
-        rb.conferir('a requisição aprovada do cenário existe', req is not None,
-                    f'RC-2026-0004 em {req.estado.name if req else "—"}')
-        if req is None:
-            return rb.relatorio()
-        req_id = req.id
+        # No cenário do MANUAL a requisição aprovada já vem pronta (ele existe
+        # para fotografar telas). No do PILOTO não vem, de propósito — janela
+        # limpa —, então o runbook cria a dele PELA TELA. É o que torna este
+        # script portátil para um tenant qualquer, inclusive um piloto de
+        # verdade, em vez de casado com um seed.
+        req_id = None
+        if not args.piloto:
+            req = RequisicaoCompra.query.filter_by(
+                admin_id=admin_id, numero='RC-2026-0004').first()
+            rb.conferir('a requisição aprovada do cenário existe', req is not None,
+                        f'RC-2026-0004 em {req.estado.name if req else "—"}')
+            if req is None:
+                return rb.relatorio()
+            req_id = req.id
 
         # As duas flags, na ordem em que dependem uma da outra. O passo 0 do
         # runbook chama o regime de recebimento de PRÉ-REQUISITO DURO: sem ele
@@ -141,6 +165,37 @@ def main():
         with app.app_context():
             pedido_id = conta_id = None
             venc = None
+
+            if args.piloto:
+                rb.passo('0b — a requisição do piloto, criada PELA TELA')
+                try:
+                    # 120 unidades, e não uma: 🔬 19/08 a primeira rodada no
+                    # piloto criou o item com quantidade 1 e o passo (c) atestou
+                    # "1 de 1.000" — INTEGRAL. O passo (f) existe para medir o
+                    # atesto PARCIAL (a conta cai para o que chegou, com a
+                    # diferença na observação), e com item indivisível ele
+                    # passava sem exercer nada. O total continua R$ 4.788, que é
+                    # 120 × 39,90 — o preço do cimento do catálogo do piloto.
+                    novo_id, aviso = criar_requisicao(
+                        pagina('solicitante'), admin_id, obra.id,
+                        'Material para a estrutura da Torre A.',
+                        Decimal('4788.00'), 120)
+                    rb.conferir('a requisição foi criada', novo_id is not None,
+                                aviso[:160])
+                    if novo_id is not None:
+                        r = enviar_e_aprovar(
+                            novo_id,
+                            [pagina('gestor'), pagina('admin')],
+                            pagina('solicitante'))
+                        rb.conferir('a requisição ficou APROVADA',
+                                    r.estado.name == 'APROVADA',
+                                    f'estado = {r.estado.name}')
+                        req_id = r.id if r.estado.name == 'APROVADA' else None
+                except Exception as e:
+                    rb.quebrou('o passo 0b chegou ao fim', e)
+                if req_id is None:
+                    navegador.close()
+                    return rb.relatorio()
 
             # ── (a) emitir → a conta nasce bloqueada ────────────────────────
             rb.passo('(a) emitir o pedido — o comprador, pela tela da requisição')
@@ -236,7 +291,14 @@ def main():
                     rb.conferir('a tela traz campo de quantidade por item',
                                 campo is not None)
                     if campo is not None:
-                        campo.fill(str(QTD_ATESTADA))
+                        frescos()
+                        item = PedidoCompraItem.query.filter_by(
+                            pedido_id=pedido_id).first()
+                        total = Decimal(str(item.quantidade or 1))
+                        qtd = max(Decimal('1'),
+                                  (total * FRACAO_ATESTADA).quantize(Decimal('1')))
+                        # Sem ponto decimal: `_quantidade_do_form` recusa o ambíguo.
+                        campo.fill(f'{qtd:f}'.rstrip('0').rstrip('.') or '1')
                         pg.fill('input[name="data_recebimento"]', date.today().isoformat())
                         submeter(pg, 'form:has(input[name="data_recebimento"])')
                         frescos()
@@ -245,7 +307,8 @@ def main():
                         atestado = Decimal(str(valor_atestado(ped) or 0))
                         rb.conferir('valor_atestado > 0', atestado > 0,
                                     f'valor_atestado = {atestado} '
-                                    f'({QTD_ATESTADA} de {QTD_PEDIDA} — parcial de propósito)')
+                                    f'({qtd} de {total} — parcial quando dá, '
+                                    f'e o total quando o item é indivisível)')
             except Exception as e:
                 rb.quebrou('o passo (c) chegou ao fim', e)
 
@@ -316,9 +379,24 @@ def main():
                             valor == atestado,
                             f'conta = {valor} | atestado = {atestado} '
                             f'| pedido = {ped.valor_total}')
-                rb.conferir('a diferença está escrita na observação',
-                            'valor ajustado' in (conta.observacoes or ''),
-                            (conta.observacoes or '(observação vazia)')[-160:])
+                # 📖 `liberar()` só escreve o ajuste quando `atestado !=
+                # total_aberto`. Num atesto INTEGRAL não há diferença, e exigir a
+                # observação ali seria exigir que o serviço registrasse um ajuste
+                # que não houve. 🔬 19/08: apareceu ao rodar contra o piloto, cujo
+                # item tem quantidade 1 — 80% de 1 arredonda para 1, e o atesto
+                # sai integral. A conferência é sobre a REGRA, não sobre o número
+                # do cenário.
+                houve_diferenca = valor != Decimal(str(ped.valor_total or 0))
+                if houve_diferenca:
+                    rb.conferir('a diferença está escrita na observação',
+                                'valor ajustado' in (conta.observacoes or ''),
+                                (conta.observacoes or '(observação vazia)')[-160:])
+                else:
+                    rb.conferir('atesto INTEGRAL: nenhum ajuste registrado',
+                                'valor ajustado' not in (conta.observacoes or ''),
+                                f'atestado = pedido = {valor}; não havia o que '
+                                f'ajustar, e registrar um ajuste inexistente '
+                                f'poluiria a observação')
             except Exception as e:
                 rb.quebrou('o passo (f) chegou ao fim', e)
 

@@ -38,11 +38,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from playwright.sync_api import sync_playwright
 
 from runbook_comum import (BASE, VIEWPORT, Runbook, _pessoas_e_obra, abrir,
-                           avisos, entrar, frescos, preparar_bibliotecas,
-                           rodar_python, semear, submeter, unico)
+                           avisos, criar_requisicao, entrar, enviar_e_aprovar,
+                           frescos, preparar_bibliotecas, rodar_python,
+                           ligar_cadeia, semear, submeter, unico)
 
 RAIZ = Path(__file__).resolve().parent.parent
 rb = Runbook('DA FASE 1 — RECEBIMENTO E ATESTO')
+
+# Quantidade dos itens que o modo `--piloto` cria. GRANDE de propósito, e é o
+# ponto: os passos (4) e (5) recebem 60% e depois o resto. Com quantidade 1 o
+# primeiro recebimento levaria tudo e o segundo não teria o que receber — o
+# runbook passaria medindo um recebimento parcial que nunca foi parcial.
+QTD_PILOTO = 120
 
 
 def _flag(script, admin_id, acao):
@@ -78,39 +85,58 @@ def _emitir_pela_tela(pg, req_id, quando):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--sem-semear', action='store_true')
+    ap.add_argument('--piloto', action='store_true',
+                    help='roda contra o cenário do PILOTO (janela limpa, dois '
+                         'fornecedores) em vez do cenário do manual')
     args = ap.parse_args()
 
     preparar_bibliotecas()
 
     if not args.sem_semear:
         print('semeando o cenário…')
-        if not semear(RAIZ, rb):
+        if not semear(RAIZ, rb, 'seed_piloto_compras.py'
+                      if args.piloto else 'seed_manual_compras.py'):
             return rb.relatorio()
 
     from app import app, db
     from models import (AlmoxarifadoEstoque, AlmoxarifadoMovimento, PedidoCompra,
                         PedidoCompraItem, RequisicaoCompra)
-    from seed_manual_compras import MARCA, SENHA
+    if args.piloto:
+        from seed_piloto_compras import MARCA, SENHA
+    else:
+        from seed_manual_compras import MARCA, SENHA
 
     with app.app_context():
-        pessoas, obra = _pessoas_e_obra()
+        pessoas, obra = (_pessoas_e_obra('piloto', 'PIL-A')
+                         if args.piloto else _pessoas_e_obra())
         admin_id = pessoas['admin'].id
         usuarios = {k: f'{MARCA}_{k}' for k in pessoas}
 
-        rb.passo('0 — o cenário e as flags')
-        req_legado = RequisicaoCompra.query.filter_by(
-            admin_id=admin_id, numero='RC-2026-0002').first()
-        req_nova = RequisicaoCompra.query.filter_by(
-            admin_id=admin_id, numero='RC-2026-0004').first()
-        rb.conferir('a requisição AGUARDANDO existe (vira o pedido legado)',
-                    req_legado is not None,
-                    req_legado.estado.name if req_legado else '—')
-        rb.conferir('a requisição APROVADA existe (vira o pedido novo)',
-                    req_nova is not None,
-                    req_nova.estado.name if req_nova else '—')
-        if not (req_legado and req_nova):
-            return rb.relatorio()
-        id_legado, id_nova = req_legado.id, req_nova.id
+        if args.piloto:
+            ligar_cadeia(RAIZ, admin_id, rb)
+
+        # 🔬 19/08 — no cenário do MANUAL as duas requisições já vêm prontas,
+        # com número fixo, porque aquele seed existe para fotografar telas. O
+        # do PILOTO nasce de janela limpa de propósito, e por isso elas são
+        # criadas PELA TELA no passo 0b. Procurar `RC-2026-0002` num tenant
+        # qualquer é o que casa um runbook com um seed — e um runbook casado
+        # com um seed não roda no tenant do cliente, que é o único que importa.
+        id_legado = id_nova = None
+        if not args.piloto:
+            rb.passo('0 — o cenário e as flags')
+            req_legado = RequisicaoCompra.query.filter_by(
+                admin_id=admin_id, numero='RC-2026-0002').first()
+            req_nova = RequisicaoCompra.query.filter_by(
+                admin_id=admin_id, numero='RC-2026-0004').first()
+            rb.conferir('a requisição AGUARDANDO existe (vira o pedido legado)',
+                        req_legado is not None,
+                        req_legado.estado.name if req_legado else '—')
+            rb.conferir('a requisição APROVADA existe (vira o pedido novo)',
+                        req_nova is not None,
+                        req_nova.estado.name if req_nova else '—')
+            if not (req_legado and req_nova):
+                return rb.relatorio()
+            id_legado, id_nova = req_legado.id, req_nova.id
 
     with sync_playwright() as pw:
         navegador = pw.chromium.launch(
@@ -126,6 +152,52 @@ def main():
 
         with app.app_context():
             ped_legado_id = ped_novo_id = None
+
+            # ── 0b. as duas requisições do piloto, criadas PELA TELA ───────
+            if args.piloto:
+                rb.passo('0b — as duas requisições do piloto, criadas PELA TELA')
+                try:
+                    # A LEGADA para no ENVIO: quem a aprova é o passo (1), com
+                    # a flag já desligada. É essa ordem que faz o pedido nascer
+                    # no regime antigo e a conferência de `exige_atesto = FALSE`
+                    # medir alguma coisa em vez de repetir o seed.
+                    id_legado, aviso = criar_requisicao(
+                        pagina('solicitante'), admin_id, obra.id,
+                        'Cimento para a fundação — o lote do regime antigo.',
+                        Decimal('4788.00'), QTD_PILOTO)
+                    rb.conferir('a requisição do pedido legado foi criada',
+                                id_legado is not None, aviso[:160])
+                    if id_legado is not None:
+                        # Lista de aprovadoras VAZIA: só envia. A requisição
+                        # tem de chegar ao passo (1) por aprovar.
+                        r = enviar_e_aprovar(id_legado, [], pagina('solicitante'))
+                        rb.conferir('ela ficou AGUARDANDO_APROVACAO (enviada, '
+                                    'não aprovada)',
+                                    r.estado.name == 'AGUARDANDO_APROVACAO',
+                                    f'estado = {r.estado.name}')
+
+                    id_nova, aviso = criar_requisicao(
+                        pagina('solicitante'), admin_id, obra.id,
+                        'Cimento para a estrutura — o lote do regime novo.',
+                        Decimal('4788.00'), QTD_PILOTO)
+                    rb.conferir('a requisição do pedido novo foi criada',
+                                id_nova is not None, aviso[:160])
+                    if id_nova is not None:
+                        r = enviar_e_aprovar(id_nova,
+                                             [pagina('gestor'), pagina('admin')],
+                                             pagina('solicitante'))
+                        rb.conferir('ela ficou APROVADA',
+                                    r.estado.name == 'APROVADA',
+                                    f'estado = {r.estado.name} — a segunda '
+                                    f'fatia da janela sobe de faixa por '
+                                    f'fracionamento e pede a segunda assinatura')
+                        if r.estado.name != 'APROVADA':
+                            id_nova = None
+                except Exception as e:
+                    rb.quebrou('o passo 0b chegou ao fim', e)
+                if id_legado is None or id_nova is None:
+                    navegador.close()
+                    return rb.relatorio()
 
             # ── 1. o pedido LEGADO: emitido com a flag DESLIGADA ───────────
             rb.passo('(1) com a flag DESLIGADA, o pedido nasce no regime antigo')
