@@ -565,8 +565,8 @@ sobreviveram ao contato com o código:
 e 🔬 23/07 **mergeados em `main`** por fast-forward após o gate verde.
 Entregou: `RequisicaoCompra` com
 máquina de estados e trilha auditada (`valor_no_momento`), alçada por tenant
-(`FaixaAlcada`, seed 5k/30k/acima **recomendado**, decisão D1 pendente do
-Cássio), `PapelObra.COMPRADOR`, flag `compras_governanca_ativa` (nasce OFF),
+(`FaixaAlcada`, seed 5k/30k/acima — 🔬 **D1 decidida em 22/07**, ver abaixo),
+`PapelObra.COMPRADOR`, flag `compras_governanca_ativa` (nasce OFF),
 6 rotas de requisição, emissão de pedido com 3 guardas, e as correções de
 segurança do portal por token (expiração 180d + trilha IP/UA, **sem flag**).
 Migrations **240-247**. Runbook: `docs/fase-3-rollout.md`.
@@ -1235,6 +1235,97 @@ que fecha em nove sem forçar mas precisa ser conferido contra as saídas latera
 o runbook por script tem de achá-la no DOM. Função pura que ninguém chama passa em
 todo teste — foi assim que `fechar_lote()` ficou semanas testado e inalcançável.
 
+### 🔬 19/08 — o gate "de 41 min para 6" NÃO se reproduz, e o que sobra é correção
+
+`fix/gate-41min-para-6min` (22/07) nunca foi mesclada e existia **só nesta
+máquina** há um mês. Ao esvaziá-la, o único commit de código (`c34309e2`) virou
+`49c99cf3`. **Medido antes e depois, mesma seleção:**
+
+| | Resultado | Tempo |
+|---|---|---|
+| antes | 2457 passed, 1 failed | **2118 s** (35min18s) |
+| depois | 2457 passed, 1 failed | **2306 s** (38min26s) |
+
+🔴 **+8,9%, mais lento.** A promessa do nome da branch não se reproduz, e a razão
+é entendível: o grosso daquele conserto era a fixture `_fotos_base_isolada` de
+`test_painel_financeiro.py` — 88% do relógio de julho — e ela **já estava em
+`main`**, carregada para a linha nova por alguém antes. A economia já estava
+embutida nos 2118 s. (Ressalva: durante a segunda corrida rodei dois processos de
+diagnóstico que carregam tensorflow; explica parte dos 188 s, não autoriza afirmar
+ganho.)
+
+**O commit foi mantido, e o título mudou de `perf(` para `fix(`.** O valor dele é
+correção, não velocidade:
+
+- 📖 `pyproject.toml` — **`--timeout-method=thread`**. O padrão é `signal`, e
+  handler de sinal só roda ENTRE bytecodes: **não interrompe chamada bloqueante do
+  psycopg2**. 🔬 22/07: um teste ficou >10 min parado em `session.flush()` esperando
+  lock, com `--timeout=300` configurado, sem nunca disparar. A garantia escrita no
+  comentário era falsa exatamente para o travamento mais provável desta suíte.
+- 📖 `app.py` — guarda **`SIGE_BOOT_DDL`**. Todo `import app` rodava `create_all()`
+  + 104 migrations no import-time pedindo `AccessExclusiveLock`. A utilidade ficou
+  demonstrada no mesmo dia: com ela desligada consegui **consultar o banco no meio
+  do gate** sem entrar na fila de lock.
+- 📖 `tests/conftest.py` — desliga DDL e demo seed por default na suíte.
+
+> ⚠️ **Trade-off:** com `SIGE_BOOT_DDL=0` a suíte não constrói mais o schema. Quem
+> criar migration nova e rodar teste local roda contra schema velho até aplicá-la
+> por fora. É `setdefault` — exportar a variável devolve o comportamento antigo.
+
+> 📌 **A lição de método, e ela é a mesma do documento inteiro:** o "6 min" era um
+> número herdado, sem data e sem reconferência, e atravessou um mês em nome de
+> branch. Medir custou 38 minutos e mostrou que ele não valia mais. **Número que
+> vem em nome de branch é número sem procedência.**
+
+### 🔬 19/08 — os 23 RDOs "assinados sem trilha": resíduo, não defeito vivo
+
+A única falha do gate desde 16/08, e ninguém tinha investigado. 🔬 Diagnosticada em
+19/08, com a consulta rodando no meio do próprio gate (graças à guarda acima):
+
+- **Os 23 são todos de tenant fixture `@test.local`. Zero de tenant real.**
+- Dois grupos, e cada um bate com uma fixture: **6 `e2e_*` de 03/06**
+  (`test_e2e_carga_obra.py`) e **17 `ex_*` de 14/07** (`test_exportacao_rdos.py`).
+- 🔴 **As duas fixtures JÁ FORAM CONSERTADAS** — cada uma hoje chama `transicionar`
+  e carrega o comentário *"Pela máquina de estados, não no braço"*. 📖 Varredura por
+  qualquer escrita a `.estado` de RDO fora do chokepoint: **nenhuma**.
+
+**Conclusão: o gate está vermelho por RESÍDUO.** As linhas criadas antes do
+conserto moram para sempre no banco de dev compartilhado, e é por isso que o número
+trava em 23 e não cresce. Remédio: uma limpeza única
+(`UPDATE rdo SET estado='preenchido'` nas 23, que é o que a migration 260 pretendia)
+— **não executada**, aguardando decisão.
+
+### 🔬 19/08 — a D1 estava DECIDIDA desde 22/07, e o registro ficou preso numa branch
+
+Achado ao esvaziar `fix/gate-41min-para-6min` antes de apagá-la. O commit
+`0a6f5ef4` (22/07), que nunca foi mesclado e **só existia nesta máquina**, carrega
+no plano da Fase 3 a decisão que este documento vinha chamando de pendente em
+**dois** lugares — na seção da Fase 3 e na tabela de decisões pendentes.
+
+O texto original, resgatado inteiro porque o qualificador dele é o que importa:
+
+> ✅ **Decidida em 22/07: Cássio aprovou a recomendação** (5k/30k, por valor
+> absoluto), como **seed editável — não como constante**. Procedência: o número é
+> **recomendação minha aceita, NÃO política levantada com a Veks**; o fecho da fase
+> deve repetir essa marca para ninguém citá-lo depois como dado do cliente. D2-D6
+> não foram perguntadas separadamente e seguem as recomendações de cada seção.
+
+E resolve a pergunta 3 da `DEVOLUTIVA.md:293-295` — *"a dupla aprovação é por valor
+absoluto, por % do orçamento da obra, ou por categoria?"* —, aberta desde 21/07.
+**Por valor absoluto.**
+
+> ⚠️ **O que este achado ensina, e vale além dele.** Não se perdeu código: perdeu-se
+> uma **decisão** e, junto, o qualificador que a torna útil. Quem lesse "5k/30k" sem
+> a marca de procedência poderia citá-la ao cliente como política acordada com a
+> Veks, que é o oposto do que ela é. Este documento abre dizendo que os cinco erros
+> dele nasceram de qualificadores perdidos na compressão entre documentos — aqui o
+> qualificador não foi comprimido, foi **deixado numa branch que nunca mesclou**.
+>
+> É o mesmo mecanismo do 🔴 de 17/08 (`gitsafe-backup` recusa branch de feature):
+> **trabalho em branch existe numa máquina só até ser mesclado.** Ali a consequência
+> era risco de perda; aqui a perda já tinha acontecido, e ninguém tinha notado
+> porque o documento seguiu funcionando — só que pedindo uma decisão já tomada.
+
 ## O plano aprovado
 
 | Fase | Conteúdo | Estado | Plano |
@@ -1630,7 +1721,7 @@ nenhum plano está bloqueado esperando resposta. Revise quando puder.
 
 | Tema | Onde | O que decidir |
 |---|---|---|
-| Alçada de aprovação de compra | F3 | **Já implementada como dado editável** (23/07): faixas 5k / 30k / acima semeadas por tenant na migration 243. Confirmar ou trocar os números é UPDATE na tabela `faixa_alcada`, sem deploy — mas confirme ANTES de ligar a flag |
+| Alçada de aprovação de compra | F3 | ✅ **DECIDIDA em 22/07** (5k/30k, valor absoluto, seed editável) — ver a seção de 19/08 acima. Implementada como dado editável (23/07), migration 243. Trocar os números segue sendo UPDATE em `faixa_alcada`, sem deploy |
 | Estados da Obra | F2 | Os 5 propostos, todos ancorados em valor que o código já usa |
 | Regra de derivação das linhas órfãs | F4 | E o destino das ~77 irrecuperáveis |
 | Folha e almoxarifado são administrativos? | F4 | Recomendado sim para ambos (evita contagem dupla com o RDO) |
