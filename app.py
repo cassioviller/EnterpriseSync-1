@@ -547,6 +547,35 @@ with app.app_context():
     # Import models
     import models  # noqa: F401
 
+    # -----------------------------------------------------------------
+    # SIGE_BOOT_DDL — quem importa `app` nem sempre quer construir schema.
+    # -----------------------------------------------------------------
+    # 🔬 22/07: este bloco executa DDL no IMPORT-TIME, sem guarda nenhuma.
+    # Todo `import app` roda `create_all()` + as 104 migrations e pede
+    # `AccessExclusiveLock`. Isso tem três importadores que não pediram
+    # schema nenhum:
+    #   * o `gunicorn --reload` do workflow, a cada edição de `.py`;
+    #   * `tests/test_fase05_sobrevivencia.py`, que faz 6×
+    #     `subprocess.run([python, '-c', 'import app'])` DENTRO do gate;
+    #   * qualquer script de `scripts/` que só queria os modelos.
+    # O lock entra na fila atrás da transação ociosa da suíte e a query
+    # seguinte da suíte enfileira atrás dele: convoy que o detector de
+    # deadlock do Postgres não vê, porque o detentor não espera ninguém.
+    #
+    # O padrão continua LIGADO — o workflow do Replit sobe o gunicorn
+    # direto, sem `pre_start.py`, então aqui é onde o schema de dev nasce,
+    # e mudar isso quebraria o boot local. Desliga-se onde o schema já
+    # existe: no `tests/conftest.py` e nos subprocessos do gate. Em
+    # produção o `docker-entrypoint` já chama `pre_start.py`
+    # (linha 136), que faz o mesmo trabalho explicitamente antes do
+    # gunicorn — aqui é a segunda execução, por worker.
+    _BOOT_DDL = os.environ.get("SIGE_BOOT_DDL", "1").strip().lower() not in (
+        "0", "false", "no")
+    if not _BOOT_DDL:
+        logging.info(
+            "[DB] SIGE_BOOT_DDL desligado — pulando create_all e migrações "
+            "(schema construído por quem chamou)")
+
     # O retry existe para o caso real: o banco leva alguns segundos a mais
     # que o app para aceitar conexão, e sem ele o worker do gunicorn morria
     # no boot por uma indisponibilidade de 2 segundos.
@@ -558,7 +587,7 @@ with app.app_context():
     # diagnosticar em cada requisição. Fora de produção, segue com aviso.
     import time as _time
     _erro_create_all = None
-    for _attempt in range(5):
+    for _attempt in (range(5) if _BOOT_DDL else ()):
         try:
             db.create_all()
             logging.info("Database tables created/verified")
@@ -675,30 +704,38 @@ with app.app_context():
                 f"[seed-demo-alfa] hook falhou (boot continua): {outer!r}"
             )
 
-    _maybe_run_demo_seed()
-    
-    # [OK] MIGRAÇÕES AUTOMÁTICAS SEMPRE ATIVAS - SIMPLICIDADE MÁXIMA
-    logger.info("[SYNC] Executando migrações automáticas do banco de dados...")
-    try:
-        from migrations import executar_migracoes
-        executar_migracoes()
-        logger.info("[OK] Migrações executadas com sucesso!")
-    except Exception as e:
-        # Fase 0.5 / 1.1 — FALHA DE MIGRAÇÃO ABORTA O BOOT.
-        # Antes: `logger.warning("Aplicação continuará mesmo com erro nas
-        # migrações")` — o app passava a servir tráfego contra um schema
-        # meio-migrado, e isso rodava em TODO boot de worker do gunicorn.
-        # Combinado com a ausência de backup (o entrypoint só imprimia que
-        # fazia um), uma migração destrutiva mal formulada corrompia dados
-        # e o app subia dizendo estar saudável.
-        logger.critical(f"[FATAL] Migração falhou: {e}", exc_info=True)
-        if IS_PRODUCTION:
-            raise RuntimeError(
-                f"Migração de banco falhou — boot abortado para não servir "
-                f"tráfego contra schema inconsistente. Erro: {e}"
-            ) from e
-        logger.warning("[DEV] Fora de produção: seguindo apesar da falha de "
-                       "migração (em produção isso abortaria o boot)")
+    # Sob SIGE_BOOT_DDL=0 o seed também não roda: quem desliga a construção
+    # de schema está dizendo "este import NÃO mexe no banco", e o seed mexe
+    # muito — foi ele, disparado por um `import app` de subprocesso do
+    # próprio gate, que segurou o `AccessExclusiveLock` em `obra` por 10 min
+    # em 22/07. O `SIGE_ENABLE_DEMO_SEED` continua valendo por si.
+    if _BOOT_DDL:
+        _maybe_run_demo_seed()
+
+    # [OK] MIGRAÇÕES AUTOMÁTICAS — ativas por padrão, desligáveis por
+    # SIGE_BOOT_DDL (ver o comentário no topo deste bloco).
+    if _BOOT_DDL:
+        logger.info("[SYNC] Executando migrações automáticas do banco de dados...")
+        try:
+            from migrations import executar_migracoes
+            executar_migracoes()
+            logger.info("[OK] Migrações executadas com sucesso!")
+        except Exception as e:
+            # Fase 0.5 / 1.1 — FALHA DE MIGRAÇÃO ABORTA O BOOT.
+            # Antes: `logger.warning("Aplicação continuará mesmo com erro nas
+            # migrações")` — o app passava a servir tráfego contra um schema
+            # meio-migrado, e isso rodava em TODO boot de worker do gunicorn.
+            # Combinado com a ausência de backup (o entrypoint só imprimia que
+            # fazia um), uma migração destrutiva mal formulada corrompia dados
+            # e o app subia dizendo estar saudável.
+            logger.critical(f"[FATAL] Migração falhou: {e}", exc_info=True)
+            if IS_PRODUCTION:
+                raise RuntimeError(
+                    f"Migração de banco falhou — boot abortado para não servir "
+                    f"tráfego contra schema inconsistente. Erro: {e}"
+                ) from e
+            logger.warning("[DEV] Fora de produção: seguindo apesar da falha de "
+                           "migração (em produção isso abortaria o boot)")
     
     # [CONFIG] AUTO-FIX UNIVERSAL - Correção automática de admin_id em TODAS as tabelas
     # Executa SEMPRE no startup para garantir que TODAS as tabelas tenham admin_id

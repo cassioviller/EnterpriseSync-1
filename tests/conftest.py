@@ -36,8 +36,31 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 1ª request, se um módulo de teste disparar uma request no import-time da
 # coleção o registro tranca incompleto e renders falham com BuildError de forma
 # não-determinística. Importar `main` aqui (nível de módulo do conftest)
-# garante os 54 blueprints registrados antes de tudo. Sem efeitos colaterais:
-# o servidor só sobe sob `if __name__ == '__main__'`.
+# garante os 54 blueprints registrados antes de tudo.
+#
+# 🔬 22/07 — a frase que estava aqui, "sem efeitos colaterais: o servidor só
+# sobe sob `if __name__ == '__main__'`", era FALSA. `import main` importa
+# `app`, e `app.py` executa DDL no import-time: `db.create_all()`
+# (`app.py:624`) e `executar_migracoes()` com as 104 migrations
+# (`app.py:740`), sob a guarda `SIGE_BOOT_DDL` criada em 22/07
+# (`app.py:604`). Pior, `_maybe_run_demo_seed()`
+# (`app.py:732`) dispara `scripts/seed_demo_alfa.py` num subprocesso de
+# thread daemon, que SOBREVIVE ao pai — foi encontrado rodando com PPID 1
+# durante o gate.
+#
+# O efeito medido: o seed pede `AccessExclusiveLock` em `obra`, entra na fila
+# atrás da transação ociosa que a própria suíte mantém aberta, e a query
+# seguinte da suíte enfileira atrás do exclusivo. Convoy fechado — e o
+# detector de deadlock do Postgres não o vê, porque o detentor não espera
+# ninguém. O gate ficou 10 min parado num único teste por causa disso.
+#
+# A suíte não precisa nem do seed nem do DDL: o schema é construído pelo
+# `pre_start.py` (workflow local) ou pelo passo próprio do `gate.yml` em CI,
+# e o seed de dados é um step explícito lá. `setdefault` para que quem
+# quiser o comportamento antigo possa exportar a variável.
+os.environ.setdefault("SIGE_ENABLE_DEMO_SEED", "false")
+os.environ.setdefault("SIGE_BOOT_DDL", "0")
+
 try:
     import main  # noqa: F401
 except Exception:

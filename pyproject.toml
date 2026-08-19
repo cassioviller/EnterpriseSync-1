@@ -77,7 +77,16 @@ dev = [
 # Fase 0.5 / 2.2 — `--strict-markers`: marker com typo passa a ser ERRO, não
 # warning silencioso. `--timeout`: sem isso um teste travado pendura o CI
 # indefinidamente (não havia timeout algum).
-addopts = "--strict-markers --timeout=300"
+#
+# 🔬 22/07 — `--timeout-method=thread` NÃO é detalhe. O método padrão é
+# `signal` (SIGALRM), e o handler de sinal do Python só roda ENTRE bytecodes:
+# ele não interrompe uma chamada bloqueante do psycopg2. Medido nesta data:
+# `test_fase06_d1_revisao_proposta.py:180` ficou >10 min parado em
+# `session.flush()` esperando lock na tabela `obra`, com o timeout de 300 s
+# configurado e sem nunca disparar. Ou seja, a garantia escrita no comentário
+# acima era falsa exatamente para o travamento mais provável desta suíte, que
+# é lock de banco. O método `thread` mata o processo de fora e funciona.
+addopts = "--strict-markers --timeout=300 --timeout-method=thread"
 markers = [
     "smoke: testes de fumaça",
     "integration: testes de integração E2E",

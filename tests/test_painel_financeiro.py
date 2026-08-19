@@ -21,6 +21,16 @@ def _fotos_base_isolada(tmp_path):
     verifica foto nenhuma. Sem o isolamento, cada import materializa as fotos
     REAIS de `fotos_rdos/` (116 desde 30/07, eram 90) com otimização WebP +
     base64 — minutos de suíte gastos em imagem que nenhum assert olha.
+
+    🔬 22/07, quando isto foi medido pela primeira vez: **536 ms por foto**
+    (LANCZOS + WebP `method=6`, o ajuste mais lento do encoder — 📖
+    `services/rdo_foto_service.py`). As 35 durações mais lentas do gate eram
+    TODAS deste arquivo, 59-66 s cada, **≈88% de um gate de 2.476 s**. Com a
+    pasta vazia, `test_painel_tem_grupos_kpi_e_wrappers_chart` caiu de
+    **62,89 s para 4,33 s**.
+
+    Quem precisar de foto sobrescreve `ff.FOTOS_RDO_BASE` no corpo do teste,
+    como fazem os testes de foto em `test_importacao_fisico_financeiro.py`.
     """
     from services import importacao_fisico_financeiro as ff
     orig = ff.FOTOS_RDO_BASE
