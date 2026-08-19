@@ -1101,6 +1101,57 @@ banco cadastrado, e o bloco de mapa de cotação só existe quando a alçada ped
 > que percorre e renderiza de verdade — mas ninguém clicou. É o mesmo aviso de 17/08, e
 > continua sendo o item nº 1 de quem retomar. A diferença é que agora o runbook tem figura.
 
+### 🔴 19/08 — a migração 287 tinha DOIS donos, e o deploy pularia um deles
+
+Pergunta do Cássio antes de subir: *"as migrações estão certas para deploy?"*
+🔬 Medidas as 111 migrações locais contra as 102 da linhagem que estava no
+GitHub. **Uma colisão, e ela é do tipo que não aparece no boot:**
+
+| | 287 | o que faz |
+|---|---|---|
+| linhagem do GitHub | `alcadas_avancadas` | 10 colunas em `requisicao_compra` + `faixa_alcada.fornecedores_minimos` |
+| linhagem local | `nota_e_adiantamento` | **cria `nota_fiscal_pedido` e `adiantamento_fornecedor`** |
+
+📖 O runner pula por **NÚMERO** (`executed_cache`), não por nome. Num banco que
+já tivesse rodado a outra linhagem, o 287 constaria `success` e as duas tabelas
+da Fase 2 **nunca seriam criadas** — e o sintoma não é no boot: é no primeiro
+uso, com `relation does not exist`, com a Fase 2 inteira (nota, adiantamento,
+liberação) fora do ar.
+
+> 📌 **Como duas pessoas escolhem o mesmo número livre.** Os dois docstrings
+> trazem a MESMA justificativa — *"conferido em `migration_history` do dev"* —,
+> um em 14/08 e outro em 16/08. **O método era ler o banco de desenvolvimento**,
+> e ele é o mesmo banco para as duas linhagens em dias diferentes. Não foi
+> descuido de ninguém: o procedimento não tinha como funcionar.
+
+**Conserto: a local virou 311**, que era livre em qualquer cenário (o máximo era
+310). Como a função é idempotente (`CREATE TABLE IF NOT EXISTS` em tudo), a
+renumeração funciona **sem depender de saber o estado de produção**: no banco que
+rodou a outra linhagem ela cria o que faltava; no que não rodou, roda no lugar da
+287. 🔬 Verificado no caminho real de deploy (`SIGE_BOOT_DDL=1`): 311 registrada
+como `success` e as duas tabelas presentes.
+
+🔬 **As 10 colunas da 287 antiga viram peso morto, não risco:** nenhuma existe no
+modelo local — que usa `regime_alcada`, `emergencial`, `ratificada_em`,
+`degrau_aplicado` — e todas têm DEFAULT ou são nullable, então nenhum INSERT
+quebra. Ficam ocupando espaço num banco que as tenha, e confundem quem ler o
+schema.
+
+**`tests/test_migrations_numeracao.py` (5 testes, sem banco, por AST)** é o que
+impede a classe inteira de voltar: número repetido, lista fora de ordem, número
+da tupla ≠ número no nome da função (o erro possível ao renumerar), e descrição
+maior que o `VARCHAR(200)` de `migration_name` — que 📖 `record_migration`
+**engole em silêncio**, fazendo a migração re-rodar a cada boot. Já aconteceu com
+a 310.
+
+⚠️ **Antes do deploy, vale saber em que pé produção está:**
+```sql
+SELECT migration_number, migration_name, executed_at
+  FROM migration_history WHERE migration_number >= 280 ORDER BY 1;
+```
+Se o 287 estiver lá com o nome das alçadas, o banco veio da outra linhagem — e é
+o cenário para o qual a renumeração foi feita.
+
 ### 🔴 19/08 — o dashboard em 500, e o `except` que engole registro de blueprint
 
 Sintoma: **toda página autenticada** em 500, com

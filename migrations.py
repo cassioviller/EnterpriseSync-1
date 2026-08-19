@@ -6342,7 +6342,7 @@ def _migration_286_timbre_pdf():
                 "(timbre dos PDFs por tenant, importável por JSON).")
 
 
-def _migration_287_nota_e_adiantamento():
+def _migration_311_nota_e_adiantamento():
     """Fase 2 do ciclo de compras — as duas tabelas novas do financeiro.
 
     `nota_fiscal_pedido` é a nota que autoriza o pagamento, e NÃO é a
@@ -6359,9 +6359,25 @@ def _migration_287_nota_e_adiantamento():
     `conta_pagar_id` é ON DELETE SET NULL e não CASCADE: se a conta sumir, a
     prova de que houve dinheiro adiantado NÃO some junto.
 
-    Alocação: 287. Conferido em `migration_history` do dev em 14/08 — a última
-    aplicada é a 286, e as faixas 290-295 (Fase 8) e 300-307 (Fase 9) ficam
-    intactas. Sem backfill: não há linha histórica que estas tabelas descrevam.
+    🔴 Alocação: **311**, e ela ERA 287. 🔬 19/08 — o número 287 foi usado por
+    DUAS linhagens do repositório que andaram em paralelo entre 13 e 19/08: aqui
+    ele era estas duas tabelas, e na linhagem que estava no GitHub era
+    `_migration_287_alcadas_avancadas` (dez colunas em `requisicao_compra`). Os
+    dois docstrings dizem a mesma frase — "conferido em `migration_history` do
+    dev" —, um em 14/08 e outro em 16/08: **duas linhagens lendo o mesmo banco de
+    desenvolvimento escolheram o mesmo número livre.**
+
+    Por que isso seria grave no deploy: 📖 o runner pula por NÚMERO
+    (`executed_cache`), não por nome. Num banco que já tivesse rodado a outra
+    linhagem, o 287 estaria como `success` e estas duas tabelas **nunca seriam
+    criadas** — a Fase 2 inteira quebraria no primeiro uso, não no boot.
+
+    311 é livre em qualquer cenário (o máximo era 310) e a função é idempotente,
+    então renumerar funciona nos dois casos: no banco que rodou a outra linhagem
+    ela cria o que faltava; no que não rodou, roda no lugar da 287. Não depende de
+    adivinhar o estado de produção. As faixas 290-295 (Fase 8) e 300-307 (Fase 9)
+    seguem intactas. Sem backfill: não há linha histórica que estas tabelas
+    descrevam.
 
     Idempotente: IF NOT EXISTS em tudo.
     """
@@ -6415,7 +6431,7 @@ def _migration_287_nota_e_adiantamento():
             "CREATE INDEX IF NOT EXISTS ix_adiantamento_admin_pendente "
             "ON adiantamento_fornecedor (admin_id, baixado_em)"))
 
-    logger.info("[Migration 287] nota_fiscal_pedido + adiantamento_fornecedor "
+    logger.info("[Migration 311] nota_fiscal_pedido + adiantamento_fornecedor "
                 "criadas (Fase 2 — a obrigação passa a nascer do que chegou).")
 
 
@@ -7153,7 +7169,6 @@ def executar_migracoes():
             (284, "Fase 4 — configuracao_empresa.recebimento_atesto_ativo: a virada do recebimento é por tenant (default FALSE)", _migration_284_flag_recebimento_atesto),
             (285, "Fase 4/C2 — recebimento_pedido_item.almoxarifado_saida_movimento_id: a saída de consumo pareada do atesto, para o estorno saber o que desfazer", _migration_285_saida_do_atesto),
             (286, "Timbre dos PDFs — configuracao_empresa.timbre_pdf (JSONB): logo, dados da empresa e cores num JSON importável pela tela", _migration_286_timbre_pdf),
-            (287, "Fase 2 do ciclo de compras — nota_fiscal_pedido (chave_acesso NULLABLE, ao contrário da NotaFiscal legada) + adiantamento_fornecedor", _migration_287_nota_e_adiantamento),
             (288, "Fase 2 — pedido_compra.fluxo_pagamento; conta_pagar.situacao_liberacao/liberada_por_id/liberada_em; trilha de quem fechou e reabriu o lote", _migration_288_regime_e_liberacao),
             (289, "Fase 2 — configuracao_empresa.financeiro_dois_fluxos_ativo (default FALSE) + tolerancia_divergencia_nf_pct (2,00%, decisão D1 editável)", _migration_289_flag_e_tolerancia),
             (296, "Fase 2/F5 — fechamento_pagamento.criado_por_id: quem MONTOU o lote, sem o qual a segregacao \"quem monta nao fecha\" nao e verificavel. 290-295 e faixa da Fase 8; 300-307 da Fase 9", _migration_296_fechamento_criado_por),
@@ -7168,6 +7183,7 @@ def executar_migracoes():
             (308, "Fecho da Fase 2 — conta_pagar.liberacao_justificativa: nao-nulo = liberacao excepcional, a porta de escape do D6. 308 e nao 300: 300-307 e faixa da Fase 9 e 290-295 da Fase 8, nenhuma aplicada", _migration_308_liberacao_justificativa),
             (309, "E02 segunda tentativa — a 279 gravou success e nao pegou: create_all roda antes das migrations e recriou a tabela enquanto o modelo existia. Drop guardado pela contagem, como a 279", _migration_309_drop_notificacao_cliente_de_novo),
             (310, "Saida da segregacao — fechamento_pagamento.segregacao_justificativa: nao-nulo = quem montou o lote o fechou e escreveu por que. Carimbar criado_por_id liga o guarda pela 1a vez", _migration_310_segregacao_justificativa),
+            (311, "Fase 2 do ciclo — nota_fiscal_pedido (chave_acesso NULLABLE, ao contrario da NotaFiscal legada) + adiantamento_fornecedor. ERA 287: o numero colidiu com outra linhagem do repo", _migration_311_nota_e_adiantamento),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
