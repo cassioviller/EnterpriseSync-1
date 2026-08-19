@@ -1235,6 +1235,63 @@ que fecha em nove sem forçar mas precisa ser conferido contra as saídas latera
 o runbook por script tem de achá-la no DOM. Função pura que ninguém chama passa em
 todo teste — foi assim que `fechar_lote()` ficou semanas testado e inalcançável.
 
+### ✅ 19/08 — GATE VERDE: 2458 passed, 0 failed — o primeiro desde 16/08
+
+🔬 `pytest tests/ -m "not browser"` → **2458 passed, 6 skipped, 201 deselected,
+2 xfailed, ZERO falhas** em 39min00s.
+
+O que destravou foi a limpeza dos 23 RDOs "assinados sem trilha" — resíduo de
+fixture, diagnosticado no mesmo dia (seção abaixo). `UPDATE rdo SET
+estado='preenchido'` nas 23 linhas de tenant `@test.local` sem trilha, com guarda:
+o script abortaria se houvesse **um** forjado fora de fixture. 🔬 antes: 23 alvo,
+23 no total; depois: **0 forjados**.
+
+> 📌 **Por que isto vale mais do que "uma falha a menos".** Desde 16/08 o gate era
+> um amarelo permanente, e amarelo permanente ensina o time a não olhar — a mesma
+> doença que o piso do sensor consertou nesta data. Com o gate em zero, a próxima
+> falha de verdade fica **visível**. É o estado que torna as próximas medições
+> baratas.
+
+### ✅ 19/08 — o runbook da Fase 3 (alçadas) por script: 14/14, como REGRESSÃO
+
+> ⚠️ **Correção de uma afirmação minha, repetida mais de uma vez nesta sessão.** Eu
+> disse que "as Fases 1 e 3 nunca foram percorridas pela tela". 📖 O spec das
+> alçadas (`2026-08-15-alcadas-design.md:720`) registra o oposto: *"15/08,
+> EXECUÇÃO: o runbook foi RODADO inteiro num tenant de dev, do 0a ao Rollback, pela
+> tela e por SQL cru"* — e aquela execução achou um defeito que nenhum teste da
+> fase pegava. **A Fase 3 já tinha sido andada.** `scripts/runbook_fase3.py` vale
+> como **regressão, não descoberta**, e o aviso está no topo do arquivo.
+
+Escopo declarado: passos **3a, 3c e 3e**. Fora: 3b (fornecedor novo, precisa de
+duas voltas para o contraste valer) e 3d (mapa com três cotações, cenário próprio).
+
+🔬 **As duas falhas da primeira rodada eram do script — o sistema estava certo nas
+duas**, e as duas valem registro:
+
+1. **A tela recusou a emergência invocada pelo SOLICITANTE**, com a razão dita:
+   *"só um gestor desta obra ou um administrador pode invocar o rito"*. É a decisão
+   **D4** (GESTOR da obra e ADMIN, 48h corridas) funcionando. Corrigido: quem
+   invoca é o gestor.
+2. **A primeira fatia já nascia elevada** — porque **a janela não estava vazia**.
+   🔬 medido: o acumulado começa em **R$ 31.376**, não em zero, porque o seed acaba
+   de criar sete requisições na mesma obra com **etapa NULA**, e 📖
+   `_criterios_da_etapa_na_janela` decidiu que *"etapa NULA é um grupo"*. **O passo
+   3c do runbook está escrito para um tenant limpo** — quem o rodar sobre cenário
+   usado verá a primeira subir, e isso não é defeito.
+
+   A conferência foi reescrita para medir o que **é** invariante: o acumulado
+   cresce a cada fatia (31.376 → 36.276 → 41.176), as três sobem **por
+   `fracionamento`** e não por valor, e a faixa BASE das três é a mesma.
+
+O rito de emergência responde como o spec descreve: *"APROVADA pelo rito de
+emergência, sem aprovação prévia. Ela já pode virar pedido — mas a alçada continua
+a mesma: 2 aprovação(ões) têm de ser registradas"*. E o `--desligar` devolve a flag
+sem reescrever `regime_alcada` das que já nasceram avançadas, de propósito.
+
+O sensor sai em **exit 1** com o achado que ele próprio nomeia como esperado — a
+**janela residual** (📖 o 📌 da A6): criar três irmãs de propósito faz a faixa de
+uma aprovada ontem ser recalculada hoje. É a janela andando, não escrita por fora.
+
 ### ✅ 19/08 — o runbook da Fase 1 rodado por script: 36/36, e nenhum defeito de produção
 
 Segunda fase percorrida pela tela por script, depois da Fase 2. `scripts/runbook_fase1.py`,
