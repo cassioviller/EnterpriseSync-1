@@ -1235,6 +1235,56 @@ que fecha em nove sem forçar mas precisa ser conferido contra as saídas latera
 o runbook por script tem de achá-la no DOM. Função pura que ninguém chama passa em
 todo teste — foi assim que `fechar_lote()` ficou semanas testado e inalcançável.
 
+### 🔴 19/08 — o ensaio de rollout: o que falta não é flag, é GENTE
+
+Pedido: rollout do ciclo de compras num tenant piloto. **Não é executável daqui**, e
+a razão é dura: 🔬 **não existe tenant de produção neste banco.** Dos 19.637 admins
+não-fixture, os domínios são `t.local` (17.992), `sige.test`, `e2e.local`,
+`teste.com` — todos fixture. Sobra **um**, `construtoraalfa.com.br`, que é o seed de
+demonstração. Piloto de verdade mora em produção, e daqui não há deploy nem
+credencial.
+
+O que foi feito no lugar: **o ensaio inteiro no tenant de demonstração** (admin_id
+**1**), que é o mais próximo de um tenant real que existe aqui. E ele parou antes
+de qualquer flag ser ligada.
+
+🔬 **Passo 0 medido:** as cinco flags OFF. Os guardas da cadeia respondem certo e
+cada recusa traz o comando exato que falta — `financeiro_dois_fluxos` recusa por
+`recebimento_atesto` desligado, `alcadas_avancadas` recusa por governança
+desligada, e a mensagem já diz que a governança "ela mesma vai exigir o escopo de
+obra".
+
+> 🔴 **O bloqueio real: 1260 obras, 5 itens de almoxarifado, faixas semeadas — e UM
+> ÚNICO usuário de login, com ZERO vínculos `usuario_obra`.**
+>
+> Ligar a cadeia ali produziria um ciclo em que **uma pessoa faz tudo**, e a alçada
+> **travaria na segunda aprovação** por não existir segunda pessoa. As flags teriam
+> ligado. O ciclo não funcionaria. Nenhum dos três runbooks pergunta isso no passo
+> 0 — os três medem flags.
+
+> ⚠️ **E o defeito é INVISÍVEL para quem testa como admin.** 📖
+> `papel_de_usuario_na_obra:144` devolve `GESTOR` ao ADMIN em **qualquer** obra do
+> tenant, então o admin nunca se tranca e percorre o fluxo inteiro sozinho. Todo
+> NÃO-admin sem vínculo fica sem papel, e 📖 `pode_comprar_na_obra` devolve False —
+> o bloco de emitir pedido **não é renderizado**. Quem não está vinculado não vê o
+> botão e conclui que o sistema quebrou. É a mesma armadilha que derrubou a primeira
+> captura do manual em 18/08, agora na escala de um rollout.
+
+**`scripts/prontidao_piloto_compras.py`** — o pré-voo que faltava, e não altera
+nada. Confere cinco requisitos com o remédio de cada um: pessoas com login,
+vínculos `usuario_obra`, itens de almoxarifado, fornecedor ativo e faixas de alçada.
+🔬 Validado nos dois sentidos: **exit 1** no tenant de demonstração (faltam pessoas
+e vínculos), **exit 0** no tenant do manual (5 logins, 4 vínculos).
+
+> 📌 **O que este ensaio ensina sobre o ciclo inteiro.** Três fases entregues,
+> mescladas, com gate verde e runbook por script — e o que impede o rollout não está
+> em nenhuma delas. **As regras de segregação que são a razão das fases existirem
+> (solicitante ≠ aprovador, aprovador ≠ emissor, quem monta o lote ≠ quem fecha)
+> exigem que o tenant tenha pessoas.** Um tenant de uma pessoa liga tudo e não
+> exerce nada. Curiosamente, a única dessas regras que sobrevive a um tenant de uma
+> pessoa é a de 19/08 — fechar o próprio lote **com justificativa gravada** —, e é
+> por isso que a saída (b) foi a decisão certa.
+
 ### ✅ 19/08 — GATE VERDE: 2458 passed, 0 failed — o primeiro desde 16/08
 
 🔬 `pytest tests/ -m "not browser"` → **2458 passed, 6 skipped, 201 deselected,
