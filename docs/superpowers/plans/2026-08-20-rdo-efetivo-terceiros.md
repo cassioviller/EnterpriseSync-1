@@ -649,13 +649,13 @@ mesmo tratamento, senão o RDO fica editável só pela criação.
 - Consumes: as mesmas rotas da Task 4.
 - Produces: nada.
 
-- [ ] **Step 1: Mapear as ocorrências**
+- [x] **Step 1: Mapear as ocorrências**
 
 Run: `grep -n "subempreitada\|responsavel" templates/rdo/editar_rdo.html`
 
 Anotar cada linha que condiciona UI a `responsavel === 'subempreitada'`.
 
-- [ ] **Step 2: Aplicar as mesmas trocas da Task 4**
+- [x] **Step 2: Aplicar as mesmas trocas da Task 4**
 
 Para cada ocorrência mapeada, aplicar a transformação equivalente aos Steps 4,
 5 e 6 da Task 4: o bloco de terceiros deixa de ser exclusivo do responsável
@@ -665,12 +665,12 @@ Se `editar_rdo.html` **não** tiver o bloco de apontamento de subempreitada (só
 menções em outro contexto, como um resumo de leitura), registrar isso no commit
 e não inventar tela nova — a criação é o fluxo de campo.
 
-- [ ] **Step 3: Verificar na aplicação rodando**
+- [x] **Step 3: Verificar na aplicação rodando**
 
 Editar o RDO criado na Task 4 Step 7 e conferir que o apontamento "Abraão / 11
 pessoas" aparece e pode ser alterado e excluído.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add templates/rdo/editar_rdo.html
