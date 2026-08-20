@@ -197,7 +197,7 @@ git commit -m "feat(cadastros): funcao.operacional separa efetivo de campo do ad
 - Consumes: `Funcao.operacional` (Task 1).
 - Produces: `GET /api/obras/<obra_id>/funcionarios?operacional=1` → `{'success': True, 'funcionarios': [{'id', 'nome', 'funcao', 'cargo'}], 'total': N}`. Sem o parâmetro o comportamento é o de hoje (todos os ativos) — outras telas consomem essa rota e não devem mudar.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar em `tests/test_rdo_efetivo_terceiros.py`:
 
@@ -254,13 +254,13 @@ def test_api_sem_parametro_continua_devolvendo_todos():
     assert 'Ana Escritorio' in nomes
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_rdo_efetivo_terceiros.py::test_api_efetivo_filtra_administrativo -v`
 
 Esperado: **FAIL** — `'Ana Escritorio' in nomes` (o filtro ainda não existe).
 
-- [ ] **Step 3: Implementar o filtro na API**
+- [x] **Step 3: Implementar o filtro na API**
 
 Em `views/api.py`, dentro de `api_funcionarios_por_obra`, substituir:
 
@@ -291,13 +291,13 @@ Conferir que `request`, `db` e `db.or_` estão importados no topo de
 `views/api.py`; se `db.or_` não existir no namespace, use
 `from sqlalchemy import or_` e troque `db.or_` por `or_`.
 
-- [ ] **Step 4: Rodar os testes**
+- [x] **Step 4: Rodar os testes**
 
 Run: `python -m pytest tests/test_rdo_efetivo_terceiros.py -v`
 
 Esperado: **os 4 PASSAM.**
 
-- [ ] **Step 5: Ligar o filtro na tela do RDO**
+- [x] **Step 5: Ligar o filtro na tela do RDO**
 
 Em `templates/rdo/novo.html`, linha ~777, trocar:
 
@@ -313,7 +313,7 @@ por:
         const resp = await fetch(`/api/obras/${obraId}/funcionarios?operacional=1`);
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add views/api.py templates/rdo/novo.html tests/test_rdo_efetivo_terceiros.py
