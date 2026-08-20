@@ -50,7 +50,7 @@ pro programa, a gente vai ter que ter um manualzinho pro RDO padronizado".
 - Consumes: `views.manual_views._carregar_capitulos() -> List[Capitulo]` com campos `slug`, `anchor`, `titulo`, `html`, `em_construcao`.
 - Produces: um `Capitulo` de slug `23a_rdo_padrao_preenchimento`, título `RDO — Padrão de Preenchimento`, `em_construcao=False`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Criar `tests/test_manual_rdo_padrao.py`:
 
@@ -111,13 +111,13 @@ def test_capitulo_cobre_os_pontos_obrigatorios(capitulo, assunto):
         f'o capítulo não fala de "{assunto}"'
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_manual_rdo_padrao.py -v`
 
 Esperado: **FAIL** — `capítulo 23a_rdo_padrao_preenchimento não encontrado em manual/`.
 
-- [ ] **Step 3: Escrever o capítulo**
+- [x] **Step 3: Escrever o capítulo**
 
 Criar `manual/23a_rdo_padrao_preenchimento.md`:
 
@@ -243,7 +243,7 @@ Um RDO é devolvido para correção quando:
 5. foi lançado com mais de **dois dias** de atraso.
 ```
 
-- [ ] **Step 4: Citar o capítulo no índice**
+- [x] **Step 4: Citar o capítulo no índice**
 
 Em `manual/00_indice.md`, na lista "Estrutura prevista", trocar a linha:
 
@@ -258,13 +258,13 @@ por:
    - RDO — Padrão de Preenchimento (a norma: o que precisa estar preenchido)
 ```
 
-- [ ] **Step 5: Rodar os testes**
+- [x] **Step 5: Rodar os testes**
 
 Run: `python -m pytest tests/test_manual_rdo_padrao.py -v`
 
 Esperado: **os 7 PASSAM** (2 + 5 do parametrize).
 
-- [ ] **Step 6: Conferir a renderização**
+- [x] **Step 6: Conferir a renderização**
 
 Subir a app e abrir `/manual`. Conferir:
 1. O capítulo aparece no sumário lateral, **entre** "RDO" e "Cronograma".
@@ -272,7 +272,7 @@ Subir a app e abrir `/manual`. Conferir:
 3. O capítulo **não** está marcado como "em construção".
 4. `/manual/download` inclui o capítulo novo.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add manual/23a_rdo_padrao_preenchimento.md manual/00_indice.md tests/test_manual_rdo_padrao.py
