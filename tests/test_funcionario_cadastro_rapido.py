@@ -314,3 +314,84 @@ def test_post_editar_cpf_duplicado_entre_admins_e_rejeitado_sem_perder_dados():
         assert fb_depois.nome == 'Funcionario B Original', (
             "nome persistiu no banco apesar da edição ter sido rejeitada — "
             "a rejeição não é atômica")
+
+
+# ---------------------------------------------------------------------------
+# Task 2 (reunião 2026-08-20) — ativar/desativar em lote. Hoje são três
+# cliques por pessoa (toggleStatusFuncionario → confirm → reload). Para os
+# oito e tantos que a Ana precisa desligar de uma vez, isso é "uma porrada
+# de cara pra ficar desativando". A confirmação continua existindo — o
+# Paulo defendeu o segundo clique —, mas agora é UMA confirmação para o
+# lote inteiro.
+# ---------------------------------------------------------------------------
+
+def _tres_funcionarios():
+    with app.app_context():
+        admin, _obra = _ambiente()
+        ids = []
+        for i, nome in enumerate(('Davi', 'Cristiano', 'Fabrício')):
+            f = Funcionario(codigo=f'L{i}{admin.id}', nome=nome, cpf=None,
+                            data_admissao=date(2026, 8, 20),
+                            admin_id=admin.id, ativo=True)
+            db.session.add(f)
+            db.session.flush()
+            ids.append(f.id)
+        db.session.commit()
+        # `_client_como` recebe o ID; e o objeto ORM devolvido de dentro do
+        # contexto já está destacado quando ele fecha.
+        return admin.id, ids
+
+
+def test_desativar_em_lote():
+    admin_id, ids = _tres_funcionarios()
+    client = _client_como(admin_id)
+
+    resp = client.post('/api/funcionarios/toggle-ativo-lote',
+                       json={'ids': ids[:2], 'ativo': False})
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert resp.get_json()['alterados'] == 2
+    with app.app_context():
+        assert Funcionario.query.get(ids[0]).ativo is False
+        assert Funcionario.query.get(ids[1]).ativo is False
+        assert Funcionario.query.get(ids[2]).ativo is True
+
+
+def test_reativar_em_lote():
+    admin_id, ids = _tres_funcionarios()
+    client = _client_como(admin_id)
+    client.post('/api/funcionarios/toggle-ativo-lote',
+                json={'ids': ids, 'ativo': False})
+
+    resp = client.post('/api/funcionarios/toggle-ativo-lote',
+                       json={'ids': ids, 'ativo': True})
+
+    assert resp.get_json()['alterados'] == 3
+    with app.app_context():
+        assert all(Funcionario.query.get(i).ativo for i in ids)
+
+
+def test_lote_ignora_id_de_outro_tenant():
+    """Silencioso de propósito: responder 404 diria a um tenant que o id
+    existe em outro."""
+    admin_a_id, ids_a = _tres_funcionarios()
+    _admin_b_id, ids_b = _tres_funcionarios()
+    client = _client_como(admin_a_id)
+
+    resp = client.post('/api/funcionarios/toggle-ativo-lote',
+                       json={'ids': [ids_a[0], ids_b[0]], 'ativo': False})
+
+    assert resp.get_json()['alterados'] == 1
+    with app.app_context():
+        assert Funcionario.query.get(ids_b[0]).ativo is True
+
+
+def test_lote_vazio_recusa():
+    admin_id, _ids = _tres_funcionarios()
+    client = _client_como(admin_id)
+
+    resp = client.post('/api/funcionarios/toggle-ativo-lote',
+                       json={'ids': [], 'ativo': False})
+
+    assert resp.status_code == 400
+    assert resp.get_json()['success'] is False

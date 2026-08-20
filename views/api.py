@@ -705,6 +705,69 @@ def toggle_funcionario_ativo(funcionario_id):
         logger.error(f"[ERROR] ERRO AO TOGGLE FUNCIONÁRIO: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@main_bp.route('/api/funcionarios/toggle-ativo-lote', methods=['POST'])
+@login_required
+def toggle_funcionarios_ativo_lote():
+    """Ativa ou desativa vários funcionários numa transação.
+
+    Reunião 2026-08-20: desligar oito pessoas custava três cliques cada.
+    A confirmação continua existindo — o Paulo defendeu o segundo clique
+    para ninguém sair do efetivo sem querer —, mas agora é UMA confirmação
+    para o lote inteiro, não uma por pessoa.
+
+    Id fora do tenant é ignorado em silêncio, não 404: responder que o id
+    "não existe aqui" já contaria que ele existe em algum lugar.
+    """
+    try:
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
+
+        data = request.get_json(silent=True) or {}
+        ids = data.get('ids') or []
+        if not isinstance(ids, list) or not ids:
+            return jsonify({'success': False,
+                            'message': 'Selecione ao menos um funcionário'}), 400
+        try:
+            ids = [int(i) for i in ids]
+        except (TypeError, ValueError):
+            return jsonify({'success': False,
+                            'message': 'Lista de ids inválida'}), 400
+
+        ativo = bool(data.get('ativo', False))
+
+        funcionarios = Funcionario.query.filter(
+            Funcionario.id.in_(ids),
+            Funcionario.admin_id == admin_id,
+        ).all()
+
+        hoje = datetime.now().date()
+        alterados = 0
+        for f in funcionarios:
+            if f.ativo == ativo:
+                continue
+            f.ativo = ativo
+            if hasattr(f, 'data_desativacao'):
+                f.data_desativacao = None if ativo else hoje
+            alterados += 1
+
+        db.session.commit()
+
+        verbo = 'ativado' if ativo else 'desativado'
+        plural = 's' if alterados != 1 else ''
+        logger.info(f"[OK] {alterados} funcionário(s) {verbo}(s) em lote "
+                    f"(tenant {admin_id})")
+        return jsonify({
+            'success': True,
+            'alterados': alterados,
+            'message': f'{alterados} funcionário{plural} {verbo}{plural}',
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[ERROR] Erro no toggle em lote de funcionários: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @main_bp.route('/api/ponto/lancamento-finais-semana', methods=['POST'])
 @login_required
 def lancamento_finais_semana():
