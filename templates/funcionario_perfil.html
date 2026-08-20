@@ -73,7 +73,7 @@
                         <div class="col-md-3">
                             <div class="mb-2">
                                 <span class="text-muted" style="font-size:0.78rem;">CPF</span><br>
-                                <strong class="text-dark">{{ funcionario.cpf }}</strong>
+                                <strong class="text-dark">{{ funcionario.cpf or '-' }}</strong>
                             </div>
                         </div>
                         <div class="col-md-3">
@@ -1532,8 +1532,8 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="cpf" class="form-label">CPF *</label>
-                                <input type="text" class="form-control" id="cpf" name="cpf" value="{{ funcionario.cpf }}" required>
+                                <label for="cpf" class="form-label">CPF</label>
+                                <input type="text" class="form-control" id="cpf" name="cpf" value="{{ funcionario.cpf or '' }}">
                             </div>
                         </div>
                     </div>

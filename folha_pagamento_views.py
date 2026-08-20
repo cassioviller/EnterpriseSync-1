@@ -1158,7 +1158,7 @@ def api_funcionarios_folha(ano, mes):
             funcionarios.append({
                 'folha_id': folha.id,
                 'nome': func.nome,
-                'cpf': func.cpf,
+                'cpf': func.cpf or '',
                 'cargo': func.funcao_ref.nome if func.funcao_ref else 'N/A',
                 'salario_liquido': float(folha.salario_liquido or 0)
             })

@@ -561,7 +561,24 @@ def editar_funcionario(funcionario_id):
         
         # Atualizar dados
         funcionario.nome = request.form.get('nome', '').strip()
-        funcionario.cpf = request.form.get('cpf', '').strip()
+
+        # Reunião 2026-08-20 — CPF é opcional. String vazia vira None pelo
+        # mesmo motivo do cadastro (views/employees.py): gravar '' faria o
+        # UNIQUE colidir no segundo funcionário editado para CPF em branco.
+        novo_cpf = request.form.get('cpf', '').strip() or None
+        if novo_cpf:
+            # Duplicidade só é checada com CPF informado, e exclui o
+            # próprio registro — editar sem trocar o CPF não pode se
+            # autorrejeitar.
+            funcionario_existente = Funcionario.query.filter(
+                Funcionario.cpf == novo_cpf,
+                Funcionario.id != funcionario_id,
+                Funcionario.admin_id == admin_id
+            ).first()
+            if funcionario_existente:
+                flash(f'[ERROR] CPF {novo_cpf} já está cadastrado para {funcionario_existente.nome}!', 'error')
+                return redirect(url_for('main.funcionarios'))
+        funcionario.cpf = novo_cpf
         funcionario.rg = request.form.get('rg', '').strip()
         
         if request.form.get('data_nascimento'):

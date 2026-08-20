@@ -1109,17 +1109,15 @@ function validateForm() {
         alert('Nome é obrigatório');
         return false;
     }
-    
-    if (!cpf.trim()) {
-        alert('CPF é obrigatório');
-        return false;
-    }
-    
-    if (!isValidCPF(cpf)) {
+
+    // Reunião 2026-08-20 — CPF é opcional (cadastro rápido sem documento em
+    // mãos). Só valida o dígito verificador quando algo foi digitado; campo
+    // vazio não bloqueia mais o submit.
+    if (cpf.trim() && !isValidCPF(cpf)) {
         alert('CPF inválido');
         return false;
     }
-    
+
     return true;
 }
 
