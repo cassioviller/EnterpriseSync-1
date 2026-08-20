@@ -6877,6 +6877,28 @@ def _migration_282_backfill_dropdown_crm():
                 total_grupos, total_opcoes)
 
 
+def _migration_312_funcao_operacional():
+    """Coluna `funcao.operacional` — separa efetivo de campo de administrativo.
+
+    O seletor de efetivo do RDO (`/api/obras/<id>/funcionarios?operacional=1`)
+    passa a listar só quem tem função operacional. Reunião 2026-08-20: o Paulo
+    pediu "aqui tem que estar só o pessoal operacional".
+
+    DEFAULT TRUE de propósito: no deploy nenhuma função existente sai do RDO.
+    Marcar as administrativas é trabalho de cadastro, feito depois pela tela
+    de Funções — não é decisão que uma migration possa adivinhar por nome.
+
+    Idempotente: ADD COLUMN IF NOT EXISTS.
+    """
+    from sqlalchemy import text as sa_text
+    logger.info("[Migration 312] Iniciando — funcao.operacional")
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE funcao ADD COLUMN IF NOT EXISTS "
+            "operacional BOOLEAN NOT NULL DEFAULT TRUE"))
+    logger.info("[Migration 312] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7184,6 +7206,7 @@ def executar_migracoes():
             (309, "E02 segunda tentativa — a 279 gravou success e nao pegou: create_all roda antes das migrations e recriou a tabela enquanto o modelo existia. Drop guardado pela contagem, como a 279", _migration_309_drop_notificacao_cliente_de_novo),
             (310, "Saida da segregacao — fechamento_pagamento.segregacao_justificativa: nao-nulo = quem montou o lote o fechou e escreveu por que. Carimbar criado_por_id liga o guarda pela 1a vez", _migration_310_segregacao_justificativa),
             (311, "Fase 2 do ciclo — nota_fiscal_pedido (chave_acesso NULLABLE, ao contrario da NotaFiscal legada) + adiantamento_fornecedor. ERA 287: o numero colidiu com outra linhagem do repo", _migration_311_nota_e_adiantamento),
+            (312, "Reuniao 2026-08-20 — funcao.operacional: separa o efetivo de campo do pessoal de escritorio no seletor do RDO. DEFAULT TRUE para ninguem sumir no deploy", _migration_312_funcao_operacional),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

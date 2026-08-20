@@ -59,7 +59,7 @@ as administrativas depois, pela tela de Funções.
 **Interfaces:**
 - Produces: `Funcao.operacional: bool` (NOT NULL, default/server_default TRUE). Consumido pela Task 2 (`views/api.py`) e pela Task 3 (formulário).
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Criar `tests/test_rdo_efetivo_terceiros.py`:
 
@@ -116,13 +116,13 @@ def test_funcao_pode_ser_marcada_como_administrativa():
         assert f.operacional is False
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_rdo_efetivo_terceiros.py -v`
 
 Esperado: **FAIL** — `TypeError: 'operacional' is an invalid keyword argument for Funcao`.
 
-- [ ] **Step 3: Declarar a coluna no modelo**
+- [x] **Step 3: Declarar a coluna no modelo**
 
 Em `models.py`, na `class Funcao`, logo depois de `salario_base`, inserir:
 
@@ -136,7 +136,7 @@ Em `models.py`, na `class Funcao`, logo depois de `salario_base`, inserir:
                             server_default='true')
 ```
 
-- [ ] **Step 4: Escrever a migration 312**
+- [x] **Step 4: Escrever a migration 312**
 
 Em `migrations.py`, imediatamente antes de `def executar_migracoes():` (linha ~6880), inserir:
 
@@ -163,7 +163,7 @@ def _migration_312_funcao_operacional():
     logger.info("[Migration 312] Concluída com sucesso")
 ```
 
-- [ ] **Step 5: Registrar a migration na lista**
+- [x] **Step 5: Registrar a migration na lista**
 
 Em `migrations.py`, na lista `migrations_to_run`, logo depois da linha da 311, acrescentar:
 
@@ -171,13 +171,13 @@ Em `migrations.py`, na lista `migrations_to_run`, logo depois da linha da 311, a
             (312, "Reuniao 2026-08-20 — funcao.operacional: separa o efetivo de campo do pessoal de escritorio no seletor do RDO. DEFAULT TRUE para ninguem sumir no deploy", _migration_312_funcao_operacional),
 ```
 
-- [ ] **Step 6: Rodar os testes**
+- [x] **Step 6: Rodar os testes**
 
 Run: `python -m pytest tests/test_rdo_efetivo_terceiros.py -v`
 
 Esperado: **os 2 PASSAM.**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add models.py migrations.py tests/test_rdo_efetivo_terceiros.py

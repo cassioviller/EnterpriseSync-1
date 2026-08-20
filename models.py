@@ -159,6 +159,13 @@ class Funcao(db.Model):
     nome = db.Column(db.String(100), nullable=False)
     descricao = db.Column(db.Text)
     salario_base = db.Column(db.Float, default=0.0)
+    # Reunião 2026-08-20 — separa o efetivo de campo do pessoal de escritório.
+    # O seletor de efetivo do RDO lista SÓ funções operacionais. Fica aqui e
+    # não em Departamento porque é a função que diz o que a pessoa faz:
+    # "Auxiliar Administrativo" e "Montador" podem dividir departamento.
+    # Default TRUE para nenhuma função existente sumir do RDO no deploy.
+    operacional = db.Column(db.Boolean, nullable=False, default=True,
+                            server_default='true')
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     # Task #62 — Insumo (tipo MAO_OBRA) equivalente desta função.
     # Usado pelo auto-vínculo Função→ComposicaoServico no salvamento de RDO.
