@@ -465,6 +465,7 @@ def criar_funcao():
                 salario_base=float(request.form.get('salario_base', 0)),
                 admin_id=admin_id,
                 insumo_id=insumo_id,
+                operacional=('operacional' in request.form),
             )
             db.session.add(funcao)
             db.session.commit()
@@ -501,6 +502,10 @@ def editar_funcao(id):
             # Atualizar dados da função
             funcao.nome = request.form['nome']
             funcao.descricao = request.form.get('descricao')
+            # Checkbox: ausente no POST = desmarcado. O formulário da tela de
+            # funções sempre envia `nome` (obrigatório), então um POST que
+            # chegou aqui veio dela — não há outro caminho que grave Funcao.
+            funcao.operacional = ('operacional' in request.form)
             novo_salario_base = float(request.form.get('salario_base', 0))
             funcao.salario_base = novo_salario_base
             # Task #62: insumo_id (tipo MAO_OBRA)

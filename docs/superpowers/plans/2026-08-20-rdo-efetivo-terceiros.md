@@ -335,7 +335,7 @@ Sem isto a coluna da Task 1 só é editável por SQL.
 - Consumes: `Funcao.operacional` (Task 1).
 - Produces: formulário envia `operacional` como checkbox (`'on'` quando marcado, ausente quando não).
 
-- [ ] **Step 1: Acrescentar o checkbox ao formulário**
+- [x] **Step 1: Acrescentar o checkbox ao formulário**
 
 Em `templates/configuracoes/funcao_form.html`, imediatamente antes de
 `<div class="d-flex gap-2">`, inserir:
@@ -357,7 +357,7 @@ Em `templates/configuracoes/funcao_form.html`, imediatamente antes de
           </div>
 ```
 
-- [ ] **Step 2: Ler o campo na criação**
+- [x] **Step 2: Ler o campo na criação**
 
 Em `configuracoes_views.py`, em `criar_funcao`, no construtor `Funcao(...)`,
 acrescentar o argumento:
@@ -379,7 +379,7 @@ O construtor fica:
             )
 ```
 
-- [ ] **Step 3: Ler o campo na edição**
+- [x] **Step 3: Ler o campo na edição**
 
 Em `configuracoes_views.py`, em `editar_funcao`, logo depois de
 `funcao.descricao = request.form.get('descricao')`, inserir:
@@ -392,7 +392,7 @@ Em `configuracoes_views.py`, em `editar_funcao`, logo depois de
             funcao.operacional = ('operacional' in request.form)
 ```
 
-- [ ] **Step 4: Verificar na aplicação rodando**
+- [x] **Step 4: Verificar na aplicação rodando**
 
 Subir a app e, em `/configuracoes/funcoes`:
 1. Criar uma função "Auxiliar Administrativo" com o checkbox **desmarcado**.
@@ -402,7 +402,7 @@ Subir a app e, em `/configuracoes/funcoes`:
 Se a app não subir localmente, invocar a skill `run` para descobrir o comando
 do projeto.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add configuracoes_views.py templates/configuracoes/funcao_form.html

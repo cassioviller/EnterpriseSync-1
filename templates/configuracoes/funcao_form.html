@@ -84,6 +84,21 @@
             {% endif %}
           </div>
 
+          <div class="mb-4">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox"
+                     id="operacional" name="operacional"
+                     {% if funcao is none or funcao.operacional %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="operacional">
+                Função operacional
+              </label>
+            </div>
+            <div class="form-text">
+              Marcada, aparece no efetivo do RDO. Desmarque para pessoal
+              administrativo, que não é apontado em atividade de obra.
+            </div>
+          </div>
+
           <div class="d-flex gap-2">
             <button type="submit" class="btn btn-primary">
               <i class="fas fa-save me-1"></i>
