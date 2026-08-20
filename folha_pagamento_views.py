@@ -1031,7 +1031,7 @@ def holerite_pdf(folha_id):
         
         # Dados do funcionário
         data_funcionario = [
-            ['Funcionário:', funcionario.nome, 'CPF:', funcionario.cpf],
+            ['Funcionário:', funcionario.nome, 'CPF:', funcionario.cpf or ''],
             ['Cargo:', funcionario.funcao_ref.nome if funcionario.funcao_ref else 'N/A', 
              'Código:', funcionario.codigo]
         ]

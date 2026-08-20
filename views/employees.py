@@ -82,15 +82,23 @@ def funcionarios():
                 codigo = f"VV{novo_numero:03d}"
                 logger.info(f"[OK] Código gerado automaticamente: {codigo}")
             
-            if not nome or not cpf:
-                flash('[ERROR] Nome e CPF são obrigatórios!', 'error')
+            if not nome:
+                flash('[ERROR] Nome é obrigatório!', 'error')
                 return redirect(url_for('main.funcionarios'))
-            
-            # Verificar se CPF já existe
-            funcionario_existente = Funcionario.query.filter_by(cpf=cpf).first()
-            if funcionario_existente:
-                flash(f'[ERROR] CPF {cpf} já está cadastrado para {funcionario_existente.nome}!', 'error')
-                return redirect(url_for('main.funcionarios'))
+
+            # Reunião 2026-08-20 — CPF é opcional. String vazia vira None:
+            # gravar '' faria o UNIQUE colidir no segundo cadastro rápido,
+            # que é justamente o caso de uso (dois ajudantes no mesmo dia).
+            cpf = cpf or None
+
+            # A checagem de duplicidade só faz sentido com CPF informado —
+            # `filter_by(cpf=None)` casaria com qualquer cadastro rápido
+            # anterior e recusaria o segundo.
+            if cpf:
+                funcionario_existente = Funcionario.query.filter_by(cpf=cpf).first()
+                if funcionario_existente:
+                    flash(f'[ERROR] CPF {cpf} já está cadastrado para {funcionario_existente.nome}!', 'error')
+                    return redirect(url_for('main.funcionarios'))
             
             # Criar novo funcionário
             # Tratar valores "0" dos dropdowns como None (opção "Selecione...")
