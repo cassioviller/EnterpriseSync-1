@@ -137,3 +137,107 @@ def test_post_editar_limpando_cpf_grava_null_e_preserva_outros_campos():
         # nome trocado na mesma submissão precisa ter sobrevivido.
         assert f1_depois.nome == 'Editado Um'
         assert f2_depois.nome == 'Editado Dois'
+
+
+# ---------------------------------------------------------------------------
+# Fix round 2 — a review encontrou a checagem de duplicidade da edição
+# escopada por admin_id, enquanto o UNIQUE de Funcionario.cpf (models.py) é
+# global, sem coluna de tenant. Isso reabre o Critical 2 de um jeito mais
+# estreito: dois admins diferentes, cada um editando seu próprio
+# funcionário, colidem no CPF sem que a checagem veja (ela só olha o
+# próprio tenant) — o INSERT/UPDATE segue, o commit estoura
+# UniqueViolation, o except genérico faz rollback e perde os outros campos
+# da submissão. Os dois testes abaixo cobrem: (1) a exclusão do próprio id
+# continua funcionando isoladamente do "or None" (a rodada anterior só
+# provou os dois juntos via stash do arquivo inteiro); (2) a checagem
+# global rejeita duplicata entre tenants de forma limpa, sem crash e sem
+# perder o campo irmão trocado na mesma submissão.
+# ---------------------------------------------------------------------------
+
+def test_post_editar_mantendo_cpf_igual_nao_se_autorrejeita():
+    """Salvar um funcionário sem trocar o CPF não pode disparar a checagem
+    de duplicidade contra ele mesmo — é o que a exclusão `Funcionario.id !=
+    funcionario_id` garante. Sem essa cláusula, o bug de perda de dados do
+    Critical 2 vira pior ainda: impossível salvar QUALQUER edição de quem
+    já tem CPF, mesmo sem mexer nele."""
+    with app.app_context():
+        admin, _obra = _ambiente()
+        admin_id = admin.id
+        c = _client_como(admin_id)
+
+        cpf_original = f'33333333{admin_id % 100:03d}'
+        f = Funcionario(codigo=f'M1{admin_id}', nome='Nome Original',
+                         cpf=cpf_original, data_admissao=date(2026, 8, 20),
+                         admin_id=admin_id, ativo=True)
+        db.session.add(f)
+        db.session.commit()
+        f_id = f.id
+
+        resp = c.post(f'/funcionarios/{f_id}/editar', data={
+            'nome': 'Nome Trocado', 'cpf': cpf_original,
+        })
+        assert resp.status_code in (200, 302)
+
+        db.session.expire_all()
+        f_depois = Funcionario.query.get(f_id)
+        assert f_depois.cpf == cpf_original, (
+            f"a autoexclusão falhou — CPF virou {f_depois.cpf!r}")
+        assert f_depois.nome == 'Nome Trocado', (
+            "o nome não persistiu — a edição foi rejeitada quando não devia")
+
+
+def test_post_editar_cpf_duplicado_entre_admins_e_rejeitado_sem_perder_dados():
+    """CPF já usado por funcionário de OUTRO admin precisa ser rejeitado
+    pela checagem do servidor (caminho amigável — flash específico e
+    redirect), não descoberto só no commit via UniqueViolation não
+    tratada. O guard roda ANTES de `funcionario.cpf = novo_cpf`, então o
+    CPF nunca é sobrescrito — mas `funcionario.nome` já tinha sido
+    atribuído na linha de cima antes do guard, e como a rota nunca chega
+    a chamar `db.session.rollback()` neste caminho (não houve exceção —
+    o guard só faz um `return redirect` limpo), esse campo irmão
+    permanece. É a diferença que importa em relação ao Critical 2 antigo:
+    lá, o `except` genérico rodava `db.session.rollback()` e apagava TUDO
+    da submissão de uma vez, de forma silenciosa. Aqui, só o CPF é
+    barrado; o nome trocado na mesma submissão não é vítima colateral de
+    um rollback que nunca acontece."""
+    with app.app_context():
+        admin_a, _obra_a = _ambiente()
+        admin_b, _obra_b = _ambiente()
+
+        cpf_do_a = f'44444444{admin_a.id % 100:03d}'
+        fa = Funcionario(codigo=f'DA{admin_a.id}', nome='Funcionario A',
+                          cpf=cpf_do_a, data_admissao=date(2026, 8, 20),
+                          admin_id=admin_a.id, ativo=True)
+        fb = Funcionario(codigo=f'DB{admin_b.id}', nome='Funcionario B Original',
+                          cpf=f'55555555{admin_b.id % 100:03d}',
+                          data_admissao=date(2026, 8, 20),
+                          admin_id=admin_b.id, ativo=True)
+        db.session.add_all([fa, fb])
+        db.session.commit()
+        fb_id = fb.id
+        cpf_original_b = fb.cpf
+
+        c_b = _client_como(admin_b.id)
+        resp = c_b.post(f'/funcionarios/{fb_id}/editar', data={
+            'nome': 'Funcionario B Renomeado', 'cpf': cpf_do_a,
+        })
+        # Caminho amigável (redirect com flash), nunca um 500 de
+        # UniqueViolation não tratada.
+        assert resp.status_code in (200, 302)
+
+        with c_b.session_transaction() as sess:
+            flashes = sess.get('_flashes', [])
+        assert any('já está cadastrado' in msg for _cat, msg in flashes), (
+            f"esperava flash amigável de duplicidade, veio {flashes!r}")
+
+        db.session.expire_all()
+        fb_depois = Funcionario.query.get(fb_id)
+        # O CPF duplicado NUNCA foi atribuído — o guard roda antes da
+        # linha `funcionario.cpf = novo_cpf`.
+        assert fb_depois.cpf == cpf_original_b, (
+            f"CPF de outro admin vazou para dentro do tenant B: {fb_depois.cpf!r}")
+        # O nome, ao contrário, não foi vítima de um rollback silencioso —
+        # não houve UniqueViolation nem exceção nenhuma neste caminho.
+        assert fb_depois.nome == 'Funcionario B Renomeado', (
+            "nome sumiu sem nenhuma exceção ter sido lançada — "
+            "sinal de um rollback silencioso indevido")

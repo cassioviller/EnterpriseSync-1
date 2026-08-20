@@ -570,10 +570,21 @@ def editar_funcionario(funcionario_id):
             # Duplicidade só é checada com CPF informado, e exclui o
             # próprio registro — editar sem trocar o CPF não pode se
             # autorrejeitar.
+            #
+            # Fix round 2 — a checagem é DELIBERADAMENTE global (sem
+            # `Funcionario.admin_id == admin_id`): o índice UNIQUE de
+            # `Funcionario.cpf` (models.py) não tem coluna de tenant, então
+            # um filtro por admin_id passaria mesmo quando o CPF já existe
+            # em OUTRO admin, e o commit estouraria UniqueViolation —
+            # capturada pelo except genérico da rota, com rollback de todos
+            # os outros campos da submissão. A checagem tem que enxergar o
+            # mesmo universo que o constraint do banco enxerga. É o mesmo
+            # raciocínio já aplicado no cadastro (views/employees.py:98,
+            # `filter_by(cpf=cpf)` também sem admin_id) — create e edit
+            # precisam concordar sobre o que é duplicata.
             funcionario_existente = Funcionario.query.filter(
                 Funcionario.cpf == novo_cpf,
-                Funcionario.id != funcionario_id,
-                Funcionario.admin_id == admin_id
+                Funcionario.id != funcionario_id
             ).first()
             if funcionario_existente:
                 flash(f'[ERROR] CPF {novo_cpf} já está cadastrado para {funcionario_existente.nome}!', 'error')
