@@ -110,3 +110,58 @@ def test_api_sem_parametro_continua_devolvendo_todos():
     nomes = [f['nome'] for f in resp.get_json()['funcionarios']]
     assert 'Davi Montador' in nomes
     assert 'Ana Escritorio' in nomes
+
+
+def test_apontar_terceiro_em_tarefa_de_empresa_nao_mexe_no_percentual():
+    """Efetivo de terceiro (11 pessoas, 0 produzido) numa tarefa da empresa.
+
+    É o caso do Abraão na fundação: a atividade é nossa, mas tem equipe
+    terceira junto. Registrar o efetivo NÃO pode alterar o avanço — quem
+    move percentual é produção, não gente presente.
+    """
+    from models import (RDO, RDOSubempreitadaApontamento, Subempreiteiro,
+                        TarefaCronograma)
+    from test_cronograma_versao_service import _tarefa
+
+    with app.app_context():
+        admin, obra = _ambiente()
+        tarefa = _tarefa(obra, admin, 'Fundação', ordem=0,
+                         duracao_dias=10,
+                         data_inicio=date(2026, 7, 1),
+                         data_fim=date(2026, 7, 10),
+                         quantidade_total=100.0,
+                         unidade_medida='m3',
+                         responsavel='empresa',
+                         percentual_concluido=40.0)
+        sub = Subempreiteiro(nome='Abraão', admin_id=admin.id, ativo=True)
+        db.session.add(sub)
+        rdo = RDO(numero_rdo=f'RDO-EF-{admin.id}',
+                  data_relatorio=date(2026, 7, 5),
+                  obra_id=obra.id, admin_id=admin.id)
+        db.session.add(rdo)
+        db.session.commit()
+        ctx = dict(admin_id=admin.id, rdo_id=rdo.id, tarefa_id=tarefa.id,
+                   sub_id=sub.id)
+
+    client = _login(ctx['admin_id'])
+    resp = client.post(
+        f"/cronograma/rdo/{ctx['rdo_id']}/apontar-subempreitada",
+        json={'tarefa_cronograma_id': ctx['tarefa_id'],
+              'subempreiteiro_id': ctx['sub_id'],
+              'qtd_pessoas': 11,
+              'horas_trabalhadas': 8.8,
+              'quantidade_produzida': 0},
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert resp.get_json()['apontamento']['qtd_pessoas'] == 11
+
+    with app.app_context():
+        apt = RDOSubempreitadaApontamento.query.filter_by(
+            rdo_id=ctx['rdo_id']).one()
+        assert apt.qtd_pessoas == 11
+        # homem_hora = 0 produzido / (11 * 8.8) = 0.0
+        assert apt.homem_hora == pytest.approx(0.0)
+        # O avanço da tarefa NÃO se mexeu.
+        t = TarefaCronograma.query.get(ctx['tarefa_id'])
+        assert t.percentual_concluido == pytest.approx(40.0, abs=0.01)
