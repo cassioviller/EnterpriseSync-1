@@ -115,12 +115,14 @@ def _cenario():
                 data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 7))
         _tarefa(obra, admin, 'Painelização', ordem=1, duracao_dias=3,
                 data_inicio=date(2026, 7, 8), data_fim=date(2026, 7, 10))
-        return admin, obra.id
+        # `_client_como` recebe o ID; e o objeto ORM devolvido de dentro do
+        # contexto já está destacado quando ele fecha.
+        return admin.id, obra.id
 
 
 def test_primeira_baseline_nasce_revisao_1():
-    admin, obra_id = _cenario()
-    client = _client_como(admin)
+    admin_id, obra_id = _cenario()
+    client = _client_como(admin_id)
 
     resp = client.post(f'/cronograma/obra/{obra_id}/baseline',
                        json={'nome': 'Cronograma aprovado'})
@@ -130,8 +132,8 @@ def test_primeira_baseline_nasce_revisao_1():
 
 
 def test_segunda_baseline_incrementa_a_revisao_e_grava_motivo():
-    admin, obra_id = _cenario()
-    client = _client_como(admin)
+    admin_id, obra_id = _cenario()
+    client = _client_como(admin_id)
     client.post(f'/cronograma/obra/{obra_id}/baseline',
                 json={'nome': 'Cronograma aprovado'})
 
@@ -145,10 +147,10 @@ def test_segunda_baseline_incrementa_a_revisao_e_grava_motivo():
 
 def test_revisao_e_sequencial_por_obra():
     """A sequência conta por obra: duas obras do mesmo tenant não se misturam."""
-    admin_a, obra_a = _cenario()
-    _admin_b, obra_b = _cenario()
+    admin_a_id, obra_a = _cenario()
+    _admin_b_id, obra_b = _cenario()
 
-    client_a = _client_como(admin_a)
+    client_a = _client_como(admin_a_id)
     client_a.post(f'/cronograma/obra/{obra_a}/baseline', json={})
     client_a.post(f'/cronograma/obra/{obra_a}/baseline', json={})
 
@@ -344,8 +346,8 @@ def test_comparar_revisoes_devolve_desvio_de_entrega():
     """V1 termina em 10/07. A obra é replanejada e a V2 termina em 24/07."""
     from models import TarefaCronograma
 
-    admin, obra_id = _cenario()
-    client = _client_como(admin)
+    admin_id, obra_id = _cenario()
+    client = _client_como(admin_id)
 
     r1 = client.post(f'/cronograma/obra/{obra_id}/baseline',
                      json={'nome': 'Aprovado'}).get_json()['baseline']
@@ -375,8 +377,8 @@ def test_comparar_revisoes_devolve_desvio_de_entrega():
 
 
 def test_comparar_recusa_mesma_revisao():
-    admin, obra_id = _cenario()
-    client = _client_como(admin)
+    admin_id, obra_id = _cenario()
+    client = _client_como(admin_id)
     r1 = client.post(f'/cronograma/obra/{obra_id}/baseline',
                      json={}).get_json()['baseline']
 
@@ -387,10 +389,10 @@ def test_comparar_recusa_mesma_revisao():
 
 
 def test_comparar_404_para_baseline_de_outra_obra():
-    admin_a, obra_a = _cenario()
-    admin_b, obra_b = _cenario()
-    client_a = _client_como(admin_a)
-    client_b = _client_como(admin_b)
+    admin_a_id, obra_a = _cenario()
+    admin_b_id, obra_b = _cenario()
+    client_a = _client_como(admin_a_id)
+    client_b = _client_como(admin_b_id)
     ra = client_a.post(f'/cronograma/obra/{obra_a}/baseline',
                        json={}).get_json()['baseline']
     rb = client_b.post(f'/cronograma/obra/{obra_b}/baseline',

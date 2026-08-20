@@ -292,12 +292,14 @@ def _tres_funcionarios():
             db.session.flush()
             ids.append(f.id)
         db.session.commit()
-        return admin, ids
+        # `_client_como` recebe o ID; e o objeto ORM devolvido de dentro do
+        # contexto já está destacado quando ele fecha.
+        return admin.id, ids
 
 
 def test_desativar_em_lote():
-    admin, ids = _tres_funcionarios()
-    client = _client_como(admin)
+    admin_id, ids = _tres_funcionarios()
+    client = _client_como(admin_id)
 
     resp = client.post('/api/funcionarios/toggle-ativo-lote',
                        json={'ids': ids[:2], 'ativo': False})
@@ -311,8 +313,8 @@ def test_desativar_em_lote():
 
 
 def test_reativar_em_lote():
-    admin, ids = _tres_funcionarios()
-    client = _client_como(admin)
+    admin_id, ids = _tres_funcionarios()
+    client = _client_como(admin_id)
     client.post('/api/funcionarios/toggle-ativo-lote',
                 json={'ids': ids, 'ativo': False})
 
@@ -327,9 +329,9 @@ def test_reativar_em_lote():
 def test_lote_ignora_id_de_outro_tenant():
     """Silencioso de propósito: responder 404 diria a um tenant que o id
     existe em outro."""
-    admin_a, ids_a = _tres_funcionarios()
-    _admin_b, ids_b = _tres_funcionarios()
-    client = _client_como(admin_a)
+    admin_a_id, ids_a = _tres_funcionarios()
+    _admin_b_id, ids_b = _tres_funcionarios()
+    client = _client_como(admin_a_id)
 
     resp = client.post('/api/funcionarios/toggle-ativo-lote',
                        json={'ids': [ids_a[0], ids_b[0]], 'ativo': False})
@@ -340,8 +342,8 @@ def test_lote_ignora_id_de_outro_tenant():
 
 
 def test_lote_vazio_recusa():
-    admin, _ids = _tres_funcionarios()
-    client = _client_como(admin)
+    admin_id, _ids = _tres_funcionarios()
+    client = _client_como(admin_id)
 
     resp = client.post('/api/funcionarios/toggle-ativo-lote',
                        json={'ids': [], 'ativo': False})
