@@ -774,7 +774,9 @@ async function _carregarFuncCache() {
         // Fase 0.5/3.2 renomeou a rota: /api/funcionarios/<int> agora é
         // funcionário POR ID (api_funcionarios.py) e devolvia outra coisa —
         // era por isso que a lista vinha vazia/errada.
-        const resp = await fetch(`/api/obras/${obraId}/funcionarios`);
+        // `operacional=1`: o efetivo do RDO é o pessoal de campo. Quem tem
+        // função marcada como administrativa não entra (reunião 2026-08-20).
+        const resp = await fetch(`/api/obras/${obraId}/funcionarios?operacional=1`);
         const data = await resp.json();
         if (data.success && data.funcionarios) {
             _funcCache = data.funcionarios;
@@ -1124,7 +1126,8 @@ async function carregarTarefasRDO() {
         renderizarTarefasRDO(json.tarefas);
         _carregarFuncCache(); // pré-carregar cache para o modal
         // Pré-carregar lista de subempreiteiros caso haja tarefas subempreitada
-        if (json.tarefas.some(t => (t.responsavel || '') === 'subempreitada')) {
+        // Qualquer folha pode receber terceiro, então a lista sempre serve.
+        if (json.tarefas && json.tarefas.length) {
             carregarSubempreiteirosComboNovo();
         }
     } catch(e) {
@@ -1155,6 +1158,33 @@ function confirmarReverterTerceiros(ev) {
 }
 
 // Task #149 — badge e helpers de responsável (Empresa | Subempreitada | Terceiros)
+// Reunião 2026-08-20 — efetivo de terceiro em QUALQUER atividade, não só nas
+// marcadas como subempreitada. É o caso do Abraão na fundação: atividade
+// nossa, com equipe terceira junto. O backend (`apontar-subempreitada`) nunca
+// olhou `responsavel` — a trava era só esta função de desenho.
+//
+// Chama `abrirNovoSubempreitadaNovo` DIRETO, e não `abrirModalEquipeTarefa`:
+// aquela faz dispatch por responsável e, numa tarefa de `empresa`, abriria o
+// modal de efetivo INTERNO. Os ids são `-terceiro-` para não colidirem com o
+// botão de efetivo interno (`btn-equipe-`), que convive com este na mesma
+// linha das tarefas da empresa.
+function _rdoBotaoTerceiros(t, nomeTarefaEsc) {
+    const apontados = (_subPendingApontamentos || [])
+        .filter(a => a.tarefa_cronograma_id === t.id).length;
+    return `
+        <button type="button"
+                class="btn btn-sm ${apontados > 0 ? 'btn-primary' : 'btn-outline-secondary'} d-flex align-items-center gap-1 px-2"
+                id="btn-terceiro-${t.id}"
+                onclick="event.stopPropagation(); abrirNovoSubempreitadaNovo(${t.id})"
+                title="Registrar equipe de terceiro nesta atividade">
+          <i class="fas fa-hammer"></i>
+          <span class="badge rounded-pill bg-light text-dark ms-1" id="badge-terceiro-${t.id}"
+                onclick="event.stopPropagation(); abrirListaSubempreitadaNovo(${t.id}, '${nomeTarefaEsc}')"
+                title="Ver/editar apontamentos de terceiro desta tarefa"
+                style="${apontados > 0 ? '' : 'display:none'};font-size:.7rem;cursor:pointer">${apontados}</span>
+        </button>`;
+}
+
 function _rdoBadgeResponsavel(resp) {
     const r = (resp || 'empresa').toLowerCase();
     if (r === 'subempreitada') {
@@ -1220,23 +1250,13 @@ function _rdoV2RenderTarefaCard(t, isPai, depth, contadorFilhos) {
                       Concluído
                     </label>
                   </div>
+                  ${_rdoBotaoTerceiros(t, nomeTarefaEsc)}
                 </div>`;
         } else if (isSub) {
-            const apontados = (_subPendingApontamentos || []).filter(a => a.tarefa_cronograma_id === t.id).length;
             acaoInner = `
                 <div class="d-flex align-items-center gap-1" onclick="event.stopPropagation()">
                   ${t.quantidade_total ? `<small class="text-muted">Total: ${qty_total}</small>` : ''}
-                  <button type="button"
-                          class="btn btn-sm ${apontados > 0 ? 'btn-primary' : 'btn-outline-secondary'} d-flex align-items-center gap-1 px-2"
-                          id="btn-equipe-${t.id}"
-                          onclick="event.stopPropagation(); abrirModalEquipeTarefa(${t.id}, '${nomeTarefaEsc}')"
-                          title="Novo apontamento de subempreitada">
-                    <i class="fas fa-hammer"></i>
-                    <span class="badge rounded-pill bg-light text-dark ms-1" id="badge-equipe-${t.id}"
-                          onclick="event.stopPropagation(); abrirListaSubempreitadaNovo(${t.id}, '${nomeTarefaEsc}')"
-                          title="Ver/editar apontamentos desta tarefa"
-                          style="${apontados > 0 ? '' : 'display:none'};font-size:.7rem;cursor:pointer">${apontados}</span>
-                  </button>
+                  ${_rdoBotaoTerceiros(t, nomeTarefaEsc)}
                 </div>`;
         } else {
             // M07: campo ÚNICO por modo — nunca dois campos, nunca "percentual"
@@ -1304,7 +1324,8 @@ function _rdoV2RenderTarefaCard(t, isPai, depth, contadorFilhos) {
                         title="Alocar equipe nesta atividade">
                     <i class="fas fa-users"></i>
                     <span class="badge rounded-pill bg-primary ms-1" id="badge-equipe-${t.id}" style="display:none;font-size:.7rem">0</span>
-                </button>`;
+                </button>
+                ${_rdoBotaoTerceiros(t, nomeTarefaEsc)}`;
         }
     }
 
@@ -1752,7 +1773,9 @@ async function carregarSubempreiteirosComboNovo() {
 
 async function _popularSubModalCombosNovo(preselectTarefaId) {
     await carregarSubempreiteirosComboNovo();
-    const tarefas = (window.__tarefasRDOAll || []).filter(t => (t.responsavel || '') === 'subempreitada');
+    // Toda folha pode receber equipe de terceiro (reunião 2026-08-20).
+    // Pais/resumo continuam fora: apontamento é sempre em folha.
+    const tarefas = (window.__tarefasRDOAll || []).filter(t => !t.is_pai);
     const selT = document.getElementById('sub_tarefa_id');
     selT.innerHTML = '<option value="">— Selecione —</option>' +
         tarefas.map(t => `<option value="${t.id}">${t.nome_tarefa}${t.unidade_medida ? ' ('+t.unidade_medida+')' : ''}</option>`).join('');
@@ -1822,8 +1845,11 @@ function salvarSubempreitadaNovo() {
 // Task #150 — Lista inline (popover) de apontamentos de subempreitada por tarefa
 function _atualizarBadgeSubNovo(tarefaId) {
     const tCount = _subPendingApontamentos.filter(a => a.tarefa_cronograma_id === tarefaId).length;
-    const badge = document.getElementById(`badge-equipe-${tarefaId}`);
-    const btn = document.getElementById(`btn-equipe-${tarefaId}`);
+    // `-terceiro-`: em tarefa de empresa o botão de efetivo interno
+    // (`btn-equipe-`) convive com este; escrever lá sobrescreveria o contador
+    // da equipe própria com o número de apontamentos de terceiro.
+    const badge = document.getElementById(`badge-terceiro-${tarefaId}`);
+    const btn = document.getElementById(`btn-terceiro-${tarefaId}`);
     if (badge) {
         badge.textContent = tCount;
         badge.style.display = tCount > 0 ? '' : 'none';

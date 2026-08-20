@@ -5,7 +5,7 @@ from utils.tenant import get_tenant_admin_id
 from views.helpers import get_admin_id_robusta, get_admin_id_dinamico
 from datetime import datetime, date
 import calendar
-from sqlalchemy import text
+from sqlalchemy import or_, text
 import logging
 
 from views import main_bp
@@ -41,9 +41,17 @@ def api_funcionarios_por_obra(obra_id):
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         if not obra:
             return jsonify({'success': False, 'funcionarios': [], 'error': 'Obra não encontrada'}), 404
-        funcionarios = Funcionario.query.filter_by(
-            admin_id=admin_id, ativo=True
-        ).order_by(Funcionario.nome).all()
+        q = Funcionario.query.filter_by(admin_id=admin_id, ativo=True)
+        # `?operacional=1` — o seletor de efetivo do RDO. Sem o parâmetro a
+        # rota continua devolvendo todos os ativos: outras telas dependem
+        # disso. Funcionário SEM função entra no filtro (é o caso do cadastro
+        # rápido que a Ana faz com só o nome), porque presumir escritório
+        # sumiria com ele do RDO justamente no dia em que foi contratado.
+        if request.args.get('operacional') in ('1', 'true', 'True'):
+            q = (q.outerjoin(Funcao, Funcionario.funcao_id == Funcao.id)
+                  .filter(or_(Funcionario.funcao_id.is_(None),
+                              Funcao.operacional.is_(True))))
+        funcionarios = q.order_by(Funcionario.nome).all()
 
         result = []
         for f in funcionarios:

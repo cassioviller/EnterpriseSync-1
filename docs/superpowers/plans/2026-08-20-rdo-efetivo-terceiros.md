@@ -59,7 +59,7 @@ as administrativas depois, pela tela de Funções.
 **Interfaces:**
 - Produces: `Funcao.operacional: bool` (NOT NULL, default/server_default TRUE). Consumido pela Task 2 (`views/api.py`) e pela Task 3 (formulário).
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Criar `tests/test_rdo_efetivo_terceiros.py`:
 
@@ -116,13 +116,13 @@ def test_funcao_pode_ser_marcada_como_administrativa():
         assert f.operacional is False
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_rdo_efetivo_terceiros.py -v`
 
 Esperado: **FAIL** — `TypeError: 'operacional' is an invalid keyword argument for Funcao`.
 
-- [ ] **Step 3: Declarar a coluna no modelo**
+- [x] **Step 3: Declarar a coluna no modelo**
 
 Em `models.py`, na `class Funcao`, logo depois de `salario_base`, inserir:
 
@@ -136,7 +136,7 @@ Em `models.py`, na `class Funcao`, logo depois de `salario_base`, inserir:
                             server_default='true')
 ```
 
-- [ ] **Step 4: Escrever a migration 312**
+- [x] **Step 4: Escrever a migration 312**
 
 Em `migrations.py`, imediatamente antes de `def executar_migracoes():` (linha ~6880), inserir:
 
@@ -163,7 +163,7 @@ def _migration_312_funcao_operacional():
     logger.info("[Migration 312] Concluída com sucesso")
 ```
 
-- [ ] **Step 5: Registrar a migration na lista**
+- [x] **Step 5: Registrar a migration na lista**
 
 Em `migrations.py`, na lista `migrations_to_run`, logo depois da linha da 311, acrescentar:
 
@@ -171,13 +171,13 @@ Em `migrations.py`, na lista `migrations_to_run`, logo depois da linha da 311, a
             (312, "Reuniao 2026-08-20 — funcao.operacional: separa o efetivo de campo do pessoal de escritorio no seletor do RDO. DEFAULT TRUE para ninguem sumir no deploy", _migration_312_funcao_operacional),
 ```
 
-- [ ] **Step 6: Rodar os testes**
+- [x] **Step 6: Rodar os testes**
 
 Run: `python -m pytest tests/test_rdo_efetivo_terceiros.py -v`
 
 Esperado: **os 2 PASSAM.**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add models.py migrations.py tests/test_rdo_efetivo_terceiros.py
@@ -197,7 +197,7 @@ git commit -m "feat(cadastros): funcao.operacional separa efetivo de campo do ad
 - Consumes: `Funcao.operacional` (Task 1).
 - Produces: `GET /api/obras/<obra_id>/funcionarios?operacional=1` → `{'success': True, 'funcionarios': [{'id', 'nome', 'funcao', 'cargo'}], 'total': N}`. Sem o parâmetro o comportamento é o de hoje (todos os ativos) — outras telas consomem essa rota e não devem mudar.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar em `tests/test_rdo_efetivo_terceiros.py`:
 
@@ -254,13 +254,13 @@ def test_api_sem_parametro_continua_devolvendo_todos():
     assert 'Ana Escritorio' in nomes
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_rdo_efetivo_terceiros.py::test_api_efetivo_filtra_administrativo -v`
 
 Esperado: **FAIL** — `'Ana Escritorio' in nomes` (o filtro ainda não existe).
 
-- [ ] **Step 3: Implementar o filtro na API**
+- [x] **Step 3: Implementar o filtro na API**
 
 Em `views/api.py`, dentro de `api_funcionarios_por_obra`, substituir:
 
@@ -291,13 +291,13 @@ Conferir que `request`, `db` e `db.or_` estão importados no topo de
 `views/api.py`; se `db.or_` não existir no namespace, use
 `from sqlalchemy import or_` e troque `db.or_` por `or_`.
 
-- [ ] **Step 4: Rodar os testes**
+- [x] **Step 4: Rodar os testes**
 
 Run: `python -m pytest tests/test_rdo_efetivo_terceiros.py -v`
 
 Esperado: **os 4 PASSAM.**
 
-- [ ] **Step 5: Ligar o filtro na tela do RDO**
+- [x] **Step 5: Ligar o filtro na tela do RDO**
 
 Em `templates/rdo/novo.html`, linha ~777, trocar:
 
@@ -313,7 +313,7 @@ por:
         const resp = await fetch(`/api/obras/${obraId}/funcionarios?operacional=1`);
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add views/api.py templates/rdo/novo.html tests/test_rdo_efetivo_terceiros.py
@@ -335,7 +335,7 @@ Sem isto a coluna da Task 1 só é editável por SQL.
 - Consumes: `Funcao.operacional` (Task 1).
 - Produces: formulário envia `operacional` como checkbox (`'on'` quando marcado, ausente quando não).
 
-- [ ] **Step 1: Acrescentar o checkbox ao formulário**
+- [x] **Step 1: Acrescentar o checkbox ao formulário**
 
 Em `templates/configuracoes/funcao_form.html`, imediatamente antes de
 `<div class="d-flex gap-2">`, inserir:
@@ -357,7 +357,7 @@ Em `templates/configuracoes/funcao_form.html`, imediatamente antes de
           </div>
 ```
 
-- [ ] **Step 2: Ler o campo na criação**
+- [x] **Step 2: Ler o campo na criação**
 
 Em `configuracoes_views.py`, em `criar_funcao`, no construtor `Funcao(...)`,
 acrescentar o argumento:
@@ -379,7 +379,7 @@ O construtor fica:
             )
 ```
 
-- [ ] **Step 3: Ler o campo na edição**
+- [x] **Step 3: Ler o campo na edição**
 
 Em `configuracoes_views.py`, em `editar_funcao`, logo depois de
 `funcao.descricao = request.form.get('descricao')`, inserir:
@@ -392,7 +392,7 @@ Em `configuracoes_views.py`, em `editar_funcao`, logo depois de
             funcao.operacional = ('operacional' in request.form)
 ```
 
-- [ ] **Step 4: Verificar na aplicação rodando**
+- [x] **Step 4: Verificar na aplicação rodando**
 
 Subir a app e, em `/configuracoes/funcoes`:
 1. Criar uma função "Auxiliar Administrativo" com o checkbox **desmarcado**.
@@ -402,7 +402,7 @@ Subir a app e, em `/configuracoes/funcoes`:
 Se a app não subir localmente, invocar a skill `run` para descobrir o comando
 do projeto.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add configuracoes_views.py templates/configuracoes/funcao_form.html
@@ -433,7 +433,7 @@ avanço via `quantidade_produzida`, então um apontamento de efetivo puro
 - Consumes: `POST /cronograma/rdo/<rdo_id>/apontar-subempreitada` com body `{tarefa_cronograma_id, subempreiteiro_id, qtd_pessoas, horas_trabalhadas, quantidade_produzida, observacoes}` → `{'status':'ok','apontamento':{...}}`; `GET /subempreiteiros/api/lista` → `{'status':'ok','subempreiteiros':[...]}`.
 - Produces: nada consumido por tasks posteriores.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar em `tests/test_rdo_efetivo_terceiros.py`:
 
@@ -493,7 +493,7 @@ def test_apontar_terceiro_em_tarefa_de_empresa_nao_mexe_no_percentual():
         assert t.percentual_concluido == pytest.approx(40.0, abs=0.01)
 ```
 
-- [ ] **Step 2: Rodar para ver o resultado**
+- [x] **Step 2: Rodar para ver o resultado**
 
 Run: `python -m pytest tests/test_rdo_efetivo_terceiros.py::test_apontar_terceiro_em_tarefa_de_empresa_nao_mexe_no_percentual -v`
 
@@ -503,14 +503,14 @@ liga. Se falhar no assert do percentual, `atualizar_percentual_tarefa` está
 zerando a tarefa e a mudança de front **não pode** ser feita antes de corrigir
 isso — pare e reporte.
 
-- [ ] **Step 3: Commit do teste**
+- [x] **Step 3: Commit do teste**
 
 ```bash
 git add tests/test_rdo_efetivo_terceiros.py
 git commit -m "test(rdo): apontar efetivo de terceiro em tarefa da empresa nao move percentual"
 ```
 
-- [ ] **Step 4: Desenhar o botão de terceiros em toda folha**
+- [x] **Step 4: Desenhar o botão de terceiros em toda folha**
 
 Em `templates/rdo/novo.html`, no bloco `acaoInner` (~linha 1200), o `if/else`
 por responsável hoje é mutuamente exclusivo. Trocar a estrutura para que o
@@ -583,7 +583,7 @@ botão de efetivo interno. O fim do `acaoInner` fica:
                 ${_rdoBotaoTerceiros(t, nomeTarefaEsc)}`;
 ```
 
-- [ ] **Step 5: Liberar a lista de tarefas do modal de terceiros**
+- [x] **Step 5: Liberar a lista de tarefas do modal de terceiros**
 
 Em `templates/rdo/novo.html`, em `_subCarregarTarefas` (~linha 1755), trocar:
 
@@ -604,7 +604,7 @@ conferir o nome real da chave em `cronograma_views.py:2447-2580` e usar a que
 existir (a rota monta o dict lá); em último caso, filtrar por
 `!(window.__tarefasRDOAll || []).some(x => x.tarefa_pai_id === t.id)`.
 
-- [ ] **Step 6: Liberar o pré-carregamento da lista de subempreiteiros**
+- [x] **Step 6: Liberar o pré-carregamento da lista de subempreiteiros**
 
 Em `templates/rdo/novo.html`, ~linha 1127, trocar:
 
@@ -618,7 +618,7 @@ por:
         if (json.tarefas && json.tarefas.length) {
 ```
 
-- [ ] **Step 7: Verificar na aplicação rodando**
+- [x] **Step 7: Verificar na aplicação rodando**
 
 Abrir um RDO novo numa obra com cronograma e conferir:
 1. Numa atividade de `empresa`, existem **dois** botões: 👥 (efetivo interno) e 🔨 (terceiro).
@@ -627,7 +627,7 @@ Abrir um RDO novo numa obra com cronograma e conferir:
 4. Recarregar a tela e conferir que o percentual da atividade **não** mudou.
 5. Numa atividade de `terceiros`, o checkbox "Concluído" continua funcionando e o botão 🔨 aparece ao lado.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add templates/rdo/novo.html
@@ -649,13 +649,13 @@ mesmo tratamento, senão o RDO fica editável só pela criação.
 - Consumes: as mesmas rotas da Task 4.
 - Produces: nada.
 
-- [ ] **Step 1: Mapear as ocorrências**
+- [x] **Step 1: Mapear as ocorrências**
 
 Run: `grep -n "subempreitada\|responsavel" templates/rdo/editar_rdo.html`
 
 Anotar cada linha que condiciona UI a `responsavel === 'subempreitada'`.
 
-- [ ] **Step 2: Aplicar as mesmas trocas da Task 4**
+- [x] **Step 2: Aplicar as mesmas trocas da Task 4**
 
 Para cada ocorrência mapeada, aplicar a transformação equivalente aos Steps 4,
 5 e 6 da Task 4: o bloco de terceiros deixa de ser exclusivo do responsável
@@ -665,12 +665,12 @@ Se `editar_rdo.html` **não** tiver o bloco de apontamento de subempreitada (só
 menções em outro contexto, como um resumo de leitura), registrar isso no commit
 e não inventar tela nova — a criação é o fluxo de campo.
 
-- [ ] **Step 3: Verificar na aplicação rodando**
+- [x] **Step 3: Verificar na aplicação rodando**
 
 Editar o RDO criado na Task 4 Step 7 e conferir que o apontamento "Abraão / 11
 pessoas" aparece e pode ser alterado e excluído.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add templates/rdo/editar_rdo.html

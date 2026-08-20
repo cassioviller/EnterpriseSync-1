@@ -1433,6 +1433,23 @@ def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
         .scalar()
     ) or 0.0
 
+    # Nada de onde derivar: NÃO escrever nada e sair.
+    #
+    # O percentual é DERIVADO dos apontamentos — mas nem todo percentual veio
+    # deles. A carga inicial de `pct_project` grava direto em
+    # `percentual_concluido` quando a obra nunca teve RDO
+    # (services/cronograma_versao_service.py:615-622). Sem esta guarda, todos
+    # os ramos abaixo calculam 0 e sobrescrevem o avanço importado do MS
+    # Project — o que acontecia no PRIMEIRO registro de efetivo de terceiro
+    # (produção 0, que é presença e não produção) numa obra recém-importada.
+    #
+    # Contrapartida assumida: apagado o ÚLTIMO apontamento de uma tarefa, ela
+    # fica no valor derivado por último em vez de voltar a 0. Preferível —
+    # zerar ali seria tão arbitrário quanto (a carga inicial já se perdeu) e
+    # acontece com o usuário na tela, não silenciosamente.
+    if ultimo is None and not qtd_sub:
+        return
+
     tem_total = bool(tarefa.quantidade_total and tarefa.quantidade_total > 0)
     percentual_livre = _percentual_livre(admin_id)
 
@@ -1462,9 +1479,6 @@ def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
             round((acum_empresa + float(qtd_sub))
                   / tarefa.quantidade_total * 100, 2)
         )
-    elif ultimo is None and not qtd_sub:
-        # Sem apontamentos — mantém 0
-        tarefa.percentual_concluido = 0.0
     else:
         # Sem quantidade_total, OU tarefa cujo histórico da empresa foi
         # lançado em percentual: o avanço da empresa é o percentual_realizado
