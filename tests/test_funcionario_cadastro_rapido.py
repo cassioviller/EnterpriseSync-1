@@ -4,6 +4,7 @@ A Ana cadastra e remove gente toda semana ("Fabrício entrou, ficou dois
 dias e já saiu"). Exigir CPF na hora do cadastro trava o fluxo: ela não
 sabe o CPF de quem acabou de chegar na obra.
 """
+import hashlib
 import os
 import sys
 from datetime import date
@@ -16,9 +17,36 @@ import main  # noqa: F401 — registra os blueprints
 from app import app, db
 from models import Funcionario
 from test_cronograma_endpoints_m05 import _client_como
-from test_cronograma_versao_service import _ambiente
+from test_cronograma_versao_service import _ambiente, _suf
 
 pytestmark = pytest.mark.integration
+
+
+def _cpf_teste() -> str:
+    """CPF de teste sem colisão contra o banco compartilhado (nunca
+    limpo entre execuções — ver tests/conftest.py).
+
+    Fix round 4 — antes, os CPFs de teste vinham de `admin_id % 100`.
+    Como `admin_id` é sequencial e o banco nunca é limpo, o módulo
+    reciclava a cada ~100 execuções e colidia com o UNIQUE de
+    `Funcionario.cpf` (`funcionario_cpf_key`) — a própria inserção de
+    setup do teste, antes de ele exercitar qualquer coisa, IntegrityError.
+    Medido: 32/31/31 linhas acumuladas nos prefixos 33333333/44444444/
+    55555555 depois de ~10 execuções desta suíte — em torno de 1 em 3
+    falhas espúrias por execução, piorando a cada rodada.
+
+    `_suf()` é o mesmo gerador (tempo de alta resolução + uuid) que
+    `_ambiente()` usa para as identidades de admin/obra — é por isso que a
+    suíte irmã (test_cronograma_versao_service.py e as que importam
+    `_ambiente`) não acumula colisão. Aqui ele é hasheado (SHA-1) e
+    reduzido para caber no tamanho de um CPF real (11 dígitos, sem
+    pontuação — o que a coluna `String(14)` comporta com folga),
+    mantendo o dado reconhecível como sintético (nenhum CPF real de 11
+    dígitos tem essa origem) e com espaço de colisão de ~10^11 — nada
+    comparável ao módulo por 100 que causou o problema.
+    """
+    n = int(hashlib.sha1(_suf().encode()).hexdigest(), 16) % (10 ** 11)
+    return f'{n:011d}'
 
 
 @pytest.fixture(autouse=True)
@@ -106,11 +134,11 @@ def test_post_editar_limpando_cpf_grava_null_e_preserva_outros_campos():
         c = _client_como(admin_id)
 
         f1 = Funcionario(codigo=f'E1{admin_id}', nome='Original Um',
-                          cpf=f'11111111{admin_id % 100:03d}',
+                          cpf=_cpf_teste(),
                           data_admissao=date(2026, 8, 20),
                           admin_id=admin_id, ativo=True)
         f2 = Funcionario(codigo=f'E2{admin_id}', nome='Original Dois',
-                          cpf=f'22222222{admin_id % 100:03d}',
+                          cpf=_cpf_teste(),
                           data_admissao=date(2026, 8, 20),
                           admin_id=admin_id, ativo=True)
         db.session.add_all([f1, f2])
@@ -177,7 +205,7 @@ def test_post_editar_mantendo_cpf_igual_nao_se_autorrejeita():
         admin_id = admin.id
         c = _client_como(admin_id)
 
-        cpf_original = f'33333333{admin_id % 100:03d}'
+        cpf_original = _cpf_teste()
         f = Funcionario(codigo=f'M1{admin_id}', nome='Nome Original',
                          cpf=cpf_original, data_admissao=date(2026, 8, 20),
                          admin_id=admin_id, ativo=True)
@@ -244,12 +272,12 @@ def test_post_editar_cpf_duplicado_entre_admins_e_rejeitado_sem_perder_dados():
         admin_a, _obra_a = _ambiente()
         admin_b, _obra_b = _ambiente()
 
-        cpf_do_a = f'44444444{admin_a.id % 100:03d}'
+        cpf_do_a = _cpf_teste()
         fa = Funcionario(codigo=f'DA{admin_a.id}', nome='Funcionario A',
                           cpf=cpf_do_a, data_admissao=date(2026, 8, 20),
                           admin_id=admin_a.id, ativo=True)
         fb = Funcionario(codigo=f'DB{admin_b.id}', nome='Funcionario B Original',
-                          cpf=f'55555555{admin_b.id % 100:03d}',
+                          cpf=_cpf_teste(),
                           data_admissao=date(2026, 8, 20),
                           admin_id=admin_b.id, ativo=True)
         db.session.add_all([fa, fb])
