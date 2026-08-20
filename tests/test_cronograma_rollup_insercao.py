@@ -122,3 +122,31 @@ def test_rollup_roda_no_caminho_de_insercao():
         recalcular_obra(obra_id, admin_id, cliente=False, commit=True)
 
     assert _pct_do_pai(pai_id) == pytest.approx(50.0, abs=0.01)
+
+
+def test_rollup_agrega_avo_a_partir_do_pai_ja_agregado():
+    """Árvore de 3 níveis com `ordem` que NÃO acompanha a profundidade.
+
+    Raiz(ordem=90) → Sub(ordem=10) → duas folhas, uma em 100% e outra sem
+    apontamento. A Sub tem de virar 50% ANTES de a Raiz ler a Sub. Com
+    ordenação por `ordem` decrescente a Raiz (90) é processada primeiro,
+    lê a Sub ainda em 0 e grava 0.
+    """
+    with app.app_context():
+        admin, obra = _ambiente()
+        raiz = _tarefa(obra, admin, 'Raiz', ordem=90, duracao_dias=1,
+                       data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 1))
+        sub = _tarefa(obra, admin, 'Sub', ordem=10, duracao_dias=1,
+                      data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 1),
+                      tarefa_pai_id=raiz.id)
+        _folha(obra, admin, sub, 'Folha A', ordem=11, duracao=5, pct=100.0)
+        _folha(obra, admin, sub, 'Folha B', ordem=12, duracao=5, pct=None)
+        admin_id, obra_id = admin.id, obra.id
+        raiz_id, sub_id = raiz.id, sub.id
+
+    with app.app_context():
+        recalcular_obra(obra_id, admin_id, cliente=False, commit=True)
+
+    assert _pct_do_pai(sub_id) == pytest.approx(50.0, abs=0.01)
+    # A Raiz tem UMA filha (Sub, duracao 1) já em 50% ⇒ 50%.
+    assert _pct_do_pai(raiz_id) == pytest.approx(50.0, abs=0.01)

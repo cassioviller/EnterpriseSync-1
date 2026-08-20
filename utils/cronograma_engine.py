@@ -600,16 +600,41 @@ def rollup_percentual_pos_recalculo(tarefas: list, pai_ids: set, admin_id: int) 
             _atualizar_percentual_sem_commit(tarefa, admin_id, percentual_livre,
                                              hist_pct)
 
-    # Bottom-up: % dos pais calculado a partir dos filhos (média ponderada por duração)
+    # Bottom-up: % dos pais calculado a partir dos filhos (média ponderada por
+    # duração). A ordem de processamento é por PROFUNDIDADE decrescente, não
+    # por `ordem` — mesma correção que `rollup_realizado` (abaixo) já carrega.
+    # `ordem` só coincide com profundidade enquanto a numeração for pré-ordem
+    # DFS, e o caminho "anexar no fim" de `criar_tarefa` grava `ordem = max+1`
+    # numa FILHA, quebrando a premissa: o pai acima seria calculado antes do
+    # subgrupo e leria 0 em vez do agregado.
+    por_id = {t.id: t for t in tarefas}
+    filhas_por_pai: dict = {}
+    for t in tarefas:
+        if t.tarefa_pai_id:
+            filhas_por_pai.setdefault(t.tarefa_pai_id, []).append(t)
+
+    def _profundidade(tarefa_id) -> int:
+        """Distância até a raiz. Defensivo contra ciclo e pai órfão."""
+        nivel, visto, atual = 0, {tarefa_id}, por_id.get(tarefa_id)
+        while atual is not None and atual.tarefa_pai_id:
+            pai_id = atual.tarefa_pai_id
+            if pai_id in visto:  # ciclo: para de subir
+                break
+            visto.add(pai_id)
+            nivel += 1
+            atual = por_id.get(pai_id)
+        return nivel
+
     pais = [t for t in tarefas if t.id in pai_ids]
-    for pai in sorted(pais, key=lambda t: t.ordem, reverse=True):
-        filhas = [t for t in tarefas if t.tarefa_pai_id == pai.id]
+    for pai in sorted(pais, key=lambda t: _profundidade(t.id), reverse=True):
+        filhas = filhas_por_pai.get(pai.id, [])
         if not filhas:
             continue
         total_dur = sum(max(f.duracao_dias or 1, 1) for f in filhas)
         if total_dur > 0:
             pai.percentual_concluido = round(
-                sum((f.percentual_concluido or 0) * max(f.duracao_dias or 1, 1) for f in filhas) / total_dur, 2
+                sum((f.percentual_concluido or 0) * max(f.duracao_dias or 1, 1)
+                    for f in filhas) / total_dur, 2
             )
 
 
