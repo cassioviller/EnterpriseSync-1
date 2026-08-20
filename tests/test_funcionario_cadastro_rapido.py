@@ -358,17 +358,34 @@ def test_desativar_em_lote():
 
 
 def test_reativar_em_lote():
+    """Fix round 1 — a versão anterior só conferia o estado final
+    (`ativo is True`), que também é o estado INICIAL de `_tres_funcionarios`
+    (todos nascem `ativo=True`). Isso deixava o teste incapaz de distinguir
+    "reativação funcionou" de "nada aconteceu": um stub que devolvesse
+    `{'alterados': len(ids)}` sem tocar no banco passava igual, porque o
+    primeiro POST (desativar) virava no-op e o segundo (reativar) só
+    reencontrava o `True` que já estava lá desde o início.
+
+    Agora o teste pina o estado intermediário — depois do primeiro POST,
+    antes do segundo — então uma rota que não persiste nada falha já nessa
+    checagem, antes mesmo de chegar na reativação."""
     admin_id, ids = _tres_funcionarios()
     client = _client_como(admin_id)
     client.post('/api/funcionarios/toggle-ativo-lote',
                 json={'ids': ids, 'ativo': False})
+
+    # Pina o estado intermediário: se a desativação foi um no-op, isto já
+    # falha aqui, antes da reativação ter qualquer chance de "acertar por
+    # coincidência" o estado inicial.
+    with app.app_context():
+        assert all(Funcionario.query.get(i).ativo is False for i in ids)
 
     resp = client.post('/api/funcionarios/toggle-ativo-lote',
                        json={'ids': ids, 'ativo': True})
 
     assert resp.get_json()['alterados'] == 3
     with app.app_context():
-        assert all(Funcionario.query.get(i).ativo for i in ids)
+        assert all(Funcionario.query.get(i).ativo is True for i in ids)
 
 
 def test_lote_ignora_id_de_outro_tenant():
@@ -384,6 +401,50 @@ def test_lote_ignora_id_de_outro_tenant():
     assert resp.get_json()['alterados'] == 1
     with app.app_context():
         assert Funcionario.query.get(ids_b[0]).ativo is True
+
+
+def test_lote_nao_conta_quem_ja_estava_no_estado_pedido():
+    """Fix round 1 — `alterados` precisa contar só quem de fato mudou de
+    estado, não quantos ids vieram na lista. Sem essa distinção, mandar de
+    novo um id que já está inativo infla a contagem, e a confirmação
+    ("N desativados") passa a mentir sobre o que realmente aconteceu — na
+    tela ela é o único registro do que a ação fez.
+
+    Este teste desativa 3 funcionários primeiro e depois manda um lote com
+    esses 3 (já inativos) MAIS 2 ainda ativos, pedindo `ativo=False`.
+    Só os 2 ainda ativos podem contar. Sem o guard `if f.ativo == ativo:
+    continue` na rota, os 5 seriam contados."""
+    admin_id, ids_inativos = _tres_funcionarios()
+    client = _client_como(admin_id)
+    client.post('/api/funcionarios/toggle-ativo-lote',
+                json={'ids': ids_inativos, 'ativo': False})
+    with app.app_context():
+        assert all(Funcionario.query.get(i).ativo is False
+                   for i in ids_inativos)
+
+    # Dois funcionários extras do MESMO tenant, ainda ativos — cobre o
+    # guard de idempotência dentro do próprio tenant (id fora do tenant já
+    # é coberto por test_lote_ignora_id_de_outro_tenant, e por outro
+    # motivo: filtro de admin_id, não o guard `if f.ativo == ativo`).
+    with app.app_context():
+        f_ativo1 = Funcionario(codigo=f'X1{admin_id}', nome='Extra Um',
+                               cpf=None, data_admissao=date(2026, 8, 20),
+                               admin_id=admin_id, ativo=True)
+        f_ativo2 = Funcionario(codigo=f'X2{admin_id}', nome='Extra Dois',
+                               cpf=None, data_admissao=date(2026, 8, 20),
+                               admin_id=admin_id, ativo=True)
+        db.session.add_all([f_ativo1, f_ativo2])
+        db.session.commit()
+        ids_extra_ativos = [f_ativo1.id, f_ativo2.id]
+
+    resp = client.post('/api/funcionarios/toggle-ativo-lote',
+                       json={'ids': ids_inativos + ids_extra_ativos,
+                             'ativo': False})
+
+    assert resp.get_json()['alterados'] == 2, resp.get_data(as_text=True)
+    with app.app_context():
+        assert all(Funcionario.query.get(i).ativo is False
+                   for i in ids_inativos + ids_extra_ativos)
 
 
 def test_lote_vazio_recusa():
