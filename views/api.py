@@ -559,19 +559,29 @@ def editar_funcionario(funcionario_id):
             flash('[ERROR] Funcionário não encontrado', 'error')
             return redirect(url_for('main.funcionarios'))
         
-        # Atualizar dados
-        funcionario.nome = request.form.get('nome', '').strip()
-
         # Reunião 2026-08-20 — CPF é opcional. String vazia vira None pelo
         # mesmo motivo do cadastro (views/employees.py): gravar '' faria o
         # UNIQUE colidir no segundo funcionário editado para CPF em branco.
+        #
+        # Fix round 3 — esta checagem tem que rodar ANTES de qualquer
+        # `funcionario.<campo> = ...`, não depois. Antes, `funcionario.nome`
+        # era atribuído primeiro; quando o guard abaixo rejeitava e dava
+        # `return` cedo, essa atribuição já tinha acontecido no objeto
+        # rastreado pela sessão. Esse caminho nunca chama `db.session.
+        # commit()` nem `rollback()` explícito — em produção, o teardown do
+        # app context (fim da requisição) desfaz a atribuição pendente, mas
+        # silenciosamente: o usuário via só o erro de CPF duplicado e não
+        # fazia ideia de que a troca de nome (ou qualquer outro campo que
+        # ele tivesse mudado) também tinha sumido. Validar tudo primeiro e
+        # só depois mutar o objeto garante que uma rejeição não deixa nada
+        # pendente na sessão, em vez de depender do teardown para limpar.
         novo_cpf = request.form.get('cpf', '').strip() or None
         if novo_cpf:
             # Duplicidade só é checada com CPF informado, e exclui o
             # próprio registro — editar sem trocar o CPF não pode se
             # autorrejeitar.
             #
-            # Fix round 2 — a checagem é DELIBERADAMENTE global (sem
+            # A checagem é DELIBERADAMENTE global (sem
             # `Funcionario.admin_id == admin_id`): o índice UNIQUE de
             # `Funcionario.cpf` (models.py) não tem coluna de tenant, então
             # um filtro por admin_id passaria mesmo quando o CPF já existe
@@ -589,6 +599,9 @@ def editar_funcionario(funcionario_id):
             if funcionario_existente:
                 flash(f'[ERROR] CPF {novo_cpf} já está cadastrado para {funcionario_existente.nome}!', 'error')
                 return redirect(url_for('main.funcionarios'))
+
+        # Atualizar dados — só depois de toda validação acima ter passado.
+        funcionario.nome = request.form.get('nome', '').strip()
         funcionario.cpf = novo_cpf
         funcionario.rg = request.form.get('rg', '').strip()
         

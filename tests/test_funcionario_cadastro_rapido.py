@@ -159,7 +159,19 @@ def test_post_editar_mantendo_cpf_igual_nao_se_autorrejeita():
     de duplicidade contra ele mesmo — é o que a exclusão `Funcionario.id !=
     funcionario_id` garante. Sem essa cláusula, o bug de perda de dados do
     Critical 2 vira pior ainda: impossível salvar QUALQUER edição de quem
-    já tem CPF, mesmo sem mexer nele."""
+    já tem CPF, mesmo sem mexer nele.
+
+    Fix round 3 — a rerevisão provou por mutação que a versão anterior
+    deste teste NÃO isolava essa cláusula: removendo só o `Funcionario.id
+    != funcionario_id` da rota, o teste continuava passando (o guard
+    disparava mais cedo, `funcionario.cpf` nunca era tocado, então "cpf
+    inalterado" valia mesmo no código quebrado; e o nome "persistia" só
+    porque o teste e a rota compartilhavam a mesma sessão sem teardown no
+    meio). A leitura final agora cruza um limite de sessão de verdade
+    (`db.session.remove()` — o mesmo que `teardown_appcontext` do
+    Flask-SQLAlchemy chama ao fim de toda requisição real) antes de
+    reler o funcionário, para provar contra estado commitado, não contra
+    a identity map da própria requisição."""
     with app.app_context():
         admin, _obra = _ambiente()
         admin_id = admin.id
@@ -178,7 +190,8 @@ def test_post_editar_mantendo_cpf_igual_nao_se_autorrejeita():
         })
         assert resp.status_code in (200, 302)
 
-        db.session.expire_all()
+        # Cruza um limite de sessão de verdade — ver docstring.
+        db.session.remove()
         f_depois = Funcionario.query.get(f_id)
         assert f_depois.cpf == cpf_original, (
             f"a autoexclusão falhou — CPF virou {f_depois.cpf!r}")
@@ -190,16 +203,43 @@ def test_post_editar_cpf_duplicado_entre_admins_e_rejeitado_sem_perder_dados():
     """CPF já usado por funcionário de OUTRO admin precisa ser rejeitado
     pela checagem do servidor (caminho amigável — flash específico e
     redirect), não descoberto só no commit via UniqueViolation não
-    tratada. O guard roda ANTES de `funcionario.cpf = novo_cpf`, então o
-    CPF nunca é sobrescrito — mas `funcionario.nome` já tinha sido
-    atribuído na linha de cima antes do guard, e como a rota nunca chega
-    a chamar `db.session.rollback()` neste caminho (não houve exceção —
-    o guard só faz um `return redirect` limpo), esse campo irmão
-    permanece. É a diferença que importa em relação ao Critical 2 antigo:
-    lá, o `except` genérico rodava `db.session.rollback()` e apagava TUDO
-    da submissão de uma vez, de forma silenciosa. Aqui, só o CPF é
-    barrado; o nome trocado na mesma submissão não é vítima colateral de
-    um rollback que nunca acontece."""
+    tratada.
+
+    Fix round 3 — a rerevisão mostrou, cruzando um limite de sessão de
+    verdade (`db.session.remove()`, o que `teardown_appcontext` do
+    Flask-SQLAlchemy chama ao fim de toda requisição real), que o nome
+    trocado na mesma submissão NÃO sobrevivia em produção: antes,
+    `funcionario.nome` era atribuído antes do guard de CPF, e como esse
+    caminho de rejeição nunca chamava `db.session.commit()`, o teardown
+    da requisição real desfazia essa atribuição pendente — só que
+    silenciosamente, sem o usuário saber que a troca de nome também
+    tinha sumido junto com a rejeição do CPF. O teste anterior não via
+    isso porque reaproveitava a mesma sessão da requisição sem nenhum
+    teardown no meio.
+
+    A rota agora valida o CPF ANTES de atribuir qualquer campo (inclusive
+    `nome`), então a rejeição é atômica de verdade: nada fica pendente
+    na sessão para o teardown desfazer, porque nada foi tocado.
+
+    Duas camadas de verificação, porque uma sozinha não distingue a
+    ordem certa da errada:
+    1. Logo após o POST, ainda dentro da MESMA sessão/app_context (o
+       test_client reaproveita o `with app.app_context():` de fora, não
+       abre um novo) — `fb` aqui é o MESMO objeto Python que a rota leu
+       e mutou via identity map do SQLAlchemy (mesma sessão, mesma PK).
+       Se a atribuição de `nome` rodasse antes do guard, `fb.nome` já
+       apareceria trocado nesse ponto, mesmo sem nenhum commit — é
+       exatamente essa leitura em memória que provou o bug nesta rodada.
+       Essa é a camada que realmente distingue a ordem certa da errada.
+    2. Depois de um `db.session.remove()` (o que `teardown_appcontext`
+       do Flask-SQLAlchemy chama ao fim de toda requisição real),
+       relendo do zero — prova o estado commitado de verdade. Sozinha
+       essa camada NÃO distingue a ordem: como `db.session.commit()`
+       nunca é alcançado no caminho de rejeição em nenhuma das duas
+       ordens, o rollback do `remove()` desfaz a atribuição pendente de
+       qualquer jeito — foi assim que a mutação nesta rodada (reverter só
+       a ordem, sem mexer no guard) passou o teste até eu adicionar a
+       camada 1."""
     with app.app_context():
         admin_a, _obra_a = _ambiente()
         admin_b, _obra_b = _ambiente()
@@ -216,8 +256,9 @@ def test_post_editar_cpf_duplicado_entre_admins_e_rejeitado_sem_perder_dados():
         db.session.commit()
         fb_id = fb.id
         cpf_original_b = fb.cpf
+        admin_b_id = admin_b.id
 
-        c_b = _client_como(admin_b.id)
+        c_b = _client_como(admin_b_id)
         resp = c_b.post(f'/funcionarios/{fb_id}/editar', data={
             'nome': 'Funcionario B Renomeado', 'cpf': cpf_do_a,
         })
@@ -230,14 +271,18 @@ def test_post_editar_cpf_duplicado_entre_admins_e_rejeitado_sem_perder_dados():
         assert any('já está cadastrado' in msg for _cat, msg in flashes), (
             f"esperava flash amigável de duplicidade, veio {flashes!r}")
 
-        db.session.expire_all()
+        # Camada 1 — mesma sessão, mesmo objeto (identity map): prova que
+        # `funcionario.nome` nunca chegou a ser atribuído durante esta
+        # requisição, não só que a atribuição foi desfeita depois.
+        assert fb.nome == 'Funcionario B Original', (
+            "nome foi atribuído no objeto ANTES da rejeição — o guard de "
+            "CPF não está rodando antes de mutar o funcionário")
+
+        # Camada 2 — cruza um limite de sessão de verdade (ver docstring).
+        db.session.remove()
         fb_depois = Funcionario.query.get(fb_id)
-        # O CPF duplicado NUNCA foi atribuído — o guard roda antes da
-        # linha `funcionario.cpf = novo_cpf`.
         assert fb_depois.cpf == cpf_original_b, (
             f"CPF de outro admin vazou para dentro do tenant B: {fb_depois.cpf!r}")
-        # O nome, ao contrário, não foi vítima de um rollback silencioso —
-        # não houve UniqueViolation nem exceção nenhuma neste caminho.
-        assert fb_depois.nome == 'Funcionario B Renomeado', (
-            "nome sumiu sem nenhuma exceção ter sido lançada — "
-            "sinal de um rollback silencioso indevido")
+        assert fb_depois.nome == 'Funcionario B Original', (
+            "nome persistiu no banco apesar da edição ter sido rejeitada — "
+            "a rejeição não é atômica")
