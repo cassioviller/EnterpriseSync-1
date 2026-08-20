@@ -433,7 +433,7 @@ avanço via `quantidade_produzida`, então um apontamento de efetivo puro
 - Consumes: `POST /cronograma/rdo/<rdo_id>/apontar-subempreitada` com body `{tarefa_cronograma_id, subempreiteiro_id, qtd_pessoas, horas_trabalhadas, quantidade_produzida, observacoes}` → `{'status':'ok','apontamento':{...}}`; `GET /subempreiteiros/api/lista` → `{'status':'ok','subempreiteiros':[...]}`.
 - Produces: nada consumido por tasks posteriores.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar em `tests/test_rdo_efetivo_terceiros.py`:
 
@@ -493,7 +493,7 @@ def test_apontar_terceiro_em_tarefa_de_empresa_nao_mexe_no_percentual():
         assert t.percentual_concluido == pytest.approx(40.0, abs=0.01)
 ```
 
-- [ ] **Step 2: Rodar para ver o resultado**
+- [x] **Step 2: Rodar para ver o resultado**
 
 Run: `python -m pytest tests/test_rdo_efetivo_terceiros.py::test_apontar_terceiro_em_tarefa_de_empresa_nao_mexe_no_percentual -v`
 
@@ -503,14 +503,14 @@ liga. Se falhar no assert do percentual, `atualizar_percentual_tarefa` está
 zerando a tarefa e a mudança de front **não pode** ser feita antes de corrigir
 isso — pare e reporte.
 
-- [ ] **Step 3: Commit do teste**
+- [x] **Step 3: Commit do teste**
 
 ```bash
 git add tests/test_rdo_efetivo_terceiros.py
 git commit -m "test(rdo): apontar efetivo de terceiro em tarefa da empresa nao move percentual"
 ```
 
-- [ ] **Step 4: Desenhar o botão de terceiros em toda folha**
+- [x] **Step 4: Desenhar o botão de terceiros em toda folha**
 
 Em `templates/rdo/novo.html`, no bloco `acaoInner` (~linha 1200), o `if/else`
 por responsável hoje é mutuamente exclusivo. Trocar a estrutura para que o
@@ -583,7 +583,7 @@ botão de efetivo interno. O fim do `acaoInner` fica:
                 ${_rdoBotaoTerceiros(t, nomeTarefaEsc)}`;
 ```
 
-- [ ] **Step 5: Liberar a lista de tarefas do modal de terceiros**
+- [x] **Step 5: Liberar a lista de tarefas do modal de terceiros**
 
 Em `templates/rdo/novo.html`, em `_subCarregarTarefas` (~linha 1755), trocar:
 
@@ -604,7 +604,7 @@ conferir o nome real da chave em `cronograma_views.py:2447-2580` e usar a que
 existir (a rota monta o dict lá); em último caso, filtrar por
 `!(window.__tarefasRDOAll || []).some(x => x.tarefa_pai_id === t.id)`.
 
-- [ ] **Step 6: Liberar o pré-carregamento da lista de subempreiteiros**
+- [x] **Step 6: Liberar o pré-carregamento da lista de subempreiteiros**
 
 Em `templates/rdo/novo.html`, ~linha 1127, trocar:
 
@@ -618,7 +618,7 @@ por:
         if (json.tarefas && json.tarefas.length) {
 ```
 
-- [ ] **Step 7: Verificar na aplicação rodando**
+- [x] **Step 7: Verificar na aplicação rodando**
 
 Abrir um RDO novo numa obra com cronograma e conferir:
 1. Numa atividade de `empresa`, existem **dois** botões: 👥 (efetivo interno) e 🔨 (terceiro).
@@ -627,7 +627,7 @@ Abrir um RDO novo numa obra com cronograma e conferir:
 4. Recarregar a tela e conferir que o percentual da atividade **não** mudou.
 5. Numa atividade de `terceiros`, o checkbox "Concluído" continua funcionando e o botão 🔨 aparece ao lado.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add templates/rdo/novo.html
