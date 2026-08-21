@@ -299,7 +299,15 @@ divergência. Esta task não é de código.
 Enviar o capítulo (ou `/manual` direto) e pedir resposta a três perguntas:
 1. Tem alguma regra aqui que **não dá para cumprir** no campo? Qual e por quê?
 2. Tem alguma coisa que você já registra e **não está aqui**?
-3. Os cinco motivos de devolução no fim são justos?
+3. Os seis motivos de devolução no fim são justos? (eram cinco no rascunho;
+   o sexto — RDO esquecido em rascunho — entrou na escrita da Task 1)
+
+> 📎 21/08 — **pacote de revisão pronto**: o capítulo em página legível no
+> celular, com as três perguntas no topo, em
+> <https://claude.ai/code/artifact/282bd8c0-a88f-4f9e-ba63-a9a4a7dc9e09>
+> (privada; compartilhar pelo menu da página). O envio ao Alan e ao Abel e a
+> coleta das respostas são passo humano — o Step 1 só fecha quando as
+> respostas voltarem.
 
 - [ ] **Step 2: Aplicar as correções**
 
