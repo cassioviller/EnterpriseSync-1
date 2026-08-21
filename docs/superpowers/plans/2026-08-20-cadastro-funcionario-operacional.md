@@ -703,7 +703,7 @@ Na função encontrada, depois do laço existente sobre os cards, acrescentar:
 Ajustar o nome da variável do termo de busca (`termo`) para o que a função já
 usa — não renomear a variável existente.
 
-- [ ] **Step 6: Verificar na aplicação rodando**
+- [x] **Step 6: Verificar na aplicação rodando**
 
 Em `/funcionarios`:
 1. Alternar Lista / Cards; recarregar a página e confirmar que voltou no formato escolhido.
