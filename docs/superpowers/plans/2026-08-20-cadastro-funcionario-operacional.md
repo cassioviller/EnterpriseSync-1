@@ -10,6 +10,14 @@
 
 **Spec:** Não há spec escrito. Este plano nasce da sessão de brainstorming de 2026-08-20.
 
+
+## Estado — 2026-08-21
+
+Tasks 1 (CPF opcional, migration 313) e 2 (ativar/desativar em lote)
+**executadas e mescladas no `main`** — resgatadas da branch
+`sdd/reuniao-20-08`, que ficou fora do merge do dia 20. A Task 3 (visão em
+lista com seleção múltipla) **não foi começada**.
+
 ## Global Constraints
 
 - Migrations em `migrations.py`: função `_migration_NNN_slug()` + entrada na lista `migrations_to_run` (~linha 6939). **O último número usado é 311.** Se o plano `2026-08-20-rdo-efetivo-terceiros.md` já tiver rodado, ele consumiu o 312 — confirme com `grep -n "^            (31" migrations.py` antes de escolher o número e use o próximo livre. Este plano assume **313**.
@@ -59,7 +67,7 @@ duplicidade na view, que com `cpf=None` casaria com qualquer outro sem CPF.
 **Interfaces:**
 - Produces: `Funcionario.cpf: str | None`. Consumido por qualquer código que leia CPF — ver Step 6.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Criar `tests/test_funcionario_cadastro_rapido.py`:
 
@@ -124,13 +132,13 @@ def test_dois_funcionarios_sem_cpf_convivem():
             admin_id=admin.id, cpf=None).count() == 2
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_funcionario_cadastro_rapido.py -v`
 
 Esperado: **FAIL** — `IntegrityError: null value in column "cpf" violates not-null constraint`.
 
-- [ ] **Step 3: Tornar a coluna nullable no modelo**
+- [x] **Step 3: Tornar a coluna nullable no modelo**
 
 Em `models.py`, na `class Funcionario`, trocar:
 
@@ -149,7 +157,7 @@ por:
     cpf = db.Column(db.String(14), unique=True, nullable=True)
 ```
 
-- [ ] **Step 4: Escrever a migration 313**
+- [x] **Step 4: Escrever a migration 313**
 
 Em `migrations.py`, imediatamente antes de `def executar_migracoes():`, inserir:
 
@@ -179,7 +187,7 @@ def _migration_313_funcionario_cpf_nullable():
     logger.info("[Migration 313] Concluída com sucesso")
 ```
 
-- [ ] **Step 5: Registrar a migration na lista**
+- [x] **Step 5: Registrar a migration na lista**
 
 Em `migrations.py`, na lista `migrations_to_run`, ao final, acrescentar:
 
@@ -187,7 +195,7 @@ Em `migrations.py`, na lista `migrations_to_run`, ao final, acrescentar:
             (313, "Reuniao 2026-08-20 — funcionario.cpf DROP NOT NULL: cadastro rapido sem documento em maos. UNIQUE mantido (Postgres aceita N nulos)", _migration_313_funcionario_cpf_nullable),
 ```
 
-- [ ] **Step 6: Rodar os testes**
+- [x] **Step 6: Rodar os testes**
 
 Run: `python -m pytest tests/test_funcionario_cadastro_rapido.py -v`
 
@@ -199,7 +207,7 @@ padrão do Postgres) — nesse caso troque a migration por
 `DROP CONSTRAINT` + `CREATE UNIQUE INDEX ... WHERE cpf IS NOT NULL` e refaça
 o Step 4. Registre a troca no commit.
 
-- [ ] **Step 7: Aceitar o POST sem CPF na view**
+- [x] **Step 7: Aceitar o POST sem CPF na view**
 
 Em `views/employees.py`, dentro de `funcionarios()`, trocar:
 
@@ -237,14 +245,14 @@ por:
                     return redirect(url_for('main.funcionarios'))
 ```
 
-- [ ] **Step 8: Tirar o `required` do CPF no formulário**
+- [x] **Step 8: Tirar o `required` do CPF no formulário**
 
 Run: `grep -n 'name="cpf"' templates/funcionarios.html`
 
 Na linha encontrada, remover o atributo `required` (se houver) e trocar o label
 `CPF *` por `CPF` — o asterisco é a promessa de obrigatoriedade na tela.
 
-- [ ] **Step 9: Procurar leituras de CPF que quebram com None**
+- [x] **Step 9: Procurar leituras de CPF que quebram com None**
 
 Run: `grep -rn "\.cpf" --include=*.py . | grep -v tests/ | grep -v migrations.py`
 
@@ -252,7 +260,7 @@ Para cada uso que formate ou fatie o CPF (`.replace`, `[:3]`, `len(`), conferir
 que tolera `None`. Corrigir com `(f.cpf or '')`. **Não** refatorar nada além
 disso — o escopo é não quebrar, não limpar.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add models.py migrations.py views/employees.py templates/funcionarios.html tests/test_funcionario_cadastro_rapido.py
@@ -275,7 +283,7 @@ o que o Paulo chamou de "uma porrada de cara pra ficar desativando".
 - Consumes: `models.Funcionario`, `get_tenant_admin_id()` (ambos já importados em `views/api.py`).
 - Produces: `POST /api/funcionarios/toggle-ativo-lote`, body `{'ids': [int], 'ativo': bool}` → `200 {'success': True, 'alterados': N, 'message': str}`; `400` com `{'success': False, 'message': ...}` se `ids` vier vazio; `403` sem tenant. Ids fora do tenant são **ignorados em silêncio** e não contam em `alterados`. Consumido pela Task 3 (front).
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar em `tests/test_funcionario_cadastro_rapido.py`:
 
@@ -352,13 +360,13 @@ def test_lote_vazio_recusa():
     assert resp.get_json()['success'] is False
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_funcionario_cadastro_rapido.py -k lote -v`
 
 Esperado: **FAIL** — 404, a rota não existe.
 
-- [ ] **Step 3: Implementar a rota**
+- [x] **Step 3: Implementar a rota**
 
 Em `views/api.py`, logo depois do fim de `toggle_funcionario_ativo` (antes de
 `@main_bp.route('/api/ponto/lancamento-finais-semana'...)`), inserir:
@@ -428,13 +436,13 @@ def toggle_funcionarios_ativo_lote():
         return jsonify({'success': False, 'message': str(e)}), 500
 ```
 
-- [ ] **Step 4: Rodar os testes**
+- [x] **Step 4: Rodar os testes**
 
 Run: `python -m pytest tests/test_funcionario_cadastro_rapido.py -v`
 
 Esperado: **os 6 PASSAM.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add views/api.py tests/test_funcionario_cadastro_rapido.py

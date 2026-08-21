@@ -10,6 +10,14 @@
 
 **Spec:** Não há spec escrito. Este plano nasce da sessão de brainstorming de 2026-08-20 (reunião com o Paulo). O critério de aceite verbal foi: "inseri 5 itens zerados numa fase que estava em 98% e ela tinha que cair para ~80%".
 
+
+## Estado — 2026-08-21
+
+Tasks 1 e 2 **executadas e mescladas no `main`** (resgatadas da branch
+`sdd/reuniao-20-08`, que ficou fora do merge do dia 20). A Task 3 **não tem
+checkbox de propósito**: ela continua BLOQUEADA na decisão do Paulo sobre qual
+fórmula vale — não confunda "0 pendentes" com plano concluído.
+
 ## Global Constraints
 
 - Python/Flask/SQLAlchemy; PostgreSQL. Sem ORM novo, sem lib nova.
@@ -57,7 +65,7 @@ medido e não sobre lembrança de reunião.
 - Consumes: `tests.test_cronograma_versao_service._ambiente() -> (Usuario, Obra)`, `._tarefa(obra, admin, nome, ordem=0, **kw) -> TarefaCronograma`; `services.cronograma_scheduler.recalcular_obra(obra_id, admin_id, *, cliente=False, commit=True) -> ResultadoAgendamento`.
 - Produces: nada consumido por outras tasks — é teste de caracterização.
 
-- [ ] **Step 1: Escrever o teste de caracterização**
+- [x] **Step 1: Escrever o teste de caracterização**
 
 Criar `tests/test_cronograma_rollup_insercao.py` com este conteúdo:
 
@@ -174,7 +182,7 @@ def test_rollup_roda_no_caminho_de_insercao():
     assert _pct_do_pai(pai_id) == pytest.approx(50.0, abs=0.01)
 ```
 
-- [ ] **Step 2: Rodar os dois testes**
+- [x] **Step 2: Rodar os dois testes**
 
 Run: `python -m pytest tests/test_cronograma_rollup_insercao.py -v`
 
@@ -190,7 +198,7 @@ Se `test_rollup_roda_no_caminho_de_insercao` falhar (pai continua em 100%),
 o rollup realmente não roda na inserção e este plano precisa de uma task nova
 antes da Task 2 — pare e reporte.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/test_cronograma_rollup_insercao.py
@@ -218,7 +226,7 @@ quebrando exatamente essa premissa.
 - Consumes: nada de tasks anteriores além do arquivo de teste criado na Task 1.
 - Produces: `rollup_percentual_pos_recalculo(tarefas: list, pai_ids: set, admin_id: int) -> None` — assinatura **inalterada**. Chamadores existentes (`services/cronograma_scheduler.recalcular_obra:614`, `utils/cronograma_engine.recalcular_cronograma`) não mudam.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar ao fim de `tests/test_cronograma_rollup_insercao.py`:
 
@@ -251,14 +259,14 @@ def test_rollup_agrega_avo_a_partir_do_pai_ja_agregado():
     assert _pct_do_pai(raiz_id) == pytest.approx(50.0, abs=0.01)
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_cronograma_rollup_insercao.py::test_rollup_agrega_avo_a_partir_do_pai_ja_agregado -v`
 
 Esperado: **FAIL** no segundo assert, com `0.0 != 50.0 ± 0.01` (a Raiz foi
 calculada antes da Sub).
 
-- [ ] **Step 3: Trocar a ordenação por profundidade**
+- [x] **Step 3: Trocar a ordenação por profundidade**
 
 Em `utils/cronograma_engine.py`, dentro de `rollup_percentual_pos_recalculo`,
 substituir o bloco:
@@ -318,20 +326,20 @@ por:
             )
 ```
 
-- [ ] **Step 4: Rodar o teste novo**
+- [x] **Step 4: Rodar o teste novo**
 
 Run: `python -m pytest tests/test_cronograma_rollup_insercao.py -v`
 
 Esperado: **os 3 testes PASSAM.**
 
-- [ ] **Step 5: Rodar a suíte de cronograma inteira (regressão)**
+- [x] **Step 5: Rodar a suíte de cronograma inteira (regressão)**
 
 Run: `python -m pytest tests/test_cronograma_scheduler.py tests/test_cronograma_engine_unificado.py tests/test_cronograma_metricas.py tests/test_a19_progresso_v1_convergencia.py tests/test_a19_progresso_v1_ponto_unico.py -v`
 
 Esperado: **todos PASSAM.** Qualquer falha aqui é regressão introduzida pelo
 Step 3 — corrigir antes de commitar, não seguir em frente.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add utils/cronograma_engine.py tests/test_cronograma_rollup_insercao.py
