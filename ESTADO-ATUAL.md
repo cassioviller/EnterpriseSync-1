@@ -2247,8 +2247,13 @@ saídas `out`; cache em `.cache/ms-playwright/ld-library-path.txt`). Destravado
 o browser, o degrau seguinte apareceu na hora: a fixture `browser_session`
 buscava `PlanoContas` pela PK antiga (`query.get(codigo)`; a PK é
 `(admin_id, codigo)` desde a Fase 0.6/D4) e os quatro blocos erravam no setup —
-`d4c3f0a0`. 🔬 `bash run_tests.sh --bloco1` → **4 passed**. Os blocos 2-7 e a
-varredura **não foram rodados** nesta sessão.
+`d4c3f0a0`. 🔬 `bash run_tests.sh --bloco1` → **4 passed**. 🔬 blocos 2-7, rodados
+em sequência depois do gate: **54 passed, 1 failed** — a falha era fumaça datada:
+`test_cronograma_fisico_financeiro` esperava a página avulsa, e a rota
+redireciona para a aba Financeiro da obra desde o redesign do painel. Teste
+ajustado ao contrato da rota (`destino + #financeiro + #tab-financeiro`); bloco 3
+→ **9 passed**. Total dos sete blocos: **59 passed**. A varredura de páginas
+(`--varredura`) e a jornada E2E (`--jornada`) **não foram rodadas**.
 
 **Linha de base (plano 5), executado inteiro** — `2a601591`. Uma nota de
 execução que vale para o próximo plano com migration: 📖 `tests/conftest.py:62`
