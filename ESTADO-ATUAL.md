@@ -2228,8 +2228,16 @@ em `.claude/worktrees/`. O gate de 20/08 (2482 verdes) não viu isso porque rodo
 de *dentro* de um worktree, onde `.claude/worktrees/` não existe — o resultado
 dependia de onde se rodava. `dfcc7c91`: os quatro sensores (o `dois_fluxos` tem
 dois) passam a ignorar diretório oculto. 🔬 famílias tocadas sobre `5c32edec`:
-**83 passed**. Gate completo sobre `5c32edec`: disparado às 13:24 — resultado na
-linha seguinte quando sair.
+**83 passed**. 🔬 gate completo sobre `5c32edec`: **2504 passed, 1 failed, 6
+skipped, 2 xfailed** em 39min55s. A falha —
+`test_migracao_269_esta_registrada_no_executor` — é **artefato de editar arquivo
+sob um gate em curso**, não defeito: o teste lê o fonte de
+`executar_migracoes` com `inspect.getsource`, que usa os números de linha do
+módulo importado no início da suíte; o merge do plano 5 (`2a601591`, 13:49)
+acrescentou 42 linhas antes da função, e aos 83 % o `inspect` leu o arquivo novo
+com o deslocamento velho. 🔬 o mesmo teste, isolado, sobre `a613ef60`: **60
+passed** no arquivo. Lição para o próximo gate: **não mesclar nada em `main`
+enquanto ele roda** — foi disparado outro, sobre `a613ef60`, com essa regra.
 
 **Depois, no mesmo dia — a suíte de browser volta a rodar aqui.** `1a36911e`:
 `run_tests.sh` resolve sozinho as libs de sistema do Chromium (`nix-build` das
