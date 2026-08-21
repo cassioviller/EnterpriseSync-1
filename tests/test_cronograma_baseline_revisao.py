@@ -96,3 +96,68 @@ def test_revisao_e_sequencial_por_obra():
                  .filter_by(obra_id=obra_b).all()]
     assert rev_a == [1, 2]
     assert rev_b == []  # a obra B não recebeu baseline nenhuma
+
+
+# ── Task 2: comparar duas revisões ────────────────────────────────────────
+
+
+def test_comparar_revisoes_devolve_desvio_de_entrega():
+    """V1 termina em 10/07. A obra é replanejada e a V2 termina em 24/07."""
+    from models import TarefaCronograma
+
+    admin_id, obra_id = _cenario()
+    client = _client_como(admin_id)
+
+    r1 = client.post(f'/cronograma/obra/{obra_id}/baseline',
+                     json={'nome': 'Aprovado'}).get_json()['baseline']
+
+    with app.app_context():
+        t = (TarefaCronograma.query
+             .filter_by(obra_id=obra_id, nome_tarefa='Painelização').one())
+        t.data_fim = date(2026, 7, 24)
+        db.session.commit()
+        tarefa_id = t.id
+
+    r2 = client.post(f'/cronograma/obra/{obra_id}/baseline',
+                     json={'nome': 'Pós-aditivo',
+                           'motivo': 'Aditivo 01'}).get_json()['baseline']
+
+    resp = client.get(f"/cronograma/obra/{obra_id}/baselines/comparar"
+                      f"?de={r1['id']}&para={r2['id']}")
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    body = resp.get_json()
+    assert body['de']['termino'] == '2026-07-10'
+    assert body['para']['termino'] == '2026-07-24'
+    assert body['desvio_dias'] == 14
+    mudou = {t['tarefa_id']: t for t in body['tarefas']}
+    assert mudou[tarefa_id]['desvio_dias'] == 14
+    assert len(body['tarefas']) == 1  # só a que mudou
+
+
+def test_comparar_recusa_mesma_revisao():
+    admin_id, obra_id = _cenario()
+    client = _client_como(admin_id)
+    r1 = client.post(f'/cronograma/obra/{obra_id}/baseline',
+                     json={}).get_json()['baseline']
+
+    resp = client.get(f"/cronograma/obra/{obra_id}/baselines/comparar"
+                      f"?de={r1['id']}&para={r1['id']}")
+
+    assert resp.status_code == 400
+
+
+def test_comparar_404_para_baseline_de_outra_obra():
+    admin_a_id, obra_a = _cenario()
+    admin_b_id, obra_b = _cenario()
+    client_a = _client_como(admin_a_id)
+    client_b = _client_como(admin_b_id)
+    ra = client_a.post(f'/cronograma/obra/{obra_a}/baseline',
+                       json={}).get_json()['baseline']
+    rb = client_b.post(f'/cronograma/obra/{obra_b}/baseline',
+                       json={}).get_json()['baseline']
+
+    resp = client_a.get(f"/cronograma/obra/{obra_a}/baselines/comparar"
+                        f"?de={ra['id']}&para={rb['id']}")
+
+    assert resp.status_code == 404

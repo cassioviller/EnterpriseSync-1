@@ -337,7 +337,7 @@ pra entregar tal dia; com o aditivo foi pra tal dia".
   ```
   `termino` é o **maior** `data_fim` dos itens congelados (a entrega da obra naquela revisão). Só entram em `tarefas` as que mudaram de `data_fim`. `400` se `de`/`para` faltarem ou forem iguais; `404` se qualquer uma não for da obra/tenant/modo.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar em `tests/test_cronograma_baseline_revisao.py`:
 
@@ -404,13 +404,13 @@ def test_comparar_404_para_baseline_de_outra_obra():
     assert resp.status_code == 404
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_cronograma_baseline_revisao.py -k comparar -v`
 
 Esperado: **FAIL** — 404, a rota não existe.
 
-- [ ] **Step 3: Implementar a rota**
+- [x] **Step 3: Implementar a rota**
 
 Em `cronograma_views.py`, logo depois do fim de `excluir_baseline`, inserir:
 
@@ -502,13 +502,13 @@ def comparar_baselines(obra_id: int):
     })
 ```
 
-- [ ] **Step 4: Rodar os testes**
+- [x] **Step 4: Rodar os testes**
 
 Run: `python -m pytest tests/test_cronograma_baseline_revisao.py -v`
 
 Esperado: **os 6 PASSAM.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cronograma_views.py tests/test_cronograma_baseline_revisao.py
