@@ -186,7 +186,8 @@ def _garantir_dados_e2e(admin_id: int) -> None:
 
     # 0) Conta de despesa de pessoal (5.1.01.001 Salários) exigida pelo handler
     #    'folha_processada' → criar_lancamento_folha_pagamento (event_manager.py
-    #    l.1110). codigo é PK global e conta_pai_codigo é FK → codigo, então a
+    #    l.1110). A PK é (admin_id, codigo) desde a Fase 0.6/D4 — era só
+    #    codigo, global — e conta_pai_codigo é FK composta para ela, então a
     #    cadeia de pais (5 → 5.1 → 5.1.01) precisa existir antes; criamos em
     #    ordem hierárquica, com flush por nível para satisfazer o FK.
     _cadeia_despesa_pessoal = [
@@ -196,7 +197,7 @@ def _garantir_dados_e2e(admin_id: int) -> None:
         ("5.1.01.001", "Salários", 4, "5.1.01", True),
     ]
     for codigo, nome, nivel, pai, aceita in _cadeia_despesa_pessoal:
-        if PlanoContas.query.get(codigo) is None:
+        if db.session.get(PlanoContas, (admin_id, codigo)) is None:
             db.session.add(PlanoContas(
                 admin_id=admin_id, codigo=codigo, nome=nome,
                 tipo_conta="DESPESA", natureza="DEVEDORA", nivel=nivel,
