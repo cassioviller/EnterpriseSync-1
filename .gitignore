@@ -26,6 +26,8 @@ tests/reports/*.png
 
 # Skills locais do Claude Code (ferramental do agente, não código do projeto)
 .claude/skills/
+.claude/hooks/
+.claude/settings.json
 
 # Fase 0.5 — attached_assets INTEIRO fora do git. Eram 1.540 arquivos
 # rastreados (logs de produção colados, planilhas, scripts antigos) contendo
@@ -48,3 +50,4 @@ attached_assets/*.pdf
 # Config do Replit — gerada por cada ambiente; fora do repo para não propagar
 .replit
 replit.nix
+.claude/worktrees/
