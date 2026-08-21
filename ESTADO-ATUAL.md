@@ -2237,7 +2237,9 @@ módulo importado no início da suíte; o merge do plano 5 (`2a601591`, 13:49)
 acrescentou 42 linhas antes da função, e aos 83 % o `inspect` leu o arquivo novo
 com o deslocamento velho. 🔬 o mesmo teste, isolado, sobre `a613ef60`: **60
 passed** no arquivo. Lição para o próximo gate: **não mesclar nada em `main`
-enquanto ele roda** — foi disparado outro, sobre `a613ef60`, com essa regra.
+enquanto ele roda** — foi disparado outro, sobre `a613ef60`, com essa regra:
+🔬 **2511 passed, 0 failed, 6 skipped, 2 xfailed** em 39min12s. É o gate que
+vale para o `main` desta revisão (os commits posteriores são só este documento).
 
 **Depois, no mesmo dia — a suíte de browser volta a rodar aqui.** `1a36911e`:
 `run_tests.sh` resolve sozinho as libs de sistema do Chromium (`nix-build` das
