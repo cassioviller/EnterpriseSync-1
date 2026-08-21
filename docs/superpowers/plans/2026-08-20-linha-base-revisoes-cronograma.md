@@ -12,7 +12,7 @@
 
 ## Estado — 2026-08-21
 
-**Executado por completo (24/24 passos)** na branch
+**Executado por completo (22/22 passos)** na branch
 `feat/cronograma-linha-base-revisoes`: migration **314** aplicada no banco de
 dev (45.252 baselines numeradas, 264 viraram V2, zero duplicatas por
 obra+modo), rota de comparação, e a tela com rótulos, histórico V1/V2 com

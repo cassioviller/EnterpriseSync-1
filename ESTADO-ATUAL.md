@@ -2196,7 +2196,7 @@ estado de cada um em `main` (`2a601591`):
 | Cadastro rápido de funcionário | ✅ 22/22 | resgate `0f4ef7fc` (CPF opcional, migration **313**, lote) + merge `5c32edec` (visão em lista) |
 | Manual do padrão de preenchimento do RDO | 🟡 Task 1 de 2 | merge `a9a30912` — Task 2 é humana (item 5 acima) |
 | Rollup de percentual do cronograma | 🟡 Tasks 1 e 2 de 3 | resgate `0f4ef7fc` — Task 3 **bloqueada** (item 4 acima) |
-| Linha de base e revisões do cronograma | ✅ 24/24 | merge `2a601591` — migration **314** (🔬 dev: 45.252 baselines numeradas, 264 viraram V2, zero duplicatas por obra+modo); roteiro de navegador 20/20 |
+| Linha de base e revisões do cronograma | ✅ 22/22 | merge `2a601591` — migration **314** (🔬 dev: 45.252 baselines numeradas, 264 viraram V2, zero duplicatas por obra+modo); roteiro de navegador 20/20 |
 
 **O que o resgate foi.** A `sdd/reuniao-20-08` saiu do commit dos planos e
 executou, em paralelo, o que acabou entrando em `main` por outra linhagem. 🔬
