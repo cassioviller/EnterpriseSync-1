@@ -2187,7 +2187,7 @@ nenhum plano está bloqueado esperando resposta. Revise quando puder.
 ### ✅ 21/08 — reunião de 20/08: o que estava preso numa branch, integrado
 
 Os cinco planos de `docs/superpowers/plans/2026-08-20-*` (commit `439aa985`) e o
-estado de cada um em `main` (`5c32edec`):
+estado de cada um em `main` (`2a601591`):
 
 | Plano | Estado | Prova |
 |---|---|---|
@@ -2195,7 +2195,7 @@ estado de cada um em `main` (`5c32edec`):
 | Cadastro rápido de funcionário | ✅ 22/22 | resgate `0f4ef7fc` (CPF opcional, migration **313**, lote) + merge `5c32edec` (visão em lista) |
 | Manual do padrão de preenchimento do RDO | 🟡 Task 1 de 2 | merge `a9a30912` — Task 2 é humana (item 5 acima) |
 | Rollup de percentual do cronograma | 🟡 Tasks 1 e 2 de 3 | resgate `0f4ef7fc` — Task 3 **bloqueada** (item 4 acima) |
-| Linha de base e revisões do cronograma | ⬜ 0/24 | migration **314** reservada; nada escrito |
+| Linha de base e revisões do cronograma | ✅ 24/24 | merge `2a601591` — migration **314** (🔬 dev: 45.252 baselines numeradas, 264 viraram V2, zero duplicatas por obra+modo); roteiro de navegador 20/20 |
 
 **O que o resgate foi.** A `sdd/reuniao-20-08` saiu do commit dos planos e
 executou, em paralelo, o que acabou entrando em `main` por outra linhagem. 🔬
@@ -2231,13 +2231,31 @@ dois) passam a ignorar diretório oculto. 🔬 famílias tocadas sobre `5c32edec
 **83 passed**. Gate completo sobre `5c32edec`: disparado às 13:24 — resultado na
 linha seguinte quando sair.
 
+**Depois, no mesmo dia — a suíte de browser volta a rodar aqui.** `1a36911e`:
+`run_tests.sh` resolve sozinho as libs de sistema do Chromium (`nix-build` das
+saídas `out`; cache em `.cache/ms-playwright/ld-library-path.txt`). Destravado
+o browser, o degrau seguinte apareceu na hora: a fixture `browser_session`
+buscava `PlanoContas` pela PK antiga (`query.get(codigo)`; a PK é
+`(admin_id, codigo)` desde a Fase 0.6/D4) e os quatro blocos erravam no setup —
+`d4c3f0a0`. 🔬 `bash run_tests.sh --bloco1` → **4 passed**. Os blocos 2-7 e a
+varredura **não foram rodados** nesta sessão.
+
+**Linha de base (plano 5), executado inteiro** — `2a601591`. Uma nota de
+execução que vale para o próximo plano com migration: 📖 `tests/conftest.py:62`
+desliga `SIGE_BOOT_DDL`, então **rodar a suíte não aplica migration nenhuma**;
+a 312/313 chegaram ao banco pelo servidor da porta 5000 (que recarrega o
+checkout principal), e uma branch em worktree não passa por ele. A 314 foi
+aplicada chamando `executar_migracoes()` explicitamente. E um sensor antigo
+(`test_pagina_injeta_baseline_map_so_quando_ha_ativa`) ancorava em
+`'>Desvio</th>'`, texto que a tabela de comparação agora carrega dentro de JS —
+reancorado no `title` do cabeçalho da grade (`cbde0c20`).
+
 **O Chromium do Playwright não sobe nesta máquina** sem ajuda: 📖 `ldd` acusa
 `libnspr4`, `libnss3`, `libgbm`, `libxkbcommon`, `libudev` e `libasound`
 ausentes; o cabeçalho do `run_tests.sh` diz que vêm "via nix", mas o
-`.replit` não as lista. Receita que funcionou (`nix-build` das saídas `out`,
-não `-dev`; `libgbm` é pacote separado no nixpkgs 25.05) está na memória da
-sessão do agente — vale trazer para o `run_tests.sh` quando a suíte `--suite`
-voltar a rodar aqui.
+`.replit` não as lista. A receita (`nix-build` das saídas `out`, não `-dev`;
+`libgbm` é pacote separado no nixpkgs 25.05) **está no `run_tests.sh`** desde
+`1a36911e` — ver parágrafo acima.
 
 ## Mapa dos documentos
 
@@ -2249,7 +2267,7 @@ voltar a rodar aqui.
 | `docs/estudo-fluxo/*.json` (31/07) | Os brutos: conferência adversarial dos 12 vereditos e o levantamento de conexões |
 | `docs/superpowers/{specs,plans}/2026-08-03-p1-*` | Spec e plano do p1 — o único pacote que teve os dois documentos antes do código, porque dois vereditos mudaram de tamanho ao serem reconferidos |
 | `docs/superpowers/plans/2026-07-21-*` | **os 10 planos das fases** (ver tabela acima). ⚠️ o da **Fase 7 está obsoleto** — substituído pelo p10 |
-| `docs/superpowers/plans/2026-08-20-*` | **os 5 planos da reunião de 20/08** (RDO com terceiros, cadastro rápido, manual do RDO, rollup, linha de base). Dois fechados, dois a meio com passo humano pendente, um por começar — tabela em "21/08" acima. Cada um traz no topo um bloco "Estado" com o que já está em `main` |
+| `docs/superpowers/plans/2026-08-20-*` | **os 5 planos da reunião de 20/08** (RDO com terceiros, cadastro rápido, manual do RDO, rollup, linha de base). Três fechados, dois a meio com passo humano pendente — tabela em "21/08" acima. Cada um traz no topo um bloco "Estado" com o que já está em `main` |
 | `DEVOLUTIVA.md` | aderência à especificação + sequência de fases. (O erro do `:73` sobre "não existe recebimento" foi corrigido em 23/07 — o recebimento existe, só não é o gatilho financeiro) |
 | `docs/fase-1-rollout.md` / `fase-2-rollout.md` / `fase-3-rollout.md` | **runbooks de rollout por fase** — pré-checagens, ordem de ligar flags e rollback. ⚠️ são do **núcleo**; no ciclo de compras o runbook mora no fim do próprio spec |
 | `docs/superpowers/specs/2026-08-{11,14,15}-*-design.md` | **os specs das três fases entregues do ciclo de compras** (recebimento e atesto, financeiro em dois fluxos, alçadas). Cada um traz o runbook no fim e as divergências como 📌 no ponto exato do texto — leia os 📌, são o que a execução descobriu contra o plano |
