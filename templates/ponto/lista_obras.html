@@ -14,6 +14,22 @@
         </div>
     </div>
 
+    {# ===== Busca por nome (21/08) — a lista é paginada em 50 ===== #}
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <form method="get" action="{{ url_for('ponto.lista_obras') }}" class="d-flex gap-2">
+                <input type="text" name="nome" class="form-control"
+                       placeholder="Buscar obra pelo nome…" value="{{ filtro_nome or '' }}">
+                <button type="submit" class="btn btn-outline-primary">
+                    <i class="fas fa-search"></i>
+                </button>
+                {% if filtro_nome %}
+                <a href="{{ url_for('ponto.lista_obras') }}" class="btn btn-outline-secondary">Limpar</a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
     <div class="row">
         {% if obras_com_dados %}
             {% for item in obras_com_dados %}
@@ -62,6 +78,32 @@
             </div>
         {% endif %}
     </div>
+
+    {# ===== Paginação (21/08) — 50 por página; a busca segue nos links ===== #}
+    {% if paginacao and paginacao.pages > 1 %}
+    <nav aria-label="Páginas da lista de obras do ponto">
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item {{ 'disabled' if not paginacao.has_prev }}">
+                <a class="page-link" href="{{ url_for('ponto.lista_obras', page=paginacao.prev_num, **filtros_url) if paginacao.has_prev else '#' }}">&laquo;</a>
+            </li>
+            {% for p in paginacao.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if p %}
+                <li class="page-item {{ 'active' if p == paginacao.page }}">
+                    <a class="page-link" href="{{ url_for('ponto.lista_obras', page=p, **filtros_url) }}">{{ p }}</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {{ 'disabled' if not paginacao.has_next }}">
+                <a class="page-link" href="{{ url_for('ponto.lista_obras', page=paginacao.next_num, **filtros_url) if paginacao.has_next else '#' }}">&raquo;</a>
+            </li>
+        </ul>
+        <div class="text-center text-muted small mt-1">
+            {{ paginacao.total }} obra(s) — página {{ paginacao.page }} de {{ paginacao.pages }}
+        </div>
+    </nav>
+    {% endif %}
 </div>
 
 <style>

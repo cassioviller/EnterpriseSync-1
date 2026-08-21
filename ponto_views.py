@@ -1177,39 +1177,49 @@ def lista_obras():
     """Lista de obras para seleção do ponto"""
     try:
         admin_id = get_tenant_admin_id()
-        
-        # Buscar obras ativas
-        obras = Obra.query.filter_by(
-            admin_id=admin_id,
-            ativo=True
-        ).order_by(Obra.nome).all()
-        
+
+        # 🔬 21/08 — o que havia aqui: um `count()` de `registro_ponto` POR OBRA
+        # para montar `registros_hoje`, chave que `ponto/lista_obras.html` nunca
+        # imprime (o card mostra o total global de funcionários, igual em todos).
+        # Com 1.358 obras ativas no tenant demo: 5,09 s, 2,29 MB e 1.365
+        # consultas, 1.358 delas em `registro_ponto`. Mesmo defeito de /obras,
+        # corrigido no mesmo dia — trabalho por obra para um número invisível.
+        #
+        # A lista é paginada em 50, com busca por nome: sem a busca, escolher a
+        # obra numa página 12 seria pior do que a lista inteira.
+        POR_PAGINA = 50
+        nome = (request.args.get('nome') or '').strip()
+
+        query = Obra.query.filter_by(admin_id=admin_id, ativo=True)
+        if nome:
+            query = query.filter(Obra.nome.ilike(f'%{nome}%'))
+
+        paginacao = query.order_by(Obra.nome).paginate(
+            page=request.args.get('page', 1, type=int),
+            per_page=POR_PAGINA, error_out=False)
+
         # Total de funcionários ativos (qualquer um pode bater ponto em qualquer obra)
         total_funcionarios_ativos = Funcionario.query.filter_by(
             admin_id=admin_id,
             ativo=True
         ).count()
-        
-        # Contar funcionários que já bateram ponto hoje em cada obra
-        obras_com_dados = []
-        hoje = date.today()
-        
-        for obra in obras:
-            registros_hoje = RegistroPonto.query.filter_by(
-                obra_id=obra.id,
-                data=hoje,
-                admin_id=admin_id
-            ).count()
-            
-            obras_com_dados.append({
-                'obra': obra,
-                'registros_hoje': registros_hoje,
-                'total_funcionarios': total_funcionarios_ativos
-            })
-        
+
+        obras_com_dados = [
+            {'obra': obra, 'total_funcionarios': total_funcionarios_ativos}
+            for obra in paginacao.items
+        ]
+
+        # A busca segue nos links de página — sem isto, "página 2" perdia o
+        # filtro e voltava à lista inteira.
+        filtros_url = {k: v for k, v in request.args.items()
+                       if k != 'page' and v not in (None, '')}
+
         return render_template('ponto/lista_obras.html',
-                             obras_com_dados=obras_com_dados)
-        
+                             obras_com_dados=obras_com_dados,
+                             paginacao=paginacao,
+                             filtros_url=filtros_url,
+                             filtro_nome=nome)
+
     except Exception as e:
         logger.error(f"Erro ao listar obras: {e}")
         flash(f'Erro ao carregar obras: {str(e)}', 'error')
