@@ -2325,12 +2325,26 @@ fotografa):**
    `'Finalizado'` para todo RDO (o ciclo de vida vive em `estado`), os ≥9
    consumidores que filtram por `status` contam o rascunho. Isso contradiz o
    contrato do `rdo_ciclo_vida` ("preenchido = custos lançados") e o que o
-   capítulo 23a promete ("rascunho não lança custo"). **Decisão humana:** travar
-   a emissão no salvar para `estado != rascunho` (e deixar o Submeter emitir, como
-   já faz) — ou reescrever a norma. Até lá, o manual visual não afirma nem uma
-   coisa nem outra.
-3. 🟡 **A página do RDO mostra "Finalizado" (o `status` legado) até em rascunho**,
-   ao lado da pílula de estado real. Cosmético, mas ensina errado.
+   capítulo 23a promete ("rascunho não lança custo"). ✅ **Fechado no mesmo dia**
+   ("arrumar as descobertas"): `services.rdo_ciclo_vida.publica_custos` guarda as
+   cinco rotas de salvar (`salvar_rdo_flexivel`, `atualizar_rdo`,
+   `rdo_salvar_unificado`, `crud_rdo_completo.salvar_rdo`,
+   `rdo_editar_sistema.salvar_edicao_rdo`) — nem `rdo_finalizado`, nem
+   `obra.rdo_publicado`, nem o custo diário por funcionário saem de um rascunho;
+   o `finalizar` legado (`/rdo/finalizar/<id>`) passou a transicionar para
+   preenchido antes de emitir, como o Submeter. O arreio de 04/08
+   (`test_arreio_custo_rdo_rotas.py`) tinha o salvar como REFERÊNCIA de custo
+   porque o ciclo de vida não existia; foi repontado para o fluxo real
+   (salvar + submeter) — 🔬 13/13, e mais 166 testes das famílias de RDO verdes.
+   Teste novo: `tests/test_rdo_rascunho_nao_lanca_custo.py`.
+   🟡 **O que ficou:** o rascunho ainda **alimenta o cronograma** — 📖
+   `utils/cronograma_engine.atualizar_percentual_tarefa` não filtra apontamento
+   por estado do RDO, e os testes de 20/08 apontam em rascunho e esperam o
+   percentual mover. Travar isso é outra decisão (muda a semântica do avanço
+   em dezenas de testes); o capítulo 23a foi reescrito para não prometer.
+3. ✅ **A página do RDO mostrava "Finalizado" (o `status` legado) até em
+   rascunho** — o bloco "Status" passou a usar `estado_rdo` (`fb9fdf30`), com
+   teste (`tests/test_rdo_visualizar_estado_real.py`).
 
 **O Chromium do Playwright não sobe nesta máquina** sem ajuda: 📖 `ldd` acusa
 `libnspr4`, `libnss3`, `libgbm`, `libxkbcommon`, `libudev` e `libasound`

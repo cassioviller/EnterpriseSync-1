@@ -111,8 +111,9 @@ Vale a pena entender a sequência antes de precisar dela.
 
 **Rascunho.** É como o RDO nasce, ao ser salvo pela tela de criação. Pode ser
 editado à vontade, quantas vezes for preciso, durante o dia. Rascunho **não
-lança custo** e **não alimenta o cronograma**: um RDO esquecido em rascunho é,
-para o resto do sistema, um dia que não existiu.
+lança custo**: o custo de mão de obra só entra no razão quando o dia é
+submetido. Um RDO esquecido em rascunho é um dia sem fecho — sem custo, sem
+assinatura, sem valor de documento.
 
 **Submeter.** É o fecho do dia, no botão **Submeter** da tela do RDO. É aqui
 que os custos de mão de obra são lançados, a medição é recalculada e o cliente

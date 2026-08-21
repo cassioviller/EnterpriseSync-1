@@ -232,8 +232,8 @@ def montar(ids):
              papel='encarregado', rota='', permanece=True, guarda_id='rdo_id',
              acoes=[Acao('submeter', '#btnFinalizarRDO')],
              resumo='O RDO nasce em RASCUNHO: é o estado em que ainda se corrige à '
-                    'vontade, quantas vezes for preciso, durante o dia. Rascunho é um dia '
-                    'em aberto — quem fecha o dia é o Submeter.',
+                    'vontade, quantas vezes for preciso, durante o dia. Rascunho não '
+                    'lança custo — quem fecha o dia e lança o custo é o Submeter.',
              campos=[Campo(1, '.header-right > span.badge', 'O estado: Rascunho'),
                      Campo(2, 'form[action$="/finalizar"] button[type="submit"]', 'Submeter — o próximo passo',
                            nota='Os botões disponíveis mudam com o estado: são eles que dizem '
@@ -249,9 +249,9 @@ def montar(ids):
                         'não se mexe — se retifica.',
              rota='/rdo/{rdo_id}',
              acoes=[Acao('submeter', 'form[action$="/finalizar"] button[type="submit"]')],
-             resumo='Submeter fecha o dia: a partir daqui o RDO só muda se o gestor '
-                    'reabrir, e ele entra na fila de assinatura. No fim do DIA, não no '
-                    'fim da semana.',
+             resumo='Submeter fecha o dia: é aqui que o custo de mão de obra é lançado '
+                    'e a medição é recalculada. A partir daqui o RDO só muda se o gestor '
+                    'reabrir. No fim do DIA, não no fim da semana.',
              campos=[Campo(1, '.header-right > span.badge', 'O estado: Preenchido'),
                      Campo(2, 'form[action$="/assinar"] button[type="submit"]', 'Assinar — o próximo passo')],
              recorte='.page-header',
