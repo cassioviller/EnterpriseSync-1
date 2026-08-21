@@ -539,11 +539,15 @@ def salvar_edicao_rdo(rdo_id):
             logger.error(f"[Task#84] aplicar_vinculo_no_rdo falhou em salvar_edicao_rdo (RDO {rdo_id}): {_ve}")
 
         # Grava custo diário PRIMEIRO (fonte de verdade para rdo_custos)
-        try:
-            from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
-            gravar_custo_funcionario_rdo(rdo, admin_id)
-        except Exception as _e:
-            logger.error(f"[custo-dia] gravar_custo_funcionario_rdo falhou: {_e}")
+        # 21/08 — rascunho não lança custo nem publica o dia
+        # (services.rdo_ciclo_vida.publica_custos). Quem emite é o Submeter.
+        from services.rdo_ciclo_vida import publica_custos
+        if publica_custos(rdo):
+            try:
+                from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+                gravar_custo_funcionario_rdo(rdo, admin_id)
+            except Exception as _e:
+                logger.error(f"[custo-dia] gravar_custo_funcionario_rdo falhou: {_e}")
 
         # Gera/atualiza GestaoCustoFilho a partir de RDOCustoDiario (idempotente)
         # p1 Step E — emite o evento em vez de chamar o serviço direto.
@@ -552,16 +556,20 @@ def salvar_edicao_rdo(rdo_id):
         # recalculada (event_manager.py:1418 é quem faz isso). Metade dos
         # caminhos de salvar RDO ficava com custo sem medição correspondente.
         # O handler do evento faz o que esta chamada fazia, MAIS o recálculo.
-        try:
-            from event_manager import EventManager
-            EventManager.emit('rdo_finalizado', {
-                                  'rdo_id': rdo.id,
-                                  'obra_id': rdo.obra_id,
-                                  'data_relatorio': str(rdo.data_relatorio),
-                              },
-                              admin_id=admin_id)
-        except Exception as _e:
-            logger.error(f"[rdo-custo] evento rdo_finalizado falhou: {_e}")
+        # 21/08 — rascunho não lança custo nem publica o dia
+        # (services.rdo_ciclo_vida.publica_custos). Quem emite é o Submeter.
+        from services.rdo_ciclo_vida import publica_custos
+        if publica_custos(rdo):
+            try:
+                from event_manager import EventManager
+                EventManager.emit('rdo_finalizado', {
+                                      'rdo_id': rdo.id,
+                                      'obra_id': rdo.obra_id,
+                                      'data_relatorio': str(rdo.data_relatorio),
+                                  },
+                                  admin_id=admin_id)
+            except Exception as _e:
+                logger.error(f"[rdo-custo] evento rdo_finalizado falhou: {_e}")
 
         logger.info(f"✅ RDO editado com sucesso: {rdo.numero_rdo}")
         flash(f'RDO {rdo.numero_rdo} editado com sucesso!', 'success')

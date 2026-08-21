@@ -8,9 +8,13 @@ dinheiro. Aqui um MESMO funcionário mensalista, uma MESMA obra e um MESMO dia
 passam pelas três rotas de RDO, e o teste pergunta a única coisa que importa:
 **quanto custo sobrou no banco.**
 
-A referência é `POST /salvar-rdo-flexivel` (`views/rdo.py:3612`) — a única das
-três que chama `gerar_custos_mao_obra_rdo` (`:4489`) **e** emite o evento com
-`obra_id` (`:4500-4504`). As outras duas se comparam a ela. O valor esperado
+A referência é o FLUXO REAL: `POST /salvar-rdo-flexivel` seguido de
+`POST /rdo/<id>/finalizar` (Submeter). 🔬 21/08: até então a referência era só
+o salvar, porque em 04/08 o ciclo de vida ainda não existia; hoje salvar deixa
+o RDO em RASCUNHO, e rascunho **não lança custo** (`services.rdo_ciclo_vida.
+publica_custos`, `tests/test_rdo_rascunho_nao_lanca_custo.py`). Quem lança é o
+Submeter — nas duas rotas de finalizar, a nova e a legada. As outras rotas se
+comparam a isso. O valor esperado
 **não é chumbado**: sai do que a rota de referência produziu no próprio teste.
 Chumbar R$ 124,00 amarraria o arreio ao mês em que foi escrito, porque o valor
 sai de `salario / (dias_úteis × horas_diárias)`.
@@ -111,11 +115,25 @@ def _ok(resposta):
 
 
 def _via_flexivel(tenant, tarefa, dia=DIA, horas=8.0):
-    """A rota de REFERÊNCIA. Cria o RDO a partir do formulário."""
+    """A REFERÊNCIA: salvar pelo formulário E submeter. Só salvar deixa o RDO
+    em rascunho, e rascunho não lança custo (21/08)."""
     cli = cliente_de(tenant.admin_id)
     form = form_rdo(tenant, dia, tarefa_id=tarefa.id, horas=horas)
     form['funcionario_id'] = str(tenant.funcionario_id)
     _ok(cli.post('/salvar-rdo-flexivel', data=form))
+    _submeter(tenant, dia)
+
+
+def _submeter(tenant, dia):
+    """`POST /rdo/<id>/finalizar` — o Submeter do ciclo de vida (views/rdo.py),
+    no RDO mais recente da obra naquele dia. NÃO usa `rdo_da_obra`: ele cria um
+    RDO quando não acha pelo critério dele, e aqui a rota já criou o dela."""
+    db.session.expire_all()
+    rdo = (RDO.query.filter_by(obra_id=tenant.obra_id, data_relatorio=dia)
+           .order_by(RDO.id.desc()).first())
+    assert rdo is not None, 'nenhum RDO para submeter'
+    _ok(cliente_de(tenant.admin_id).post(f'/rdo/{rdo.id}/finalizar'))
+    db.session.expire_all()
 
 
 def _via_finalizar(tenant, tarefa, dia=DIA, horas=8.0):
@@ -138,6 +156,7 @@ def _via_editar(tenant, tarefa, dia=DIA, horas=8.0):
     cli = cliente_de(tenant.admin_id)
     _ok(cli.post(f'/rdo/editar/{rdo.id}',
                  data=form_rdo(tenant, dia, tarefa_id=tarefa.id, horas=horas)))
+    _submeter(tenant, dia)      # editar deixa em rascunho; o custo vem do Submeter
     return rdo
 
 
@@ -280,7 +299,9 @@ def test_reexecutar_o_mesmo_rdo_nao_duplica_o_custo():
     with app.app_context():
         tenant, tarefa = _cenario('idem', tipo_remuneracao='diaria',
                                   valor_diaria=150.0)
-        rdo = rdo_da_obra(tenant, DIA)
+        # preenchido: rascunho não lança, e aqui o que se mede é a idempotência
+        # de quem lança (21/08)
+        rdo = rdo_da_obra(tenant, DIA, estado='preenchido')
         mao_de_obra(rdo, tenant, horas=8.0, tarefa=tarefa)
         cli = cliente_de(tenant.admin_id)
         form = form_rdo(tenant, DIA, tarefa_id=tarefa.id, horas=8.0)
@@ -538,6 +559,7 @@ def test_rdo_salvar_unificado_gera_custo_e_recalcula_medicao():
         form = form_rdo(tenant, DIA, tarefa_id=tarefa.id, flat_func=True)
         form['funcionario_id'] = str(tenant.funcionario_id)
         _ok(cli.post('/rdo/salvar', data=form))
+        _submeter(tenant, DIA)      # salvar deixa em rascunho (21/08)
 
         assert len(filhos_mao_de_obra(tenant, DIA)) == 1, (
             '/rdo/salvar deixou de gerar custo: a chamada direta saiu na B1.5 e '

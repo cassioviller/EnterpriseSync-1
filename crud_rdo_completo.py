@@ -481,16 +481,20 @@ def salvar_rdo():
         # recalculada (event_manager.py:1418 é quem faz isso). Metade dos
         # caminhos de salvar RDO ficava com custo sem medição correspondente.
         # O handler do evento faz o que esta chamada fazia, MAIS o recálculo.
-        try:
-            from event_manager import EventManager
-            EventManager.emit('rdo_finalizado', {
-                                  'rdo_id': rdo.id,
-                                  'obra_id': rdo.obra_id,
-                                  'data_relatorio': str(rdo.data_relatorio),
-                              },
-                              admin_id=admin_id)
-        except Exception as _e:
-            logger.error(f"[rdo-custo] evento rdo_finalizado falhou: {_e}")
+        # 21/08 — rascunho não lança custo nem publica o dia
+        # (services.rdo_ciclo_vida.publica_custos). Quem emite é o Submeter.
+        from services.rdo_ciclo_vida import publica_custos
+        if publica_custos(rdo):
+            try:
+                from event_manager import EventManager
+                EventManager.emit('rdo_finalizado', {
+                                      'rdo_id': rdo.id,
+                                      'obra_id': rdo.obra_id,
+                                      'data_relatorio': str(rdo.data_relatorio),
+                                  },
+                                  admin_id=admin_id)
+            except Exception as _e:
+                logger.error(f"[rdo-custo] evento rdo_finalizado falhou: {_e}")
 
         # Mensagem de sucesso
         acao = "editado" if rdo_id else "criado"
@@ -597,6 +601,16 @@ def finalizar_rdo(rdo_id):
         rdo.status = 'Finalizado'
         rdo.finalizado_em = datetime.utcnow()
         rdo.finalizado_por_id = current_user.id
+        # 21/08 — esta rota marcava `status` e emitia custo sem mexer em `estado`:
+        # o RDO seguia rascunho para o ciclo de vida e, com o guarda
+        # `publica_custos`, deixaria de lançar. Finalizar É submeter — a mesma
+        # transição de views/rdo.py:finalizar_rdo, antes do emit.
+        from services.rdo_ciclo_vida import (PREENCHIDO, RASCUNHO, estado_de,
+                                             transicionar)
+        if estado_de(rdo) == RASCUNHO:
+            transicionar(rdo, PREENCHIDO, usuario=current_user,
+                         ip=request.remote_addr,
+                         detalhes={'origem': 'rdo_crud.finalizar_rdo'})
         # Calcular produtividade por funcionário (V2) — parte da mesma transação
         subs_com_meta = RDOServicoSubatividade.query.filter(
             RDOServicoSubatividade.rdo_id == rdo_id,
