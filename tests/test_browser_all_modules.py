@@ -424,16 +424,22 @@ class TestBloco3ObrasRdo:
             _js_erros_stop(browser_session, erros)
 
     def test_cronograma_fisico_financeiro(self, browser_session):
-        """Página físico-financeira do cronograma — abre sem 500/404 e exibe o
-        título. Pula se nenhuma obra tiver cronograma materializado."""
+        """A rota físico-financeira do cronograma redireciona para a aba
+        Financeiro da página da obra (`cronograma_views.fisico_financeiro`:
+        "o painel agora vive na aba Financeiro") — o teste confere o destino e
+        a aba, não mais um título de página avulsa, que deixou de existir.
+        Pula se nenhuma obra tiver cronograma materializado."""
         obra_id = _obra_com_cronograma(_get_admin_id())
         if obra_id is None:
             pytest.skip("Nenhuma obra com cronograma materializado no banco demo")
         path = f"/cronograma/obra/{obra_id}/fisico-financeiro"
         _check_page(browser_session, path)
-        html = browser_session.content().lower()
-        assert "físico-financeiro" in html or "fisico-financeiro" in html, \
-            "Página FF não exibe o título esperado"
+        assert f"/obras/detalhes/{obra_id}" in browser_session.url, \
+            f"FF não redirecionou para a página da obra — URL: {browser_session.url}"
+        assert browser_session.url.endswith("#financeiro"), \
+            f"FF não apontou para a aba Financeiro — URL: {browser_session.url}"
+        assert browser_session.locator("#tab-financeiro").count() == 1, \
+            "A página da obra não tem a aba Financeiro (#tab-financeiro)"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
