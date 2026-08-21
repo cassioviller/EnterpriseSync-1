@@ -3,6 +3,10 @@
 Este capítulo é a **norma** do RDO. O capítulo anterior ensina onde clicar;
 este define **o que precisa estar preenchido para o RDO ser aceito**.
 
+> 📘 **Versão ilustrada:** [RDO, do cronograma à assinatura (PDF)](/static/docs/manual-rdo.pdf) —
+> as mesmas regras, tela a tela, com as caixas numeradas. Regerável por
+> `scripts/seed_manual_rdo.py` → `capturar_manual_rdo.py` → `gerar_manual_rdo.py`.
+
 Ele existe porque o mesmo dia de obra hoje vira relatórios diferentes conforme
 quem preenche. Um RDO que não permite reconstruir o dia não serve para medição,
 não serve para produtividade e não serve como prova em discussão com o cliente.
