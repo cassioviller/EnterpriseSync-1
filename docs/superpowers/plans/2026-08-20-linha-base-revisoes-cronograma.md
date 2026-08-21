@@ -10,6 +10,15 @@
 
 **Spec:** Não há spec escrito. Este plano nasce da sessão de brainstorming de 2026-08-20.
 
+## Estado — 2026-08-21
+
+**Executado por completo (24/24 passos)** na branch
+`feat/cronograma-linha-base-revisoes`: migration **314** aplicada no banco de
+dev (45.252 baselines numeradas, 264 viraram V2, zero duplicatas por
+obra+modo), rota de comparação, e a tela com rótulos, histórico V1/V2 com
+motivo e comparação. Roteiro do Step 6 da Task 3 executado em navegador real
+(Playwright), 20/20.
+
 ## Global Constraints
 
 - Migrations em `migrations.py`: função `_migration_NNN_slug()` + entrada na lista `migrations_to_run` (~linha 6939). **O último número usado é 311.** Os planos irmãos deste dia reservam 312 (`rdo-efetivo-terceiros`) e 313 (`cadastro-funcionario-operacional`). Este plano assume **314** — confirme com `grep -n "^            (31" migrations.py` antes de escrever.
@@ -535,7 +544,7 @@ Paulo chama de planejado — não têm rótulo nenhum. Essa é a colisão a desf
 - Consumes: `GET /obra/<id>/baselines` (agora com `revisao` e `motivo`) e `GET /obra/<id>/baselines/comparar` (Task 2).
 - Produces: nada.
 
-- [ ] **Step 1: Renomear os cabeçalhos**
+- [x] **Step 1: Renomear os cabeçalhos**
 
 Em `templates/obras/cronograma.html`, no `<thead>`, aplicar:
 
@@ -555,14 +564,14 @@ e
 grade usa índice de coluna (`COLS_NAV`, `td.cellIndex`) e a coluna Desvio já
 depende de `baseline_ativa`. Só o texto e o `title` mudam.
 
-- [ ] **Step 2: Rodar a regressão de interface**
+- [x] **Step 2: Rodar a regressão de interface**
 
 Run: `python -m pytest tests/test_cronograma_interface_obra.py tests/test_cronograma_grade_api.py -v`
 
 Esperado: **todos PASSAM.** Se algum teste casar por texto de cabeçalho
 (`"Planejado"`), atualizar o teste — é mudança de rótulo intencional.
 
-- [ ] **Step 3: Mostrar revisão e motivo no histórico**
+- [x] **Step 3: Mostrar revisão e motivo no histórico**
 
 Em `templates/obras/cronograma.html`, em `carregarBaselines`, substituir o
 `box.innerHTML = data.baselines.map(...)` por:
@@ -585,7 +594,7 @@ Em `templates/obras/cronograma.html`, em `carregarBaselines`, substituir o
     </div>`).join('');
 ```
 
-- [ ] **Step 4: Implementar a comparação no front**
+- [x] **Step 4: Implementar a comparação no front**
 
 Logo depois de `carregarBaselines`, inserir:
 
@@ -645,7 +654,7 @@ async function _executarComparacao(deId, paraId) {
 }
 ```
 
-- [ ] **Step 5: Acrescentar o campo motivo ao modal**
+- [x] **Step 5: Acrescentar o campo motivo ao modal**
 
 Localizar o modal com `grep -n 'id="bl_nome"' templates/obras/cronograma.html`
 e, logo depois do input de nome, inserir:
@@ -671,7 +680,7 @@ e acrescentar `motivo` ao objeto enviado:
 Conferir o nome real das variáveis `nome` e `ativar` na função antes de editar
 — não renomear o que já existe.
 
-- [ ] **Step 6: Verificar na aplicação rodando**
+- [x] **Step 6: Verificar na aplicação rodando**
 
 Numa obra com cronograma e editor v2 ligado:
 1. Cabeçalhos mostram "Início (plan.)", "Término (plan.)", "% Planejado", "% Realizado".
@@ -680,7 +689,7 @@ Numa obra com cronograma e editor v2 ligado:
 4. Clicar no ícone de comparar na V1, depois na V2 → aparece a tabela com o desvio de entrega e só as tarefas que mudaram.
 5. "Voltar" recarrega a lista.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add templates/obras/cronograma.html

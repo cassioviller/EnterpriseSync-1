@@ -198,13 +198,13 @@
               <th class="th-num">#</th>
               <th class="th-nome">Nome da Tarefa</th>
               <th class="th-dur" title="Duração em dias úteis">Dur.</th>
-              <th class="th-date">Início</th>
-              <th class="th-date">Término</th>
+              <th class="th-date" title="Data de início PLANEJADA — é esta que se move durante a obra">Início (plan.)</th>
+              <th class="th-date" title="Data de término PLANEJADA — é esta que se move durante a obra">Término (plan.)</th>
               <th class="th-pred" title="ID da tarefa predecessora">Pred.</th>
               <th class="th-qty" title="Quantidade prevista e unidade de medida">Qtd / Un.</th>
               <th class="th-resp" title="Responsável pela execução">Responsável</th>
-              <th class="th-perc" title="Progresso planejado para hoje (cálculo linear de datas)">Planejado</th>
-              <th class="th-perc" title="Progresso realizado, calculado automaticamente pelos apontamentos do RDO">Realizado</th>
+              <th class="th-perc" title="Progresso planejado para hoje (cálculo linear de datas)">% Planejado</th>
+              <th class="th-perc" title="Progresso realizado, calculado automaticamente pelos apontamentos do RDO">% Realizado</th>
               {% if baseline_ativa %}
               {# Fase 4 — só existe quando há linha de base ativa; sem ela a
                  tabela tem exatamente as colunas de sempre e os índices de
@@ -3318,7 +3318,8 @@ async function salvarBaseline() {
   const ativar = document.getElementById('bl_ativar')?.checked !== false;
   const data = await _baselineFetch(apiUrl('/baseline'), {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ nome, ativar }),
+    body: JSON.stringify({ nome, ativar,
+                           motivo: (document.getElementById('bl_motivo')?.value || '').trim() }),
   });
   if (!data) return;
   if (ativar) _aplicarBaselineMap(data.baseline_map);
@@ -3357,15 +3358,72 @@ async function carregarBaselines() {
   box.innerHTML = data.baselines.map(b => `
     <div class="d-flex align-items-center justify-content-between border rounded px-2 py-1 mb-1">
       <div class="small">
+        <span class="badge bg-dark me-1" title="Revisão da linha de base">V${b.revisao}</span>
         ${b.ativa ? '<span class="badge bg-success me-1">ativa</span>' : ''}
         <strong>${b.nome}</strong>
+        ${b.motivo ? `<span class="badge bg-warning text-dark ms-1" title="Motivo da revisão">${b.motivo}</span>` : ''}
         <span class="text-muted">— ${b.total_itens} tarefa(s)</span>
       </div>
       <div class="btn-group btn-group-sm">
         ${b.ativa ? '' : `<button class="btn btn-outline-primary" onclick="ativarBaseline(${b.id})" title="Usar esta na comparação"><i class="fas fa-check"></i></button>`}
+        <button class="btn btn-outline-secondary" onclick="marcarParaComparar(${b.id}, ${b.revisao})" title="Comparar com outra revisão"><i class="fas fa-code-compare"></i></button>
         <button class="btn btn-outline-danger" onclick="excluirBaseline(${b.id}, '${b.nome.replace(/'/g, '')}')" title="Excluir"><i class="fas fa-trash-can"></i></button>
       </div>
     </div>`).join('');
+}
+
+// ── Comparar duas revisões (reunião 2026-08-20) ──
+// Dois cliques no ícone de comparação: o 1º marca a origem, o 2º dispara.
+let _blComparar = null;
+
+function marcarParaComparar(id, revisao) {
+  if (_blComparar === null) {
+    _blComparar = { id, revisao };
+    toast(`V${revisao} marcada. Clique em outra revisão para comparar.`);
+    return;
+  }
+  if (_blComparar.id === id) {
+    _blComparar = null;
+    toast('Comparação cancelada.');
+    return;
+  }
+  const de = _blComparar;
+  _blComparar = null;
+  _executarComparacao(de.id, id);
+}
+
+async function _executarComparacao(deId, paraId) {
+  const data = await _baselineFetch(
+    apiUrl(`/baselines/comparar?de=${deId}&para=${paraId}`), {});
+  if (!data) return;
+  const box = document.getElementById('bl_lista');
+  if (!box) return;
+  const sinal = (n) => (n > 0 ? `+${n}` : `${n}`);
+  const linhas = data.tarefas.length
+    ? data.tarefas.map(t => `
+        <tr><td class="small">${t.nome}</td>
+            <td class="small text-muted">${formatDate(t.de)}</td>
+            <td class="small">${formatDate(t.para)}</td>
+            <td class="small text-end ${t.desvio_dias > 0 ? 'text-danger' : 'text-success'}">${sinal(t.desvio_dias)} d</td></tr>`).join('')
+    : '<tr><td colspan="4" class="small text-muted">Nenhuma tarefa mudou de término entre as duas revisões.</td></tr>';
+  box.innerHTML = `
+    <div class="border rounded p-2 mb-2">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <strong class="small">V${data.de.revisao} → V${data.para.revisao}</strong>
+        <button class="btn btn-sm btn-outline-secondary" onclick="carregarBaselines()">
+          <i class="fas fa-arrow-left"></i> Voltar
+        </button>
+      </div>
+      <div class="small mb-2">
+        Entrega: <span class="text-muted">${formatDate(data.de.termino)}</span>
+        → <strong>${formatDate(data.para.termino)}</strong>
+        <span class="badge ${data.desvio_dias > 0 ? 'bg-danger' : 'bg-success'} ms-1">${sinal(data.desvio_dias)} dia(s)</span>
+      </div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th class="small">Tarefa</th><th class="small">De</th><th class="small">Para</th><th class="small text-end">Desvio</th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
+    </div>`;
 }
 
 function abrirModalBaseline() {
@@ -3374,6 +3432,9 @@ function abrirModalBaseline() {
   if (inp) inp.value = `Linha de base ${hoje}`;
   const chk = document.getElementById('bl_ativar');
   if (chk) chk.checked = true;
+  const mot = document.getElementById('bl_motivo');
+  if (mot) mot.value = '';
+  _blComparar = null;
   carregarBaselines();
   bootstrap.Modal.getOrCreateInstance(
     document.getElementById('modalBaseline')).show();
@@ -3615,6 +3676,12 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="mb-3">
           <label class="form-label fw-semibold">Nome</label>
           <input type="text" id="bl_nome" class="form-control" maxlength="120">
+        </div>
+        <div class="mb-2">
+          <label for="bl_motivo" class="form-label small mb-1">Motivo da revisão</label>
+          <input type="text" class="form-control form-control-sm" id="bl_motivo"
+                 maxlength="200" placeholder="Ex.: Aditivo 01">
+          <div class="form-text">Opcional. Deixe em branco na primeira linha de base (o cronograma aprovado).</div>
         </div>
         <div class="form-check mb-3">
           <input class="form-check-input" type="checkbox" id="bl_ativar" checked>
