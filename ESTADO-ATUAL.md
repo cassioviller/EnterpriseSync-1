@@ -407,7 +407,7 @@ em produção e levar o número de "EM EXECUÇÃO sem gestor" ao Cássio (em dev
 | 2 | **`gh auth login`** (a API do GitHub **e agora o `git push`**) | 🔬 03/08 dizia "`git push` funciona — o que falta é só a API". **Isso envelheceu.** 🔬 14/08: `git push origin main` **falha** — `remote: Invalid username or token. Password authentication is not supported for Git operations` / `fatal: Authentication failed`. `gh auth status` segue "not logged into any GitHub hosts" e `GH_TOKEN`/`GITHUB_TOKEN` continuam ausentes. Consequência: 🔬 21/08: **28 commits em `main` não estão no GitHub** (estão no `gitsafe-backup`, que é outra máquina da mesma rede — não é o mesmo que estar fora dela). Refazer o login é interativo — só o humano consegue |
 | 3 | **Criar o volume persistente** no painel | Vale para `/var/backups/sige` (dumps) **e** para os uploads. O pré-requisito de código caiu em 23/07: a armadilha nº 2 (descasamento do `UPLOADS_PATH`) está corrigida — montar o volume e definir a variável já é seguro |
 | 4 | **Paulo: qual fórmula vale para o percentual do grupo no cronograma** | 📖 `docs/superpowers/plans/2026-08-20-rollup-percentual-cronograma.md`, "DECISÃO PENDENTE". Hoje é média **ponderada por duração** (`utils/cronograma_engine.py`, `rollup_percentual_pos_recalculo` e `rollup_realizado`): 5 tarefas de 1 dia numa fase de ~300 dias levam o pai de 98% para ~96%, **não** para os ~80% que ele descreveu na reunião. Para dar 80% seria média **simples por item** — e isso muda curva S, EVM (`bac` congelado), medição e físico-financeiro em cascata. A Task 3 do plano está travada nisso de propósito; as Tasks 1 e 2 (caracterização em teste + pais por profundidade) valem nas duas hipóteses e já estão em `main` |
-| 6 | **Rodar a limpeza das obras de teste do tenant demo** | `.pythonlibs/bin/python scripts/limpar_obras_teste_demo.py --apagar` (dry-run sem a flag). 1.280 obras `^Obra #` no admin 1, deixadas por teste até 21/08; o agente é bloqueado em exclusão em massa. Sem isso, `/ponto/lista-obras` segue no limite da varredura |
+| 6 | **Rodar a limpeza das obras de teste do tenant demo** | `.pythonlibs/bin/python scripts/limpar_obras_teste_demo.py --apagar` (dry-run sem a flag). 1.280 obras `^Obra #` no admin 1, deixadas por teste até 21/08; o agente é bloqueado em exclusão em massa. ~~Sem isso, `/ponto/lista-obras` segue no limite da varredura~~ — 🔬 21/08 a página foi corrigida no código (`cfd8247a`) e a varredura fecha 48/48 **com** as 1.358 obras. A limpeza continua valendo (o demo não deveria ter 1.280 obras de teste), mas não destrava mais nada |
 | 5 | **Alan e Abel: revisar a norma de preenchimento do RDO** | 📖 `manual/23a_rdo_padrao_preenchimento.md` está no ar (`/manual`), mas é a Task 2 do plano: quem vai ser cobrado pela norma tem de lê-la antes de ela virar cobrança. Sem essa rodada o capítulo é opinião do escritório, não acordo |
 
 > 📖 **O contorno do risco aceito no item 1.** O código não tem fallback fixo:
@@ -2282,13 +2282,52 @@ página com cache quente (curl, 3×). Duas causas, uma em cima da outra:
   casam, 78 ficam**. A execução é **item humano**: o agente foi bloqueado ao tentar
   a exclusão em massa (`--apagar`, ~2,6 s por obra, ~55 min).
   Mesmo vício, outro sintoma, fica para depois: outros 5 arquivos de teste usam
-  `Usuario.query.first()` para propostas/composições/notificações.
+  `Usuario.query.first()` para propostas/composições/notificações. ⚠️ **esta
+  frase era hipótese e foi medida: eles NÃO sujam** — ver o parágrafo do "mesmo
+  vício" logo abaixo.
 
-🔬 varredura repetida sobre `2de944bd`: **47 de 48, `/obras` verde**; agora quem
-fica no limite é `/ponto/lista-obras` — 📖 `ponto_views.py:1176` faz um `count()`
-de ponto por obra e renderiza **todas** (🔬 1,6 s e 2,3 MB com as 1.358 obras do
-demo). Não foi tocada: é o mesmo acúmulo de dados, e deve cair sozinha com a
-limpeza acima. Se não cair, paginar como em `/obras`.
+🔬 varredura repetida sobre `2de944bd`: **47 de 48, `/obras` verde**; quem passou
+a ficar no limite foi `/ponto/lista-obras`.
+
+**✅ `/ponto/lista-obras` corrigida (`cfd8247a`) — e a varredura fecha 48 de 48.**
+O diagnóstico de "é só acúmulo de dados, deve cair com a limpeza" estava **meio
+errado**: 🔬 a página emitia **1.365 consultas, 1.358 delas contando
+`registro_ponto` uma vez por obra**, para montar um `registros_hoje` que 📖
+`templates/ponto/lista_obras.html` **nunca imprime** — o card mostra o total
+*global* de funcionários ativos (uma consulta só, igual em todos os cards),
+o nome e o status. Mesmo defeito de `/obras`, mesma forma: trabalho por obra
+para um número invisível. Saiu o laço, entrou paginação de 50 **com busca por
+nome** preservada nos links (sem a busca, escolher a obra na página 12 seria
+pior do que a lista inteira). 🔬 tenant demo, 1.358 obras ativas:
+
+| | antes | depois |
+|---|---|---|
+| tempo | 5,09 s | **0,14 s** |
+| resposta | 2.291 KB | **155 KB** |
+| consultas | 1.365 | **6** |
+| em `registro_ponto` | 1.358 | **0** |
+
+Testes escritos antes (vermelhos por 46 consultas contra 6, e 51 cards em vez de
+50): `tests/test_ponto_lista_obras.py`. 🔬 rede de regressão das famílias de
+ponto e `/obras`: **138 passed, 2 xfailed**. 🔬 `bash run_tests.sh --varredura`:
+**48 de 48** — completa pela primeira vez.
+
+**🔬 O "mesmo vício, outro sintoma" dos 5 arquivos de teste NÃO se confirma.**
+A nota acima dizia que outros cinco arquivos usam `Usuario.query.first()` e
+supunha, por analogia com `test_resumo_custos_obra.py`, que sujassem o tenant
+demo do mesmo jeito. Era hipótese, não medição. 🔬 21/08: rodados os cinco
+(`test_task_86_catalogo_propostas`, `test_orcamento_service`,
+`test_propagacao_proposta_obra`, `test_notificacao_proposta_enviada`,
+`test_importar_composicoes`) — **48 passed e delta ZERO** nas onze tabelas que
+tocam (Proposta 284→284, PropostaItem 309→309, PropostaHistorico 171→171,
+ItemMedicaoComercial 167→167, ObraServicoCusto 1.246→1.246, Servico 154→154,
+Insumo 254→254, PrecoBaseInsumo 392→392, ComposicaoServico 266→266, Obra
+1.358→1.358). Eles fazem rollback na fixture ou limpam por prefixo no teardown.
+O vício de *escolher tenant pelo primeiro usuário da tabela* continua lá — torna
+o teste dependente do seed demo e é o que produziu as 1.242 obras quando o
+arquivo **não** limpava —, mas **não há sangramento**: corrigir os cinco é
+higiene, não conserto. Sétimo caso do defeito de fabricação que abre o
+documento, agora com a marca certa.
 
 **Linha de base (plano 5), executado inteiro** — `2a601591`. Uma nota de
 execução que vale para o próximo plano com migration: 📖 `tests/conftest.py:62`
