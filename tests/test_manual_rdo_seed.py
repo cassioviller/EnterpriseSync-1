@@ -40,7 +40,7 @@ def test_seed_e_idempotente_e_monta_o_cenario_inteiro():
     assert admin2.id == admin.id
     assert antes == depois
     assert antes['tarefas'] == 6          # 2 fases + 4 folhas
-    assert antes['funcionarios'] == 4     # 3 operacionais + 1 administrativo
+    assert antes['funcionarios'] == 6     # 3 operacionais + 1 administrativo + quem assina (2)
     assert antes['subempreiteiros'] == 1
     assert antes['vinculos'] == 2         # encarregado APONTADOR, gestor GESTOR
 
@@ -56,6 +56,8 @@ def test_encarregado_aponta_e_gestor_edita():
                   UsuarioObra.query.filter_by(obra_id=ids['obra_id']).all()}
     assert papeis[enc.id] == PapelObra.APONTADOR
     assert papeis[ges.id] == PapelObra.GESTOR
+    # assinar/aprovar registram autoria pela identidade de RH do login
+    assert enc.funcionario_id and ges.funcionario_id
 
 
 def test_feed_do_rdo_traz_as_quatro_folhas_com_o_modo_certo():

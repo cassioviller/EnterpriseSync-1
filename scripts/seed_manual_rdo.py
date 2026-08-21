@@ -37,12 +37,18 @@ PESSOAS = [
 ]
 OBRA_NOME = 'Galpão Logístico Vila Norte'
 OBRA_CODIGO = 'MRDO-01'
-FUNCOES = [('Montador', True), ('Soldador', True), ('Auxiliar Administrativo', False)]
+FUNCOES = [('Montador', True), ('Soldador', True), ('Auxiliar Administrativo', False),
+           ('Encarregado', True), ('Engenheira Civil', False)]
 FUNCIONARIOS = [  # (codigo, nome, funcao)
     ('MR01', 'Davi Montador', 'Montador'),
     ('MR02', 'Lucas Soldador', 'Soldador'),
     ('MR03', 'Pedro Ajudante', 'Montador'),
     ('MR04', 'Ana Escritório', 'Auxiliar Administrativo'),
+    # As duas pessoas que assinam. 📖 services/rdo_assinatura.assinar exige
+    # `funcionario_do_usuario(usuario)`: login sem vinculo a Funcionario nao
+    # assina ('Seu login nao esta vinculado a um cadastro de funcionario').
+    ('MR05', 'Mateus Lira', 'Encarregado'),
+    ('MR06', 'Carla Nunes', 'Engenheira Civil'),
 ]
 SUBEMPREITEIRO = ('Abraão Fundações', 'Fundações')
 # (chave, nome, pai, ordem, inicio, fim, quantidade, unidade, responsavel, marco)
@@ -193,26 +199,43 @@ def semear():
     _flags(admin)
     obra = _obra(admin)
     _vinculos(admin, obra, pessoas)
-    _pessoal(admin)
+    func_ids = _pessoal(admin)
+    # Fase 1 (utils/identidade): quem assina precisa de identidade de RH.
+    pessoas['encarregado'].funcionario_id = func_ids['Mateus Lira']
+    pessoas['gestor'].funcionario_id = func_ids['Carla Nunes']
+    db.session.commit()
     _subempreiteiro(admin)
     _cronograma(admin, obra)
     return db.session.get(Usuario, admin.id)
 
 
 def limpar_rdos(admin_id):
-    """Apaga os RDOs do tenant (filhos primeiro), para a captura começar do zero."""
+    """Apaga os RDOs do tenant, para a captura começar do zero.
+
+    🔬 21/08 (information_schema): dos 15 FKs para `rdo.id`, 11 são CASCADE e
+    um é SET NULL — o banco limpa sozinho. Três NÃO: `custo_obra.rdo_id`,
+    `movimentacao_estoque.rdo_id` e `alocacao_equipe.rdo_gerado_id`. Esses têm
+    de sair (ou ser desligados) antes, senão o DELETE do RDO estoura na FK —
+    foi exatamente o que parou a 2ª rodada da captura.
+    """
     from app import db
-    from models import (RDO, RDOApontamentoCronograma, RDOAssinatura, RDOFoto,
-                        RDOServicoSubatividade, RDOSubempreitadaApontamento,
-                        RDOTransicaoEstado, Obra)
+    from models import RDO, Obra
+    from sqlalchemy import text
+    # RDO assinado/aprovado/retificado é IMUTÁVEL pelo guarda do ciclo de vida
+    # (services/rdo_ciclo_vida._guarda_imutabilidade) — e o manual termina
+    # exatamente nesses estados. A limpeza é manutenção de cenário de teste,
+    # então passa pelo canal que o próprio módulo oferece para isso.
+    from services.rdo_ciclo_vida import escrita_de_ciclo_de_vida
     obra_ids = [o.id for o in Obra.query.filter_by(admin_id=admin_id).all()]
     rdos = RDO.query.filter(RDO.obra_id.in_(obra_ids)).all() if obra_ids else []
-    for r in rdos:
-        for modelo in (RDOSubempreitadaApontamento, RDOApontamentoCronograma,
-                       RDOServicoSubatividade, RDOFoto, RDOAssinatura, RDOTransicaoEstado):
-            modelo.query.filter_by(rdo_id=r.id).delete(synchronize_session=False)
-        db.session.delete(r)          # mao_obra, equipamentos, ocorrencias: cascade no modelo
-    db.session.commit()
+    with escrita_de_ciclo_de_vida():
+      for r in rdos:
+        db.session.execute(text('DELETE FROM custo_obra WHERE rdo_id = :id'), {'id': r.id})
+        db.session.execute(text('DELETE FROM movimentacao_estoque WHERE rdo_id = :id'), {'id': r.id})
+        db.session.execute(text('UPDATE alocacao_equipe SET rdo_gerado_id = NULL '
+                                'WHERE rdo_gerado_id = :id'), {'id': r.id})
+        db.session.delete(r)      # o resto cai por CASCADE / SET NULL
+      db.session.commit()
     return len(rdos)
 
 
