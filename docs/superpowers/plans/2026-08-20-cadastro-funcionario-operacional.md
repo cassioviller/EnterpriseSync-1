@@ -467,7 +467,7 @@ visita.
 - Consumes: `POST /api/funcionarios/toggle-ativo-lote` (Task 2); `funcionarios_kpis` (lista de dicts com `.funcionario` e `.modo_remuneracao`), `obter_foto_funcionario(funcionario)` — ambos já disponíveis no contexto do template.
 - Produces: nada.
 
-- [ ] **Step 1: Acrescentar o alternador de visão**
+- [x] **Step 1: Acrescentar o alternador de visão**
 
 Em `templates/funcionarios.html`, imediatamente antes do comentário
 `<!-- Grid de Cards de Funcionários - SEPARAÇÃO ATIVO/INATIVO -->` (linha ~543),
@@ -501,7 +501,7 @@ inserir:
 </div>
 ```
 
-- [ ] **Step 2: Acrescentar a tabela**
+- [x] **Step 2: Acrescentar a tabela**
 
 Logo depois do bloco do Step 1, inserir:
 
@@ -568,7 +568,7 @@ Logo depois do bloco do Step 1, inserir:
 </div>
 ```
 
-- [ ] **Step 3: Envolver os cards existentes num contêiner alternável**
+- [x] **Step 3: Envolver os cards existentes num contêiner alternável**
 
 Ainda em `templates/funcionarios.html`:
 
@@ -587,7 +587,7 @@ Conferir com `grep -c "visaoCardsFuncionarios" templates/funcionarios.html` que
 o resultado é `2` (abertura e nenhuma outra menção além do JS do Step 4, que
 soma mais uma — então após o Step 4 o esperado passa a ser `3`).
 
-- [ ] **Step 4: Acrescentar o JS**
+- [x] **Step 4: Acrescentar o JS**
 
 No bloco `<script>` do fim do arquivo, logo antes de
 `// Toggle status funcionário (ativar/desativar) - CORRIGIDO` (linha ~2143),
@@ -680,7 +680,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 ```
 
-- [ ] **Step 5: Fazer o filtro de busca alcançar as linhas**
+- [x] **Step 5: Fazer o filtro de busca alcançar as linhas**
 
 O filtro atual varre `.funcionario-card` (linha ~1262). Localizar a função que
 faz isso e, no mesmo laço, aplicar a mesma regra a `.funcionario-linha`:
@@ -703,7 +703,7 @@ Na função encontrada, depois do laço existente sobre os cards, acrescentar:
 Ajustar o nome da variável do termo de busca (`termo`) para o que a função já
 usa — não renomear a variável existente.
 
-- [ ] **Step 6: Verificar na aplicação rodando**
+- [x] **Step 6: Verificar na aplicação rodando**
 
 Em `/funcionarios`:
 1. Alternar Lista / Cards; recarregar a página e confirmar que voltou no formato escolhido.
@@ -712,7 +712,7 @@ Em `/funcionarios`:
 4. Digitar no campo de busca e conferir que as linhas filtram junto com os cards.
 5. "Selecionar todos" com busca ativa deve marcar só o que está visível.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add templates/funcionarios.html
