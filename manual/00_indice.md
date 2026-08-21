@@ -18,6 +18,7 @@ Este manual reúne, em um único lugar, as instruções de uso de **todos os mó
    - Funcionários
    - Obras
    - RDO (Relatório Diário de Obra)
+   - RDO — Padrão de Preenchimento (a norma: o que precisa estar preenchido)
    - Cronograma
    - Financeiro
    - Propostas Comerciais
