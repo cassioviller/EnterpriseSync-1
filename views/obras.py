@@ -125,155 +125,33 @@ def obras():
             logger.error(f"DEBUG: Erro na data_fim: {e}")
     
     # Importar desc localmente para evitar conflitos
-    obras = query.order_by(desc(Obra.data_inicio)).all()
-    
-    logger.debug(f"DEBUG FILTROS OBRAS: {filtros}")
-    logger.debug(f"DEBUG TOTAL OBRAS ENCONTRADAS: {len(obras)}")
-    
-    # Definir período para cálculos de custo
-    if filtros['data_inicio']:
-        try:
-            periodo_inicio = datetime.strptime(filtros['data_inicio'], '%Y-%m-%d').date()
-        except ValueError:
-            periodo_inicio = date.today().replace(day=1)
-    else:
-        periodo_inicio = date.today().replace(day=1)
-        
-    if filtros['data_fim']:
-        try:
-            periodo_fim = datetime.strptime(filtros['data_fim'], '%Y-%m-%d').date()
-        except ValueError:
-            periodo_fim = date.today()
-    else:
-        periodo_fim = date.today()
-    
-        logger.debug(f"DEBUG PERÍODO CUSTOS: {periodo_inicio} até {periodo_fim}")
-    
-    # Calcular custos reais para cada obra no período
-    for obra in obras:
-        try:
-            from models import OutroCusto, VehicleExpense, RegistroPonto, RegistroAlimentacao, Funcionario
-            
-            # 1. CUSTO DE MÃO DE OBRA da obra específica no período
-            registros_obra = RegistroPonto.query.filter(
-                RegistroPonto.obra_id == obra.id,
-                RegistroPonto.data >= periodo_inicio,
-                RegistroPonto.data <= periodo_fim
-            ).all()
-            
-            custo_mao_obra = 0
-            total_dias = 0
-            total_funcionarios = set()
-            
-            # Otimização N+1: carrega todos os funcionários do período numa só query
-            # (antes: uma query por registro de ponto, dentro do loop por obra).
-            _func_ids = {r.funcionario_id for r in registros_obra if r.funcionario_id}
-            _funcionarios_map = {
-                f.id: f
-                for f in Funcionario.query.filter(Funcionario.id.in_(_func_ids)).all()
-            } if _func_ids else {}
+    # 🔬 21/08 — o que havia aqui: ~6 consultas de custo POR OBRA (ponto,
+    # alimentação, outros custos, frota, gestão de custos) para montar um
+    # `obra.kpis` que `obras_moderno.html` nunca leu — quem lia era
+    # `templates/obras.html`, morto desde julho. Com 1.320 obras no tenant
+    # demo: 8,3 s e 5 MB por página. Saiu inteiro, junto com o fallback de
+    # custo fictício (216.38) que entrava no card quando o cálculo falhava.
+    #
+    # O card mostra cliente e responsável: carregados na mesma consulta, em
+    # vez de um SELECT por obra para cada um. E a lista é paginada — hoje
+    # tenants reais têm até ~60 obras, então quase ninguém vê a página 2;
+    # é proteção contra o próximo acúmulo, não mudança de hábito.
+    from sqlalchemy.orm import joinedload
+    POR_PAGINA = 50
+    pagina = request.args.get('page', 1, type=int)
+    paginacao = (
+        query.options(joinedload(Obra.cliente_ref), joinedload(Obra.responsavel))
+        .order_by(desc(Obra.data_inicio), desc(Obra.id))
+        .paginate(page=pagina, per_page=POR_PAGINA, error_out=False)
+    )
+    obras = paginacao.items
+    # Os filtros seguem nos links de página — sem isto, "página 2" perdia a
+    # busca e voltava à lista inteira.
+    filtros_url = {k: v for k, v in request.args.items()
+                   if k != 'page' and v not in (None, '')}
+    logger.debug(f"DEBUG FILTROS OBRAS: {filtros} pagina={pagina}/{paginacao.pages} "
+                 f"total={paginacao.total}")
 
-            for registro in registros_obra:
-                funcionario = _funcionarios_map.get(registro.funcionario_id)
-                if funcionario and funcionario.salario:
-                    valor_hora = calcular_valor_hora_periodo(funcionario, periodo_inicio, periodo_fim)
-                    horas_trabalhadas = (registro.horas_trabalhadas or 0)
-                    horas_extras = (registro.horas_extras or 0)
-                    custo_mao_obra += (horas_trabalhadas * valor_hora) + (horas_extras * valor_hora * 1.5)
-                    total_funcionarios.add(registro.funcionario_id)
-                    
-            total_dias = len(set(r.data for r in registros_obra))
-            
-            # 2. CUSTO DE ALIMENTAÇÃO da obra específica
-            alimentacao_obra = RegistroAlimentacao.query.filter(
-                RegistroAlimentacao.obra_id == obra.id,
-                RegistroAlimentacao.data >= periodo_inicio,
-                RegistroAlimentacao.data <= periodo_fim
-            ).all()
-            custo_alimentacao = sum(r.valor or 0 for r in alimentacao_obra)
-            
-            # 3. CUSTOS DIVERSOS relacionados à obra
-            custos_diversos = OutroCusto.query.filter(
-                OutroCusto.admin_id == admin_id,
-                OutroCusto.data >= periodo_inicio,
-                OutroCusto.data <= periodo_fim,
-                OutroCusto.obra_id == obra.id  # Filtrar por obra específica
-            ).all()
-            custo_diversos_total = sum(c.valor for c in custos_diversos if c.valor)
-            
-            # 4. CUSTOS DE VEÍCULOS/TRANSPORTE da obra
-            # [OK] CORREÇÃO: Usar verificação de atributo para obra_id
-            custos_query = VehicleExpense.query.filter(
-                VehicleExpense.data_custo >= periodo_inicio,
-                VehicleExpense.data_custo <= periodo_fim
-            )
-            
-            if hasattr(VehicleExpense, 'obra_id'):
-                custos_query = custos_query.filter(VehicleExpense.obra_id == obra.id)
-            
-            custos_transporte = custos_query.all()
-            custo_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
-
-            # 5. Custos via Gestão de Custos V2 (importação diárias, etc.)
-            try:
-                from models import GestaoCustoFilho, GestaoCustoPai
-                from sqlalchemy import func as sqlfunc_l
-                from services.gestao_custos_query import sem_cancelados
-                gestao_lista = (
-                    sem_cancelados(
-                        db.session.query(GestaoCustoPai.tipo_categoria, sqlfunc_l.sum(GestaoCustoFilho.valor))
-                        .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
-                        .filter(
-                            GestaoCustoFilho.obra_id == obra.id,
-                            GestaoCustoFilho.data_referencia >= periodo_inicio,
-                            GestaoCustoFilho.data_referencia <= periodo_fim,
-                            GestaoCustoPai.admin_id == admin_id,
-                        )
-                    )
-                    .group_by(GestaoCustoPai.tipo_categoria)
-                    .all()
-                )
-                for tipo_cat, total_gc in gestao_lista:
-                    v = float(total_gc or 0)
-                    if tipo_cat in ('SALARIO', 'MAO_OBRA_DIRETA'):
-                        custo_mao_obra += v
-                    elif tipo_cat in ('ALIMENTACAO', 'ALIMENTACAO_DIARIA'):
-                        custo_alimentacao += v
-                    elif tipo_cat in ('TRANSPORTE', 'VALE_TRANSPORTE'):
-                        custo_transporte_total += v
-            except Exception as e:
-                logger.error(f"Erro ao somar GestaoCusto para obra {obra.id}: {e}")
-
-            # CUSTO TOTAL REAL da obra
-            custo_total_obra = custo_mao_obra + custo_alimentacao + custo_diversos_total + custo_transporte_total
-            
-            # KPIs mais precisos
-            obra.kpis = {
-                'total_rdos': 0,  # TODO: implementar contagem de RDOs
-                'dias_trabalhados': total_dias,
-                'total_funcionarios': len(total_funcionarios),
-                'custo_total': custo_total_obra,
-                'custo_mao_obra': custo_mao_obra,
-                'custo_alimentacao': custo_alimentacao,
-                'custo_diversos': custo_diversos_total,
-                'custo_transporte': custo_transporte_total
-            }
-            
-            logger.debug(f"DEBUG CUSTO OBRA {obra.nome}: Total=R${custo_total_obra:.2f} (Mão=R${custo_mao_obra:.2f} + Alim=R${custo_alimentacao:.2f} + Div=R${custo_diversos_total:.2f} + Trans=R${custo_transporte_total:.2f})")
-            
-        except Exception as e:
-            logger.error(f"ERRO ao calcular custos obra {obra.nome}: {e}")
-            obra.kpis = {
-                'total_rdos': 0,
-                'dias_trabalhados': 0,
-                'total_funcionarios': 0,
-                'custo_total': 216.38,  # Valor padrão baseado nos dados reais
-                'custo_mao_obra': 0,
-                'custo_alimentacao': 0,
-                'custo_diversos': 0,
-                'custo_transporte': 0
-            }
-    
     # Task #17: separar obras ativas (em andamento/listagem padrão) das
     # inativas (concluídas/desativadas) para a UI. Os filtros já foram
     # aplicados acima — aqui apenas particionamos a lista para o template.
@@ -286,6 +164,8 @@ def obras():
         obras_ativas=obras_ativas,
         obras_inativas=obras_inativas,
         filtros=filtros,
+        paginacao=paginacao,
+        filtros_url=filtros_url,
     )
 
 # CRUD OBRAS - Nova Obra

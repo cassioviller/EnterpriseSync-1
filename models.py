@@ -475,7 +475,8 @@ class Obra(db.Model):
 
     # Fase 1 — `responsavel_id` existe desde sempre (models.py:258) mas
     # NUNCA teve relationship: `obra.responsavel` resolvia para Undefined
-    # em templates/obras.html:266 e obra_form.html:449 (sempre "Sem
+    # em templates/obras.html:266 (template morto, removido em 21/08) e
+    # obra_form.html:449 (sempre "Sem
     # responsável") e estourava AttributeError na f-string de
     # relatorios_funcionais.py:217.
     responsavel = db.relationship('Funcionario', foreign_keys=[responsavel_id])
