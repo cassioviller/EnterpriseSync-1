@@ -371,15 +371,22 @@
         function adicionarLinhaRepetivel(containerId, tipo) {
             const cont = document.getElementById(containerId);
             if (!cont) return;
+            // 🔬 21/08 — no navegador o <form> fecha ANTES destes cards (o
+            // template fecha mais </div> do que abre dentro dele), então uma
+            // linha criada aqui não pertence a formulário nenhum e o POST a
+            // perde em silêncio. Mesmo remédio que os inputs de foto já usam:
+            // o atributo `form` aponta o dono.
+            const formId = (cont.closest('form') && cont.closest('form').id)
+                || (document.getElementById('formEditarRDO') ? 'formEditarRDO' : 'formNovoRDO');
             const div = document.createElement('div');
             div.className = 'row g-2 mb-2 align-items-end repet-row';
             if (tipo === 'equip') {
                 div.innerHTML = `
-                    <div class="col-md-4"><input type="text" class="form-control form-control-sm" name="equip_nome[]" placeholder="Nome do equipamento"></div>
-                    <div class="col-md-2"><input type="number" min="1" step="1" class="form-control form-control-sm" name="equip_quantidade[]" placeholder="Qtd" value="1"></div>
-                    <div class="col-md-2"><input type="number" min="0" step="0.5" class="form-control form-control-sm" name="equip_horas_uso[]" placeholder="Horas" value="8"></div>
+                    <div class="col-md-4"><input form="${formId}" type="text" class="form-control form-control-sm" name="equip_nome[]" placeholder="Nome do equipamento"></div>
+                    <div class="col-md-2"><input form="${formId}" type="number" min="1" step="1" class="form-control form-control-sm" name="equip_quantidade[]" placeholder="Qtd" value="1"></div>
+                    <div class="col-md-2"><input form="${formId}" type="number" min="0" step="0.5" class="form-control form-control-sm" name="equip_horas_uso[]" placeholder="Horas" value="8"></div>
                     <div class="col-md-3">
-                        <select class="form-control form-control-sm" name="equip_estado[]">
+                        <select form="${formId}" class="form-control form-control-sm" name="equip_estado[]">
                             ${equipEstadoOptions}
                         </select>
                     </div>
@@ -387,21 +394,21 @@
             } else {
                 div.innerHTML = `
                     <div class="col-md-3">
-                        <select class="form-control form-control-sm" name="ocorr_tipo[]">
+                        <select form="${formId}" class="form-control form-control-sm" name="ocorr_tipo[]">
                             <option value="Outros" selected>Outros</option><option value="Atraso">Atraso</option>
                             <option value="Acidente">Acidente</option><option value="Falha de Equipamento">Falha de Equipamento</option>
                             <option value="Material">Material</option><option value="Clima">Clima</option>
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <select class="form-control form-control-sm" name="ocorr_severidade[]">
+                        <select form="${formId}" class="form-control form-control-sm" name="ocorr_severidade[]">
                             <option value="Baixa" selected>Baixa</option><option value="Média">Média</option>
                             <option value="Alta">Alta</option><option value="Crítica">Crítica</option>
                         </select>
                     </div>
-                    <div class="col-md-4"><input type="text" class="form-control form-control-sm" name="ocorr_descricao[]" placeholder="Descrição da ocorrência"></div>
+                    <div class="col-md-4"><input form="${formId}" type="text" class="form-control form-control-sm" name="ocorr_descricao[]" placeholder="Descrição da ocorrência"></div>
                     <div class="col-md-2">
-                        <select class="form-control form-control-sm" name="ocorr_status[]">
+                        <select form="${formId}" class="form-control form-control-sm" name="ocorr_status[]">
                             <option value="Pendente" selected>Pendente</option><option value="Em andamento">Em andamento</option>
                             <option value="Resolvido">Resolvido</option>
                         </select>

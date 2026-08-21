@@ -2300,6 +2300,38 @@ aplicada chamando `executar_migracoes()` explicitamente. E um sensor antigo
 `'>Desvio</th>'`, texto que a tabela de comparação agora carrega dentro de JS —
 reancorado no `title` do cabeçalho da grade (`cbde0c20`).
 
+**📘 Manual visual do RDO — `docs/manual_rdo/`, regenerável por três comandos.**
+18 telas, do cronograma à retificação, caixas numeradas por seletor, PDF (21 págs.)
++ markdown; PDF também em `static/docs/manual-rdo.pdf`, linkado do capítulo 23a.
+Mesma ferramenta do manual de compras, com acréscimos aditivos no motor (`clicar`,
+`anexar`, `Tela.permanece`, `Tela.guarda_id`) e o gerador extraído para
+`scripts/manual_pdf.py` — compras passou a usá-lo, markdown idêntico. Cenário no
+tenant `manualrdo` (`scripts/seed_manual_rdo.py`, idempotente). Plano e desvios:
+`docs/superpowers/plans/2026-08-21-manual-visual-rdo.md`.
+
+**Três achados do app que a captura desenterrou (porque ela AGE na tela, não só
+fotografa):**
+
+1. 🔴 **Ocorrência e equipamento digitados no RDO novo eram descartados.** 🔬 no
+   navegador o `<form id="formNovoRDO">` fecha antes dos cards (o template fecha
+   mais `</div>` do que abre); as linhas criadas por `adicionarLinhaRepetivel`
+   nasciam fora do form e o POST não as levava — o backend grava quando recebe.
+   Corrigido (atributo `form` nas linhas) com teste de regressão. Sintoma de
+   campo: "registrei a ocorrência e ela sumiu" — e o capítulo 23a devolve RDO sem
+   ocorrência.
+2. 🔴 **Salvar um rascunho já lança custo.** 📖 `views/rdo.py` (`salvar-rdo-flexivel`)
+   emite `rdo_finalizado` no salvar; 🔬 um RDO que nunca foi submetido ficou com 2
+   `custo_obra` de mão de obra (R$ 277,12). E como `RDO.status` segue
+   `'Finalizado'` para todo RDO (o ciclo de vida vive em `estado`), os ≥9
+   consumidores que filtram por `status` contam o rascunho. Isso contradiz o
+   contrato do `rdo_ciclo_vida` ("preenchido = custos lançados") e o que o
+   capítulo 23a promete ("rascunho não lança custo"). **Decisão humana:** travar
+   a emissão no salvar para `estado != rascunho` (e deixar o Submeter emitir, como
+   já faz) — ou reescrever a norma. Até lá, o manual visual não afirma nem uma
+   coisa nem outra.
+3. 🟡 **A página do RDO mostra "Finalizado" (o `status` legado) até em rascunho**,
+   ao lado da pílula de estado real. Cosmético, mas ensina errado.
+
 **O Chromium do Playwright não sobe nesta máquina** sem ajuda: 📖 `ldd` acusa
 `libnspr4`, `libnss3`, `libgbm`, `libxkbcommon`, `libudev` e `libasound`
 ausentes; o cabeçalho do `run_tests.sh` diz que vêm "via nix", mas o

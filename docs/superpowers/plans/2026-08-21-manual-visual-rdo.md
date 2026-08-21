@@ -10,6 +10,34 @@
 
 **Spec:** Não há spec escrito. Decisões da conversa de 2026-08-21 com o Cássio: *"pdf com script passo a passo tirando print de tudo do rdo desde entender que o rdo é alimentado pelo cronograma as atividades ate assinar"*. D1 tenant próprio semeado; D2 ciclo de vida inteiro (submeter → reabrir → assinar → aprovar → retificar); D3 PDF + markdown em `docs/manual_rdo/`, PDF também em `static/docs/manual-rdo.pdf` e linkado do capítulo 23a.
 
+## Estado — 21/08 (executado; 18 telas; PDF de 21 páginas)
+
+Tudo executado no mesmo dia. O que a execução descobriu e o plano não previa:
+
+- **O `<form>` do RDO novo fecha cedo no navegador** (🔬 o template fecha mais
+  `</div>` do que abre dentro dele; em runtime só o cabeçalho é filho do form).
+  Os inputs de foto já levavam `form="formNovoRDO"` e os apontamentos são hidden
+  injetados no form — mas as linhas de **ocorrência/equipamento** criadas por
+  `adicionarLinhaRepetivel` nasciam sem dono e o POST as perdia em silêncio.
+  Corrigido no template (atributo `form`), com teste de regressão
+  (`tests/test_rdo_novo_linhas_fora_do_form.py`).
+- **Quem assina precisa de identidade de RH** (`Usuario.funcionario_id`, Fase 1):
+  o seed ganhou dois funcionários vinculados (Mateus e Carla).
+- **O id do RDO nem sempre está na URL depois de salvar**: FUNCIONARIO cai no
+  consolidado, só ADMIN cai em `/rdo/<id>`. `guarda_id` lê da URL ou do banco.
+- **RDO assinado/aprovado/retificado é imutável também para a limpeza**: o
+  `limpar_rdos` do seed passa por `escrita_de_ciclo_de_vida()`.
+- **Três FKs para `rdo.id` não têm CASCADE** (`custo_obra`, `movimentacao_estoque`,
+  `alocacao_equipe.rdo_gerado_id`): a limpeza trata os três.
+- **A página do RDO não tem `.estado-badge`**: o estado é a pílula
+  `.header-right > span.badge` e os botões disponíveis. O selo "Finalizado" ao
+  lado é o `status` legado e aparece até em rascunho.
+- **Salvar um rascunho pelo formulário já emite `rdo_finalizado`** e lança
+  `custo_obra` (🔬 2 linhas, R$ 277,12, num RDO que nunca foi submetido) — o que
+  contradiz o contrato do `rdo_ciclo_vida` e o capítulo 23a. O texto das telas 12
+  e 13 foi escrito sem afirmar o que o sistema hoje não garante; a decisão de
+  código é humana (ver `ESTADO-ATUAL.md`).
+
 ## Global Constraints
 
 - **Falhou, para.** Seletor que não casa, tela que não abre, login que falha → `SystemExit`/`MarcacaoQuebrada` com o nome do passo. Nunca `except Exception: continue` (📖 `scripts/capturar_manual_ciclo.py:76-79` é o contraexemplo que produziu manual com foto velha).
@@ -93,7 +121,7 @@ O formulário de RDO é preenchido em etapas na **mesma página** (modais, campo
 **Interfaces:**
 - Produces: `Acao('clicar', seletor)` — `page.click(seletor)` + 400 ms, **sem** esperar navegação; `Acao('anexar', seletor, valor)` — `page.set_input_files(seletor, valor.split(';'))`; `Tela.permanece: bool` — a captura não faz `goto`; `Tela.guarda_id: str` — depois da foto, a captura lê `/rdo/(\d+)` da URL e guarda em `ctx[guarda_id]`. Consumidos pelas Tasks 4 e 5.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Criar `tests/test_manual_rdo_roteiro.py`:
 
@@ -168,13 +196,13 @@ def test_tela_nasce_sem_permanecer_e_sem_guardar_id():
     assert t.guarda_id == ''
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `.pythonlibs/bin/pytest tests/test_manual_rdo_roteiro.py -q`
 
 Esperado: **4 failed** — `MarcacaoQuebrada: tipo desconhecido 'clicar'` nos dois primeiros, `AttributeError`/`TypeError` em `permanece`.
 
-- [ ] **Step 3: Acrescentar as ações e os campos**
+- [x] **Step 3: Acrescentar as ações e os campos**
 
 Em `scripts/anotar_captura.py`:
 
@@ -214,13 +242,13 @@ Em `executar`, trocar o `else:` final por:
             page.wait_for_timeout(900)         # o flash é renderizado no servidor
 ```
 
-- [ ] **Step 4: Rodar os testes — novos e os de compras**
+- [x] **Step 4: Rodar os testes — novos e os de compras**
 
 Run: `.pythonlibs/bin/pytest tests/test_manual_rdo_roteiro.py tests/test_manual_compras_roteiro.py -q`
 
 Esperado: **todos PASSAM.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/anotar_captura.py tests/test_manual_rdo_roteiro.py
@@ -247,7 +275,7 @@ git commit -m "feat(captura): acoes clicar/anexar e Tela.permanece/guarda_id par
   ```
   `roteiro` é a lista de `Tela`. `construir_pdf` levanta `SystemExit('faltam capturas: ...')` se faltar PNG de algum slug. `quem` mapeia `papel → "quem faz"` para o rodapé de cada passo.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar em `tests/test_manual_rdo_roteiro.py`:
 
@@ -285,13 +313,13 @@ def test_construir_pdf_recusa_foto_faltando(tmp_path):
     assert 'sem_foto' in str(erro.value)
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `.pythonlibs/bin/pytest tests/test_manual_rdo_roteiro.py -q -k pdf`
 
 Esperado: **2 failed** — `ModuleNotFoundError: manual_pdf`.
 
-- [ ] **Step 3: Criar `scripts/manual_pdf.py`**
+- [x] **Step 3: Criar `scripts/manual_pdf.py`**
 
 Mover de `gerar_manual_compras.py` as constantes de cor/margem, os estilos (`est`), `_imagem`, `_tabela_legenda`, `_aviso`, e o corpo de `construir`/`markdown`, parametrizando o que era de compras:
 
@@ -369,7 +397,7 @@ def escrever_markdown(roteiro, *, md, titulo, gerador, roteiro_nome):
 
 (Os `...` acima são **o corpo existente** de `gerar_manual_compras.py`, movido sem alteração de lógica — copiar linha a linha das funções de mesmo nome; o único ponto que muda é a origem dos textos.)
 
-- [ ] **Step 4: `gerar_manual_compras.py` passa a usar o módulo**
+- [x] **Step 4: `gerar_manual_compras.py` passa a usar o módulo**
 
 Substituir as constantes de estilo, `_imagem`, `_tabela_legenda`, `_aviso`, `construir` e `markdown` por:
 
@@ -407,7 +435,7 @@ if __name__ == '__main__':
 
 Conferir que o `main()` antigo não fazia nada além de `construir()` + `markdown()` + print (`grep -n "def main" -A8 scripts/gerar_manual_compras.py` antes de apagar).
 
-- [ ] **Step 5: Rodar os testes e regerar o manual de compras**
+- [x] **Step 5: Rodar os testes e regerar o manual de compras**
 
 Run: `.pythonlibs/bin/pytest tests/test_manual_rdo_roteiro.py tests/test_manual_compras_roteiro.py -q`
 Esperado: **todos PASSAM.**
@@ -415,7 +443,7 @@ Esperado: **todos PASSAM.**
 Run: `cp docs/manual_compras/manual-compras.md /tmp/claude-1000/-home-runner-workspace/d5a46dab-89eb-4b97-808d-0e37f37724d3/scratchpad/manual-compras-antes.md && .pythonlibs/bin/python scripts/gerar_manual_compras.py && diff /tmp/claude-1000/-home-runner-workspace/d5a46dab-89eb-4b97-808d-0e37f37724d3/scratchpad/manual-compras-antes.md docs/manual_compras/manual-compras.md && echo "markdown idêntico"`
 Esperado: `ok: ...` e **"markdown idêntico"** (o PDF muda só no timestamp interno; o markdown é a prova de que a lógica não mudou).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scripts/manual_pdf.py scripts/gerar_manual_compras.py tests/test_manual_rdo_roteiro.py
@@ -433,7 +461,7 @@ git commit -m "refactor(manual): gerador de PDF/markdown sai de compras para man
 **Interfaces:**
 - Produces: `MARCA = 'manualrdo'`, `SENHA = 'Manual@2026'`, `PESSOAS` (lista de tuplas `(chave, username, nome, cargo)` com chaves `admin`, `encarregado`, `gestor`), `semear() -> Usuario` (o admin), `limpar_rdos(admin_id) -> int`, `resumo(admin) -> dict` com as chaves `obra_id`, `t_blocos`, `t_estacas`, `t_pilares`, `t_marco`, `f_davi`, `f_pedro`, `sub_id`. Usernames: `manualrdo_admin`, `manualrdo_encarregado`, `manualrdo_gestor`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Criar `tests/test_manual_rdo_seed.py`:
 
@@ -517,18 +545,18 @@ def test_feed_do_rdo_traz_as_quatro_folhas_com_o_modo_certo():
     assert por_id[ids['t_marco']].get('is_marco') is True
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `.pythonlibs/bin/pytest tests/test_manual_rdo_seed.py -q`
 Esperado: **3 failed** — `ModuleNotFoundError: seed_manual_rdo`.
 
-- [ ] **Step 3: Conferir a forma do JSON de `tarefas-rdo`**
+- [x] **Step 3: Conferir a forma do JSON de `tarefas-rdo`**
 
 Run: `sed -n '2549,2640p' cronograma_views.py | grep -nE "jsonify|'id'|'responsavel'|'is_marco'|'modo'|'nome'"`
 
 Anotar as chaves reais; se o JSON não trouxer `is_marco`/`responsavel` com esses nomes, **ajustar o teste** para as chaves existentes (o teste existe para fixar o contrato que a tela 05 usa, não para inventar um).
 
-- [ ] **Step 4: Escrever `scripts/seed_manual_rdo.py`**
+- [x] **Step 4: Escrever `scripts/seed_manual_rdo.py`**
 
 ```python
 #!/usr/bin/env python3
@@ -798,7 +826,7 @@ Antes de rodar, conferir três nomes de coluna que o seed usa e que variam entre
 Run: `grep -nE "^\s+(salario|ativo|especialidade|cargo_id|funcao_id) = db\.Column" models.py | awk -F: '$1>290 && $1<340 || $1>7700 && $1<7760'`
 Se `Funcionario` não tiver `salario` ou `Subempreiteiro` não tiver `ativo`, retirar o argumento correspondente do construtor — o seed não pode inventar coluna.
 
-- [ ] **Step 5: Rodar o seed e os testes**
+- [x] **Step 5: Rodar o seed e os testes**
 
 Run: `.pythonlibs/bin/python scripts/seed_manual_rdo.py && .pythonlibs/bin/python scripts/seed_manual_rdo.py --resumo`
 Esperado: `tenant manualrdo (admin N) pronto` e os 8 ids.
@@ -806,12 +834,12 @@ Esperado: `tenant manualrdo (admin N) pronto` e os 8 ids.
 Run: `.pythonlibs/bin/pytest tests/test_manual_rdo_seed.py -q`
 Esperado: **3 passed.**
 
-- [ ] **Step 6: Conferir na aplicação que o encarregado enxerga a obra e o cronograma**
+- [x] **Step 6: Conferir na aplicação que o encarregado enxerga a obra e o cronograma**
 
 Run: `J=$(mktemp); curl -s -c $J -o /dev/null http://localhost:5000/login; curl -s -b $J -c $J -o /dev/null -d "username=manualrdo_encarregado&password=Manual@2026" http://localhost:5000/login; OBRA=$(.pythonlibs/bin/python scripts/seed_manual_rdo.py --resumo | awk '$1=="obra_id"{print $2}'); for p in /rdos "/cronograma/obra/$OBRA" "/rdo/novo?obra_id=$OBRA"; do curl -s -b $J -o /dev/null -w "$p -> HTTP %{http_code}\n" "http://localhost:5000$p"; done`
 Esperado: **200** nos três. Se `/cronograma/obra/<id>` devolver 302/403 para o APONTADOR, a tela 02 passa a usar `papel='gestor'` no roteiro (Task 4) — anotar no plano o motivo.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add scripts/seed_manual_rdo.py tests/test_manual_rdo_seed.py
@@ -830,13 +858,13 @@ git commit -m "feat(manual-rdo): seed do tenant manualrdo — obra, cronograma d
 - Consumes: `Tela`, `Campo`, `Acao` (Task 1); `seed_manual_rdo.resumo`/`MARCA`/`PESSOAS` (Task 3).
 - Produces: `resolver_ids() -> dict` (os 8 ids do seed + `hoje` em ISO), `montar(ids) -> list[Tela]`, `telas(ids=None) -> list[Tela]`. Rotas e valores podem conter `{rdo_id}` e `{rdo_retif_id}`, que a captura resolve em runtime. `FOTOS = '{foto1};{foto2};{foto3}'` também resolvido pela captura.
 
-- [ ] **Step 1: Descobrir os `value` dos selects que o roteiro escolhe**
+- [x] **Step 1: Descobrir os `value` dos selects que o roteiro escolhe**
 
 Run: `grep -n -A12 'id="clima_geral"' templates/rdo/novo.html | grep -oE '<option value="[^"]*"[^>]*>[^<]*' | head -6; grep -n -A8 'name="ocorr_tipo\[\]"' templates/rdo/novo.html | grep -oE '<option value="[^"]*"' | head -6; grep -n -A8 'name="ocorr_severidade\[\]"' templates/rdo/novo.html | grep -oE '<option value="[^"]*"' | head -6; grep -n -B3 'id="ocorr-rows"' templates/rdo/novo.html | grep -oE 'onclick="[^"]+"' | head -2`
 
 Anotar: o `value` de clima para "Ensolarado" (ou o primeiro não vazio), o de tipo de ocorrência para chuva/clima, o de severidade média, e o `onclick` exato do botão que adiciona linha de ocorrência — o seletor da ação 10 é `button[onclick="<esse onclick>"]`.
 
-- [ ] **Step 2: Escrever os testes de invariantes do roteiro**
+- [x] **Step 2: Escrever os testes de invariantes do roteiro**
 
 Acrescentar em `tests/test_manual_rdo_roteiro.py`:
 
@@ -886,12 +914,12 @@ def test_tela_que_permanece_nao_tem_rota():
             assert t.rota.startswith('/'), t.slug
 ```
 
-- [ ] **Step 3: Rodar para confirmar que falha**
+- [x] **Step 3: Rodar para confirmar que falha**
 
 Run: `.pythonlibs/bin/pytest tests/test_manual_rdo_roteiro.py -q -k roteiro`
 Esperado: **5 failed** — `ModuleNotFoundError: roteiro_manual_rdo`.
 
-- [ ] **Step 4: Escrever `scripts/roteiro_manual_rdo.py`**
+- [x] **Step 4: Escrever `scripts/roteiro_manual_rdo.py`**
 
 ```python
 #!/usr/bin/env python3
@@ -1167,12 +1195,12 @@ def telas(ids=None):
 
 Depois de escrever, **substituir** os três marcadores `Ensolarado` / `ADICIONAR_OCORRENCIA` / `clima` / `media` pelos valores anotados no Step 1.
 
-- [ ] **Step 5: Rodar os testes do roteiro**
+- [x] **Step 5: Rodar os testes do roteiro**
 
 Run: `.pythonlibs/bin/pytest tests/test_manual_rdo_roteiro.py -q`
 Esperado: **todos PASSAM** (os 5 novos e os anteriores).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scripts/roteiro_manual_rdo.py tests/test_manual_rdo_roteiro.py
@@ -1190,7 +1218,7 @@ git commit -m "feat(manual-rdo): roteiro das 18 telas — do cronograma a retifi
 - Consumes: `capturar_manual_compras.preparar_bibliotecas`, `capturar_manual_compras.entrar`; `anotar_captura.executar/marcar/limpar/MarcacaoQuebrada`; `roteiro_manual_rdo.telas`; `seed_manual_rdo.MARCA/SENHA/limpar_rdos`.
 - Produces: `docs/manual_rdo/screenshots/<slug>.png` para as 18 telas, ou exit ≠ 0 dizendo qual tela quebrou.
 
-- [ ] **Step 1: Escrever `scripts/capturar_manual_rdo.py`**
+- [x] **Step 1: Escrever `scripts/capturar_manual_rdo.py`**
 
 ```python
 #!/usr/bin/env python3
@@ -1361,7 +1389,7 @@ O handler de `dialog` acima aceita **qualquer** prompt com o motivo que casar co
                 pg.on('dialog', _aceitar)
 ```
 
-- [ ] **Step 2: Rodar a captura**
+- [x] **Step 2: Rodar a captura**
 
 Run: `.pythonlibs/bin/python scripts/seed_manual_rdo.py && .pythonlibs/bin/python scripts/capturar_manual_rdo.py`
 
@@ -1373,7 +1401,7 @@ Se parar numa tela, o erro diz o seletor. Os prováveis:
 - **14/18**: o `prompt` — se o estado não mudar, o dialog não foi aceito: conferir a mensagem exata em `visualizar_rdo_moderno.html:1111,1121`.
 - **02** com 302: APONTADOR não vê o cronograma → trocar `papel='gestor'` na tela 02 (Task 3, Step 6 já avisou).
 
-- [ ] **Step 3: Olhar as 18 imagens**
+- [x] **Step 3: Olhar as 18 imagens**
 
 Run: `ls -la docs/manual_rdo/screenshots/ && .pythonlibs/bin/python -c "
 from PIL import Image; import glob
@@ -1382,7 +1410,7 @@ for p in sorted(glob.glob('docs/manual_rdo/screenshots/*.png')):
 
 Abrir com o `Read` pelo menos `05_atividades.png`, `08_terceiro.png`, `12_salvar_rascunho.png` e `18_retificar.png` e conferir: caixas numeradas nos campos certos, estado visível no badge, nenhuma imagem de página de erro.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add scripts/capturar_manual_rdo.py docs/manual_rdo/screenshots
@@ -1402,7 +1430,7 @@ git commit -m "feat(manual-rdo): captura das 18 telas — formulario em etapas, 
 **Interfaces:**
 - Consumes: `manual_pdf.construir_pdf/escrever_markdown` (Task 2), `roteiro_manual_rdo.telas` (Task 4), as capturas (Task 5).
 
-- [ ] **Step 1: Escrever `scripts/gerar_manual_rdo.py`**
+- [x] **Step 1: Escrever `scripts/gerar_manual_rdo.py`**
 
 ```python
 #!/usr/bin/env python3
@@ -1464,7 +1492,7 @@ if __name__ == '__main__':
     sys.exit(main())
 ```
 
-- [ ] **Step 2: Gerar**
+- [x] **Step 2: Gerar**
 
 Run: `.pythonlibs/bin/python scripts/gerar_manual_rdo.py && .pythonlibs/bin/python -c "
 from pypdf import PdfReader" 2>/dev/null && .pythonlibs/bin/python -c "
@@ -1472,11 +1500,11 @@ from pypdf import PdfReader; r = PdfReader('docs/manual_rdo/Manual_RDO_SIGE.pdf'
 
 Esperado: `ok: ...` e **19+ páginas** (capa + 18 telas, algumas com quebra).
 
-- [ ] **Step 3: Ler o PDF**
+- [x] **Step 3: Ler o PDF**
 
 Abrir `docs/manual_rdo/Manual_RDO_SIGE.pdf` com o `Read` (páginas 1-8 e 14-20) e conferir: capa, atos na ordem, cada figura com a legenda numerada embaixo, avisos "O que acontece"/"Atenção" grudados à tela.
 
-- [ ] **Step 4: Linkar do capítulo 23a**
+- [x] **Step 4: Linkar do capítulo 23a**
 
 Em `manual/23a_rdo_padrao_preenchimento.md`, logo depois do parágrafo que começa com "Este capítulo é a **norma** do RDO", inserir:
 
@@ -1492,7 +1520,7 @@ Esperado: **passa** (o teste confere seções e a ausência de "capítulo em con
 Run: `curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5000/static/docs/manual-rdo.pdf`
 Esperado: **200**.
 
-- [ ] **Step 5: Registrar no `ESTADO-ATUAL.md`**
+- [x] **Step 5: Registrar no `ESTADO-ATUAL.md`**
 
 Na seção `### ✅ 21/08 — reunião de 20/08: o que estava preso numa branch, integrado`, antes do parágrafo `**O Chromium do Playwright não sobe nesta máquina**`, acrescentar:
 
@@ -1507,7 +1535,7 @@ Cenário no tenant `manualrdo` (`scripts/seed_manual_rdo.py`, idempotente). Plan
 `docs/superpowers/plans/2026-08-21-manual-visual-rdo.md`.
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scripts/gerar_manual_rdo.py docs/manual_rdo manual/23a_rdo_padrao_preenchimento.md static/docs/manual-rdo.pdf ESTADO-ATUAL.md

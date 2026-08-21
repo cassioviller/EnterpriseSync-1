@@ -72,7 +72,7 @@ class Acao:
     valor: str = ''
 
 
-TIPOS_DE_ACAO = ('preencher', 'escolher', 'marcar', 'submeter')
+TIPOS_DE_ACAO = ('preencher', 'escolher', 'marcar', 'submeter', 'clicar', 'anexar')
 
 
 @dataclass
@@ -100,6 +100,15 @@ class Tela:
     # dentro do desenho feito para não ter nenhuma. O ato é da tela.
     ato: str = ''
     ato_resumo: str = ''
+    # Manual do RDO (21/08). O formulário de RDO é preenchido em ETAPAS na
+    # mesma página — modal de equipe, modal de terceiro, avanço, fotos —, e
+    # cada etapa merece a sua foto. `permanece=True` diz à captura para NÃO
+    # navegar: a foto é do estado em que a tela anterior deixou a página.
+    permanece: bool = False
+    # O id do RDO só existe depois de salvar. `guarda_id='rdo_id'` manda a
+    # captura ler `/rdo/<n>` da URL depois desta tela e guardar em ctx['rdo_id'],
+    # que as rotas seguintes usam via `{rdo_id}`.
+    guarda_id: str = ''
 
 
 _JS_MARCAR = """
@@ -185,6 +194,15 @@ def executar(page, acoes):
             page.select_option(a.seletor, a.valor)
         elif a.tipo == 'marcar':
             page.check(a.seletor)
+        elif a.tipo == 'clicar':
+            # Abre modal / acrescenta linha: fica na mesma página, então NÃO
+            # espera navegação — esperar `load` aqui pendura até o timeout.
+            page.click(a.seletor)
+            page.wait_for_timeout(400)
+        elif a.tipo == 'anexar':
+            # Vários arquivos separados por ';' — um input[type=file] multiple.
+            page.set_input_files(a.seletor, a.valor.split(';'))
+            page.wait_for_timeout(400)
         else:                                  # submeter
             page.click(a.seletor)
             page.wait_for_load_state('domcontentloaded')
