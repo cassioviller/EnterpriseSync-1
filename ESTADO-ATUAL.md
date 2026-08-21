@@ -407,6 +407,7 @@ em produção e levar o número de "EM EXECUÇÃO sem gestor" ao Cássio (em dev
 | 2 | **`gh auth login`** (a API do GitHub **e agora o `git push`**) | 🔬 03/08 dizia "`git push` funciona — o que falta é só a API". **Isso envelheceu.** 🔬 14/08: `git push origin main` **falha** — `remote: Invalid username or token. Password authentication is not supported for Git operations` / `fatal: Authentication failed`. `gh auth status` segue "not logged into any GitHub hosts" e `GH_TOKEN`/`GITHUB_TOKEN` continuam ausentes. Consequência: 🔬 21/08: **28 commits em `main` não estão no GitHub** (estão no `gitsafe-backup`, que é outra máquina da mesma rede — não é o mesmo que estar fora dela). Refazer o login é interativo — só o humano consegue |
 | 3 | **Criar o volume persistente** no painel | Vale para `/var/backups/sige` (dumps) **e** para os uploads. O pré-requisito de código caiu em 23/07: a armadilha nº 2 (descasamento do `UPLOADS_PATH`) está corrigida — montar o volume e definir a variável já é seguro |
 | 4 | **Paulo: qual fórmula vale para o percentual do grupo no cronograma** | 📖 `docs/superpowers/plans/2026-08-20-rollup-percentual-cronograma.md`, "DECISÃO PENDENTE". Hoje é média **ponderada por duração** (`utils/cronograma_engine.py`, `rollup_percentual_pos_recalculo` e `rollup_realizado`): 5 tarefas de 1 dia numa fase de ~300 dias levam o pai de 98% para ~96%, **não** para os ~80% que ele descreveu na reunião. Para dar 80% seria média **simples por item** — e isso muda curva S, EVM (`bac` congelado), medição e físico-financeiro em cascata. A Task 3 do plano está travada nisso de propósito; as Tasks 1 e 2 (caracterização em teste + pais por profundidade) valem nas duas hipóteses e já estão em `main` |
+| 6 | **Rodar a limpeza das obras de teste do tenant demo** | `.pythonlibs/bin/python scripts/limpar_obras_teste_demo.py --apagar` (dry-run sem a flag). 1.280 obras `^Obra #` no admin 1, deixadas por teste até 21/08; o agente é bloqueado em exclusão em massa. Sem isso, `/ponto/lista-obras` segue no limite da varredura |
 | 5 | **Alan e Abel: revisar a norma de preenchimento do RDO** | 📖 `manual/23a_rdo_padrao_preenchimento.md` está no ar (`/manual`), mas é a Task 2 do plano: quem vai ser cobrado pela norma tem de lê-la antes de ela virar cobrança. Sem essa rodada o capítulo é opinião do escritório, não acordo |
 
 > 📖 **O contorno do risco aceito no item 1.** O código não tem fallback fixo:
@@ -2252,8 +2253,42 @@ em sequência depois do gate: **54 passed, 1 failed** — a falha era fumaça da
 `test_cronograma_fisico_financeiro` esperava a página avulsa, e a rota
 redireciona para a aba Financeiro da obra desde o redesign do painel. Teste
 ajustado ao contrato da rota (`destino + #financeiro + #tab-financeiro`); bloco 3
-→ **9 passed**. Total dos sete blocos: **59 passed**. A varredura de páginas
-(`--varredura`) e a jornada E2E (`--jornada`) **não foram rodadas**.
+→ **9 passed**. Total dos sete blocos: **59 passed**. A jornada E2E (`--jornada`)
+**não foi rodada**.
+
+**Varredura de páginas (`--varredura`): 47 de 48 — e a que caiu era diagnóstico,
+não ruído.** `/obras` estourava os 30 s de `networkidle`: 🔬 **8,3 s e 5 MB** por
+página com cache quente (curl, 3×). Duas causas, uma em cima da outra:
+
+- *Código.* 📖 `views/obras.py:48` calculava ~6 consultas de custo **por obra**
+  para montar `obra.kpis` — que `obras_moderno.html` **nunca leu**; quem lia era
+  `templates/obras.html`, que nenhuma rota renderiza desde julho. E quando o
+  cálculo falhava, entrava um custo fictício `216.38` "baseado nos dados reais".
+  Tudo isso para um número invisível. `18ed2c49`/`2de944bd`: o laço saiu inteiro,
+  `cliente_ref` e `responsavel` (que o card mostra) vêm por `joinedload`, a lista é
+  paginada em 50 com filtros preservados, o template morto foi apagado. 🔬 depois:
+  **55–380 ms quente (1,2 s frio), 271 KB**; o teste trava que o número de
+  consultas não cresce com o número de obras (era 10 com 1 obra, 210 com 41).
+  Anotado, não resolvido: o card tenta mostrar `obra.progresso_conclusao`, que
+  **não existe em Python nenhum** — o `{% if %}` engole e a barra de progresso
+  nunca aparece. Fazer funcionar é outra funcionalidade.
+- *Dados.* ⚠️ dev: o tenant demo tinha **1.320 obras, 1.242 delas "Obra #NN"**
+  criadas por `tests/test_resumo_custos_obra.py`, que fazia `Usuario.query.first()`
+  (o primeiro usuário é o admin demo) — ~19 por rodada, ~19 rodadas desde julho, e a
+  suíte nunca limpa o banco. `65c24bcc`: cada teste cria o próprio tenant (🔬 0
+  obras novas no demo por rodada; antes 19). `ec9b0e50`: `scripts/
+  limpar_obras_teste_demo.py` apaga as que ficaram **pelo mesmo caminho da tela**
+  (`POST /obras/excluir/<id>`), só tenant 1 e só `^Obra #` — 🔬 dry-run: **1.280
+  casam, 78 ficam**. A execução é **item humano**: o agente foi bloqueado ao tentar
+  a exclusão em massa (`--apagar`, ~2,6 s por obra, ~55 min).
+  Mesmo vício, outro sintoma, fica para depois: outros 5 arquivos de teste usam
+  `Usuario.query.first()` para propostas/composições/notificações.
+
+🔬 varredura repetida sobre `2de944bd`: **47 de 48, `/obras` verde**; agora quem
+fica no limite é `/ponto/lista-obras` — 📖 `ponto_views.py:1176` faz um `count()`
+de ponto por obra e renderiza **todas** (🔬 1,6 s e 2,3 MB com as 1.358 obras do
+demo). Não foi tocada: é o mesmo acúmulo de dados, e deve cair sozinha com a
+limpeza acima. Se não cair, paginar como em `/obras`.
 
 **Linha de base (plano 5), executado inteiro** — `2a601591`. Uma nota de
 execução que vale para o próximo plano com migration: 📖 `tests/conftest.py:62`
