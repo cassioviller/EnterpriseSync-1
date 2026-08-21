@@ -102,3 +102,51 @@ def test_construir_pdf_recusa_foto_faltando(tmp_path):
         construir_pdf(roteiro, pdf=tmp_path / 'm.pdf', shots=tmp_path, titulo='T',
                       subtitulo='S', intro=[], quem={})
     assert 'sem_foto' in str(erro.value)
+
+
+# ── Task 4: o roteiro das 18 telas ────────────────────────────────────────
+
+
+def _roteiro_de_teste():
+    from roteiro_manual_rdo import montar
+    ids = {'obra_id': 1, 't_blocos': 2, 't_estacas': 3, 't_pilares': 4, 't_marco': 5,
+           'f_davi': 6, 'f_pedro': 7, 'sub_id': 8, 'hoje': '2026-08-21'}
+    return montar(ids)
+
+
+def test_roteiro_tem_slugs_unicos_e_em_ordem():
+    slugs = [t.slug for t in _roteiro_de_teste()]
+    assert len(slugs) == len(set(slugs))
+    assert slugs == sorted(slugs), 'o prefixo numérico do slug é a ordem do manual'
+
+
+def test_numeracao_das_caixas_e_contigua_em_cada_tela():
+    for t in _roteiro_de_teste():
+        numeros = [c.numero for c in t.campos]
+        assert numeros == list(range(1, len(numeros) + 1)), (t.slug, numeros)
+
+
+def test_toda_acao_usa_tipo_que_o_motor_conhece():
+    from anotar_captura import TIPOS_DE_ACAO
+    for t in _roteiro_de_teste():
+        for a in t.acoes:
+            assert a.tipo in TIPOS_DE_ACAO, (t.slug, a.tipo)
+
+
+def test_rdo_id_so_aparece_depois_da_tela_que_o_guarda():
+    """`{rdo_id}` numa rota ANTES do salvar é um manual que não tem como rodar."""
+    liberado = set()
+    for t in _roteiro_de_teste():
+        for chave in ('rdo_id', 'rdo_retif_id'):
+            if '{' + chave + '}' in t.rota:
+                assert chave in liberado, (t.slug, chave)
+        if t.guarda_id:
+            liberado.add(t.guarda_id)
+
+
+def test_tela_que_permanece_nao_tem_rota():
+    for t in _roteiro_de_teste():
+        if t.permanece:
+            assert t.rota == '', (t.slug, 'permanece=True não navega — rota vazia')
+        else:
+            assert t.rota.startswith('/'), t.slug
