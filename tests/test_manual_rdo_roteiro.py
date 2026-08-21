@@ -66,3 +66,39 @@ def test_tela_nasce_sem_permanecer_e_sem_guardar_id():
     t = Tela(slug='x', titulo='X', papel='anon', rota='/x', resumo='x')
     assert t.permanece is False
     assert t.guarda_id == ''
+
+
+# ── Task 2: gerador de PDF parametrizado ─────────────────────────────────
+
+
+def test_construir_pdf_monta_um_manual_de_uma_tela(tmp_path):
+    from PIL import Image
+    from manual_pdf import construir_pdf, escrever_markdown
+    from anotar_captura import Campo
+
+    shots = tmp_path / 'shots'
+    shots.mkdir()
+    Image.new('RGB', (640, 400), (240, 240, 240)).save(shots / 'x.png')
+    roteiro = [Tela(slug='x', titulo='Uma tela', papel='anon', rota='/x',
+                    resumo='Resumo.', campos=[Campo(1, '#a', 'Campo A', True)],
+                    depois='Depois.', atencao='Atenção.',
+                    ato='Ato único', ato_resumo='Só um ato.')]
+    pdf, md = tmp_path / 'm.pdf', tmp_path / 'm.md'
+
+    construir_pdf(roteiro, pdf=pdf, shots=shots, titulo='T', subtitulo='S',
+                  intro=['Linha.'], quem={'anon': 'qualquer pessoa'})
+    escrever_markdown(roteiro, md=md, titulo='T', gerador='g.py', roteiro_nome='r.py')
+
+    assert pdf.exists() and pdf.stat().st_size > 1000
+    texto = md.read_text(encoding='utf-8')
+    assert '## Ato único' in texto and '![Uma tela](screenshots/x.png)' in texto
+    assert '| 1 | Campo A * |' in texto
+
+
+def test_construir_pdf_recusa_foto_faltando(tmp_path):
+    from manual_pdf import construir_pdf
+    roteiro = [Tela(slug='sem_foto', titulo='X', papel='anon', rota='/x', resumo='x')]
+    with pytest.raises(SystemExit) as erro:
+        construir_pdf(roteiro, pdf=tmp_path / 'm.pdf', shots=tmp_path, titulo='T',
+                      subtitulo='S', intro=[], quem={})
+    assert 'sem_foto' in str(erro.value)
