@@ -27,6 +27,33 @@ def _garantir_cliente_id(admin_id):
     return cliente.id
 
 
+def _admin_isolado():
+    """Um tenant NOVO por chamada, em vez de pegar o primeiro Usuario da tabela.
+
+    🔬 21/08: o primeiro usuário da tabela é o admin do tenant demo, e este
+    arquivo gravou nele 1.242 obras "Obra #…" ao longo de ~19 rodadas de gate
+    (a suíte nunca limpa o banco). A listagem /obras do demo passou a levar
+    8 s e 5 MB, e a varredura de páginas caiu por timeout. Tenant próprio, como
+    o resto da suíte já faz (`_ambiente`, `make_admin`), é o que impede o
+    próximo acúmulo.
+    """
+    from models import Usuario, TipoUsuario
+    from werkzeug.security import generate_password_hash
+    suf = uuid.uuid4().hex[:10]
+    admin = Usuario(
+        username=f'rc70_{suf}',
+        email=f'rc70_{suf}@test.local',
+        nome=f'Admin Resumo Custos {suf}',
+        password_hash=generate_password_hash('Senha@2026'),
+        tipo_usuario=TipoUsuario.ADMIN,
+        ativo=True,
+        versao_sistema='v2',
+    )
+    db.session.add(admin)
+    db.session.commit()
+    return admin
+
+
 class ResumoCustosObraBaseTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -40,9 +67,7 @@ class ResumoCustosObraBaseTest(unittest.TestCase):
     def _criar_obra(self, nome='Obra Teste 70'):
         from datetime import date
         from models import Usuario, Obra
-        admin = Usuario.query.first()
-        if not admin:
-            self.skipTest('Nenhum Usuario admin no banco')
+        admin = _admin_isolado()
         obra = Obra(
             nome=nome,
             admin_id=admin.id,
@@ -320,7 +345,7 @@ class TestResumoCustosObra(ResumoCustosObraBaseTest):
         from datetime import date
         from models import Obra, Usuario, Proposta
         from services.resumo_custos_obra import calcular_resumo_obra
-        admin = Usuario.query.first()
+        admin = _admin_isolado()
         obra = Obra(
             nome='Obra #14 Fallback',
             admin_id=admin.id,
@@ -360,21 +385,9 @@ class TestResumoCustosObra(ResumoCustosObraBaseTest):
         )
         from services.resumo_custos_obra import calcular_resumo_obra
 
-        admins = Usuario.query.limit(2).all()
-        if len(admins) < 2:
-            from werkzeug.security import generate_password_hash
-            outro = Usuario(
-                nome='Outro Tenant 70',
-                email=f'outro70-{uuid.uuid4().hex[:8]}@example.test',
-                username=f'outro70_{uuid.uuid4().hex[:6]}',
-                password_hash=generate_password_hash('senha1234'),
-                tipo_usuario='admin',
-                ativo=True,
-            )
-            db.session.add(outro)
-            db.session.commit()
-            admins = Usuario.query.limit(2).all()
-        tenant_a, tenant_b = admins[0], admins[1]
+        # Dois tenants NOVOS — pegar os dois primeiros usuários da tabela fazia
+        # do admin demo o tenant A e gravava a obra nele a cada rodada.
+        tenant_a, tenant_b = _admin_isolado(), _admin_isolado()
 
         obra = Obra(
             nome='Obra #15 Isolamento',
@@ -440,7 +453,7 @@ class TestResumoCustosObra(ResumoCustosObraBaseTest):
             GestaoCustoPai, GestaoCustoFilho,
         )
         from services.resumo_custos_obra import calcular_resumo_obra
-        admin = Usuario.query.first()
+        admin = _admin_isolado()
         obra = Obra(
             nome='Obra #16 Override',
             admin_id=admin.id,
@@ -500,9 +513,7 @@ class TestRecalcularObraVinculoDireto(ResumoCustosObraBaseTest):
     def _setup(self, nome):
         from datetime import date
         from models import Usuario, Obra, ObraServicoCusto, GestaoCustoPai
-        admin = Usuario.query.first()
-        if not admin:
-            self.skipTest('Nenhum Usuario admin no banco')
+        admin = _admin_isolado()
         obra = Obra(
             nome=nome, admin_id=admin.id,
             cliente_id=_garantir_cliente_id(admin.id),
