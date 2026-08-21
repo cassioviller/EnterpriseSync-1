@@ -2130,11 +2130,15 @@ def atualizar_rdo(id):
         db.session.commit()
 
         # Task #12: pipeline de finalização (custos) idempotente
-        try:
-            from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
-            gravar_custo_funcionario_rdo(rdo, admin_id)
-        except Exception as _ce:
-            logger.warning("[custo-dia] gravar_custo_funcionario_rdo falhou em atualizar_rdo: %s", _ce)
+        # 21/08 — rascunho não lança custo nem publica o dia
+        # (services.rdo_ciclo_vida.publica_custos). Quem emite é o Submeter.
+        from services.rdo_ciclo_vida import publica_custos
+        if publica_custos(rdo):
+            try:
+                from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+                gravar_custo_funcionario_rdo(rdo, admin_id)
+            except Exception as _ce:
+                logger.warning("[custo-dia] gravar_custo_funcionario_rdo falhou em atualizar_rdo: %s", _ce)
 
         # B1.5 — a chamada direta a `gerar_custos_mao_obra_rdo` saiu daqui.
         # O `EventManager.emit` logo abaixo faz tudo o que ela fazia, com a
@@ -2155,23 +2159,27 @@ def atualizar_rdo(id):
         # `RDOCustoDiario`, o handler o repete, e é dele que o handler lê.
 
         # Emitir evento rdo_finalizado (handlers legados continuam consumindo)
-        try:
-            from event_manager import EventManager
-            EventManager.emit('rdo_finalizado', {
-                'rdo_id': rdo.id,
-                'obra_id': rdo.obra_id,
-                'data_relatorio': str(rdo.data_relatorio)
-            }, admin_id)
-            logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id}")
-        except Exception as e:
-            logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {e}")
+        # 21/08 — rascunho não lança custo nem publica o dia
+        # (services.rdo_ciclo_vida.publica_custos). Quem emite é o Submeter.
+        from services.rdo_ciclo_vida import publica_custos
+        if publica_custos(rdo):
+            try:
+                from event_manager import EventManager
+                EventManager.emit('rdo_finalizado', {
+                    'rdo_id': rdo.id,
+                    'obra_id': rdo.obra_id,
+                    'data_relatorio': str(rdo.data_relatorio)
+                }, admin_id)
+                logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id}")
+            except Exception as e:
+                logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {e}")
 
-        # Task #45 — catálogo `dominio.acao`: obra.rdo_publicado.
-        try:
-            from utils.catalogo_eventos import emit_obra_rdo_publicado
-            emit_obra_rdo_publicado(rdo, admin_id)
-        except Exception as _e_cat:
-            logger.warning(f"#45: emit obra.rdo_publicado falhou (best-effort): {_e_cat}")
+            # Task #45 — catálogo `dominio.acao`: obra.rdo_publicado.
+            try:
+                from utils.catalogo_eventos import emit_obra_rdo_publicado
+                emit_obra_rdo_publicado(rdo, admin_id)
+            except Exception as _e_cat:
+                logger.warning(f"#45: emit obra.rdo_publicado falhou (best-effort): {_e_cat}")
 
         flash(f'RDO {rdo.numero_rdo} atualizado com sucesso!', 'success')
 
@@ -3403,11 +3411,15 @@ def rdo_salvar_unificado():
         db.session.commit()
 
         # Gravar custo diário PRIMEIRO (fonte de verdade para o módulo financeiro)
-        try:
-            from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
-            gravar_custo_funcionario_rdo(rdo, admin_id_correto)
-        except Exception as _ce:
-            logger.warning("[custo-dia] gravar falhou no salvar_unificado: %s", _ce)
+        # 21/08 — rascunho não lança custo nem publica o dia
+        # (services.rdo_ciclo_vida.publica_custos). Quem emite é o Submeter.
+        from services.rdo_ciclo_vida import publica_custos
+        if publica_custos(rdo):
+            try:
+                from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+                gravar_custo_funcionario_rdo(rdo, admin_id_correto)
+            except Exception as _ce:
+                logger.warning("[custo-dia] gravar falhou no salvar_unificado: %s", _ce)
 
         # B1.5 — a chamada direta vira emit. Esta era a única rota VIVA que
         # gerava custo e nunca recalculava medição: o custo entrava no razão e a
@@ -3419,20 +3431,24 @@ def rdo_salvar_unificado():
         # o handler commita por dentro e não pode ver um RDO que ainda não
         # existe. Payload completo desde a B1.4: sem `obra_id`,
         # `recalcular_medicao_apos_rdo` sai em `event_manager.py:1529-1531`.
-        try:
-            from event_manager import EventManager
-            EventManager.emit('rdo_finalizado', {
-                'rdo_id': rdo.id,
-                'obra_id': rdo.obra_id,
-                'data_relatorio': str(rdo.data_relatorio)
-            }, admin_id_correto)
-            logger.info(
-                "[ALERT] Evento rdo_finalizado emitido para RDO %s "
-                "(rdo_salvar_unificado)", rdo.id)
-        except Exception as ev_err:
-            logger.error(
-                "[ERROR] Erro ao emitir evento rdo_finalizado "
-                "(rdo_salvar_unificado): %s", ev_err)
+        # 21/08 — rascunho não lança custo nem publica o dia
+        # (services.rdo_ciclo_vida.publica_custos). Quem emite é o Submeter.
+        from services.rdo_ciclo_vida import publica_custos
+        if publica_custos(rdo):
+            try:
+                from event_manager import EventManager
+                EventManager.emit('rdo_finalizado', {
+                    'rdo_id': rdo.id,
+                    'obra_id': rdo.obra_id,
+                    'data_relatorio': str(rdo.data_relatorio)
+                }, admin_id_correto)
+                logger.info(
+                    "[ALERT] Evento rdo_finalizado emitido para RDO %s "
+                    "(rdo_salvar_unificado)", rdo.id)
+            except Exception as ev_err:
+                logger.error(
+                    "[ERROR] Erro ao emitir evento rdo_finalizado "
+                    "(rdo_salvar_unificado): %s", ev_err)
 
 
         if rdo_id:
@@ -4484,14 +4500,18 @@ def salvar_rdo_flexivel():
         if success:
             # Task #12: pipeline de finalização (custos) idempotente — mesmo
             # pipeline usado em atualizar_rdo / salvar_edicao_rdo.
-            try:
-                from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
-                gravar_custo_funcionario_rdo(rdo, admin_id)
-            except Exception as _ce:
-                logger.warning(
-                    "[custo-dia] gravar_custo_funcionario_rdo falhou em "
-                    "salvar_rdo_flexivel (RDO %s): %s", rdo.id, _ce,
-                )
+            # 21/08 — rascunho não lança custo nem publica o dia
+            # (services.rdo_ciclo_vida.publica_custos). Quem emite é o Submeter.
+            from services.rdo_ciclo_vida import publica_custos
+            if publica_custos(rdo):
+                try:
+                    from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+                    gravar_custo_funcionario_rdo(rdo, admin_id)
+                except Exception as _ce:
+                    logger.warning(
+                        "[custo-dia] gravar_custo_funcionario_rdo falhou em "
+                        "salvar_rdo_flexivel (RDO %s): %s", rdo.id, _ce,
+                    )
 
             # B1.5 — a chamada direta saiu. Esta rota era a REFERÊNCIA do arreio
             # (`tests/test_arreio_custo_rdo_rotas.py`) por ser a única que chamava
@@ -4501,23 +4521,27 @@ def salvar_rdo_flexivel():
             # reintroduzir a chamada direta aqui.
 
             # Emitir evento rdo_finalizado para lançamento automático de custos V2
-            try:
-                from event_manager import EventManager
-                EventManager.emit('rdo_finalizado', {
-                    'rdo_id': rdo.id,
-                    'obra_id': rdo.obra_id,
-                    'data_relatorio': str(rdo.data_relatorio)
-                }, admin_id)
-                logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id} (salvar_rdo_flexivel)")
-            except Exception as ev_err:
-                logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {ev_err}")
+            # 21/08 — rascunho não lança custo nem publica o dia
+            # (services.rdo_ciclo_vida.publica_custos). Quem emite é o Submeter.
+            from services.rdo_ciclo_vida import publica_custos
+            if publica_custos(rdo):
+                try:
+                    from event_manager import EventManager
+                    EventManager.emit('rdo_finalizado', {
+                        'rdo_id': rdo.id,
+                        'obra_id': rdo.obra_id,
+                        'data_relatorio': str(rdo.data_relatorio)
+                    }, admin_id)
+                    logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id} (salvar_rdo_flexivel)")
+                except Exception as ev_err:
+                    logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {ev_err}")
 
-            # Task #45 — catálogo `dominio.acao`: obra.rdo_publicado.
-            try:
-                from utils.catalogo_eventos import emit_obra_rdo_publicado
-                emit_obra_rdo_publicado(rdo, admin_id)
-            except Exception as _e_cat:
-                logger.warning(f"#45: emit obra.rdo_publicado falhou (best-effort): {_e_cat}")
+                # Task #45 — catálogo `dominio.acao`: obra.rdo_publicado.
+                try:
+                    from utils.catalogo_eventos import emit_obra_rdo_publicado
+                    emit_obra_rdo_publicado(rdo, admin_id)
+                except Exception as _e_cat:
+                    logger.warning(f"#45: emit obra.rdo_publicado falhou (best-effort): {_e_cat}")
 
             flash(f'RDO {numero_rdo} salvo com sucesso!', 'success')
             logger.info(f"[OK] RDO {numero_rdo} salvo com {len(subactivities)} subatividades")

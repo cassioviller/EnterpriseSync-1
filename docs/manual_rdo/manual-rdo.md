@@ -187,7 +187,7 @@ Uma da frente de serviço no início, uma do que foi executado, uma de cada ocor
 
 **Quem faz:** encarregado · **Onde:** `(mesma tela)`
 
-O RDO nasce em RASCUNHO: é o estado em que ainda se corrige à vontade, quantas vezes for preciso, durante o dia. Rascunho é um dia em aberto — quem fecha o dia é o Submeter.
+O RDO nasce em RASCUNHO: é o estado em que ainda se corrige à vontade, quantas vezes for preciso, durante o dia. Rascunho não lança custo — quem fecha o dia e lança o custo é o Submeter.
 
 ![Salvo — mas ainda é rascunho](screenshots/12_salvar_rascunho.png)
 
@@ -206,7 +206,7 @@ Submeter, corrigir se preciso, assinar. Depois disso o documento não se mexe �
 
 **Quem faz:** encarregado · **Onde:** `/rdo/{rdo_id}`
 
-Submeter fecha o dia: a partir daqui o RDO só muda se o gestor reabrir, e ele entra na fila de assinatura. No fim do DIA, não no fim da semana.
+Submeter fecha o dia: é aqui que o custo de mão de obra é lançado e a medição é recalculada. A partir daqui o RDO só muda se o gestor reabrir. No fim do DIA, não no fim da semana.
 
 ![Submeter: o fecho do dia](screenshots/13_submeter.png)
 

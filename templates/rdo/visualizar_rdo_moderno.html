@@ -1303,8 +1303,9 @@ console.log('Initializing RDO view with light theme...');
                 <div class="info-row">
                     <span class="info-label">Status:</span>
                     <span class="info-value">
-                        {% set _st = rdo.status or 'Finalizado' %}
-                        <span class="status-badge {% if _st == 'Aprovado' %}status-aprovado{% else %}status-finalizado{% endif %}">{{ _st }}</span>
+                        {# 21/08 — era `rdo.status` (coluna legada, 'Finalizado' até em
+                           rascunho). O estado que vale é o do ciclo de vida. #}
+                        <span class="badge bg-{{ estado_rdo.cor }}">{{ estado_rdo.rotulo }}</span>
                     </span>
                 </div>
             </div>

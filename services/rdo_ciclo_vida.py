@@ -138,6 +138,20 @@ def estado_de(rdo) -> str:
     return getattr(rdo, 'estado', None) or RASCUNHO
 
 
+def publica_custos(rdo) -> bool:
+    """Rascunho não lança custo nem "publica" o dia.
+
+    🔬 21/08: as rotas de salvar emitiam `rdo_finalizado` (o evento que lança
+    custo e recalcula medição) em qualquer estado, e um RDO nunca submetido
+    ficou com custo de mão de obra no razão. Como `RDO.status` vale
+    'Finalizado' para todo RDO, os consumidores que filtram por `status`
+    contavam o rascunho. Este é o guarda: só RDO fora de rascunho dispara
+    `rdo_finalizado` e `obra.rdo_publicado`. O Submeter transiciona ANTES de
+    emitir, então continua lançando.
+    """
+    return estado_de(rdo) != RASCUNHO
+
+
 def e_imutavel(rdo) -> bool:
     return estado_de(rdo) in ESTADOS_IMUTAVEIS
 
