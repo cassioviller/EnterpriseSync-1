@@ -6809,6 +6809,17 @@ class CronogramaBaseline(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False,
                          index=True)
     nome = db.Column(db.String(120), nullable=False)
+    # Reunião 2026-08-20 — revisão sequencial por obra E por modo, pela mesma
+    # razão que o índice de "uma ativa": o plano do cliente e o interno são
+    # conjuntos de tarefas distintos e não compartilham numeração.
+    # O nome continua livre; a revisão é o que dá ORDEM confiável ao histórico
+    # ("V1 → V2 depois do aditivo") sem depender de alguém digitar certo.
+    # Migração espelho: 314.
+    revisao = db.Column(db.Integer, nullable=False, default=1,
+                        server_default='1')
+    # Por que esta revisão existe: 'Aditivo 01', 'Replanejamento pós-chuva'.
+    # Livre de propósito — a taxonomia de motivo ainda não está madura.
+    motivo = db.Column(db.String(200), nullable=True)
     criada_em = db.Column(db.DateTime, default=datetime.utcnow)
     criada_por = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     ativa = db.Column(db.Boolean, nullable=False, default=True,

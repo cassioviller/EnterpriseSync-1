@@ -6924,6 +6924,47 @@ def _migration_313_funcionario_cpf_nullable():
     logger.info("[Migration 313] Concluída com sucesso")
 
 
+def _migration_314_baseline_revisao_e_motivo():
+    """`cronograma_baseline.revisao` e `.motivo`.
+
+    Reunião 2026-08-20: as linhas de base já eram guardadas (salvar de novo
+    sempre criou outra), mas sem numeração o histórico dependia do texto que
+    alguém digitou no nome. Revisão sequencial dá ordem; motivo diz POR QUE
+    a revisão existe — na prática, quase sempre um aditivo.
+
+    Backfill: numera as baselines existentes por (obra_id, is_cliente) na
+    ordem de `criada_em` (desempate por `id`, que é estável). Sem isso todas
+    ficariam em 1 e a próxima colidiria.
+
+    Idempotente: ADD COLUMN IF NOT EXISTS; o backfill só toca quem está em 1
+    e tem irmã mais antiga — rodar de novo é no-op.
+    """
+    from sqlalchemy import text as sa_text
+    logger.info("[Migration 314] Iniciando — baseline revisao/motivo")
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE cronograma_baseline ADD COLUMN IF NOT EXISTS "
+            "revisao INTEGER NOT NULL DEFAULT 1"))
+        conn.execute(sa_text(
+            "ALTER TABLE cronograma_baseline ADD COLUMN IF NOT EXISTS "
+            "motivo VARCHAR(200)"))
+        conn.execute(sa_text("""
+            UPDATE cronograma_baseline AS b
+               SET revisao = n.rn
+              FROM (
+                    SELECT id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY obra_id, is_cliente
+                               ORDER BY criada_em NULLS FIRST, id
+                           ) AS rn
+                      FROM cronograma_baseline
+                   ) AS n
+             WHERE b.id = n.id
+               AND b.revisao IS DISTINCT FROM n.rn
+        """))
+    logger.info("[Migration 314] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7233,6 +7274,7 @@ def executar_migracoes():
             (311, "Fase 2 do ciclo — nota_fiscal_pedido (chave_acesso NULLABLE, ao contrario da NotaFiscal legada) + adiantamento_fornecedor. ERA 287: o numero colidiu com outra linhagem do repo", _migration_311_nota_e_adiantamento),
             (312, "Reuniao 2026-08-20 — funcao.operacional: separa o efetivo de campo do pessoal de escritorio no seletor do RDO. DEFAULT TRUE para ninguem sumir no deploy", _migration_312_funcao_operacional),
             (313, "Reuniao 2026-08-20 — funcionario.cpf DROP NOT NULL: cadastro rapido sem documento em maos. UNIQUE mantido (Postgres aceita N nulos)", _migration_313_funcionario_cpf_nullable),
+            (314, "Reuniao 2026-08-20 — cronograma_baseline.revisao (sequencial por obra+modo, com backfill por criada_em) e .motivo: historico de V1/V2 deixa de depender do texto do nome", _migration_314_baseline_revisao_e_motivo),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

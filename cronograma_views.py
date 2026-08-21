@@ -2164,6 +2164,8 @@ def _baseline_to_dict(baseline) -> dict:
     return {
         'id': baseline.id,
         'nome': baseline.nome,
+        'revisao': baseline.revisao,
+        'motivo': baseline.motivo,
         'ativa': baseline.ativa,
         'criada_em': baseline.criada_em.isoformat() if baseline.criada_em else None,
         'total_itens': baseline.itens.count(),
@@ -2220,6 +2222,17 @@ def criar_baseline(obra_id: int):
     ativar = data.get('ativar')
     ativar = True if ativar is None else bool(ativar)
 
+    # Revisão = próxima da sequência desta obra NESTE modo. `max + 1` e não
+    # `count + 1`: excluir a V2 não pode fazer a próxima nascer V2 de novo e
+    # colidir com a comparação que alguém já guardou.
+    ultima_rev = (
+        db.session.query(db.func.max(CronogramaBaseline.revisao))
+        .filter_by(obra_id=obra_id, admin_id=admin_id,
+                   is_cliente=cliente_mode)
+        .scalar()
+    ) or 0
+    motivo = (data.get('motivo') or '').strip() or None
+
     if ativar:
         _desativar_baselines(obra_id, admin_id, cliente_mode)
 
@@ -2232,7 +2245,8 @@ def criar_baseline(obra_id: int):
     baseline = CronogramaBaseline(
         obra_id=obra_id, admin_id=admin_id, nome=nome[:120],
         criada_por=current_user.id, ativa=ativar, is_cliente=cliente_mode,
-        bac=bac_congelado or None)
+        bac=bac_congelado or None,
+        revisao=ultima_rev + 1, motivo=motivo[:200] if motivo else None)
     db.session.add(baseline)
     db.session.flush()
     for t in tarefas:
@@ -2263,7 +2277,8 @@ def listar_baselines(obra_id: int):
     baselines = (
         CronogramaBaseline.query
         .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
-        .order_by(CronogramaBaseline.id.desc()).all()
+        .order_by(CronogramaBaseline.revisao.desc(),
+                  CronogramaBaseline.id.desc()).all()
     )
     return jsonify({'status': 'ok',
                     'baselines': [_baseline_to_dict(b) for b in baselines]})
@@ -2317,6 +2332,93 @@ def excluir_baseline(obra_id: int, bid: int):
     ativa = _baseline_ativa(obra_id, admin_id, cliente_mode)
     return jsonify({'status': 'ok',
                     'baseline_map': _itens_da_baseline(ativa)})
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/baselines/comparar')
+@login_required
+def comparar_baselines(obra_id: int):
+    """Desvio de datas entre duas revisões da linha de base.
+
+    Reunião 2026-08-20: é a pergunta que o Paulo precisa responder ao
+    cliente — "era pra entregar tal dia; com o aditivo foi pra tal dia".
+
+    `termino` de uma revisão é o MAIOR `data_fim` dos itens congelados: a
+    entrega da obra naquela revisão. Tarefa que não mudou de término fica
+    fora de `tarefas` — a lista existe para mostrar o que se mexeu, e
+    despejar o cronograma inteiro esconderia justamente isso.
+    """
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+
+    try:
+        de_id = int(request.args.get('de') or 0)
+        para_id = int(request.args.get('para') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'msg': 'Parâmetros de/para inválidos'}), 400
+    if not de_id or not para_id:
+        return jsonify({'status': 'error',
+                        'msg': 'Informe as duas revisões (de e para)'}), 400
+    if de_id == para_id:
+        return jsonify({'status': 'error',
+                        'msg': 'Escolha duas revisões diferentes'}), 400
+
+    def _carregar(bid):
+        return CronogramaBaseline.query.filter_by(
+            id=bid, obra_id=obra_id, admin_id=admin_id,
+            is_cliente=cliente_mode).first()
+
+    de, para = _carregar(de_id), _carregar(para_id)
+    if de is None or para is None:
+        return jsonify({'status': 'error', 'msg': 'Linha de base não encontrada'}), 404
+
+    def _itens(bl):
+        return {i.tarefa_id: i for i in bl.itens}
+
+    itens_de, itens_para = _itens(de), _itens(para)
+
+    def _termino(itens):
+        fins = [i.data_fim for i in itens.values() if i.data_fim]
+        return max(fins) if fins else None
+
+    fim_de, fim_para = _termino(itens_de), _termino(itens_para)
+    desvio_obra = (fim_para - fim_de).days if (fim_de and fim_para) else None
+
+    nomes = {
+        t.id: t.nome_tarefa
+        for t in TarefaCronograma.query.filter(
+            TarefaCronograma.id.in_(list(set(itens_de) | set(itens_para)))).all()
+    }
+
+    linhas = []
+    for tarefa_id in sorted(set(itens_de) & set(itens_para)):
+        a, b = itens_de[tarefa_id], itens_para[tarefa_id]
+        if a.data_fim == b.data_fim:
+            continue
+        dias = ((b.data_fim - a.data_fim).days
+                if (a.data_fim and b.data_fim) else None)
+        linhas.append({
+            'tarefa_id': tarefa_id,
+            'nome': nomes.get(tarefa_id, ''),
+            'de': a.data_fim.isoformat() if a.data_fim else None,
+            'para': b.data_fim.isoformat() if b.data_fim else None,
+            'desvio_dias': dias,
+        })
+
+    def _cabecalho(bl, termino):
+        return {'id': bl.id, 'revisao': bl.revisao, 'nome': bl.nome,
+                'motivo': bl.motivo,
+                'termino': termino.isoformat() if termino else None}
+
+    return jsonify({
+        'status': 'ok',
+        'de': _cabecalho(de, fim_de),
+        'para': _cabecalho(para, fim_para),
+        'desvio_dias': desvio_obra,
+        'tarefas': linhas,
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────

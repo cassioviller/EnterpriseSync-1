@@ -301,15 +301,17 @@ def test_pagina_injeta_baseline_map_so_quando_ha_ativa():
     assert r.status_code == 200
     html = r.get_data(as_text=True)
     assert 'let BASELINE_MAP = {};' in html
-    # "Desvio"/"desvio-val" também aparecem no JS (comentário e seletor) — a
-    # asserção é sobre a MARCAÇÃO da coluna, não sobre o texto solto.
+    # "Desvio"/"desvio-val" também aparecem no JS (comentário, seletor e,
+    # desde a comparação de revisões, um <th>Desvio</th> dentro de template
+    # literal) — a asserção é sobre a MARCAÇÃO da coluna da GRADE, ancorada
+    # no title que só ela tem, não sobre o texto solto.
     assert 'td-perc desvio-val' not in html
-    assert '>Desvio</th>' not in html
+    assert '(término atual − término congelado)">Desvio</th>' not in html
 
     assert c.post(f"{_base(ctx)}/baseline", json={}).status_code == 201
     r = c.get(_base(ctx))
     assert r.status_code == 200
     html = r.get_data(as_text=True)
     assert f'"{ctx["a_id"]}"' in html.split('let BASELINE_MAP = ')[1][:400]
-    assert '>Desvio</th>' in html
+    assert '(término atual − término congelado)">Desvio</th>' in html
     assert html.count('td-perc desvio-val') == 2   # uma célula por tarefa

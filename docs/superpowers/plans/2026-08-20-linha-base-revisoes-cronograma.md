@@ -10,6 +10,15 @@
 
 **Spec:** Não há spec escrito. Este plano nasce da sessão de brainstorming de 2026-08-20.
 
+## Estado — 2026-08-21
+
+**Executado por completo (24/24 passos)** na branch
+`feat/cronograma-linha-base-revisoes`: migration **314** aplicada no banco de
+dev (45.252 baselines numeradas, 264 viraram V2, zero duplicatas por
+obra+modo), rota de comparação, e a tela com rótulos, histórico V1/V2 com
+motivo e comparação. Roteiro do Step 6 da Task 3 executado em navegador real
+(Playwright), 20/20.
+
 ## Global Constraints
 
 - Migrations em `migrations.py`: função `_migration_NNN_slug()` + entrada na lista `migrations_to_run` (~linha 6939). **O último número usado é 311.** Os planos irmãos deste dia reservam 312 (`rdo-efetivo-terceiros`) e 313 (`cadastro-funcionario-operacional`). Este plano assume **314** — confirme com `grep -n "^            (31" migrations.py` antes de escrever.
@@ -58,7 +67,7 @@ de tarefas distintos.
 **Interfaces:**
 - Produces: `CronogramaBaseline.revisao: int` (NOT NULL, ≥1) e `CronogramaBaseline.motivo: str | None` (até 200 chars). `_baseline_to_dict` passa a devolver `revisao` e `motivo` além das chaves de hoje (`id`, `nome`, `ativa`, `criada_em`, `total_itens`). `POST /obra/<id>/baseline` passa a aceitar `motivo` no body. Consumido pelas Tasks 2 e 3.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Criar `tests/test_cronograma_baseline_revisao.py`:
 
@@ -163,7 +172,7 @@ def test_revisao_e_sequencial_por_obra():
     assert rev_b == []  # a obra B não recebeu baseline nenhuma
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_cronograma_baseline_revisao.py -v`
 
@@ -173,7 +182,7 @@ Esperado: **FAIL** — `KeyError: 'revisao'` (o dict da baseline não tem a chav
 em `_ambiente`), então as duas obras do teste de sequência são de tenants
 distintos — o que o teste prova é que a numeração não vaza entre obras.
 
-- [ ] **Step 3: Declarar as colunas no modelo**
+- [x] **Step 3: Declarar as colunas no modelo**
 
 Em `models.py`, na `class CronogramaBaseline`, logo depois de `nome`, inserir:
 
@@ -190,7 +199,7 @@ Em `models.py`, na `class CronogramaBaseline`, logo depois de `nome`, inserir:
     motivo = db.Column(db.String(200), nullable=True)
 ```
 
-- [ ] **Step 4: Escrever a migration 314**
+- [x] **Step 4: Escrever a migration 314**
 
 Em `migrations.py`, imediatamente antes de `def executar_migracoes():`, inserir:
 
@@ -236,7 +245,7 @@ def _migration_314_baseline_revisao_e_motivo():
     logger.info("[Migration 314] Concluída com sucesso")
 ```
 
-- [ ] **Step 5: Registrar a migration na lista**
+- [x] **Step 5: Registrar a migration na lista**
 
 Em `migrations.py`, na lista `migrations_to_run`, ao final, acrescentar:
 
@@ -244,7 +253,7 @@ Em `migrations.py`, na lista `migrations_to_run`, ao final, acrescentar:
             (314, "Reuniao 2026-08-20 — cronograma_baseline.revisao (sequencial por obra+modo, com backfill por criada_em) e .motivo: historico de V1/V2 deixa de depender do texto do nome", _migration_314_baseline_revisao_e_motivo),
 ```
 
-- [ ] **Step 6: Numerar a revisão ao criar a baseline**
+- [x] **Step 6: Numerar a revisão ao criar a baseline**
 
 Em `cronograma_views.py`, em `criar_baseline`, logo antes de
 `if ativar:` (a linha `_desativar_baselines(...)`), inserir:
@@ -272,7 +281,7 @@ E no construtor `CronogramaBaseline(...)`, acrescentar os dois argumentos:
         revisao=ultima_rev + 1, motivo=motivo[:200] if motivo else None)
 ```
 
-- [ ] **Step 7: Expor no JSON**
+- [x] **Step 7: Expor no JSON**
 
 Em `cronograma_views.py`, em `_baseline_to_dict`, acrescentar as duas chaves:
 
@@ -294,20 +303,20 @@ Conferir com `sed -n '2163,2175p' cronograma_views.py` que as chaves antigas
 `templates/obras/cronograma.html` e `tests/test_cronograma_baseline_api.py`
 dependem delas.
 
-- [ ] **Step 8: Ordenar o histórico por revisão**
+- [x] **Step 8: Ordenar o histórico por revisão**
 
 Em `cronograma_views.py`, em `listar_baselines`, trocar a ordenação da query
 por `CronogramaBaseline.revisao.desc()` (a mais nova primeiro). Localizar com:
 
 Run: `sed -n '2254,2272p' cronograma_views.py`
 
-- [ ] **Step 9: Rodar os testes**
+- [x] **Step 9: Rodar os testes**
 
 Run: `python -m pytest tests/test_cronograma_baseline_revisao.py tests/test_cronograma_baseline_api.py -v`
 
 Esperado: **todos PASSAM** — inclusive os antigos de `test_cronograma_baseline_api.py`, que é a rede de regressão desta task.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add models.py migrations.py cronograma_views.py tests/test_cronograma_baseline_revisao.py
@@ -337,7 +346,7 @@ pra entregar tal dia; com o aditivo foi pra tal dia".
   ```
   `termino` é o **maior** `data_fim` dos itens congelados (a entrega da obra naquela revisão). Só entram em `tarefas` as que mudaram de `data_fim`. `400` se `de`/`para` faltarem ou forem iguais; `404` se qualquer uma não for da obra/tenant/modo.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar em `tests/test_cronograma_baseline_revisao.py`:
 
@@ -404,13 +413,13 @@ def test_comparar_404_para_baseline_de_outra_obra():
     assert resp.status_code == 404
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_cronograma_baseline_revisao.py -k comparar -v`
 
 Esperado: **FAIL** — 404, a rota não existe.
 
-- [ ] **Step 3: Implementar a rota**
+- [x] **Step 3: Implementar a rota**
 
 Em `cronograma_views.py`, logo depois do fim de `excluir_baseline`, inserir:
 
@@ -502,13 +511,13 @@ def comparar_baselines(obra_id: int):
     })
 ```
 
-- [ ] **Step 4: Rodar os testes**
+- [x] **Step 4: Rodar os testes**
 
 Run: `python -m pytest tests/test_cronograma_baseline_revisao.py -v`
 
 Esperado: **os 6 PASSAM.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cronograma_views.py tests/test_cronograma_baseline_revisao.py
@@ -535,7 +544,7 @@ Paulo chama de planejado — não têm rótulo nenhum. Essa é a colisão a desf
 - Consumes: `GET /obra/<id>/baselines` (agora com `revisao` e `motivo`) e `GET /obra/<id>/baselines/comparar` (Task 2).
 - Produces: nada.
 
-- [ ] **Step 1: Renomear os cabeçalhos**
+- [x] **Step 1: Renomear os cabeçalhos**
 
 Em `templates/obras/cronograma.html`, no `<thead>`, aplicar:
 
@@ -555,14 +564,14 @@ e
 grade usa índice de coluna (`COLS_NAV`, `td.cellIndex`) e a coluna Desvio já
 depende de `baseline_ativa`. Só o texto e o `title` mudam.
 
-- [ ] **Step 2: Rodar a regressão de interface**
+- [x] **Step 2: Rodar a regressão de interface**
 
 Run: `python -m pytest tests/test_cronograma_interface_obra.py tests/test_cronograma_grade_api.py -v`
 
 Esperado: **todos PASSAM.** Se algum teste casar por texto de cabeçalho
 (`"Planejado"`), atualizar o teste — é mudança de rótulo intencional.
 
-- [ ] **Step 3: Mostrar revisão e motivo no histórico**
+- [x] **Step 3: Mostrar revisão e motivo no histórico**
 
 Em `templates/obras/cronograma.html`, em `carregarBaselines`, substituir o
 `box.innerHTML = data.baselines.map(...)` por:
@@ -585,7 +594,7 @@ Em `templates/obras/cronograma.html`, em `carregarBaselines`, substituir o
     </div>`).join('');
 ```
 
-- [ ] **Step 4: Implementar a comparação no front**
+- [x] **Step 4: Implementar a comparação no front**
 
 Logo depois de `carregarBaselines`, inserir:
 
@@ -645,7 +654,7 @@ async function _executarComparacao(deId, paraId) {
 }
 ```
 
-- [ ] **Step 5: Acrescentar o campo motivo ao modal**
+- [x] **Step 5: Acrescentar o campo motivo ao modal**
 
 Localizar o modal com `grep -n 'id="bl_nome"' templates/obras/cronograma.html`
 e, logo depois do input de nome, inserir:
@@ -671,7 +680,7 @@ e acrescentar `motivo` ao objeto enviado:
 Conferir o nome real das variáveis `nome` e `ativar` na função antes de editar
 — não renomear o que já existe.
 
-- [ ] **Step 6: Verificar na aplicação rodando**
+- [x] **Step 6: Verificar na aplicação rodando**
 
 Numa obra com cronograma e editor v2 ligado:
 1. Cabeçalhos mostram "Início (plan.)", "Término (plan.)", "% Planejado", "% Realizado".
@@ -680,7 +689,7 @@ Numa obra com cronograma e editor v2 ligado:
 4. Clicar no ícone de comparar na V1, depois na V2 → aparece a tabela com o desvio de entrega e só as tarefas que mudaram.
 5. "Voltar" recarrega a lista.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add templates/obras/cronograma.html
