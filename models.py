@@ -301,7 +301,12 @@ class Funcionario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     codigo = db.Column(db.String(10), nullable=False)  # VV001, VV002, etc. — único por tenant
     nome = db.Column(db.String(100), nullable=False)
-    cpf = db.Column(db.String(14), unique=True, nullable=False)
+    # Reunião 2026-08-20 — CPF deixou de ser obrigatório: a Ana cadastra
+    # quem chegou na obra hoje e não sabe o CPF. O UNIQUE fica: no Postgres
+    # um índice único aceita quantos NULL quiser, então não há colisão entre
+    # cadastros rápidos, e o dia em que o CPF for preenchido a unicidade
+    # volta a valer sozinha.
+    cpf = db.Column(db.String(14), unique=True, nullable=True)
     rg = db.Column(db.String(20))
     data_nascimento = db.Column(db.Date)
     endereco = db.Column(db.Text)

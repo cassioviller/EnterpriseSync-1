@@ -6899,6 +6899,31 @@ def _migration_312_funcao_operacional():
     logger.info("[Migration 312] Concluída com sucesso")
 
 
+def _migration_313_funcionario_cpf_nullable():
+    """`funcionario.cpf` deixa de ser NOT NULL.
+
+    Reunião 2026-08-20: a Ana cadastra funcionário no dia em que ele aparece
+    na obra e o CPF chega depois. Exigir CPF fazia o cadastro esperar pelo
+    documento — e o RDO daquele dia saía sem a pessoa.
+
+    O UNIQUE **não** é tocado: no Postgres um índice único aceita múltiplos
+    NULL, então N cadastros sem CPF convivem, e a unicidade volta a valer
+    assim que o número for preenchido. Trocar por índice parcial seria
+    equivalente e mais arriscado (drop + create numa tabela em uso).
+
+    Sem backfill: NULL aqui significa "ainda não informado", que é
+    exatamente o estado novo — nenhuma linha histórica precisa mudar.
+
+    Idempotente: DROP NOT NULL num coluna já nullable é no-op no Postgres.
+    """
+    from sqlalchemy import text as sa_text
+    logger.info("[Migration 313] Iniciando — funcionario.cpf DROP NOT NULL")
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE funcionario ALTER COLUMN cpf DROP NOT NULL"))
+    logger.info("[Migration 313] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7207,6 +7232,7 @@ def executar_migracoes():
             (310, "Saida da segregacao — fechamento_pagamento.segregacao_justificativa: nao-nulo = quem montou o lote o fechou e escreveu por que. Carimbar criado_por_id liga o guarda pela 1a vez", _migration_310_segregacao_justificativa),
             (311, "Fase 2 do ciclo — nota_fiscal_pedido (chave_acesso NULLABLE, ao contrario da NotaFiscal legada) + adiantamento_fornecedor. ERA 287: o numero colidiu com outra linhagem do repo", _migration_311_nota_e_adiantamento),
             (312, "Reuniao 2026-08-20 — funcao.operacional: separa o efetivo de campo do pessoal de escritorio no seletor do RDO. DEFAULT TRUE para ninguem sumir no deploy", _migration_312_funcao_operacional),
+            (313, "Reuniao 2026-08-20 — funcionario.cpf DROP NOT NULL: cadastro rapido sem documento em maos. UNIQUE mantido (Postgres aceita N nulos)", _migration_313_funcionario_cpf_nullable),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

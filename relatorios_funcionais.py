@@ -73,7 +73,7 @@ def _relatorio_funcionarios(departamento_id=None):
     
     for f in funcionarios:
         status_badge = '<span class="badge bg-success">Ativo</span>' if f.ativo else '<span class="badge bg-danger">Inativo</span>'
-        html += f'<tr><td>{f.codigo or "-"}</td><td>{f.nome}</td><td>{f.cpf}</td><td>{f.departamento_ref.nome if f.departamento_ref else "-"}</td>'
+        html += f'<tr><td>{f.codigo or "-"}</td><td>{f.nome}</td><td>{f.cpf or "-"}</td><td>{f.departamento_ref.nome if f.departamento_ref else "-"}</td>'
         html += f'<td>{f.funcao_ref.nome if f.funcao_ref else "-"}</td><td>{f.data_admissao.strftime("%d/%m/%Y") if f.data_admissao else "-"}</td>'
         html += f'<td>R$ {f.salario:,.2f}</td><td>{status_badge}</td></tr>'
     
@@ -722,7 +722,7 @@ def gerar_relatorio_funcional(tipo, formato, filtros=None):
             dados.append({
                 'Código': func.codigo or '',
                 'Nome': func.nome,
-                'CPF': func.cpf,
+                'CPF': func.cpf or '',
                 'Departamento': func.departamento_ref.nome if func.departamento_ref else '',
                 'Função': func.funcao_ref.nome if func.funcao_ref else '',
                 'Data Admissão': func.data_admissao.strftime('%d/%m/%Y') if func.data_admissao else '',

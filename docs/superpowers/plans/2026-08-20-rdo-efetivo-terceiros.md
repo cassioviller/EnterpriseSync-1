@@ -202,14 +202,19 @@ git commit -m "feat(cadastros): funcao.operacional separa efetivo de campo do ad
 Acrescentar em `tests/test_rdo_efetivo_terceiros.py`:
 
 ```python
-def _login(admin):
-    """Client autenticado como o admin, fora de app_context aberto."""
+def _login(admin_id):
+    """Client autenticado como o admin. `_client_como` recebe o ID, não o
+    objeto — e um objeto ORM devolvido de dentro de `app_context` já está
+    destacado quando o contexto fecha."""
     from test_cronograma_endpoints_m05 import _client_como
-    return _client_como(admin)
+    return _client_como(admin_id)
 
 
 def _cenario_efetivo():
-    """Um funcionário operacional (Montador) e um administrativo."""
+    """Um funcionário operacional (Montador) e um administrativo.
+
+    Devolve (admin_id, obra_id) — ids lidos DENTRO do contexto.
+    """
     with app.app_context():
         admin, obra = _ambiente()
         op = Funcao(nome='Montador', admin_id=admin.id, salario_base=0.0,
@@ -218,21 +223,26 @@ def _cenario_efetivo():
                      salario_base=0.0, operacional=False)
         db.session.add_all([op, adm])
         db.session.flush()
+        # CPF é UNIQUE GLOBAL. Sufixo fixo por papel em vez de `admin.id + 1`:
+        # com admins sequenciais, o "+1" de um tenant colide com o id do
+        # tenant seguinte e o segundo teste da sessão quebra por IntegrityError.
         db.session.add(Funcionario(
-            codigo=f'OP{admin.id}', nome='Davi Montador', cpf=f'{admin.id:011d}',
+            codigo=f'OP{admin.id}', nome='Davi Montador',
+            cpf=f'{admin.id:09d}01',
             data_admissao=date(2026, 1, 5), admin_id=admin.id,
             funcao_id=op.id, ativo=True))
         db.session.add(Funcionario(
-            codigo=f'AD{admin.id}', nome='Ana Escritorio', cpf=f'{admin.id + 1:011d}',
+            codigo=f'AD{admin.id}', nome='Ana Escritorio',
+            cpf=f'{admin.id:09d}02',
             data_admissao=date(2026, 1, 5), admin_id=admin.id,
             funcao_id=adm.id, ativo=True))
         db.session.commit()
-        return admin, obra.id
+        return admin.id, obra.id
 
 
 def test_api_efetivo_filtra_administrativo():
-    admin, obra_id = _cenario_efetivo()
-    client = _login(admin)
+    admin_id, obra_id = _cenario_efetivo()
+    client = _login(admin_id)
 
     resp = client.get(f'/api/obras/{obra_id}/funcionarios?operacional=1')
 
@@ -244,8 +254,8 @@ def test_api_efetivo_filtra_administrativo():
 
 def test_api_sem_parametro_continua_devolvendo_todos():
     """Outras telas consomem esta rota — sem o parâmetro nada muda."""
-    admin, obra_id = _cenario_efetivo()
-    client = _login(admin)
+    admin_id, obra_id = _cenario_efetivo()
+    client = _login(admin_id)
 
     resp = client.get(f'/api/obras/{obra_id}/funcionarios')
 
@@ -466,10 +476,10 @@ def test_apontar_terceiro_em_tarefa_de_empresa_nao_mexe_no_percentual():
                   obra_id=obra.id, admin_id=admin.id)
         db.session.add(rdo)
         db.session.commit()
-        ctx = dict(admin=admin, rdo_id=rdo.id, tarefa_id=tarefa.id,
+        ctx = dict(admin_id=admin.id, rdo_id=rdo.id, tarefa_id=tarefa.id,
                    sub_id=sub.id)
 
-    client = _login(ctx['admin'])
+    client = _login(ctx['admin_id'])
     resp = client.post(
         f"/cronograma/rdo/{ctx['rdo_id']}/apontar-subempreitada",
         json={'tarefa_cronograma_id': ctx['tarefa_id'],

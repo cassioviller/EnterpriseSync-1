@@ -559,9 +559,50 @@ def editar_funcionario(funcionario_id):
             flash('[ERROR] Funcionário não encontrado', 'error')
             return redirect(url_for('main.funcionarios'))
         
-        # Atualizar dados
+        # Reunião 2026-08-20 — CPF é opcional. String vazia vira None pelo
+        # mesmo motivo do cadastro (views/employees.py): gravar '' faria o
+        # UNIQUE colidir no segundo funcionário editado para CPF em branco.
+        #
+        # Fix round 3 — esta checagem tem que rodar ANTES de qualquer
+        # `funcionario.<campo> = ...`, não depois. Antes, `funcionario.nome`
+        # era atribuído primeiro; quando o guard abaixo rejeitava e dava
+        # `return` cedo, essa atribuição já tinha acontecido no objeto
+        # rastreado pela sessão. Esse caminho nunca chama `db.session.
+        # commit()` nem `rollback()` explícito — em produção, o teardown do
+        # app context (fim da requisição) desfaz a atribuição pendente, mas
+        # silenciosamente: o usuário via só o erro de CPF duplicado e não
+        # fazia ideia de que a troca de nome (ou qualquer outro campo que
+        # ele tivesse mudado) também tinha sumido. Validar tudo primeiro e
+        # só depois mutar o objeto garante que uma rejeição não deixa nada
+        # pendente na sessão, em vez de depender do teardown para limpar.
+        novo_cpf = request.form.get('cpf', '').strip() or None
+        if novo_cpf:
+            # Duplicidade só é checada com CPF informado, e exclui o
+            # próprio registro — editar sem trocar o CPF não pode se
+            # autorrejeitar.
+            #
+            # A checagem é DELIBERADAMENTE global (sem
+            # `Funcionario.admin_id == admin_id`): o índice UNIQUE de
+            # `Funcionario.cpf` (models.py) não tem coluna de tenant, então
+            # um filtro por admin_id passaria mesmo quando o CPF já existe
+            # em OUTRO admin, e o commit estouraria UniqueViolation —
+            # capturada pelo except genérico da rota, com rollback de todos
+            # os outros campos da submissão. A checagem tem que enxergar o
+            # mesmo universo que o constraint do banco enxerga. É o mesmo
+            # raciocínio já aplicado no cadastro (views/employees.py:98,
+            # `filter_by(cpf=cpf)` também sem admin_id) — create e edit
+            # precisam concordar sobre o que é duplicata.
+            funcionario_existente = Funcionario.query.filter(
+                Funcionario.cpf == novo_cpf,
+                Funcionario.id != funcionario_id
+            ).first()
+            if funcionario_existente:
+                flash(f'[ERROR] CPF {novo_cpf} já está cadastrado para {funcionario_existente.nome}!', 'error')
+                return redirect(url_for('main.funcionarios'))
+
+        # Atualizar dados — só depois de toda validação acima ter passado.
         funcionario.nome = request.form.get('nome', '').strip()
-        funcionario.cpf = request.form.get('cpf', '').strip()
+        funcionario.cpf = novo_cpf
         funcionario.rg = request.form.get('rg', '').strip()
         
         if request.form.get('data_nascimento'):
@@ -662,6 +703,69 @@ def toggle_funcionario_ativo(funcionario_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"[ERROR] ERRO AO TOGGLE FUNCIONÁRIO: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@main_bp.route('/api/funcionarios/toggle-ativo-lote', methods=['POST'])
+@login_required
+def toggle_funcionarios_ativo_lote():
+    """Ativa ou desativa vários funcionários numa transação.
+
+    Reunião 2026-08-20: desligar oito pessoas custava três cliques cada.
+    A confirmação continua existindo — o Paulo defendeu o segundo clique
+    para ninguém sair do efetivo sem querer —, mas agora é UMA confirmação
+    para o lote inteiro, não uma por pessoa.
+
+    Id fora do tenant é ignorado em silêncio, não 404: responder que o id
+    "não existe aqui" já contaria que ele existe em algum lugar.
+    """
+    try:
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
+
+        data = request.get_json(silent=True) or {}
+        ids = data.get('ids') or []
+        if not isinstance(ids, list) or not ids:
+            return jsonify({'success': False,
+                            'message': 'Selecione ao menos um funcionário'}), 400
+        try:
+            ids = [int(i) for i in ids]
+        except (TypeError, ValueError):
+            return jsonify({'success': False,
+                            'message': 'Lista de ids inválida'}), 400
+
+        ativo = bool(data.get('ativo', False))
+
+        funcionarios = Funcionario.query.filter(
+            Funcionario.id.in_(ids),
+            Funcionario.admin_id == admin_id,
+        ).all()
+
+        hoje = datetime.now().date()
+        alterados = 0
+        for f in funcionarios:
+            if f.ativo == ativo:
+                continue
+            f.ativo = ativo
+            if hasattr(f, 'data_desativacao'):
+                f.data_desativacao = None if ativo else hoje
+            alterados += 1
+
+        db.session.commit()
+
+        verbo = 'ativado' if ativo else 'desativado'
+        plural = 's' if alterados != 1 else ''
+        logger.info(f"[OK] {alterados} funcionário(s) {verbo}(s) em lote "
+                    f"(tenant {admin_id})")
+        return jsonify({
+            'success': True,
+            'alterados': alterados,
+            'message': f'{alterados} funcionário{plural} {verbo}{plural}',
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[ERROR] Erro no toggle em lote de funcionários: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @main_bp.route('/api/ponto/lancamento-finais-semana', methods=['POST'])

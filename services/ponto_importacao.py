@@ -98,7 +98,7 @@ class PontoExcelService:
             ws.merge_cells('A1:I1')
             
             ws['A2'] = f"Código: {func.codigo}"
-            ws['B2'] = f"CPF: {func.cpf}"
+            ws['B2'] = f"CPF: {func.cpf or ''}"
             ws['D2'] = f"Cargo: {func.funcao_ref.nome if func.funcao_ref else 'N/A'}"
             
             # Horário padrão do funcionário (para cálculos)
