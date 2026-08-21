@@ -21,8 +21,10 @@
 #   bash run_tests.sh --varredura        # Varredura de todas as páginas do menu (browser real)
 #   bash run_tests.sh --standalone       # Modo standalone (sem pytest)
 #
-# Dependências de sistema (instaladas via nix):
-#   nspr nss atk cups libdrm xorg.* libxkbcommon mesa pango cairo alsa-lib expat
+# Dependências de sistema do Chromium (nspr, nss, libgbm, libxkbcommon, libudev,
+# alsa): NÃO vêm do .replit. Este script as resolve sozinho via nix-build e
+# cacheia o LD_LIBRARY_PATH em .cache/ms-playwright/ld-library-path.txt —
+# ver garantir_libs_chromium() abaixo.
 
 set -euo pipefail
 
@@ -55,6 +57,53 @@ while [[ $# -gt 0 ]]; do
 done
 
 mkdir -p tests/reports
+
+# Chromium do Playwright precisa de libs de sistema que este ambiente não tem
+# no caminho padrão (🔬 21/08: `ldd` acusa libnspr4, libnss3, libgbm,
+# libxkbcommon, libudev e libasound). Sem elas, todo teste de browser morre em
+# "BrowserType.launch: Target page, context or browser has been closed".
+# Resolve via nix-build das saídas `out` — `nix-shell -p` daria as `-dev`, que
+# só têm headers — e cacheia o resultado para não reconstruir a cada execução.
+# No nixpkgs 25.05 a libgbm é pacote separado do mesa.
+garantir_libs_chromium() {
+    local bin cache outs libs p
+    bin=$(ls -d .cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell 2>/dev/null | head -1 || true)
+    [[ -z "$bin" ]] && return 0                       # sem Chromium instalado: nada a fazer
+    if ! ldd "$bin" 2>/dev/null | grep -q "not found"; then return 0; fi
+
+    cache=".cache/ms-playwright/ld-library-path.txt"
+    if [[ -s "$cache" ]]; then
+        export LD_LIBRARY_PATH="$(cat "$cache")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        if ! ldd "$bin" 2>/dev/null | grep -q "not found"; then
+            echo "[INFO] Libs do Chromium via cache ($cache)"
+            return 0
+        fi
+    fi
+    if ! command -v nix-build >/dev/null 2>&1; then
+        echo "[AVISO] Chromium sem libs de sistema e sem nix-build — testes de browser vão falhar no launch"
+        return 0
+    fi
+
+    echo "[INFO] Resolvendo libs do Chromium via nix-build (nspr nss mesa libgbm libxkbcommon systemd alsa-lib)..."
+    outs=$(timeout 300 nix-build --no-out-link '<nixpkgs>' \
+            -A nspr -A nss -A mesa -A libgbm -A libxkbcommon -A systemd -A alsa-lib 2>/dev/null || true)
+    libs=""
+    for p in $outs; do [[ -d "$p/lib" ]] && libs="$libs:$p/lib"; done
+    libs="${libs#:}"
+    if [[ -z "$libs" ]]; then
+        echo "[AVISO] nix-build não devolveu caminhos — testes de browser vão falhar no launch"
+        return 0
+    fi
+    export LD_LIBRARY_PATH="$libs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    if ldd "$bin" 2>/dev/null | grep -q "not found"; then
+        echo "[AVISO] ainda faltam libs ao Chromium:"
+        ldd "$bin" 2>/dev/null | grep "not found"
+    else
+        echo "$libs" > "$cache"
+        echo "[INFO] Libs do Chromium resolvidas e cacheadas em $cache"
+    fi
+}
+garantir_libs_chromium
 
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 REPORT_HTML="tests/reports/playwright_report_${TIMESTAMP}.html"
