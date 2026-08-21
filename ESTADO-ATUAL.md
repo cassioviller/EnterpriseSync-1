@@ -1,7 +1,7 @@
 # ESTADO ATUAL — SIGE / Veks
 
-> Snapshot de **2026-08-03** (6ª revisão, após o `PLANO-NUCLEO.md` — os dez
-> pacotes entregues, com três recortes explícitos).
+> Snapshot de **2026-08-21** (7ª revisão — a reunião de 20/08 integrada em
+> `main`; a 6ª, de 03/08, fechou o `PLANO-NUCLEO.md` com os dez pacotes).
 > Este é o documento a ler PRIMEIRO ao retomar. Os demais (`PLANO-NUCLEO.md`,
 > `DEVOLUTIVA.md`, `DOSSIE-REPO.md`, `docs/archive/FECHO-FASE-0.5.md`) são o
 > detalhe; este é o mapa.
@@ -68,6 +68,15 @@ triagem). Refazer o login é interativo — item humano, restrito ao `gh`.~~
 > `replit-agent`); tudo o mais que era feature já entrou e portanto está no
 > backup. **Isto não substitui o item humano nº 2** — nada disso está no GitHub,
 > e o backup é uma máquina na mesma rede.
+
+> 🔬 **21/08: `gitsafe-backup/main == main == 5c32edec`**, conferido em `git fetch`
+> após o push (`9a8381ec..5c32edec`, 28 commits). São **28 commits** à frente de
+> `origin/main`; o GitHub segue sem credencial (item humano nº 2). Das branches
+> locais, resta só **`sdd/reuniao-20-08`** — e ela já foi *esvaziada*: o que tinha
+> de exclusivo entrou em `main` por cherry-pick (`0f4ef7fc`), o resto era cópia do
+> que já estava lá. O git não a considera mesclada porque cherry-pick não é merge;
+> apagá-la é seguro, ficou para decisão humana. Os quatro worktrees em
+> `.claude/worktrees/` foram removidos — ver por quê em "21/08 — sensores" abaixo.
 
 > ⚠️ **O que continua parado não é o push, é a produção.** Os dez pacotes
 > mexem em custo, medição, progresso e contrato — números que o cliente vê — e
@@ -395,8 +404,10 @@ em produção e levar o número de "EM EXECUÇÃO sem gestor" ao Cássio (em dev
 | # | O quê | Por que trava |
 |---|---|---|
 | 1 | ~~Rotacionar `SESSION_SECRET` e a senha do Postgres~~ | 🔴 **Decisão do Cássio, 03/08: NÃO rotacionar.** Sai da lista de pendências — não voltar a recomendar. O que fica registrado abaixo é só o contorno do risco aceito |
-| 2 | **`gh auth login`** (a API do GitHub **e agora o `git push`**) | 🔬 03/08 dizia "`git push` funciona — o que falta é só a API". **Isso envelheceu.** 🔬 14/08: `git push origin main` **falha** — `remote: Invalid username or token. Password authentication is not supported for Git operations` / `fatal: Authentication failed`. `gh auth status` segue "not logged into any GitHub hosts" e `GH_TOKEN`/`GITHUB_TOKEN` continuam ausentes. Consequência: **8 commits em `main` existem só na máquina de dev**, incluindo o merge da Fase 1 do ciclo de compras (23 commits de trabalho que estavam presos numa branch desde 12/08). Refazer o login é interativo — só o humano consegue |
+| 2 | **`gh auth login`** (a API do GitHub **e agora o `git push`**) | 🔬 03/08 dizia "`git push` funciona — o que falta é só a API". **Isso envelheceu.** 🔬 14/08: `git push origin main` **falha** — `remote: Invalid username or token. Password authentication is not supported for Git operations` / `fatal: Authentication failed`. `gh auth status` segue "not logged into any GitHub hosts" e `GH_TOKEN`/`GITHUB_TOKEN` continuam ausentes. Consequência: 🔬 21/08: **28 commits em `main` não estão no GitHub** (estão no `gitsafe-backup`, que é outra máquina da mesma rede — não é o mesmo que estar fora dela). Refazer o login é interativo — só o humano consegue |
 | 3 | **Criar o volume persistente** no painel | Vale para `/var/backups/sige` (dumps) **e** para os uploads. O pré-requisito de código caiu em 23/07: a armadilha nº 2 (descasamento do `UPLOADS_PATH`) está corrigida — montar o volume e definir a variável já é seguro |
+| 4 | **Paulo: qual fórmula vale para o percentual do grupo no cronograma** | 📖 `docs/superpowers/plans/2026-08-20-rollup-percentual-cronograma.md`, "DECISÃO PENDENTE". Hoje é média **ponderada por duração** (`utils/cronograma_engine.py`, `rollup_percentual_pos_recalculo` e `rollup_realizado`): 5 tarefas de 1 dia numa fase de ~300 dias levam o pai de 98% para ~96%, **não** para os ~80% que ele descreveu na reunião. Para dar 80% seria média **simples por item** — e isso muda curva S, EVM (`bac` congelado), medição e físico-financeiro em cascata. A Task 3 do plano está travada nisso de propósito; as Tasks 1 e 2 (caracterização em teste + pais por profundidade) valem nas duas hipóteses e já estão em `main` |
+| 5 | **Alan e Abel: revisar a norma de preenchimento do RDO** | 📖 `manual/23a_rdo_padrao_preenchimento.md` está no ar (`/manual`), mas é a Task 2 do plano: quem vai ser cobrado pela norma tem de lê-la antes de ela virar cobrança. Sem essa rodada o capítulo é opinião do escritório, não acordo |
 
 > 📖 **O contorno do risco aceito no item 1.** O código não tem fallback fixo:
 > `app.py:52` lê `SESSION_SECRET` da env, `:53-56` **recusa subir em produção**
@@ -2173,6 +2184,61 @@ nenhum plano está bloqueado esperando resposta. Revise quando puder.
 | Expiração do token do portal | ~~F9a~~ **F3, decidida** | 🔬 23/07: implementada em **180 dias** (D4 da F3 — o plano da F9a dizia 90; a F3 escolheu 180 para não gerar chamado de suporte a cada obra). Token antigo sem data segue valendo até rotacionar |
 | Miniatura do portal × migração de fotos | F5 | Único ponto sem recomendação — **agora é gate da passada 2 da Task 15** (a parte destrutiva ainda não rodou): ou a rota de foto por token (Fase 9a) vem antes, ou o portal fica sem miniatura no intervalo. Foto NOVA (sem base64 desde 24/07) já cai no fallback de arquivo no detalhe e no ícone genérico na listagem |
 
+### ✅ 21/08 — reunião de 20/08: o que estava preso numa branch, integrado
+
+Os cinco planos de `docs/superpowers/plans/2026-08-20-*` (commit `439aa985`) e o
+estado de cada um em `main` (`5c32edec`):
+
+| Plano | Estado | Prova |
+|---|---|---|
+| RDO — efetivo interno e terceiros | ✅ 31/31 | merge `c9283e25` (20/08), migration **312** |
+| Cadastro rápido de funcionário | ✅ 22/22 | resgate `0f4ef7fc` (CPF opcional, migration **313**, lote) + merge `5c32edec` (visão em lista) |
+| Manual do padrão de preenchimento do RDO | 🟡 Task 1 de 2 | merge `a9a30912` — Task 2 é humana (item 5 acima) |
+| Rollup de percentual do cronograma | 🟡 Tasks 1 e 2 de 3 | resgate `0f4ef7fc` — Task 3 **bloqueada** (item 4 acima) |
+| Linha de base e revisões do cronograma | ⬜ 0/24 | migration **314** reservada; nada escrito |
+
+**O que o resgate foi.** A `sdd/reuniao-20-08` saiu do commit dos planos e
+executou, em paralelo, o que acabou entrando em `main` por outra linhagem. 🔬
+`git cherry main sdd/reuniao-20-08` acusava **18 commits ausentes** — mas só
+**10** eram de fato exclusivos (rollup, funcionários e a correção de pré-voo dos
+planos). Os 8 do RDO/`funcao.operacional` eram duplicatas, e em dois pontos a
+versão de `main` era melhor (a guarda de `atualizar_percentual_tarefa` de
+`6252862a` — sem ela, o primeiro efetivo de terceiro apagava o avanço importado
+do MS Project — e o `or_` importado direto). Vieram por cherry-pick, não por
+merge, para não arrastar a versão pior por cima da melhor. Até esse resgate, o
+trabalho existia **numa máquina só**: o `gitsafe-backup` recusa branch de feature.
+
+**Dois defeitos antigos na tela de funcionários**, achados ao executar a Task 3
+(📖 `templates/funcionarios.html`, `filtrarFuncionarios()`): o filtro comparava
+o **elemento** `<select>` com o status do card em vez do `.value` — a comparação
+era sempre falsa, e **qualquer letra digitada na busca escondia a tela inteira**;
+e a mensagem de "nenhum resultado" ia para um `#funcionariosGrid` que não
+existe no template (`TypeError` toda vez). Corrigidos em `d3a12988`, porque sem
+isso o passo "as linhas filtram junto com os cards" não tinha como passar.
+🔬 roteiro de navegador do plano executado com Playwright (Chrome for Testing
+145, tenant demo): **13/13**.
+
+**21/08 — sensores.** 🔬 gate completo sobre `0cf547f7` (o `main` logo após os
+dois merges): **2500 passed, 3 failed, 6 skipped, 2 xfailed** em 45min15s. As
+três falhas eram a mesma coisa: `test_existe_uma_unica_definicao_de_admin_required`,
+`test_so_o_servico_cria_conta_pagar_de_compra` e
+`test_todo_ponto_que_cria_requisicao_carimba_o_regime_alcada` varrem a árvore a
+partir da raiz e encontraram **cópias inteiras do projeto** nos quatro worktrees
+em `.claude/worktrees/`. O gate de 20/08 (2482 verdes) não viu isso porque rodou
+de *dentro* de um worktree, onde `.claude/worktrees/` não existe — o resultado
+dependia de onde se rodava. `dfcc7c91`: os quatro sensores (o `dois_fluxos` tem
+dois) passam a ignorar diretório oculto. 🔬 famílias tocadas sobre `5c32edec`:
+**83 passed**. Gate completo sobre `5c32edec`: disparado às 13:24 — resultado na
+linha seguinte quando sair.
+
+**O Chromium do Playwright não sobe nesta máquina** sem ajuda: 📖 `ldd` acusa
+`libnspr4`, `libnss3`, `libgbm`, `libxkbcommon`, `libudev` e `libasound`
+ausentes; o cabeçalho do `run_tests.sh` diz que vêm "via nix", mas o
+`.replit` não as lista. Receita que funcionou (`nix-build` das saídas `out`,
+não `-dev`; `libgbm` é pacote separado no nixpkgs 25.05) está na memória da
+sessão do agente — vale trazer para o `run_tests.sh` quando a suíte `--suite`
+voltar a rodar aqui.
+
 ## Mapa dos documentos
 
 | Arquivo | O que é |
@@ -2183,6 +2249,7 @@ nenhum plano está bloqueado esperando resposta. Revise quando puder.
 | `docs/estudo-fluxo/*.json` (31/07) | Os brutos: conferência adversarial dos 12 vereditos e o levantamento de conexões |
 | `docs/superpowers/{specs,plans}/2026-08-03-p1-*` | Spec e plano do p1 — o único pacote que teve os dois documentos antes do código, porque dois vereditos mudaram de tamanho ao serem reconferidos |
 | `docs/superpowers/plans/2026-07-21-*` | **os 10 planos das fases** (ver tabela acima). ⚠️ o da **Fase 7 está obsoleto** — substituído pelo p10 |
+| `docs/superpowers/plans/2026-08-20-*` | **os 5 planos da reunião de 20/08** (RDO com terceiros, cadastro rápido, manual do RDO, rollup, linha de base). Dois fechados, dois a meio com passo humano pendente, um por começar — tabela em "21/08" acima. Cada um traz no topo um bloco "Estado" com o que já está em `main` |
 | `DEVOLUTIVA.md` | aderência à especificação + sequência de fases. (O erro do `:73` sobre "não existe recebimento" foi corrigido em 23/07 — o recebimento existe, só não é o gatilho financeiro) |
 | `docs/fase-1-rollout.md` / `fase-2-rollout.md` / `fase-3-rollout.md` | **runbooks de rollout por fase** — pré-checagens, ordem de ligar flags e rollback. ⚠️ são do **núcleo**; no ciclo de compras o runbook mora no fim do próprio spec |
 | `docs/superpowers/specs/2026-08-{11,14,15}-*-design.md` | **os specs das três fases entregues do ciclo de compras** (recebimento e atesto, financeiro em dois fluxos, alçadas). Cada um traz o runbook no fim e as divergências como 📌 no ponto exato do texto — leia os 📌, são o que a execução descobriu contra o plano |
