@@ -2637,7 +2637,11 @@ def test_todo_ponto_que_cria_requisicao_carimba_o_regime_alcada():
     sem_carimbo = []
     arquivos_com_criacao = set()
     for pasta, subpastas, arquivos in os.walk(raiz):
-        subpastas[:] = [d for d in subpastas if d not in ignorados]
+        # Diretório oculto nunca é código do projeto — e .claude/worktrees/
+        # guarda cópias INTEIRAS da árvore, que fariam este sensor ver
+        # N pontos onde há um.
+        subpastas[:] = [d for d in subpastas
+                        if d not in ignorados and not d.startswith('.')]
         for nome in arquivos:
             if not nome.endswith('.py'):
                 continue

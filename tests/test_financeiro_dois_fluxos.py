@@ -332,7 +332,11 @@ def test_todo_ponto_que_cria_pedido_carimba_o_fluxo():
 
     construcoes, sem_carimbo = [], []
     for pasta, subpastas, arquivos in os.walk(raiz):
-        subpastas[:] = [d for d in subpastas if d not in ignorados]
+        # Diretório oculto nunca é código do projeto — e .claude/worktrees/
+        # guarda cópias INTEIRAS da árvore, que fariam este sensor ver
+        # N pontos onde há um.
+        subpastas[:] = [d for d in subpastas
+                        if d not in ignorados and not d.startswith('.')]
         for nome in arquivos:
             if not nome.endswith('.py'):
                 continue
@@ -909,7 +913,11 @@ def test_so_o_servico_cria_conta_pagar_de_compra():
 
     inesperadas = []
     for pasta, subpastas, arquivos in os.walk(raiz):
-        subpastas[:] = [d for d in subpastas if d not in ignorados]
+        # Diretório oculto nunca é código do projeto — e .claude/worktrees/
+        # guarda cópias INTEIRAS da árvore, que fariam este sensor ver
+        # N pontos onde há um.
+        subpastas[:] = [d for d in subpastas
+                        if d not in ignorados and not d.startswith('.')]
         for nome in arquivos:
             if not nome.endswith('.py'):
                 continue

@@ -393,7 +393,10 @@ def test_existe_uma_unica_definicao_de_admin_required():
         cwd=raiz, capture_output=True, text=True).stdout
     definicoes = [linha for linha in saida.splitlines()
                   if './archive/' not in linha
-                  and './entrega_baia_rev10/' not in linha]
+                  and './entrega_baia_rev10/' not in linha
+                  # diretório oculto (.claude/worktrees/ tem cópias
+                  # inteiras da árvore) não é código do projeto
+                  and not linha.startswith('./.')]
     assert len(definicoes) == 1, (
         f'esperava 1 definição de admin_required, achei '
         f'{len(definicoes)}:\n' + '\n'.join(definicoes))
