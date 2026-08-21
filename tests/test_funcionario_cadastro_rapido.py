@@ -6,6 +6,7 @@ sabe o CPF de quem acabou de chegar na obra.
 """
 import hashlib
 import os
+import re
 import sys
 from datetime import date
 
@@ -456,3 +457,66 @@ def test_lote_vazio_recusa():
 
     assert resp.status_code == 400
     assert resp.get_json()['success'] is False
+
+
+# ── Visão em lista (Task 3 do plano) ──────────────────────────────────────
+#
+# O plano previa só verificação manual para esta task, "porque é template".
+# Um template que não compila derruba a tela inteira, e o custo de pinar isso
+# é um GET — então fica pinado. O que este teste NÃO cobre é o comportamento
+# de navegador (localStorage, alternância, seleção); isso continua sendo o
+# roteiro manual do Step 6.
+
+
+def _admin_com_funcionario():
+    """Um tenant com uma pessoa ativa. Devolve (admin_id, nome)."""
+    with app.app_context():
+        admin, _obra = _ambiente()
+        nome = f'Vera Lista {admin.id}'
+        db.session.add(Funcionario(
+            codigo=f'VL{admin.id}', nome=nome, cpf=_cpf_teste(),
+            data_admissao=date(2026, 8, 20), admin_id=admin.id, ativo=True))
+        db.session.commit()
+        return admin.id, nome
+
+
+def test_tela_de_funcionarios_renderiza_as_duas_visoes():
+    admin_id, nome = _admin_com_funcionario()
+    client = _client_como(admin_id)
+
+    resp = client.get('/funcionarios')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    # As duas visões existem, e o alternador entre elas.
+    assert 'id="visaoListaFuncionarios"' in html
+    assert 'id="visaoCardsFuncionarios"' in html
+    assert 'definirVisaoFuncionarios' in html
+
+    # A barra de ação em lote aponta para a rota da Task 2.
+    assert '/api/funcionarios/toggle-ativo-lote' in html
+
+    # A pessoa aparece nas duas — a lista não pode ser um <table> vazio.
+    assert html.count(nome) >= 2
+    assert 'funcionario-linha' in html
+
+
+def test_lista_marca_o_status_de_quem_esta_inativo():
+    """A linha carrega data-status: é dele que o filtro de status vive."""
+    with app.app_context():
+        admin, _obra = _ambiente()
+        db.session.add(Funcionario(
+            codigo=f'VI{admin.id}', nome=f'Ivo Inativo {admin.id}',
+            cpf=_cpf_teste(), data_admissao=date(2026, 8, 20),
+            admin_id=admin.id, ativo=False))
+        db.session.commit()
+        admin_id = admin.id
+
+    html = _client_como(admin_id).get('/funcionarios').get_data(as_text=True)
+
+    # `data-status` também existe nos cards — o que se quer aqui é a LINHA.
+    # Sem ancorar em funcionario-linha, o teste passa com a lista inexistente.
+    linhas_inativas = re.findall(
+        r'<tr class="funcionario-linha"[^>]*data-status="inativo"',
+        html, re.S)
+    assert linhas_inativas, 'nenhuma linha da visao em lista marcada como inativa'

@@ -540,8 +540,103 @@
         </div>
     </div>
 
+<!-- Alternador de visão (reunião 2026-08-20) — cards para consultar uma
+     pessoa, lista para bater o efetivo inteiro de relance, como na planilha. -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="btn-group btn-group-sm" role="group" aria-label="Formato da lista">
+    <button type="button" class="btn btn-outline-secondary" id="btnVisaoLista"
+            onclick="definirVisaoFuncionarios('lista')">
+      <i class="fas fa-list me-1"></i> Lista
+    </button>
+    <button type="button" class="btn btn-outline-secondary" id="btnVisaoCards"
+            onclick="definirVisaoFuncionarios('cards')">
+      <i class="fas fa-th-large me-1"></i> Cards
+    </button>
+  </div>
+  <div id="barraAcaoLote" class="d-none align-items-center gap-2">
+    <span class="text-muted small" id="loteContador">0 selecionados</span>
+    <button type="button" class="btn btn-sm btn-outline-danger"
+            onclick="toggleLoteFuncionarios(false)">
+      <i class="fas fa-user-times me-1"></i> Desativar selecionados
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-success"
+            onclick="toggleLoteFuncionarios(true)">
+      <i class="fas fa-user-check me-1"></i> Reativar selecionados
+    </button>
+  </div>
+</div>
+
+<!-- Destino da mensagem "nenhum resultado". Existe porque o filtro apontava
+     para um #funcionariosGrid que não existe neste template — ver
+     filtrarFuncionarios(). -->
+<div id="funcionariosSemResultadoHost"></div>
+
+<div id="visaoListaFuncionarios" class="d-none">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:36px">
+            <input class="form-check-input" type="checkbox" id="chkTodosFuncionarios"
+                   onchange="marcarTodosFuncionarios(this.checked)"
+                   title="Selecionar todos">
+          </th>
+          <th>Nome</th>
+          <th>Função</th>
+          <th>Telefone</th>
+          <th class="text-end">Remuneração</th>
+          <th>Status</th>
+          <th style="width:110px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for kpi in funcionarios_kpis %}
+        <tr class="funcionario-linha"
+            data-nome="{{ kpi.funcionario.nome.lower() }}"
+            data-telefone="{{ kpi.funcionario.telefone.lower() if kpi.funcionario.telefone else '' }}"
+            data-funcao="{{ kpi.funcionario.funcao_ref.nome.lower() if kpi.funcionario.funcao_ref else '' }}"
+            data-status="{{ 'ativo' if kpi.funcionario.ativo else 'inativo' }}">
+          <td>
+            <input class="form-check-input chk-funcionario" type="checkbox"
+                   value="{{ kpi.funcionario.id }}"
+                   onchange="atualizarContadorLote()">
+          </td>
+          <td class="{{ '' if kpi.funcionario.ativo else 'text-muted' }}">
+            {{ kpi.funcionario.nome }}
+          </td>
+          <td>{{ kpi.funcionario.funcao_ref.nome if kpi.funcionario.funcao_ref else '-' }}</td>
+          <td>{{ kpi.funcionario.telefone or '-' }}</td>
+          <td class="text-end">
+            {% if kpi.modo_remuneracao == 'diaria' %}
+              R$ {{ '{:,.2f}'.format(kpi.funcionario.valor_diaria or 0) }} / dia
+            {% else %}
+              R$ {{ '{:,.2f}'.format(kpi.funcionario.salario or 0) }} / mês
+            {% endif %}
+          </td>
+          <td>
+            {% if kpi.funcionario.ativo %}
+              <span class="badge bg-success">Ativo</span>
+            {% else %}
+              <span class="badge bg-secondary">Inativo</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('main.funcionario_perfil', id=kpi.funcionario.id) }}"
+               class="btn btn-sm btn-outline-primary" title="Ver perfil">
+              <i class="fas fa-user"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
 <!-- Grid de Cards de Funcionários - SEPARAÇÃO ATIVO/INATIVO -->
 <!-- Funcionários Ativos -->
+<div id="visaoCardsFuncionarios">
 {% set funcionarios_ativos = funcionarios_kpis | selectattr('funcionario.ativo', 'equalto', true) | list %}
 {% set funcionarios_inativos = funcionarios_kpis | selectattr('funcionario.ativo', 'equalto', false) | list %}
 
@@ -787,6 +882,7 @@
     </div>
 </div>
 {% endif %}
+</div>
 
 <!-- Mensagem quando não há funcionários -->
 {% if not funcionarios_kpis %}
@@ -1268,7 +1364,6 @@ function filtrarFuncionarios() {
     
     if (funcionarioCards.length === 0) {
         console.warn('⚠️ Nenhum card .funcionario-card encontrado');
-        return;
     }
     
     funcionarioCards.forEach(card => {
@@ -1288,7 +1383,10 @@ function filtrarFuncionarios() {
                             telefone.includes(searchTerm) || 
                             funcao.includes(searchTerm);
         
-        const matchesStatus = statusFilter === '' || status === statusFilter;
+        // Comparar com o VALOR do select, não com o elemento. Enquanto era
+        // `statusFilter` (o <select>), `status === statusFilter` era sempre
+        // falso e qualquer busca escondia a tela inteira.
+        const matchesStatus = statusFilterValue === '' || status === statusFilterValue;
         
         if (matchesSearch && matchesStatus) {
             card.style.display = '';
@@ -1298,6 +1396,20 @@ function filtrarFuncionarios() {
         }
     });
     
+    // Mesmo filtro para a visão em lista (reunião 2026-08-20).
+    document.querySelectorAll('.funcionario-linha').forEach(function (linha) {
+        const nome = linha.dataset.nome || '';
+        const telefone = linha.dataset.telefone || '';
+        const funcao = linha.dataset.funcao || '';
+        const status = linha.dataset.status || '';
+        const casaBusca = nome.includes(searchTerm) ||
+                          telefone.includes(searchTerm) ||
+                          funcao.includes(searchTerm);
+        const casaStatus = statusFilterValue === '' || status === statusFilterValue;
+        linha.style.display = (casaBusca && casaStatus) ? '' : 'none';
+    });
+    atualizarContadorLote();
+
     console.log('Funcionários visíveis:', visibleCount);
     
     // Mostrar/esconder mensagem "nenhum resultado"
@@ -1306,7 +1418,7 @@ function filtrarFuncionarios() {
         // Criar mensagem se não existir
         noResults = document.createElement('div');
         noResults.id = 'noResultsMessage';
-        noResults.className = 'col-12 text-center py-5';
+        noResults.className = 'text-center py-5';
         noResults.innerHTML = `
             <div class="text-muted">
                 <i class="fas fa-search fa-3x mb-3"></i>
@@ -1314,7 +1426,8 @@ function filtrarFuncionarios() {
                 <p>Tente ajustar os filtros de pesquisa</p>
             </div>
         `;
-        document.getElementById('funcionariosGrid').appendChild(noResults);
+        const host = document.getElementById('funcionariosSemResultadoHost');
+        if (host) host.appendChild(noResults);
     }
     
     if (noResults) {
@@ -2137,6 +2250,95 @@ function executarLancamentoFinaisSemana() {
         btnLancar.innerHTML = '<i class="fas fa-rocket"></i> Lançar Sábados e Domingos';
     });
 }
+
+// ── Visão lista x cards (reunião 2026-08-20) ──────────────────────────
+// A preferência é lembrada porque quem vive nesta tela é a Ana: reescolher
+// o formato a cada visita é o tipo de atrito que faz voltar pro Excel.
+const _VISAO_KEY = 'sige.funcionarios.visao';
+
+function definirVisaoFuncionarios(visao) {
+    const lista = document.getElementById('visaoListaFuncionarios');
+    const cards = document.getElementById('visaoCardsFuncionarios');
+    const barra = document.getElementById('barraAcaoLote');
+    const btnL = document.getElementById('btnVisaoLista');
+    const btnC = document.getElementById('btnVisaoCards');
+    if (!lista || !cards) return;
+
+    const ehLista = visao === 'lista';
+    lista.classList.toggle('d-none', !ehLista);
+    cards.classList.toggle('d-none', ehLista);
+    if (btnL) btnL.classList.toggle('active', ehLista);
+    if (btnC) btnC.classList.toggle('active', !ehLista);
+    // A ação em lote só existe na lista — é lá que tem checkbox.
+    if (barra) {
+        barra.classList.toggle('d-none', !ehLista);
+        barra.classList.toggle('d-flex', ehLista);
+    }
+
+    try { localStorage.setItem(_VISAO_KEY, visao); } catch (e) { /* modo privado */ }
+    if (ehLista) atualizarContadorLote();
+}
+
+function marcarTodosFuncionarios(marcar) {
+    document.querySelectorAll('.chk-funcionario').forEach(c => {
+        // Respeita o filtro de busca: linha escondida não entra na seleção.
+        if (c.closest('tr').style.display !== 'none') c.checked = marcar;
+    });
+    atualizarContadorLote();
+}
+
+function _idsSelecionados() {
+    return Array.from(document.querySelectorAll('.chk-funcionario:checked'))
+        .filter(c => c.closest('tr').style.display !== 'none')
+        .map(c => parseInt(c.value, 10));
+}
+
+function atualizarContadorLote() {
+    const n = _idsSelecionados().length;
+    const el = document.getElementById('loteContador');
+    if (el) el.textContent = `${n} selecionado${n === 1 ? '' : 's'}`;
+}
+
+function toggleLoteFuncionarios(ativo) {
+    const ids = _idsSelecionados();
+    if (!ids.length) {
+        alert('Selecione ao menos um funcionário.');
+        return;
+    }
+    const verbo = ativo ? 'reativar' : 'desativar';
+    // UMA confirmação para o lote — o segundo clique continua existindo,
+    // só deixou de ser um por pessoa.
+    if (!confirm(`Tem certeza que deseja ${verbo} ${ids.length} funcionário(s)?`)) return;
+
+    fetch('/api/funcionarios/toggle-ativo-lote', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({ ids: ids, ativo: ativo })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        alert('Erro interno do servidor');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    let salva = 'cards';
+    try { salva = localStorage.getItem(_VISAO_KEY) || 'cards'; } catch (e) { /* modo privado */ }
+    definirVisaoFuncionarios(salva);
+});
+
 
 // Toggle status funcionário (ativar/desativar) - CORRIGIDO
 function toggleStatusFuncionario(id, nome, ativar) {
