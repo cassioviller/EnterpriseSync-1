@@ -58,7 +58,7 @@ de tarefas distintos.
 **Interfaces:**
 - Produces: `CronogramaBaseline.revisao: int` (NOT NULL, ≥1) e `CronogramaBaseline.motivo: str | None` (até 200 chars). `_baseline_to_dict` passa a devolver `revisao` e `motivo` além das chaves de hoje (`id`, `nome`, `ativa`, `criada_em`, `total_itens`). `POST /obra/<id>/baseline` passa a aceitar `motivo` no body. Consumido pelas Tasks 2 e 3.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Criar `tests/test_cronograma_baseline_revisao.py`:
 
@@ -163,7 +163,7 @@ def test_revisao_e_sequencial_por_obra():
     assert rev_b == []  # a obra B não recebeu baseline nenhuma
 ```
 
-- [ ] **Step 2: Rodar para confirmar que falha**
+- [x] **Step 2: Rodar para confirmar que falha**
 
 Run: `python -m pytest tests/test_cronograma_baseline_revisao.py -v`
 
@@ -173,7 +173,7 @@ Esperado: **FAIL** — `KeyError: 'revisao'` (o dict da baseline não tem a chav
 em `_ambiente`), então as duas obras do teste de sequência são de tenants
 distintos — o que o teste prova é que a numeração não vaza entre obras.
 
-- [ ] **Step 3: Declarar as colunas no modelo**
+- [x] **Step 3: Declarar as colunas no modelo**
 
 Em `models.py`, na `class CronogramaBaseline`, logo depois de `nome`, inserir:
 
@@ -190,7 +190,7 @@ Em `models.py`, na `class CronogramaBaseline`, logo depois de `nome`, inserir:
     motivo = db.Column(db.String(200), nullable=True)
 ```
 
-- [ ] **Step 4: Escrever a migration 314**
+- [x] **Step 4: Escrever a migration 314**
 
 Em `migrations.py`, imediatamente antes de `def executar_migracoes():`, inserir:
 
@@ -236,7 +236,7 @@ def _migration_314_baseline_revisao_e_motivo():
     logger.info("[Migration 314] Concluída com sucesso")
 ```
 
-- [ ] **Step 5: Registrar a migration na lista**
+- [x] **Step 5: Registrar a migration na lista**
 
 Em `migrations.py`, na lista `migrations_to_run`, ao final, acrescentar:
 
@@ -244,7 +244,7 @@ Em `migrations.py`, na lista `migrations_to_run`, ao final, acrescentar:
             (314, "Reuniao 2026-08-20 — cronograma_baseline.revisao (sequencial por obra+modo, com backfill por criada_em) e .motivo: historico de V1/V2 deixa de depender do texto do nome", _migration_314_baseline_revisao_e_motivo),
 ```
 
-- [ ] **Step 6: Numerar a revisão ao criar a baseline**
+- [x] **Step 6: Numerar a revisão ao criar a baseline**
 
 Em `cronograma_views.py`, em `criar_baseline`, logo antes de
 `if ativar:` (a linha `_desativar_baselines(...)`), inserir:
@@ -272,7 +272,7 @@ E no construtor `CronogramaBaseline(...)`, acrescentar os dois argumentos:
         revisao=ultima_rev + 1, motivo=motivo[:200] if motivo else None)
 ```
 
-- [ ] **Step 7: Expor no JSON**
+- [x] **Step 7: Expor no JSON**
 
 Em `cronograma_views.py`, em `_baseline_to_dict`, acrescentar as duas chaves:
 
@@ -294,20 +294,20 @@ Conferir com `sed -n '2163,2175p' cronograma_views.py` que as chaves antigas
 `templates/obras/cronograma.html` e `tests/test_cronograma_baseline_api.py`
 dependem delas.
 
-- [ ] **Step 8: Ordenar o histórico por revisão**
+- [x] **Step 8: Ordenar o histórico por revisão**
 
 Em `cronograma_views.py`, em `listar_baselines`, trocar a ordenação da query
 por `CronogramaBaseline.revisao.desc()` (a mais nova primeiro). Localizar com:
 
 Run: `sed -n '2254,2272p' cronograma_views.py`
 
-- [ ] **Step 9: Rodar os testes**
+- [x] **Step 9: Rodar os testes**
 
 Run: `python -m pytest tests/test_cronograma_baseline_revisao.py tests/test_cronograma_baseline_api.py -v`
 
 Esperado: **todos PASSAM** — inclusive os antigos de `test_cronograma_baseline_api.py`, que é a rede de regressão desta task.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add models.py migrations.py cronograma_views.py tests/test_cronograma_baseline_revisao.py

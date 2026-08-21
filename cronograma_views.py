@@ -2164,6 +2164,8 @@ def _baseline_to_dict(baseline) -> dict:
     return {
         'id': baseline.id,
         'nome': baseline.nome,
+        'revisao': baseline.revisao,
+        'motivo': baseline.motivo,
         'ativa': baseline.ativa,
         'criada_em': baseline.criada_em.isoformat() if baseline.criada_em else None,
         'total_itens': baseline.itens.count(),
@@ -2220,6 +2222,17 @@ def criar_baseline(obra_id: int):
     ativar = data.get('ativar')
     ativar = True if ativar is None else bool(ativar)
 
+    # Revisão = próxima da sequência desta obra NESTE modo. `max + 1` e não
+    # `count + 1`: excluir a V2 não pode fazer a próxima nascer V2 de novo e
+    # colidir com a comparação que alguém já guardou.
+    ultima_rev = (
+        db.session.query(db.func.max(CronogramaBaseline.revisao))
+        .filter_by(obra_id=obra_id, admin_id=admin_id,
+                   is_cliente=cliente_mode)
+        .scalar()
+    ) or 0
+    motivo = (data.get('motivo') or '').strip() or None
+
     if ativar:
         _desativar_baselines(obra_id, admin_id, cliente_mode)
 
@@ -2232,7 +2245,8 @@ def criar_baseline(obra_id: int):
     baseline = CronogramaBaseline(
         obra_id=obra_id, admin_id=admin_id, nome=nome[:120],
         criada_por=current_user.id, ativa=ativar, is_cliente=cliente_mode,
-        bac=bac_congelado or None)
+        bac=bac_congelado or None,
+        revisao=ultima_rev + 1, motivo=motivo[:200] if motivo else None)
     db.session.add(baseline)
     db.session.flush()
     for t in tarefas:
@@ -2263,7 +2277,8 @@ def listar_baselines(obra_id: int):
     baselines = (
         CronogramaBaseline.query
         .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
-        .order_by(CronogramaBaseline.id.desc()).all()
+        .order_by(CronogramaBaseline.revisao.desc(),
+                  CronogramaBaseline.id.desc()).all()
     )
     return jsonify({'status': 'ok',
                     'baselines': [_baseline_to_dict(b) for b in baselines]})
