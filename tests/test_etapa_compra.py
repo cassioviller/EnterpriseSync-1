@@ -336,6 +336,77 @@ def test_a_regua_aparece_no_DOM_do_detalhe_do_pedido():
     assert 'data-ponteiro="material_recebido"' in html
 
 
+def _segundo_pedido(admin_id, primeiro_pedido_id, estado_requisicao):
+    """Um segundo pedido DISTINTO, no mesmo tenant do primeiro — reaproveita
+    obra e fornecedor para isolar o que a contagem de consultas precisa medir:
+    se o número de pedidos, e não o número de tenants, é o que importa."""
+    suf = uuid.uuid4().hex[:8]
+    with app.app_context():
+        primeiro = db.session.get(PedidoCompra, primeiro_pedido_id)
+        obra_id, fornecedor_id = primeiro.obra_id, primeiro.fornecedor_id
+        requisicao = RequisicaoCompra(
+            admin_id=admin_id, obra_id=obra_id, estado=estado_requisicao,
+            numero=f'REQ-{suf.upper()}', solicitante_id=admin_id)
+        db.session.add(requisicao)
+        db.session.commit()
+        pedido = PedidoCompra(
+            admin_id=admin_id, obra_id=obra_id, fornecedor_id=fornecedor_id,
+            numero=f'PC-{suf.upper()}', valor_total=Decimal('2000.00'),
+            data_compra=date(2026, 1, 11), exige_atesto=True,
+            fluxo_pagamento='faturado', requisicao_id=requisicao.id)
+        db.session.add(pedido)
+        db.session.commit()
+        return pedido.id
+
+
+def test_listagem_nao_consulta_por_linha():
+    """O sensor do vício de 21/08: o número de consultas não pode crescer com o
+    número de pedidos na página. Dois pedidos DISTINTOS — não o mesmo objeto
+    repetido, que o identity map do SQLAlchemy esconderia como se o
+    pré-carregamento em lote estivesse funcionando quando não está."""
+    from sqlalchemy import event
+    from services.etapa_compra import ponteiros_de
+
+    admin_id, primeiro = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    segundo = _segundo_pedido(admin_id, primeiro, EstadoRequisicao.CONVERTIDA)
+    with app.app_context():
+        um = [db.session.get(PedidoCompra, primeiro)]
+        dois = [db.session.get(PedidoCompra, primeiro),
+                db.session.get(PedidoCompra, segundo)]
+        contadas = []
+        motor = db.engine
+
+        def _conta(conn, cursor, statement, *args):
+            contadas.append(statement)
+
+        event.listen(motor, 'before_cursor_execute', _conta)
+        try:
+            ponteiros_de(um)
+            com_um = len(contadas)
+            contadas.clear()
+            ponteiros_de(dois)
+            com_dois = len(contadas)
+        finally:
+            event.remove(motor, 'before_cursor_execute', _conta)
+
+    assert com_dois == com_um, (
+        'consultas cresceram com o número de pedidos: %d contra %d'
+        % (com_dois, com_um))
+
+
+def test_listagem_mostra_o_ponteiro_de_cada_pedido():
+    """A comparação entre compras é o motivo de haver régua — e ela mora na
+    listagem, não no detalhe."""
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    with app.test_client() as client:
+        _login(client, admin_id)
+        resp = client.get('/compras/')
+        html = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert f'data-ponteiro-pedido="{pedido_id}"' in html
+    assert 'Material recebido' in html
+
+
 def test_a_regua_cancelada_ainda_expoe_data_ponteiro_no_DOM():
     """O contrato de DOM é universal: o runbook da Task 7 escolhe um pedido
     qualquer e procura `[data-ponteiro]` — um pedido cancelado que só

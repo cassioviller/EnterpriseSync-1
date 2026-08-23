@@ -88,6 +88,7 @@
               <th>Obra</th>
               <th>Pagamento</th>
               <th>Recebimento</th>
+              <th>Onde está</th>
               <th class="text-end">Total (R$)</th>
               <th>Anexo</th>
               <th></th>
@@ -136,6 +137,12 @@
                 {% else %}
                   <span class="text-muted">—</span>
                 {% endif %}
+              </td>
+              <td>
+                <span class="badge bg-light text-dark border"
+                      data-ponteiro-pedido="{{ p.id }}">
+                  {{ ponteiros.get(p.id, '—') }}
+                </span>
               </td>
               <td class="text-end fw-semibold text-dark">{{ p.valor_total|brl_raw }}</td>
               <td>

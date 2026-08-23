@@ -52,16 +52,22 @@ def etapa_do_pedido(pedido, dados=None):
     passou por lote) não é pendência, é caminho não tomado.
 
     `dados` é o pré-carregamento opcional que a LISTAGEM usa (Task 6): um dict
-    {'contas': [...], 'notas': [...], 'adiantamentos': [...]} já filtrado para
-    este pedido. Sem ele a função consulta sozinha, que é o certo para a tela de
-    um pedido só. 🔬 a listagem traz até 200 pedidos (`compras_views.py:592`,
-    `query.limit(200)`) e NÃO é paginada — chamar esta função 200 vezes sem
-    pré-carregamento são ~800 consultas, o mesmo vício que custou /obras e
-    /ponto/lista-obras em 21/08.
+    {'contas': [...], 'notas': [...], 'adiantamentos': [...], 'requisicao':
+    RequisicaoCompra|None} já filtrado/resolvido para este pedido. Quando
+    `dados` é dado, a função HONRA — não consulta o banco por conta, nota,
+    adiantamento ou requisição; só assim `ponteiros_de` consegue as quatro
+    consultas totais que o seu docstring promete. Sem `dados` a função
+    consulta sozinha, que é o certo para a tela de um pedido só. 🔬 a listagem
+    traz até 200 pedidos (`compras_views.py:592`, `query.limit(200)`) e NÃO é
+    paginada — chamar esta função 200 vezes sem pré-carregamento são ~800
+    consultas, o mesmo vício que custou /obras e /ponto/lista-obras em 21/08.
     """
     from models import EstadoRequisicao
 
-    requisicao = pedido.requisicao
+    if dados is not None and 'requisicao' in dados:
+        requisicao = dados['requisicao']
+    else:
+        requisicao = pedido.requisicao
     tem_requisicao = requisicao is not None
 
     estado = getattr(requisicao, 'estado', None)
@@ -83,8 +89,6 @@ def etapa_do_pedido(pedido, dados=None):
     aplicavel['aprovada'] = tem_requisicao
     selos = {chave: [] for chave in CHAVES}
 
-    from services.financeiro_compra import valor_das_notas
-
     # A tríade só existe no regime novo. 📖 templates/compras/index.html:126:
     # em pedido legado o estoque entrou na emissão, e inventar "não recebido"
     # ali seria mentir.
@@ -95,7 +99,14 @@ def etapa_do_pedido(pedido, dados=None):
     recebido = pedido.situacao_recebimento in ('parcial', 'recebido',
                                                'encerrado_com_saldo')
     acesa['material_recebido'] = tem_triade and recebido
-    acesa['nota_lancada'] = tem_triade and valor_das_notas(pedido) > 0
+
+    if dados is not None:
+        from services.financeiro_compra import _d
+        valor_notas = sum((_d(n.valor_total) for n in dados['notas']), _d(0))
+    else:
+        from services.financeiro_compra import valor_das_notas
+        valor_notas = valor_das_notas(pedido)
+    acesa['nota_lancada'] = tem_triade and valor_notas > 0
 
     if pedido.situacao_recebimento == 'encerrado_com_saldo':
         selos['material_recebido'].append('com saldo')
@@ -104,10 +115,12 @@ def etapa_do_pedido(pedido, dados=None):
     recebimento_fechado = pedido.situacao_recebimento in ('recebido',
                                                           'encerrado_com_saldo')
 
-    from models import AdiantamentoFornecedor, ContaPagar
-
-    contas = ContaPagar.query.filter_by(
-        pedido_compra_id=pedido.id, admin_id=pedido.admin_id).all()
+    if dados is not None:
+        contas = dados['contas']
+    else:
+        from models import ContaPagar
+        contas = ContaPagar.query.filter_by(
+            pedido_compra_id=pedido.id, admin_id=pedido.admin_id).all()
 
     acesa['liberada'] = any(c.situacao_liberacao == 'liberada' for c in contas)
     if any(c.situacao_liberacao == 'liberada' and c.liberacao_justificativa
@@ -125,9 +138,14 @@ def etapa_do_pedido(pedido, dados=None):
     # "não pago" sobre um pedido cujo dinheiro já saiu.
     adiantamento_baixado = False
     if pedido.fluxo_pagamento == 'adiantamento':
-        adiantamento_baixado = AdiantamentoFornecedor.query.filter(
-            AdiantamentoFornecedor.pedido_id == pedido.id,
-            AdiantamentoFornecedor.baixado_em.isnot(None)).first() is not None
+        if dados is not None:
+            adiantamento_baixado = any(
+                a.baixado_em is not None for a in dados['adiantamentos'])
+        else:
+            from models import AdiantamentoFornecedor
+            adiantamento_baixado = AdiantamentoFornecedor.query.filter(
+                AdiantamentoFornecedor.pedido_id == pedido.id,
+                AdiantamentoFornecedor.baixado_em.isnot(None)).first() is not None
     acesa['paga'] = bool(pagas) or adiantamento_baixado
     if adiantamento_baixado:
         selos['paga'].append('adiantamento')
@@ -184,3 +202,63 @@ def etapa_do_pedido(pedido, dados=None):
 
     return {'casas': casas, 'ponteiro': ponteiro,
             'encerrada_por': encerrada_por, 'parou_em': parou_em}
+
+
+def ponteiros_de(pedidos):
+    """{pedido_id: rótulo do ponteiro} para uma lista de pedidos.
+
+    🔬 Existe por causa de uma medição: `compras_views.py:592` traz até 200
+    pedidos com `query.limit(200)` e a listagem NÃO é paginada. Chamar
+    `etapa_do_pedido` por linha seriam ~800 consultas — o mesmo defeito que
+    custou /obras (8,3 s) e /ponto/lista-obras (1.365 consultas) em 21/08:
+    trabalho por linha para um número na tela. Aqui são quatro consultas para
+    a página inteira, e o número É lido: contas, notas, adiantamentos e
+    requisições. `pedido.requisicao` e `conta.fechamento` são lazy — sem
+    pré-carregá-los aqui eles virariam uma consulta POR PEDIDO e POR CONTA
+    dentro do laço abaixo, escondida atrás de `etapa_do_pedido`.
+    """
+    from sqlalchemy.orm import joinedload
+
+    from models import AdiantamentoFornecedor, ContaPagar, NotaFiscalPedido, RequisicaoCompra
+
+    if not pedidos:
+        return {}
+    ids = [p.id for p in pedidos]
+    requisicao_ids = [p.requisicao_id for p in pedidos if p.requisicao_id is not None]
+
+    def _por_pedido(linhas, campo):
+        agrupado = {}
+        for linha in linhas:
+            agrupado.setdefault(getattr(linha, campo), []).append(linha)
+        return agrupado
+
+    contas = _por_pedido(
+        ContaPagar.query.options(joinedload(ContaPagar.fechamento))
+        .filter(ContaPagar.pedido_compra_id.in_(ids)).all(),
+        'pedido_compra_id')
+    notas = _por_pedido(NotaFiscalPedido.query.filter(
+        NotaFiscalPedido.pedido_id.in_(ids)).all(), 'pedido_id')
+    adiantamentos = _por_pedido(AdiantamentoFornecedor.query.filter(
+        AdiantamentoFornecedor.pedido_id.in_(ids)).all(), 'pedido_id')
+
+    requisicoes = {}
+    if requisicao_ids:
+        requisicoes = {r.id: r for r in RequisicaoCompra.query.filter(
+            RequisicaoCompra.id.in_(requisicao_ids)).all()}
+
+    saida = {}
+    for pedido in pedidos:
+        regua = etapa_do_pedido(pedido, dados={
+            'contas': contas.get(pedido.id, []),
+            'notas': notas.get(pedido.id, []),
+            'adiantamentos': adiantamentos.get(pedido.id, []),
+            'requisicao': requisicoes.get(pedido.requisicao_id),
+        })
+        if regua['encerrada_por']:
+            saida[pedido.id] = 'Cancelada'
+        elif regua['ponteiro']:
+            saida[pedido.id] = dict(
+                (c.chave, c.rotulo) for c in regua['casas'])[regua['ponteiro']]
+        else:
+            saida[pedido.id] = 'Nada pendente'
+    return saida
