@@ -162,7 +162,7 @@ estão **mescladas** (`ahead=0`). Só a espinha tem entrega distinta pendurada.
 
 | Fase | Estado | O que saber antes de começar |
 |---|---|---|
-| **6** — orçamento versionado e aditivo | ⬜ nunca começada | O p9 abriu a porta: `definir_valor_contrato()` é escritor único e os 5 chamadores passam por ele. ⚠️ faixa de migration **271-276** — o **270 está queimado** por registro fantasma no `migration_history`; numerar 270 faz a migração nunca rodar, em silêncio |
+| **6** — orçamento versionado e aditivo | ⬜ nunca começada; **premissas revisadas em 23/08** (nenhuma caiu; Task 2 meio-entregue pelo p9, Task 8 quase; faixa 271-276 livre, 270 segue queimado; decisão nova N3: versão de orçamento × BAC da baseline — ver o fim do plano) | O p9 abriu a porta: `definir_valor_contrato()` é escritor único e os 5 chamadores passam por ele. ⚠️ faixa de migration **271-276** — o **270 está queimado** por registro fantasma no `migration_history`; numerar 270 faz a migração nunca rodar, em silêncio |
 | **7** — CPM/baseline/EVM | ❌ **obsoleta como escrita** | Reescrita pelo p10. Implementá-la ao pé da letra criaria uma **segunda** rede de predecessoras e uma **segunda** baseline |
 | **8** — financeiro avançado + Domínio | ⬜ **spec nova, plano nenhum** | A spec foi reescrita em 17/08 (`specs/2026-08-17-fase-8-financeiro-design.md`) com escopo maior; 🔬 **não existe plano de execução para ela**. O `plans/2026-07-21-fase-8-...md` é da versão velha e serve como referência, não como roteiro |
 | **9a/9b** — portal, assinatura de medição, contratos, Drive | ⬜ nunca começada | A decisão nº 2 já foi tomada: o dono do `valor_contrato` é a **Fase 6**; a 9b vira camada documental |
