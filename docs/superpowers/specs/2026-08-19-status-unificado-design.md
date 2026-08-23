@@ -297,6 +297,13 @@ como a spec já tinha decidido — eixo ortogonal, selo próprio.
 | 8 | Paga | `ContaPagar.status` ∈ PAGO, PARCIAL **ou** (`fluxo_pagamento` = adiantamento **e** `AdiantamentoFornecedor.baixado_em` não nulo) |
 | 9 | Encerrada | todas as contas do pedido pagas **e** `situacao_recebimento` ∈ recebido, encerrado_com_saldo |
 
+**23/08 — nota de implementação:** a tabela lê como estados mutuamente
+exclusivos (casa 1 só para RASCUNHO/AGUARDANDO/REJEITADA, casa 2 só para
+APROVADA), mas o código entregue é **cumulativo** — casa 1 acende para
+qualquer requisição existente, casa 2 acende para APROVADA **ou**
+CONVERTIDA — o mesmo espírito de lista de conferência do D3.1, onde cada
+casa é sua própria condição, não um enum linear.
+
 **Saídas que encerram a régua:** CANCELADA (e CONVERTIDA, que é sucesso da
 requisição). O ponteiro dá lugar a um selo que diz **em qual casa parou**.
 
@@ -306,3 +313,10 @@ requisição). O ponteiro dá lugar a um selo que diz **em qual casa parou**.
 `etapa_do_pedido(pedido)` derivada (D1a), a tela, e o runbook por script que a
 ache no DOM — o critério que a própria spec fixou para não repetir o
 `fechar_lote()`, testado e inalcançável por semanas.
+
+---
+
+**23/08 — entregue.** `etapa_do_pedido` derivada, a régua no detalhe e na
+listagem, e o runbook por script achando-a no DOM: branch
+`feat/regua-status-unificado`. Números e detalhe em `### ✅ 23/08 — Fase 4 do
+ciclo` em `ESTADO-ATUAL.md`.

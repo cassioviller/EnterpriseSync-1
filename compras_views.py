@@ -33,6 +33,7 @@ from services.alcada_compras import (ESTADOS_QUE_RATIFICAM,
                                      ratificacao_vencida,
                                      registrar_aprovacao,
                                      registrar_ratificacao)
+from services.etapa_compra import etapa_do_pedido, ponteiros_de
 from services.requisicao_compra import (TransicaoInvalida, proximo_numero,
                                         recalcular_valor, transicionar)
 from utils.autorizacao import (obras_visiveis, pode_comprar_na_obra,
@@ -594,6 +595,11 @@ def index():
 
     fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
 
+    # Task 6 — o ponteiro da régua de status por pedido, em LOTE (quatro
+    # consultas para a página inteira, não quatro por pedido). 📖
+    # services/etapa_compra.py:ponteiros_de.
+    ponteiros = ponteiros_de(pedidos)
+
     return render_template(
         'compras/index.html',
         pedidos=pedidos,
@@ -604,6 +610,7 @@ def index():
         filtro_data_fim=filtro_data_fim,
         CONDICOES=CONDICOES,
         SITUACOES_RECEBIMENTO=SITUACOES_RECEBIMENTO,
+        ponteiros=ponteiros,
     )
 
 
@@ -1059,6 +1066,7 @@ def detalhe(pedido_id):
         # botão que responde 403 é pior que botão ausente.
         pode_liberar=_e_admin_do_tenant(),
         pedido=pedido,
+        regua=etapa_do_pedido(pedido),
         itens=itens,
         custos_gestao=custos_gestao,
         CONDICOES=CONDICOES,

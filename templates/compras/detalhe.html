@@ -147,6 +147,56 @@
   </div>
   {% endif %}
 
+  {# Fase 4 — a régua de status unificado. Lista de conferência, não barra de
+     progresso: cada casa acende pela própria condição, e o ponteiro é a primeira
+     casa aplicável ainda não satisfeita. No Fluxo B "Paga" acende antes de
+     "Material recebido", e isso é a verdade, não defeito. #}
+  <div class="card mb-3" id="regua-status">
+    <div class="card-body">
+      <h6 class="card-title mb-3">
+        Onde esta compra está
+        {% if regua.encerrada_por == 'cancelada' %}
+          <span class="badge bg-danger-subtle text-danger ms-2"
+                data-encerrada="cancelada" data-ponteiro="">
+            Cancelada em "{{ regua.casas | selectattr('chave', 'equalto', regua.parou_em)
+                            | map(attribute='rotulo') | first }}"
+          </span>
+        {% elif regua.ponteiro %}
+          <span class="badge bg-primary-subtle text-primary ms-2"
+                data-ponteiro="{{ regua.ponteiro }}">
+            Aguardando: {{ regua.casas | selectattr('chave', 'equalto', regua.ponteiro)
+                           | map(attribute='rotulo') | first }}
+          </span>
+        {% else %}
+          <span class="badge bg-success-subtle text-success ms-2"
+                data-ponteiro="">Nada pendente</span>
+        {% endif %}
+      </h6>
+      <ol class="list-unstyled d-flex flex-wrap gap-2 mb-0">
+        {% for casa in regua.casas %}
+          <li data-casa="{{ casa.chave }}"
+              data-acesa="{{ 'sim' if casa.acesa else 'nao' }}"
+              data-aplicavel="{{ 'sim' if casa.aplicavel else 'nao' }}"
+              class="border rounded px-2 py-1 small
+                     {% if not casa.aplicavel %}text-muted opacity-50
+                     {% elif casa.acesa %}bg-success-subtle text-success
+                     {% else %}bg-light text-secondary{% endif %}">
+            {% if casa.acesa %}<i class="fas fa-check me-1"></i>{% endif %}
+            {{ casa.rotulo }}
+            {% if casa.grupo == 'triade' %}
+              <span class="badge bg-info-subtle text-info ms-1"
+                    title="Three-way match: pedido ↔ recebimento ↔ nota">3×</span>
+            {% endif %}
+            {% for selo in casa.selos %}
+              <span class="badge bg-warning-subtle text-warning ms-1"
+                    data-selo="{{ selo }}">{{ selo }}</span>
+            {% endfor %}
+          </li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+
   <div class="row g-3">
     <!-- Dados gerais -->
     <div class="col-lg-6">
