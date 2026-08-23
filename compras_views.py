@@ -33,6 +33,7 @@ from services.alcada_compras import (ESTADOS_QUE_RATIFICAM,
                                      ratificacao_vencida,
                                      registrar_aprovacao,
                                      registrar_ratificacao)
+from services.etapa_compra import etapa_do_pedido
 from services.requisicao_compra import (TransicaoInvalida, proximo_numero,
                                         recalcular_valor, transicionar)
 from utils.autorizacao import (obras_visiveis, pode_comprar_na_obra,
@@ -1059,6 +1060,7 @@ def detalhe(pedido_id):
         # botão que responde 403 é pior que botão ausente.
         pode_liberar=_e_admin_do_tenant(),
         pedido=pedido,
+        regua=etapa_do_pedido(pedido),
         itens=itens,
         custos_gestao=custos_gestao,
         CONDICOES=CONDICOES,

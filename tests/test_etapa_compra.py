@@ -313,3 +313,24 @@ def test_rejeitada_NAO_e_saida_lateral_e_sim_selo_na_casa_1():
     assert casas['requisitada'].acesa is True
     assert 'rejeitada' in casas['requisitada'].selos
     assert regua['ponteiro'] == 'aprovada'
+
+
+def _login(client, admin_id):
+    with client.session_transaction() as sess:
+        sess['_user_id'] = str(admin_id)
+        sess['_fresh'] = True
+
+
+def test_a_regua_aparece_no_DOM_do_detalhe_do_pedido():
+    """O critério que a spec fixou: função pura que ninguém chama passa em todo
+    teste — foi assim que fechar_lote() ficou semanas testado e inalcançável."""
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    with app.test_client() as client:
+        _login(client, admin_id)
+        resp = client.get(f'/compras/{pedido_id}')
+        html = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert 'id="regua-status"' in html
+    for chave in CHAVES:
+        assert f'data-casa="{chave}"' in html
+    assert 'data-ponteiro="material_recebido"' in html
