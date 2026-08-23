@@ -199,8 +199,9 @@ plano.**
 As Fases 1, 2 e 3 do ciclo estão ✅ entregues, com runbook rodado **por script**
 (43+41+21 no piloto, 14/14 nas alçadas, 36/36 na Fase 1).
 
-**✅ 23/08 — Fase 4 entregue**, branch `feat/regua-status-unificado`, commit
-`a5163f8b` (merge: pendente — a branch ainda não foi mesclada em `main`).
+**✅ 23/08 — Fase 4 entregue e mesclada**, branch `feat/regua-status-unificado`,
+merge `05c2c639` em `main` (gate re-rodado sobre a árvore mesclada por
+identidade: o diff branch↔main é vazio — 2560 verdes valem para o merge).
 `services/etapa_compra.py` deriva a régua (9 casas, ponteiro, selos); régua no
 detalhe e coluna "onde está" na listagem; `scripts/runbook_fase4.py` acha a
 régua no DOM. Ver `### ✅ 23/08 — Fase 4 do ciclo` em `ESTADO-ATUAL.md`.
