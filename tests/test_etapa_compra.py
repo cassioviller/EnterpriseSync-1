@@ -1,0 +1,125 @@
+"""A régua de status unificado — Fase 4 do ciclo de compras.
+
+Spec: docs/superpowers/specs/2026-08-19-status-unificado-design.md
+Plano: docs/superpowers/plans/2026-08-23-plano-execucao-status-unificado.md
+
+Molde de tests/test_nota_e_liberacao.py: fixtures locais, tenant por uuid4,
+sem depender de seed.
+"""
+import os
+import sys
+import uuid
+from datetime import date
+from decimal import Decimal
+
+import pytest
+from werkzeug.security import generate_password_hash
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import main  # noqa: F401 — registra os blueprints
+from app import app, db
+from models import (Cliente, EstadoRequisicao, Fornecedor, Obra, PedidoCompra,
+                    RequisicaoCompra, TipoUsuario, Usuario)
+from services.etapa_compra import CHAVES, etapa_do_pedido
+
+pytestmark = pytest.mark.integration
+
+
+@pytest.fixture(autouse=True)
+def _config():
+    app.config['TESTING'] = True
+    app.config['WTF_CSRF_ENABLED'] = False
+    if not app.secret_key:
+        app.secret_key = 'test-etapa-compra'
+    yield
+
+
+def _cenario(estado_requisicao=None, exige_atesto=True, fluxo='faturado'):
+    """Admin + obra + fornecedor + pedido. Requisição só se o estado for dado."""
+    suf = uuid.uuid4().hex[:8]
+    with app.app_context():
+        adm = Usuario(
+            username=f'ec_{suf}', email=f'ec_{suf}@test.local', nome=f'Adm {suf}',
+            password_hash=generate_password_hash('Senha@2026'),
+            tipo_usuario=TipoUsuario.ADMIN, ativo=True, versao_sistema='v2')
+        db.session.add(adm)
+        db.session.commit()
+
+        cliente = Cliente(nome=f'Cli {suf}', admin_id=adm.id)
+        db.session.add(cliente)
+        db.session.commit()
+        obra = Obra(nome=f'Obra {suf}', codigo=f'O{suf[:6].upper()}',
+                    data_inicio=date(2026, 1, 1), admin_id=adm.id,
+                    cliente_id=cliente.id)
+        forn = Fornecedor(nome=f'Forn {suf}', cnpj=suf, admin_id=adm.id)
+        db.session.add_all([obra, forn])
+        db.session.commit()
+
+        requisicao = None
+        if estado_requisicao is not None:
+            requisicao = RequisicaoCompra(
+                admin_id=adm.id, obra_id=obra.id, estado=estado_requisicao,
+                numero=f'REQ-{suf.upper()}', solicitante_id=adm.id)
+            db.session.add(requisicao)
+            db.session.commit()
+
+        pedido = PedidoCompra(
+            admin_id=adm.id, obra_id=obra.id, fornecedor_id=forn.id,
+            numero=f'PC-{suf.upper()}', valor_total=Decimal('1000.00'),
+            data_compra=date(2026, 1, 10), exige_atesto=exige_atesto,
+            fluxo_pagamento=fluxo,
+            requisicao_id=requisicao.id if requisicao else None)
+        db.session.add(pedido)
+        db.session.commit()
+        return adm.id, pedido.id
+
+
+def _casas(pedido_id):
+    with app.app_context():
+        pedido = db.session.get(PedidoCompra, pedido_id)
+        regua = etapa_do_pedido(pedido)
+        return regua, {c.chave: c for c in regua['casas']}
+
+
+def test_regua_tem_as_nove_casas_na_ordem():
+    _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.RASCUNHO)
+    regua, _ = _casas(pedido_id)
+    assert [c.chave for c in regua['casas']] == list(CHAVES)
+
+
+def test_requisicao_em_rascunho_acende_so_a_casa_1():
+    _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.RASCUNHO)
+    _, casas = _casas(pedido_id)
+    assert casas['requisitada'].acesa is True
+    assert casas['aprovada'].acesa is False
+
+
+def test_requisicao_aprovada_acende_1_e_2():
+    _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.APROVADA)
+    _, casas = _casas(pedido_id)
+    assert casas['requisitada'].acesa is True
+    assert casas['aprovada'].acesa is True
+
+
+def test_pedido_existente_acende_a_casa_3():
+    _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    _, casas = _casas(pedido_id)
+    assert casas['pedido_emitido'].acesa is True
+
+
+def test_compra_direta_sem_requisicao_deixa_1_e_2_apagadas_nao_ausentes():
+    """Sem requisição as duas primeiras casas não se aplicam — mas continuam
+    na régua, apagadas. Casa ausente quebraria a comparação entre compras."""
+    _, pedido_id = _cenario(estado_requisicao=None)
+    regua, casas = _casas(pedido_id)
+    assert [c.chave for c in regua['casas']] == list(CHAVES)
+    assert casas['requisitada'].aplicavel is False
+    assert casas['aprovada'].aplicavel is False
+    assert casas['pedido_emitido'].acesa is True
+
+
+def test_ponteiro_e_a_primeira_casa_aplicavel_nao_satisfeita():
+    _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.RASCUNHO)
+    regua, _ = _casas(pedido_id)
+    assert regua['ponteiro'] == 'aprovada'
