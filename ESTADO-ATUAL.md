@@ -2392,6 +2392,30 @@ ausentes; o cabeçalho do `run_tests.sh` diz que vêm "via nix", mas o
 `libgbm` é pacote separado no nixpkgs 25.05) **está no `run_tests.sh`** desde
 `1a36911e` — ver parágrafo acima.
 
+### ✅ 23/08 — Fase 4 do ciclo: a régua de status unificado
+
+Branch `feat/regua-status-unificado`. `services/etapa_compra.py` deriva a régua
+(9 casas, ponteiro, selos, saídas laterais) das mesmas seis tabelas que já
+existiam — `requisicao_compra`, `pedido_compra`, `nota_fiscal_pedido`,
+`conta_pagar` (e a leitura de `situacao_liberacao`/`situacao_recebimento` e de
+`AdiantamentoFornecedor.baixado_em`, que já eram função, não coluna nova). A
+régua aparece no detalhe do pedido (`/compras/<id>`, `#regua-status`) e como
+coluna "Onde está" na listagem, com `ponteiros_de` calculando em lote (número
+constante de consultas, não uma por linha).
+
+**Nada foi gravado.** A régua é 100% derivada — nenhuma coluna, tabela ou
+migração nova. Os **seis portadores de estado continuam sendo seis, não
+sete**: a régua lê o que já existia e não abre um sétimo lugar para o mesmo
+fato divergir.
+
+🔬 gate completo (`bash run_tests.sh --gate`), 23/08: **2559 passed, 6 skipped,
+201 deselected, 2 xfailed** em 30min27s, **zero falhas** — inclusive as duas
+falhas conhecidas de 21/08 não reapareceram. 🔬 suíte da fase,
+`tests/test_etapa_compra.py`: **25 passed**.
+
+🔬 `scripts/runbook_fase4.py`: **14/14 OK**, pela tela, por Playwright — inclusive
+rodado com `--sem-semear`, sobre cenário já existente.
+
 ## Mapa dos documentos
 
 | Arquivo | O que é |

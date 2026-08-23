@@ -199,6 +199,12 @@ plano.**
 As Fases 1, 2 e 3 do ciclo estão ✅ entregues, com runbook rodado **por script**
 (43+41+21 no piloto, 14/14 nas alçadas, 36/36 na Fase 1).
 
+**✅ 23/08 — Fase 4 entregue**, branch `feat/regua-status-unificado`, commit
+`a5163f8b` (merge: pendente — a branch ainda não foi mesclada em `main`).
+`services/etapa_compra.py` deriva a régua (9 casas, ponteiro, selos); régua no
+detalhe e coluna "onde está" na listagem; `scripts/runbook_fase4.py` acha a
+régua no DOM. Ver `### ✅ 23/08 — Fase 4 do ciclo` em `ESTADO-ATUAL.md`.
+
 ---
 
 ## 5. As 25 automações — 25 vivas em 04/08, sem reconferência desde
@@ -268,7 +274,7 @@ o arquivo que ele promete existe — foi o teste aplicado no item 1.
 1. **Decidir sobre o PR #6** (espinha financeira). É a única entrega inteira fora
    do `main`, e o documento que a descreve engana quem retomar por ele. Depende do
    item humano nº 2.
-2. **Fase 4 do ciclo** — enumerar as 9 etapas. A spec está pronta; a decisão é sua.
+2. ~~**Fase 4 do ciclo** — enumerar as 9 etapas.~~ → ✅ entregue em 23/08 (ver seção 4).
 3. **Rollup Task 3** — uma frase do Paulo destrava.
 4. **Reconferir as 25 automações** — a lista tem 19 dias e pelo menos a A05 já está
    errada.

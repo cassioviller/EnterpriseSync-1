@@ -306,3 +306,10 @@ requisição). O ponteiro dá lugar a um selo que diz **em qual casa parou**.
 `etapa_do_pedido(pedido)` derivada (D1a), a tela, e o runbook por script que a
 ache no DOM — o critério que a própria spec fixou para não repetir o
 `fechar_lote()`, testado e inalcançável por semanas.
+
+---
+
+**23/08 — entregue.** `etapa_do_pedido` derivada, a régua no detalhe e na
+listagem, e o runbook por script achando-a no DOM: branch
+`feat/regua-status-unificado`. Números e detalhe em `### ✅ 23/08 — Fase 4 do
+ciclo` em `ESTADO-ATUAL.md`.
