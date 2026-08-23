@@ -224,6 +224,7 @@ def ponteiros_de(pedidos):
     if not pedidos:
         return {}
     ids = [p.id for p in pedidos]
+    admin_ids = {p.admin_id for p in pedidos}
     requisicao_ids = [p.requisicao_id for p in pedidos if p.requisicao_id is not None]
 
     def _por_pedido(linhas, campo):
@@ -232,9 +233,14 @@ def ponteiros_de(pedidos):
             agrupado.setdefault(getattr(linha, campo), []).append(linha)
         return agrupado
 
+    # `admin_id` aqui é defesa em profundidade, não a fonte da segregação por
+    # tenant — `ids` já vem de pedidos que o chamador filtrou por admin_id
+    # (📖 compras_views.py `index()`). Espelha o filtro que a consulta por
+    # pedido único já fazia (`etapa_do_pedido` sem `dados`).
     contas = _por_pedido(
         ContaPagar.query.options(joinedload(ContaPagar.fechamento))
-        .filter(ContaPagar.pedido_compra_id.in_(ids)).all(),
+        .filter(ContaPagar.pedido_compra_id.in_(ids),
+                ContaPagar.admin_id.in_(admin_ids)).all(),
         'pedido_compra_id')
     notas = _por_pedido(NotaFiscalPedido.query.filter(
         NotaFiscalPedido.pedido_id.in_(ids)).all(), 'pedido_id')

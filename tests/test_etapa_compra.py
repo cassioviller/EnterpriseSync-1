@@ -359,16 +359,43 @@ def _segundo_pedido(admin_id, primeiro_pedido_id, estado_requisicao):
         return pedido.id
 
 
+def _conta_em_lote(admin_id, pedido_id):
+    """Uma ContaPagar do pedido, já em lote — sem isto o teste de contagem
+    de consultas não exercita `ContaPagar.fechamento` (lazy) e passaria
+    mesmo que o `joinedload` em `ponteiros_de` fosse removido: `dados['contas']`
+    ficaria vazio e o lazy-load nunca seria disparado."""
+    from models import ContaPagar, FechamentoPagamento
+    with app.app_context():
+        lote = FechamentoPagamento(
+            admin_id=admin_id, status='FECHADO', descricao='Lote de teste',
+            data_fechamento=date(2026, 2, 1))
+        db.session.add(lote)
+        db.session.commit()
+        c = ContaPagar(
+            admin_id=admin_id, pedido_compra_id=pedido_id,
+            descricao='Conta do pedido', valor_original=Decimal('1000.00'),
+            data_emissao=date(2026, 1, 10), data_vencimento=date(2026, 2, 10),
+            status='PENDENTE', situacao_liberacao='liberada',
+            fechamento_id=lote.id)
+        db.session.add(c)
+        db.session.commit()
+
+
 def test_listagem_nao_consulta_por_linha():
     """O sensor do vício de 21/08: o número de consultas não pode crescer com o
     número de pedidos na página. Dois pedidos DISTINTOS — não o mesmo objeto
     repetido, que o identity map do SQLAlchemy esconderia como se o
-    pré-carregamento em lote estivesse funcionando quando não está."""
+    pré-carregamento em lote estivesse funcionando quando não está. Cada um
+    carrega uma ContaPagar já em lote, para que o lazy-load de
+    `ContaPagar.fechamento` também seja exercitado, não só o de
+    `pedido.requisicao`."""
     from sqlalchemy import event
     from services.etapa_compra import ponteiros_de
 
     admin_id, primeiro = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
     segundo = _segundo_pedido(admin_id, primeiro, EstadoRequisicao.CONVERTIDA)
+    _conta_em_lote(admin_id, primeiro)
+    _conta_em_lote(admin_id, segundo)
     with app.app_context():
         um = [db.session.get(PedidoCompra, primeiro)]
         dois = [db.session.get(PedidoCompra, primeiro),
@@ -376,10 +403,10 @@ def test_listagem_nao_consulta_por_linha():
         contadas = []
         motor = db.engine
 
-        def _conta(conn, cursor, statement, *args):
+        def _registrar(conn, cursor, statement, *args):
             contadas.append(statement)
 
-        event.listen(motor, 'before_cursor_execute', _conta)
+        event.listen(motor, 'before_cursor_execute', _registrar)
         try:
             ponteiros_de(um)
             com_um = len(contadas)
@@ -387,7 +414,7 @@ def test_listagem_nao_consulta_por_linha():
             ponteiros_de(dois)
             com_dois = len(contadas)
         finally:
-            event.remove(motor, 'before_cursor_execute', _conta)
+            event.remove(motor, 'before_cursor_execute', _registrar)
 
     assert com_dois == com_um, (
         'consultas cresceram com o número de pedidos: %d contra %d'
