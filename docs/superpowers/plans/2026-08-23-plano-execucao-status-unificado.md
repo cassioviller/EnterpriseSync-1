@@ -58,7 +58,7 @@ CHAVES = ('requisitada', 'aprovada', 'pedido_emitido', 'material_recebido',
 
 **Interfaces:**
 - Consumes: `models.RequisicaoCompra`, `models.PedidoCompra`, `models.EstadoRequisicao`
-- Produces: `etapa_do_pedido(pedido) -> dict` com as chaves `casas` (lista de `Casa`), `ponteiro` (str ou None), `encerrada_por` (str ou None). `Casa` é um `namedtuple('Casa', 'chave rotulo grupo acesa aplicavel selos')`. Todas as tasks seguintes acrescentam condições **dentro** desta função — nenhuma cria função nova.
+- Produces: `etapa_do_pedido(pedido, dados=None) -> dict` com as chaves `casas` (lista de `Casa`), `ponteiro` (str ou None), `encerrada_por` (str ou None). `Casa` é um `namedtuple('Casa', 'chave rotulo grupo acesa aplicavel selos')`. Todas as tasks seguintes acrescentam condições **dentro** desta função — nenhuma cria função nova.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -241,11 +241,19 @@ ROTULOS = {
 GRUPO_TRIADE = ('pedido_emitido', 'material_recebido', 'nota_lancada')
 
 
-def etapa_do_pedido(pedido):
+def etapa_do_pedido(pedido, dados=None):
     """Onde este pedido está. Não escreve nada.
 
     Devolve {'casas': [Casa...], 'ponteiro': chave|None, 'encerrada_por': None}.
     `ponteiro` é None quando não falta nada aplicável.
+
+    `dados` é o pré-carregamento opcional que a LISTAGEM usa (Task 6): um dict
+    {'contas': [...], 'notas': [...], 'adiantamentos': [...]} já filtrado para
+    este pedido. Sem ele a função consulta sozinha, que é o certo para a tela de
+    um pedido só. 🔬 a listagem traz até 200 pedidos (`compras_views.py:592`,
+    `query.limit(200)`) e NÃO é paginada — chamar esta função 200 vezes sem
+    pré-carregamento são ~800 consultas, o mesmo vício que custou /obras e
+    /ponto/lista-obras em 21/08.
     """
     from models import EstadoRequisicao
 
@@ -520,6 +528,17 @@ def test_fluxo_b_paga_antes_de_receber_sem_a_regua_mentir():
     assert regua['ponteiro'] == 'material_recebido'
 
 
+def test_pedido_legado_encerra_so_com_o_pagamento():
+    """Sem tríade não há recebimento a fechar — exigi-lo prenderia o pedido
+    legado para sempre numa casa que nunca acende."""
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA,
+                                   exige_atesto=False)
+    _conta(admin_id, pedido_id, situacao_liberacao='liberada', status='PAGO')
+    regua, casas = _casas(pedido_id)
+    assert casas['encerrada'].acesa is True
+    assert regua['ponteiro'] is None
+
+
 def test_encerrada_exige_pago_e_recebimento_fechado():
     admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
     _conta(admin_id, pedido_id, situacao_liberacao='liberada', status='PAGO')
@@ -571,7 +590,14 @@ Substituir as linhas `False` restantes e a atribuição provisória de `encerrad
         selos['paga'].append('adiantamento')
 
     tudo_pago = bool(contas) and all(c.status == 'PAGO' for c in contas)
-    acesa['encerrada'] = (tudo_pago or adiantamento_baixado) and recebimento_fechado
+    # Pedido LEGADO (sem tríade) não tem recebimento a fechar: exigir
+    # `recebimento_fechado` dele o prenderia para sempre na casa 9, com o
+    # ponteiro apontando uma casa que nunca vai acender. Para ele, encerrar é
+    # pagar.
+    if tem_triade:
+        acesa['encerrada'] = (tudo_pago or adiantamento_baixado) and recebimento_fechado
+    else:
+        acesa['encerrada'] = tudo_pago
 ```
 
 - [ ] **Step 4: Rodar e ver passar**
@@ -691,7 +717,7 @@ def test_a_regua_aparece_no_DOM_do_detalhe_do_pedido():
     admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
     with app.test_client() as client:
         _login(client, admin_id)
-        resp = client.get(f'/compras/pedido/{pedido_id}')
+        resp = client.get(f'/compras/{pedido_id}')
         html = resp.get_data(as_text=True)
     assert resp.status_code == 200
     assert 'id="regua-status"' in html
@@ -802,11 +828,41 @@ git commit -m "feat(compras): a regua na tela do pedido, com os selos e o pontei
 
 **Interfaces:**
 - Consumes: `etapa_do_pedido`
-- Produces: contexto `ponteiros` — `{pedido_id: rotulo}` — e uma coluna "Onde está".
+- Produces: `ponteiros_de(pedidos) -> {pedido_id: rotulo}` em `services/etapa_compra.py`, que carrega em LOTE e chama `etapa_do_pedido(p, dados=...)`; contexto `ponteiros` no template.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
 ```python
+def test_listagem_nao_consulta_por_linha():
+    """O sensor do vício de 21/08: o número de consultas não pode crescer com o
+    número de pedidos na página."""
+    from sqlalchemy import event
+    from services.etapa_compra import ponteiros_de
+
+    admin_id, primeiro = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    with app.app_context():
+        pedidos = [db.session.get(PedidoCompra, primeiro)]
+        contadas = []
+        motor = db.engine
+
+        def _conta(conn, cursor, statement, *args):
+            contadas.append(statement)
+
+        event.listen(motor, 'before_cursor_execute', _conta)
+        try:
+            ponteiros_de(pedidos)
+            com_um = len(contadas)
+            contadas.clear()
+            ponteiros_de(pedidos * 5)
+            com_cinco = len(contadas)
+        finally:
+            event.remove(motor, 'before_cursor_execute', _conta)
+
+    assert com_cinco == com_um, (
+        'consultas cresceram com o número de pedidos: %d contra %d'
+        % (com_cinco, com_um))
+
+
 def test_listagem_mostra_o_ponteiro_de_cada_pedido():
     """A comparação entre compras é o motivo de haver régua — e ela mora na
     listagem, não no detalhe."""
@@ -829,25 +885,71 @@ Expected: FAIL — `assert 'data-ponteiro-pedido="1" in html'`
 
 Na rota que renderiza `compras/index.html`, depois de montar a lista de pedidos e **antes** do `render_template`:
 
+Uma linha antes do `render_template`:
+
 ```python
-    # Um dicionário e não um método no modelo: a régua é derivada e não deve
-    # virar atributo de linha, senão vira o sétimo portador de estado.
-    ponteiros = {}
-    for p in pedidos:
-        regua_p = etapa_do_pedido(p)
-        if regua_p['encerrada_por']:
-            ponteiros[p.id] = 'Cancelada'
-        elif regua_p['ponteiro']:
-            ponteiros[p.id] = dict(
-                (c.chave, c.rotulo) for c in regua_p['casas'])[regua_p['ponteiro']]
-        else:
-            ponteiros[p.id] = 'Nada pendente'
+    ponteiros = ponteiros_de(pedidos)
 ```
 
-E `ponteiros=ponteiros` no `render_template`.
+E `ponteiros=ponteiros` no `render_template`, mais o import no topo:
 
-> ⚠️ Se a listagem for paginada, isto roda **por página** — o que é aceitável.
-> Se alguém a tornar global, medir antes: são ~4 consultas por pedido.
+```python
+from services.etapa_compra import etapa_do_pedido, ponteiros_de
+```
+
+Em `services/etapa_compra.py`, a função de lote — **quatro consultas no total**,
+não quatro por pedido:
+
+```python
+def ponteiros_de(pedidos):
+    """{pedido_id: rótulo do ponteiro} para uma lista de pedidos.
+
+    🔬 Existe por causa de uma medição: `compras_views.py:592` traz até 200
+    pedidos com `query.limit(200)` e a listagem NÃO é paginada. Chamar
+    `etapa_do_pedido` por linha seriam ~800 consultas — o mesmo defeito que
+    custou /obras (8,3 s) e /ponto/lista-obras (1.365 consultas) em 21/08:
+    trabalho por linha para um número na tela. Aqui são quatro consultas para a
+    página inteira, e o número É lido.
+    """
+    from models import AdiantamentoFornecedor, ContaPagar, NotaFiscalPedido
+
+    if not pedidos:
+        return {}
+    ids = [p.id for p in pedidos]
+
+    def _por_pedido(linhas, campo):
+        agrupado = {}
+        for linha in linhas:
+            agrupado.setdefault(getattr(linha, campo), []).append(linha)
+        return agrupado
+
+    contas = _por_pedido(ContaPagar.query.filter(
+        ContaPagar.pedido_compra_id.in_(ids)).all(), 'pedido_compra_id')
+    notas = _por_pedido(NotaFiscalPedido.query.filter(
+        NotaFiscalPedido.pedido_id.in_(ids)).all(), 'pedido_id')
+    adiantamentos = _por_pedido(AdiantamentoFornecedor.query.filter(
+        AdiantamentoFornecedor.pedido_id.in_(ids)).all(), 'pedido_id')
+
+    saida = {}
+    for pedido in pedidos:
+        regua = etapa_do_pedido(pedido, dados={
+            'contas': contas.get(pedido.id, []),
+            'notas': notas.get(pedido.id, []),
+            'adiantamentos': adiantamentos.get(pedido.id, []),
+        })
+        if regua['encerrada_por']:
+            saida[pedido.id] = 'Cancelada'
+        elif regua['ponteiro']:
+            saida[pedido.id] = dict(
+                (c.chave, c.rotulo) for c in regua['casas'])[regua['ponteiro']]
+        else:
+            saida[pedido.id] = 'Nada pendente'
+    return saida
+```
+
+> ⚠️ **`etapa_do_pedido` tem de honrar `dados` de verdade** — se ela ignorar o
+> parâmetro e consultar assim mesmo, o teste de contagem de consultas abaixo
+> falha, que é exatamente o que ele existe para pegar.
 
 - [ ] **Step 4: Implementar — o template**
 
@@ -952,7 +1054,7 @@ def main():
         print('\n%d/%d' % (verdes, total))
         return 1
 
-    html = sessao.get('%s/compras/pedido/%s' % (BASE, ids[0])).text
+    html = sessao.get('%s/compras/%s' % (BASE, ids[0])).text
     afirma('o detalhe tem #regua-status', 'id="regua-status"' in html)
     for chave in CHAVES:
         afirma('a casa %s está no DOM' % chave, 'data-casa="%s"' % chave in html)
