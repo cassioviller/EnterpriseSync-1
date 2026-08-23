@@ -7553,6 +7553,56 @@ class MedicaoContrato(db.Model):
         return f'<MedicaoContrato {self.nome} obra={self.obra_id}>'
 
 
+class ObraContratoVersao(db.Model):
+    """Fase 6 — baseline versionado do valor de contrato da obra.
+
+    Espelha `ObraOrcamentoOperacionalItemVersao` (models.py:8929): janela
+    [vigente_de, vigente_ate), `vigente_ate IS NULL` marca a versão ATUAL.
+    `versao` 1 é sempre o contrato original (ou o backfill da migration 271,
+    quando a obra já existia antes desta feature). Aditivos (Task 3) entram
+    como novas versões com `origem_tipo='aditivo'` e `aditivo_id` preenchido.
+
+    `valor` é Numeric(15,2) — diferente de `Obra.valor_contrato` (Float, por
+    herança do modelo antigo): o baseline nasce com o tipo certo.
+
+    `aditivo_id` referencia `aditivo_contrato.id`, que só existe a partir da
+    Task 3 (migration 272 planejada). Por isso a coluna é um Integer PLANO
+    aqui — sem `db.ForeignKey` — para não apontar para uma tabela ainda
+    inexistente; a constraint é adicionada junto da Task 3.
+    """
+    __tablename__ = 'obra_contrato_versao'
+    __table_args__ = (
+        db.Index('idx_contrato_versao_lookup', 'obra_id', 'vigente_de', 'vigente_ate'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    versao = db.Column(db.Integer, nullable=False)
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
+    prazo_dias = db.Column(db.Integer, nullable=True)
+    vigente_de = db.Column(db.DateTime, nullable=False, index=True)
+    vigente_ate = db.Column(db.DateTime, nullable=True, index=True)
+    origem_tipo = db.Column(db.String(30), nullable=False)
+    origem_proposta_id = db.Column(db.Integer,
+                                   db.ForeignKey('propostas_comerciais.id', ondelete='SET NULL'),
+                                   nullable=True)
+    # FK real (aditivo_contrato.id) chega na Task 3 — ver docstring da classe.
+    aditivo_id = db.Column(db.Integer, nullable=True)
+    motivo = db.Column(db.Text, nullable=True)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    obra = db.relationship('Obra', backref=db.backref('contrato_versoes',
+                                                       cascade='all, delete-orphan',
+                                                       passive_deletes=True,
+                                                       order_by='ObraContratoVersao.vigente_de.desc()'))
+
+    def __repr__(self):
+        return f'<ObraContratoVersao obra={self.obra_id} v{self.versao} vigente_ate={self.vigente_ate}>'
+
+
 class MapaConcorrenciaV2(db.Model):
     """Mapa de Concorrência V2 — tabela multi-fornecedor comparativa (N itens × N fornecedores)"""
     __tablename__ = 'mapa_concorrencia_v2'

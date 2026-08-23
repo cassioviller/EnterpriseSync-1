@@ -5703,6 +5703,92 @@ def _migration_269_remover_indice_unico_antigo_de_assinatura():
         raise
 
 
+def _migration_271_obra_contrato_versao():
+    """Fase 6 — baseline versionado do contrato da obra.
+
+    Cria obra_contrato_versao e faz o backfill: cada obra com
+    valor_contrato > 0 ganha a versão nº1 (origem_tipo='backfill'),
+    vigente_de = obra.created_at (fallback data_inicio, fallback now()).
+    Idempotente. Não altera obra.valor_contrato.
+
+    aditivo_id é Integer SEM FK: aditivo_contrato só nasce na Task 3
+    (migration 272 planejada) — ver docstring de ObraContratoVersao em
+    models.py.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS obra_contrato_versao (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    versao INTEGER NOT NULL,
+                    valor NUMERIC(15,2) NOT NULL,
+                    prazo_dias INTEGER,
+                    vigente_de TIMESTAMP NOT NULL,
+                    vigente_ate TIMESTAMP,
+                    origem_tipo VARCHAR(30) NOT NULL,
+                    origem_proposta_id INTEGER
+                        REFERENCES propostas_comerciais(id) ON DELETE SET NULL,
+                    aditivo_id INTEGER,
+                    motivo TEXT,
+                    criado_por_id INTEGER REFERENCES usuario(id),
+                    created_at TIMESTAMP NOT NULL DEFAULT now()
+                )
+            """))
+            # Nomes IDÊNTICOS aos que o SQLAlchemy geraria via `index=True`
+            # (models.py) — se `db.create_all()` rodar primeiro (boot normal,
+            # app.py:624, antes das migrações), a tabela já nasce com estes
+            # nomes; `IF NOT EXISTS` torna esta migração um no-op nesse caso.
+            # Nomes diferentes duplicariam o índice.
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_obra_contrato_versao_obra_id "
+                "ON obra_contrato_versao(obra_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_obra_contrato_versao_admin_id "
+                "ON obra_contrato_versao(admin_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_obra_contrato_versao_vigente_de "
+                "ON obra_contrato_versao(vigente_de)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_obra_contrato_versao_vigente_ate "
+                "ON obra_contrato_versao(vigente_ate)"))
+            conn.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS idx_contrato_versao_lookup
+                    ON obra_contrato_versao(obra_id, vigente_de, vigente_ate)
+            """))
+
+            # Backfill: toda obra com valor_contrato > 0 e ainda SEM nenhuma
+            # versão ganha a versão nº1. WHERE NOT EXISTS torna o INSERT
+            # idempotente — rodar de novo não duplica.
+            conn.execute(sa_text("""
+                INSERT INTO obra_contrato_versao
+                    (obra_id, admin_id, versao, valor, prazo_dias,
+                     vigente_de, vigente_ate, origem_tipo, created_at)
+                SELECT
+                    o.id,
+                    o.admin_id,
+                    1,
+                    o.valor_contrato,
+                    NULL,
+                    COALESCE(o.created_at, o.data_inicio::timestamp, now()),
+                    NULL,
+                    'backfill',
+                    now()
+                FROM obra o
+                WHERE COALESCE(o.valor_contrato, 0) > 0
+                  AND o.admin_id IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM obra_contrato_versao v WHERE v.obra_id = o.id
+                  )
+            """))
+        logger.info("[Migration 271] obra_contrato_versao criada e backfill aplicado.")
+    except Exception as e:
+        logger.error(f"[Migration 271] Falha: {e}", exc_info=True)
+        raise
+
+
 # Tamanho do lote da linha de base (passo 1 da 277). A migração roda dentro
 # do timeout do entrypoint (MIGRATION_TIMEOUT, 300s por padrão): congelar
 # milhares de obras num único INSERT arrisca estourar o relógio e perder o
@@ -7247,6 +7333,7 @@ def executar_migracoes():
             (267, "Fase 9a — obra_signatario_cliente + rdo_assinatura.signatario_cliente_id", _migration_267_signatario_cliente),
             (268, "Fase 9a — unicidade de assinatura por signatário (dois índices parciais)", _migration_268_unicidade_assinatura_por_signatario),
             (269, "Fase 9a — remove uq_rdo_assinatura_papel também quando é ÍNDICE (a 268 só tratava constraint)", _migration_269_remover_indice_unico_antigo_de_assinatura),
+            (271, "Fase 6 — obra_contrato_versao: baseline versionado do contrato da obra, com backfill da versão nº1 para obras pré-existentes", _migration_271_obra_contrato_versao),
             (277, "Editor de cronograma v2 em todo o parque — linha de base primeiro, flag ligada em todos os tenants, default da coluna vira TRUE", _migration_277_editor_v2_em_todo_o_parque),
             (278, "p10 — cronograma_baseline.bac (orçamento congelado junto com o prazo; NULL = baseline anterior)", _migration_278_baseline_bac),
             (279, "E02 — drop de notificacao_cliente, auto-guardado pela contagem (falha e retenta se houver linha)", _migration_279_drop_notificacao_cliente),
