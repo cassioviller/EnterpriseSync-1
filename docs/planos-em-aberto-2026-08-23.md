@@ -85,6 +85,54 @@ importador de obra por planilha e a lente de caixa **não têm equivalente**.
 > o que o resgate custa é portar contra o schema de hoje, que mudou nas Fases 0.6
 > a 5, não obter o código.
 
+### 🔬 23/08 — o custo do resgate, medido
+
+Com o código a um `git checkout`, o porte deixou de ser chute. Os cinco módulos e
+os sete arquivos de teste (**2.542 linhas**) foram extraídos e conferidos contra o
+`main` de hoje.
+
+**O que porta de graça:**
+
+- 🔬 **os cinco módulos importam limpo** sob o app de hoje (`resultado_atividade_service`,
+  `caixa_obra_service`, `aprendizado_produtividade`, `importar_obra_completa`,
+  `resultado_views`) — nenhum `ImportError`, nenhuma classe de modelo sumida;
+- 🔬 **16 classes de `models` referenciadas, todas existem**;
+- 🔬 a cadeia que sustenta o read-model está inteira: `ItemMedicaoCronogramaTarefa.peso`,
+  `PropostaItem.composicao_snapshot`, `RDOCustoDiario.custo_total_dia` e
+  `RDOMaoObra.tarefa_cronograma_id` — as quatro presentes;
+- 🔬 `caixa_obra_service.py` (27 linhas) porta **sem tocar em nada**: chama
+  `FinanceiroService.calcular_fluxo_caixa(admin_id, data_inicio, data_fim, obra_id=None)`
+  e `agregar_fluxo_mensal(detalhes, saldo_inicial=0.0)`, e as duas assinaturas
+  batem exatamente com as de hoje.
+
+**O que não existe e teria de ser recriado** — as migrations 193/194/195 são da
+linhagem velha e nunca chegaram aqui (🔬 a maior migration de hoje é a **314**,
+então elas entrariam como **315+**):
+
+| Coluna que falta | Era a migration | Quem depende |
+|---|---|---|
+| `cronograma_template_item.peso_medicao` | 193 | 📖 `importar_obra_completa.py:214` — é o **coração** do importador (peso explícito, DC8/ADR 0004) |
+| `propostas_comerciais.origem` | 194 | 📖 `importar_obra_completa.py:68` (`origem='importacao_obra'`, ADR 0005). Hoje existe `proposta_origem_id`, que é **outra coisa** |
+| `rdo_subempreitada_apontamento.verba` / `lucro` / `pai` | 195 | A Fatia 2 (DC9). 🔬 a tabela já tem `tarefa_cronograma_id`; faltam os três de verba/lucro/pai |
+
+**Leitura honesta do resultado.** A auditoria de atributos (`Classe.atributo`) não
+pega acesso por instância (`ti.peso_medicao`), então "nenhum atributo ausente" era
+mais fraco do que parecia — foi a conferência coluna a coluna acima que achou os
+três buracos. O porte é, então:
+
+1. **`caixa_obra_service` + `aprendizado_produtividade`** (90 linhas): entram como estão;
+2. **`resultado_atividade_service`** (537 linhas): entra inteiro **menos** o ramo de
+   subempreitada da Fatia 2, que espera as colunas de verba/lucro;
+3. **`importar_obra_completa`** (291 linhas) + **`resultado_views`** (174) + 4 templates:
+   exigem **duas migrations novas** (peso_medicao, origem) e o registro do blueprint;
+4. os **sete arquivos de teste** (1.450 linhas) só rodam depois de 1-3, e não foram
+   executados nesta medição — o banco de dev estava em limpeza.
+
+**Não há incompatibilidade estrutural** com as Fases 0.6-5: 🔬 nenhum uso do padrão
+antigo de PK do plano de contas (`PlanoContas.query.get(codigo)`), e o read-model lê
+`RDOCustoDiario`, que o ciclo de vida do RDO só passa a alimentar fora do rascunho —
+mudança de semântica, não de contrato.
+
 ### As outras 15 branches do `origin` não escondem entrega
 
 🔬 varridas uma a uma: o que falta delas na árvore são templates mortos que a

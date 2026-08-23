@@ -145,3 +145,78 @@ já decidiu deixar quieta (`:469`), e a convergência da `NotaFiscal` legada.
 as compras irmãs são de etapas diferentes. Ele é de alçada, não de régua — mas é
 aqui que "o quadro inteiro está à vista", que foi a razão de adiá-lo. Entra como
 pergunta a responder, não como entrega assumida.
+
+---
+
+## 🔬 Conferência de 23/08 — a régua lida no código, e o que sobra para decidir
+
+> A spec pedia, em D3, que as nove casas fossem "conferidas contra as saídas
+> laterais". Isto é essa conferência: cada casa foi lida no `models.py` de hoje,
+> campo por campo. **Nada aqui é decisão tomada** — é o candidato da D3 com os
+> defeitos que a leitura achou, para virar aprovação ou correção.
+
+### As nove casas existem no dado — com duas correções
+
+🔬 23/08, por introspeção dos modelos (`__table__.columns`):
+
+| # | Casa | Campo que ela lê | Existe hoje |
+|---|---|---|---|
+| 1 | Requisitada | `RequisicaoCompra.estado` | ✅ |
+| 2 | Aprovada | `RequisicaoCompra.estado` | ✅ |
+| 3 | Pedido emitido | ~~`RequisicaoCompra.pedido_id`~~ → **`PedidoCompra.requisicao_id`** | ⚠️ **corrigido** — o vínculo existe ao contrário do que a D3 supôs; a derivação vai do pedido para a requisição |
+| 4 | Material recebido | `PedidoCompra.situacao_recebimento` | ✅ |
+| 5 | Nota lançada | presença de `NotaFiscalPedido` (`pedido_id`) | ✅ |
+| 6 | Liberada para pagamento | `ContaPagar.situacao_liberacao` | ✅ |
+| 7 | Em lote de pagamento | `ContaPagar.fechamento_id` | ✅ |
+| 8 | Paga | `ContaPagar.status`, `valor_pago` | ✅ |
+| 9 | Encerrada | `situacao_recebimento` + `ContaPagar.status` | ✅ |
+
+⚠️ **Segunda correção: o atesto não é coluna.** `PedidoCompra.valor_atestado`
+**não existe**; 📖 `valor_atestado(pedido)` é **função** em
+`services/recebimento_pedido.py`, consumida por `services/financeiro_compra.py:306,315`.
+Quem escrever a régua tem de chamá-la, não ler campo.
+
+### 🔴 O problema que a régua linear ainda não resolve: o Fluxo B inverte a ordem
+
+A D2 resolveu a *forma* (uma régua, casas nomeadas por função, inaplicáveis
+apagadas) mas não a *ordem*. 📖 `models.py:5845` — no fluxo `'adiantamento'`
+**paga-se antes de receber**. Numa régua linear, isso acende a casa 8 antes da 4,
+e uma barra de progresso que acende fora de ordem lê como defeito.
+
+**Proposta (a decidir): a régua é uma LISTA DE CONFERÊNCIA com um ponteiro, não
+uma barra de progresso.**
+
+- cada casa acende quando **a condição dela é verdadeira**, independente da ordem;
+- o "onde está" é derivado: **a primeira casa aplicável ainda não satisfeita**;
+- no Fluxo B a casa 8 acende cedo e o ponteiro continua dizendo *"aguardando
+  material"* — que é exatamente a verdade que hoje ninguém consegue ler.
+
+Isso preserva o motivo de haver régua (as mesmas nove colunas em toda compra,
+comparáveis) sem mentir sobre o caminho de cada fluxo.
+
+**Condição da casa 8, então, é união e não campo único:**
+`ContaPagar.status ∈ (PAGO, PARCIAL)` **ou** (`fluxo_pagamento = 'adiantamento'`
+**e** `AdiantamentoFornecedor.baixado_em` não nulo). 🔬 os quatro campos existem.
+
+### As saídas laterais — e uma que não é saída
+
+| Situação | O que a conferência achou | Proposta |
+|---|---|---|
+| **REJEITADA** | 📖 `models.py:80-99`: **não é terminal** — dela se volta para RASCUNHO ("rejeitar não é matar"). O docstring já registra que até 17/08 ele mesmo dizia o contrário | **Não é saída lateral**: é a casa 1 com um selo. Tratá-la como fim seria repetir o erro que a Fase 3 já corrigiu |
+| **CANCELADA** | Terminal, junto com CONVERTIDA | Encerra a régua: badge no lugar do ponteiro, dizendo **em qual casa parou** |
+| **`encerrado_com_saldo`** | Valor de `situacao_recebimento` | Satisfaz a casa 4 **e** a 9, com selo "com saldo" — não é pendência |
+| **Liberação com ressalva** (D6 da Fase 2) | 📖 `ContaPagar.liberacao_justificativa`, gravada em `services/financeiro_compra.py:450` | Casa 6 acesa **com selo**; a régua não pode esconder que houve ressalva |
+| **Fechamento por quem montou** (19/08) | Exceção declarada quando falta `criado_por_id` | Casa 7 acesa **com selo**, mesma regra |
+| **Faturamento direto** (`status_aprovacao_cliente`) | Eixo ortogonal, como a spec já dizia | Fora da régua, selo ao lado |
+
+### O que continua sendo decisão humana
+
+1. **A régua é lista de conferência com ponteiro** (proposta acima) ou barra de
+   progresso que ramifica no Fluxo B?
+2. As nove casas, com as duas correções, **são estas nove**?
+3. Os cinco selos (ressalva, fechamento por quem montou, com saldo, adiantamento,
+   aprovação do cliente) aparecem na régua ou só no detalhe?
+
+Respondidas as três, a fase vira plano: 🔬 não existe hoje função nenhuma que
+agregue isto, então é código novo — `etapa_do_pedido(pedido)` derivada (D1a), a
+tela, e o runbook por script que a acha no DOM.
