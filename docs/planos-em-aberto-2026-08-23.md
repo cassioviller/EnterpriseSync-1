@@ -208,7 +208,17 @@ régua no DOM. Ver `### ✅ 23/08 — Fase 4 do ciclo` em `ESTADO-ATUAL.md`.
 
 ---
 
-## 5. As 25 automações — 25 vivas em 04/08, sem reconferência desde
+## 5. As 25 automações — ✅ reconferidas em 23/08 (9 entregues, 7 parciais, 9 abertas)
+
+> **23/08 — a lista foi reaberta e reconferida item a item**:
+> `docs/reconferencia-backlog-2026-08-23.md`. Manchete: 9 dos 25 itens foram
+> entregues pelo trabalho das últimas semanas sem ninguém riscar da lista
+> (A02, A03, A05, A06, A07, A09, A10, A14, A19); 7 estão parciais com recorte
+> menor; 9 seguem como estavam. O trabalho real que sobra e as 4 decisões que
+> destravam o resto (A04, A18, A24, A25) estão lá. O texto abaixo é o retrato
+> de 04/08, mantido como histórico.
+
+## 5-histórico. As 25 automações — 25 vivas em 04/08, sem reconferência desde
 
 `docs/reconferencia-backlog-2026-08-04.md`: **zero entregues, 25 vivas** — 13
 podiam começar naquele dia, 12 travadas por decisão ou credencial. Passaram-se 19

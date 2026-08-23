@@ -1,5 +1,9 @@
 # Reconferência do backlog — 2026-08-04
 
+> ⚠️ **Superado em 23/08** — reconferência item a item em
+> `docs/reconferencia-backlog-2026-08-23.md` (9 entregues, 7 parciais, 9
+> abertas). Este documento fica como retrato de 04/08.
+
 > **O que é:** a reconferência, **no código vivo**, das duas listas do
 > `PLANO-NUCLEO.md` — o backlog de 25 automações (§5) e as 12 estruturas mortas
 > (§6). Ambas foram escritas em **2026-07-31**. Entre 31/07 e 03/08 entraram os
