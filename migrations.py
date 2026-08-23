@@ -5778,6 +5778,10 @@ def _migration_271_obra_contrato_versao():
                     now()
                 FROM obra o
                 WHERE COALESCE(o.valor_contrato, 0) > 0
+                  -- obra.admin_id é nullable (obra órfã/sem tenant); a coluna
+                  -- correspondente aqui é NOT NULL, então sem esta guarda uma
+                  -- única obra órfã estouraria NOT NULL violation e abortaria
+                  -- a transação inteira (rollback do INSERT em lote).
                   AND o.admin_id IS NOT NULL
                   AND NOT EXISTS (
                       SELECT 1 FROM obra_contrato_versao v WHERE v.obra_id = o.id

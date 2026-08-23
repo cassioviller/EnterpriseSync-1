@@ -52,6 +52,17 @@ def _novo_admin(prefixo='f6cb'):
 
 
 def _nova_obra(admin, valor_contrato=100000.0, com_created_at=True):
+    """com_created_at=False simula uma obra pré-existente sem created_at.
+
+    `Obra.created_at` tem `default=datetime.utcnow` (models.py) — um Python-side
+    default do SQLAlchemy, que dispara sempre que o atributo está None NO FLUSH,
+    inclusive quando é atribuído None explicitamente (não só quando nunca foi
+    tocado). Por isso simplesmente deixar de setar `obra.created_at` não basta
+    para simular NULL: o INSERT já sai com o timestamp do default. O NULL real
+    só existe fazendo um UPDATE bruto depois do insert, direto na coluna (que é
+    nullable no banco — `information_schema.columns.is_nullable = 'YES'` para
+    `obra.created_at`).
+    """
     suf = uuid.uuid4().hex[:8]
     cliente = Cliente(admin_id=admin.id, nome=f'Cliente {suf}',
                       email=f'cli_{suf}@test.local', telefone='11988887777')
@@ -69,6 +80,12 @@ def _nova_obra(admin, valor_contrato=100000.0, com_created_at=True):
         obra.created_at = datetime(2026, 1, 5, 12, 0, 0)
     db.session.add(obra)
     db.session.flush()
+    if not com_created_at:
+        from sqlalchemy import text as _text
+        db.session.execute(_text('UPDATE obra SET created_at = NULL WHERE id = :id'),
+                           {'id': obra.id})
+        db.session.flush()
+        db.session.expire(obra, ['created_at'])
     return obra
 
 
@@ -180,6 +197,62 @@ def test_backfill_usa_created_at_como_vigente_de(ambiente):
         v = ObraContratoVersao.query.filter_by(obra_id=obra_id).one()
         assert v.vigente_de == esperado
         assert v.vigente_ate is None
+
+
+@pytest.mark.integration
+def test_backfill_cai_para_data_inicio_quando_created_at_e_nulo():
+    """2º elo do COALESCE: created_at NULL, data_inicio presente → vigente_de
+    vira data_inicio (00:00:00, por causa do cast ::timestamp na migração)."""
+    from migrations import _migration_271_obra_contrato_versao
+    with app.app_context():
+        admin = _novo_admin('f6cb_sem_ca')
+        obra = _nova_obra(admin, com_created_at=False)
+        db.session.commit()
+        assert obra.created_at is None, (
+            'fixture deveria ter deixado created_at NULL — sem isso o teste '
+            'não exercita o 2º elo do COALESCE')
+
+        _migration_271_obra_contrato_versao()
+
+        v = ObraContratoVersao.query.filter_by(obra_id=obra.id).one()
+        assert v.vigente_de == datetime.combine(obra.data_inicio, datetime.min.time())
+
+
+@pytest.mark.integration
+def test_backfill_coalesce_cai_para_now_quando_ambos_sao_nulos():
+    """3º elo do COALESCE: created_at E data_inicio NULL → now().
+
+    Não dá pra montar este cenário com uma obra REAL: `obra.data_inicio` é
+    NOT NULL no banco (`information_schema.columns.is_nullable = 'NO'`,
+    verificado — é uma constraint de verdade, não só `nullable=False` no
+    modelo), então nenhuma obra chega a ter os dois campos NULL ao mesmo
+    tempo. Alterar essa constraint só pra este teste mexeria numa tabela
+    com ~129 mil linhas compartilhada com o resto da suíte — fora de escopo
+    e arriscado.
+
+    Em vez disso, o teste roda a MESMA expressão SQL da migração
+    (migrations.py, `_migration_271_obra_contrato_versao`:
+    `COALESCE(o.created_at, o.data_inicio::timestamp, now())`) com os dois
+    primeiros operandos NULL, e prova que o resultado é um `now()` recente.
+    Se a expressão da migração mudar, este teste precisa ser atualizado
+    junto — é o acoplamento certo para travar o 3º elo do fallback.
+    """
+    from sqlalchemy import text as _text
+    with app.app_context():
+        antes = datetime.utcnow()
+        # CAST externo pro tipo da coluna de destino real (`vigente_de
+        # TIMESTAMP`, sem timezone) — é o mesmo cast implícito que o INSERT
+        # da migração faz ao gravar o valor de COALESCE(...) na coluna.
+        resultado = db.session.execute(_text(
+            "SELECT CAST(COALESCE(CAST(NULL AS timestamp), CAST(NULL AS timestamp), now()) AS timestamp)"
+        )).scalar()
+        depois = datetime.utcnow()
+        # now() do Postgres roda no servidor; folga de 5s absorve qualquer
+        # deriva de relógio entre o processo de teste e o Postgres.
+        margem = timedelta(seconds=5)
+        assert antes - margem <= resultado <= depois + margem, (
+            f'esperava um timestamp recente (entre {antes} e {depois}), '
+            f'veio {resultado}')
 
 
 @pytest.mark.integration
