@@ -220,3 +220,89 @@ comparáveis) sem mentir sobre o caminho de cada fluxo.
 Respondidas as três, a fase vira plano: 🔬 não existe hoje função nenhuma que
 agregue isto, então é código novo — `etapa_do_pedido(pedido)` derivada (D1a), a
 tela, e o runbook por script que a acha no DOM.
+
+---
+
+## ✅ 23/08 — as três decisões, tomadas por delegação e ancoradas fora de casa
+
+> "Para três perguntas pode fazer o que achar melhor, pesquise na internet o que o
+> mercado atual trabalha em outros app, ou em estudos acadêmicos atuais."
+> — Cássio, 23/08. Isto é a resposta, com a evidência externa que a sustenta.
+> A régua nunca tinha sido comparada com como o resto do mundo modela P2P; foi.
+
+### O que o mercado faz — quatro fontes, mesma conclusão
+
+| Fonte | O que ela mostra |
+|---|---|
+| **SAP MM** ([SAP Help — PO Status](https://help.sap.com/docs/SAP_SUPPLY_CHAIN_MANAGEMENT/3ca3c124fc81486585fde980106996a8/480dce82909d3c8be10000000a42189c.html)) | O item de pedido **não tem status linear**. Tem indicadores independentes: `ELIKZ` (entrega concluída) e `EREKZ` (fatura final) na `EKPO`, mais status de confirmação, de alteração e de aprovação, cada um por sua conta. O relatório ME2N cruza-os; não os funde |
+| **Odoo** ([3-way matching](https://www.odoo.com/documentation/13.0/applications/inventory_and_mrp/purchase/purchases/rfq/3_way_matching.html), [receipt status](https://apps.odoo.com/apps/modules/18.0/eq_purchase_receipt_status)) | `state` do pedido **ao lado** de `receipt_status` e `invoice_status` derivados. O veredito do 3-way match é o campo **computado** "Should be paid" — com um "Force Status" para o humano sobrepor, visível no mesmo lugar |
+| **NetSuite** ([status do PO](https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_N2408514.html)) | Força **um** enum linear — e o resultado é o produto cartesiano vazando para dentro dele: existe o status **"Pending Billing/Partially Received"**. É a prova pelo contra-exemplo do que acontece quando dois eixos são espremidos num |
+| **BPI Challenge 2019** ([ICPM](https://icpmconference.org/2019/icpm-2019/contests-challenges/bpi-challenge-2019/)), 1,5 milhão de eventos de P2P real | O log **exige ao menos quatro modelos de processo**, um por categoria de fluxo — e "fatura antes do recebimento" é uma delas, **legítima**, não desvio. Nosso Fluxo B é um caso conhecido da literatura, não uma esquisitice nossa |
+
+E a orientação de UX bate: passo a passo (*stepper*) só serve para processo
+**genuinamente sequencial**; quando os passos são independentes, cada um tem de
+exibir o próprio estado, senão o componente vira "um menu confuso"
+([Progress tracker design](https://www.uxpin.com/studio/blog/design-progress-trackers/),
+[PatternFly](https://www.patternfly.org/components/progress-stepper/design-guidelines/)).
+
+### ✅ D3.1 — a régua é LISTA DE CONFERÊNCIA com ponteiro, não barra de progresso
+
+Cada casa acende quando **a condição dela é verdadeira**, na ordem que for; o
+"onde está" é derivado — **a primeira casa aplicável ainda não satisfeita**.
+
+**Por quê:** é o que SAP e Odoo fazem (indicadores independentes + derivação), e o
+que a NetSuite mostra custar quando não se faz (o status combinado). Com 9 casas ×
+2 fluxos, um enum linear precisaria enumerar as combinações — e a primeira delas
+já seria "pago aguardando material", que é exatamente o Fluxo B normal.
+
+### ✅ D3.2 — são estas NOVE casas, com as duas correções da conferência
+
+Sem casa nova. Duas anotações que passam a valer:
+
+- **As casas 3, 4 e 5 são o *three-way match*** (pedido ↔ recebimento ↔ nota) — o
+  mesmo trio que SAP, Odoo e NetSuite conferem. Vale marcá-las como um grupo: é o
+  que dá sentido a elas para além da ordem.
+- **O atesto NÃO vira uma décima casa.** Ele é a **condição da casa 6**
+  (liberada para pagamento), do mesmo jeito que na SAP a verificação de fatura é o
+  que solta o bloqueio de pagamento em vez de ser uma etapa à parte. Uma casa
+  própria contaria o mesmo evento duas vezes. 📖 lembrar que `valor_atestado()` é
+  função em `services/recebimento_pedido.py`, não coluna.
+
+### ✅ D3.3 — quatro selos na régua, um ao lado
+
+Selo **na casa** que ele qualifica — é o padrão do "Force Status" da Odoo, que
+mostra a exceção no mesmo lugar do estado, e não numa tela de detalhe:
+
+| Selo | Casa | Por que na régua |
+|---|---|---|
+| Liberação **com ressalva** (📖 `ContaPagar.liberacao_justificativa`) | 6 | Esconder a ressalva é esconder que alguém assumiu um risco |
+| **Fechamento por quem montou** (exceção declarada de 19/08) | 7 | Idem — é segregação de função dispensada |
+| **`encerrado_com_saldo`** | 4 e 9 | Distingue "chegou tudo" de "encerramos com falta" |
+| **Adiantamento** (Fluxo B, `AdiantamentoFornecedor.baixado_em`) | 8 | É *por que* a casa acendeu fora de ordem |
+
+**Fora da régua, ao lado:** o **faturamento direto** (`status_aprovacao_cliente`),
+como a spec já tinha decidido — eixo ortogonal, selo próprio.
+
+### A condição de cada casa, fechada
+
+| # | Casa | Acende quando |
+|---|---|---|
+| 1 | Requisitada | `RequisicaoCompra.estado` ∈ RASCUNHO, AGUARDANDO_APROVACAO, REJEITADA *(REJEITADA é selo, não saída — dela volta-se a RASCUNHO)* |
+| 2 | Aprovada | `estado` = APROVADA |
+| 3 | Pedido emitido | existe `PedidoCompra` com `requisicao_id` = esta *(o vínculo é este; não há `RequisicaoCompra.pedido_id`)* |
+| 4 | Material recebido | `situacao_recebimento` ∈ parcial, recebido, encerrado_com_saldo |
+| 5 | Nota lançada | existe `NotaFiscalPedido` do pedido |
+| 6 | Liberada para pagamento | `ContaPagar.situacao_liberacao` = liberada *(o atesto é a condição disto)* |
+| 7 | Em lote de pagamento | `ContaPagar.fechamento_id` não nulo |
+| 8 | Paga | `ContaPagar.status` ∈ PAGO, PARCIAL **ou** (`fluxo_pagamento` = adiantamento **e** `AdiantamentoFornecedor.baixado_em` não nulo) |
+| 9 | Encerrada | todas as contas do pedido pagas **e** `situacao_recebimento` ∈ recebido, encerrado_com_saldo |
+
+**Saídas que encerram a régua:** CANCELADA (e CONVERTIDA, que é sucesso da
+requisição). O ponteiro dá lugar a um selo que diz **em qual casa parou**.
+
+🔬 23/08: todos os campos acima foram lidos por introspeção dos modelos e existem.
+
+**A fase está pronta para virar plano.** O que falta é escrever
+`etapa_do_pedido(pedido)` derivada (D1a), a tela, e o runbook por script que a
+ache no DOM — o critério que a própria spec fixou para não repetir o
+`fechar_lote()`, testado e inalcançável por semanas.

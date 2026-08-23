@@ -188,9 +188,13 @@ mais dois sem coluna (a nota é presença, o adiantamento é `baixado_em`), e
 **nenhuma função que agregue isso** — as telas põem os badges lado a lado e deixam
 a soma para a cabeça de quem olha. **A régua é código novo, não refatoração.**
 
-Três decisões abertas, todas com recomendação na spec: régua **derivada** e não
-gravada; **uma** régua com as casas inaplicáveis apagadas; e o mapa das 9 casas
-conferido contra as saídas laterais.
+~~Três decisões abertas~~ → ✅ **fechadas em 23/08**, por delegação do Cássio e
+ancoradas em evidência externa (SAP MM, Odoo, NetSuite e o log de P2P real do BPI
+Challenge 2019): a régua é **lista de conferência com ponteiro**, não barra de
+progresso; são **estas nove casas**, com o atesto como condição da casa 6 e não
+como décima; e **quatro selos na régua**, com o faturamento direto ao lado. Ver a
+seção "23/08 — as três decisões" no fim da spec. **A fase está pronta para virar
+plano.**
 
 As Fases 1, 2 e 3 do ciclo estão ✅ entregues, com runbook rodado **por script**
 (43+41+21 no piloto, 14/14 nas alçadas, 36/36 na Fase 1).
