@@ -73,9 +73,17 @@ também são da linhagem velha.
 (`e86ab635` + `3612db6b`). Mas *resultado por atividade* como serviço e tela, o
 importador de obra por planilha e a lente de caixa **não têm equivalente**.
 
-**Decisão humana, e é a mais cara desta varredura:** resgatar do PR #6 (que exige
-`gh auth login`, item humano nº 2) ou riscar o `ESTADO_design_espinha_financeira.md`,
-que hoje mente para quem retomar por ele.
+**Decisão humana, e é a mais cara desta varredura:** resgatar do PR #6 ou riscar o
+`ESTADO_design_espinha_financeira.md`, que hoje mente para quem retomar por ele.
+
+> 🔬 **23/08, corrigido no mesmo dia: o resgate NUNCA dependeu do `gh`.** A leitura
+> do repositório é **anônima** — `git fetch origin design/espinha-financeira-obra`
+> devolve `EXIT=0` sem credencial e o ref local `a18f86e7` bate com o remoto. A
+> varredura tratou "abrir o PR pela API" e "ler o código da branch" como a mesma
+> coisa; não são. O `gh` deslogado bloqueia só metadado (abrir issue, ler
+> comentário de PR). **O código das cinco fatias está a um `git checkout` daqui** —
+> o que o resgate custa é portar contra o schema de hoje, que mudou nas Fases 0.6
+> a 5, não obter o código.
 
 ### As outras 15 branches do `origin` não escondem entrega
 
@@ -85,8 +93,11 @@ limpeza apagou (`templates/obras.html`, `rdo/novo_backup.html`,
 As de agosto (`feat/cronograma-pdf`, `feat/recebimento-atesto`, `test/b0-arreio`)
 estão **mescladas** (`ahead=0`). Só a espinha tem entrega distinta pendurada.
 
-> 🔬 23/08: `main` está **63 commits à frente de `origin/main`** (`9a8381ec`).
-> O item humano nº 2 continua sendo o que segura tudo isso.
+> ✅ **23/08, no mesmo dia: o Cássio subiu `main` manualmente.** 🔬
+> `git ls-remote origin main` → **`975cb2a1`**, igual ao local. Os 63 commits que
+> estavam só nesta máquina e no `gitsafe-backup` estão no GitHub. Do item humano
+> nº 2 sobra apenas a API (`gh auth status` segue deslogado): abrir as 8 issues de
+> `docs/superpowers/issues/` e ler comentário de PR.
 
 ---
 
@@ -176,7 +187,7 @@ Três delas são decisões suas, não trabalho pendente:
 | Item | Situação |
 |---|---|
 | Backup **agendado** | ❌ só existe o pré-migração; usar job do EasyPanel, não APScheduler |
-| Triagem de `fix/bloco2-segredos` e `fix/bloco1-blindagem-acesso` | ❌ exige `git fetch` autenticado (item humano nº 2) |
+| ~~Triagem de `fix/bloco2-segredos` e `fix/bloco1-blindagem-acesso`~~ | ✅ **fechado por inexistência — 23/08.** 🔬 `git ls-remote --heads origin` lista **20 branches** e nenhuma das duas está entre elas. O item nunca esperou credencial: as branches não existem mais no remoto. Não há o que triar |
 | Conflito `opencv-python` × `headless` | ❌ entra por `deepface`/`retina-face`; exige decidir sobre reconhecimento facial |
 | `psycopg2-binary` → compilado | ⏸️ recomendado; só se valida no build de produção |
 | `scripts/medir_producao.py` | ❌ aguarda acesso ao banco de produção — pré-requisito de quase toda medição pendente |
