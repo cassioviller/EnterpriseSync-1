@@ -177,3 +177,119 @@ def test_nota_lancada_acende_a_casa_5():
         db.session.commit()
     _, casas = _casas(pedido_id)
     assert casas['nota_lancada'].acesa is True
+
+
+def _conta(admin_id, pedido_id, **kw):
+    from models import ContaPagar
+    with app.app_context():
+        c = ContaPagar(
+            admin_id=admin_id, pedido_compra_id=pedido_id,
+            descricao='Conta do pedido', valor_original=Decimal('1000.00'),
+            data_emissao=date(2026, 1, 10), data_vencimento=date(2026, 2, 10),
+            status=kw.pop('status', 'PENDENTE'),
+            situacao_liberacao=kw.pop('situacao_liberacao', 'bloqueada'), **kw)
+        db.session.add(c)
+        db.session.commit()
+        return c.id
+
+
+def test_conta_liberada_acende_a_casa_6():
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    _conta(admin_id, pedido_id, situacao_liberacao='liberada')
+    _, casas = _casas(pedido_id)
+    assert casas['liberada'].acesa is True
+
+
+def test_liberacao_com_ressalva_carrega_selo_na_casa_6():
+    """📖 ContaPagar.liberacao_justificativa (services/financeiro_compra.py:450).
+    Esconder a ressalva é esconder que alguém assumiu um risco."""
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    _conta(admin_id, pedido_id, situacao_liberacao='liberada',
+           liberacao_justificativa='nota chega semana que vem')
+    _, casas = _casas(pedido_id)
+    assert 'com ressalva' in casas['liberada'].selos
+
+
+def test_conta_em_lote_acende_a_casa_7():
+    from models import FechamentoPagamento
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    conta_id = _conta(admin_id, pedido_id, situacao_liberacao='liberada')
+    with app.app_context():
+        lote = FechamentoPagamento(admin_id=admin_id, status='FECHADO',
+                                   descricao='Lote 1',
+                                   data_fechamento=date(2026, 2, 1))
+        db.session.add(lote)
+        db.session.commit()
+        from models import ContaPagar
+        conta = db.session.get(ContaPagar, conta_id)
+        conta.fechamento_id = lote.id
+        db.session.commit()
+    _, casas = _casas(pedido_id)
+    assert casas['em_lote'].acesa is True
+
+
+def test_lote_fechado_por_quem_montou_carrega_selo_na_casa_7():
+    from models import ContaPagar, FechamentoPagamento
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    conta_id = _conta(admin_id, pedido_id, situacao_liberacao='liberada')
+    with app.app_context():
+        lote = FechamentoPagamento(
+            admin_id=admin_id, status='FECHADO', descricao='Lote 2',
+            data_fechamento=date(2026, 2, 1),
+            segregacao_justificativa='sou o único do financeiro hoje')
+        db.session.add(lote)
+        db.session.commit()
+        conta = db.session.get(ContaPagar, conta_id)
+        conta.fechamento_id = lote.id
+        db.session.commit()
+    _, casas = _casas(pedido_id)
+    assert 'fechado por quem montou' in casas['em_lote'].selos
+
+
+def test_conta_paga_acende_a_casa_8():
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    _conta(admin_id, pedido_id, situacao_liberacao='liberada', status='PAGO')
+    _, casas = _casas(pedido_id)
+    assert casas['paga'].acesa is True
+
+
+def test_fluxo_b_paga_antes_de_receber_sem_a_regua_mentir():
+    """O caso que derrubou a barra de progresso: no adiantamento o dinheiro sai
+    antes do material. A casa 8 acende, a 4 não, e o ponteiro continua honesto."""
+    from models import AdiantamentoFornecedor
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA,
+                                   fluxo='adiantamento')
+    with app.app_context():
+        from datetime import datetime
+        db.session.add(AdiantamentoFornecedor(
+            admin_id=admin_id, pedido_id=pedido_id, valor=Decimal('500.00'),
+            baixado_em=datetime(2026, 1, 12, 10, 0)))
+        db.session.commit()
+    regua, casas = _casas(pedido_id)
+    assert casas['paga'].acesa is True
+    assert 'adiantamento' in casas['paga'].selos
+    assert casas['material_recebido'].acesa is False
+    assert regua['ponteiro'] == 'material_recebido'
+
+
+def test_pedido_legado_encerra_so_com_o_pagamento():
+    """Sem tríade não há recebimento a fechar — exigi-lo prenderia o pedido
+    legado para sempre numa casa que nunca acende."""
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA,
+                                   exige_atesto=False)
+    _conta(admin_id, pedido_id, situacao_liberacao='liberada', status='PAGO')
+    regua, casas = _casas(pedido_id)
+    assert casas['encerrada'].acesa is True
+    assert regua['ponteiro'] is None
+
+
+def test_encerrada_exige_pago_e_recebimento_fechado():
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    _conta(admin_id, pedido_id, situacao_liberacao='liberada', status='PAGO')
+    with app.app_context():
+        pedido = db.session.get(PedidoCompra, pedido_id)
+        pedido.situacao_recebimento = 'recebido'
+        db.session.commit()
+    regua, casas = _casas(pedido_id)
+    assert casas['encerrada'].acesa is True
+    assert regua['ponteiro'] is None

@@ -45,7 +45,10 @@ def etapa_do_pedido(pedido, dados=None):
     """Onde este pedido está. Não escreve nada.
 
     Devolve {'casas': [Casa...], 'ponteiro': chave|None, 'encerrada_por': None}.
-    `ponteiro` é None quando não falta nada aplicável.
+    `ponteiro` é None quando não falta nada aplicável, e também quando a casa 9
+    (`encerrada`) já acendeu — casa terminal, e casa que ficou apagada no
+    caminho que o pedido de fato seguiu (nota lançada depois de pago, ou nunca
+    passou por lote) não é pendência, é caminho não tomado.
 
     `dados` é o pré-carregamento opcional que a LISTAGEM usa (Task 6): um dict
     {'contas': [...], 'notas': [...], 'adiantamentos': [...]} já filtrado para
@@ -100,8 +103,43 @@ def etapa_do_pedido(pedido, dados=None):
     recebimento_fechado = pedido.situacao_recebimento in ('recebido',
                                                           'encerrado_com_saldo')
 
-    # A casa 9 depende do pagamento, entregue na Task 3 — provisória por ora.
-    acesa['encerrada'] = (not tem_triade) and recebimento_fechado
+    from models import AdiantamentoFornecedor, ContaPagar
+
+    contas = ContaPagar.query.filter_by(
+        pedido_compra_id=pedido.id, admin_id=pedido.admin_id).all()
+
+    acesa['liberada'] = any(c.situacao_liberacao == 'liberada' for c in contas)
+    if any(c.situacao_liberacao == 'liberada' and c.liberacao_justificativa
+           for c in contas):
+        selos['liberada'].append('com ressalva')
+
+    acesa['em_lote'] = any(c.fechamento_id for c in contas)
+    if any(c.fechamento is not None and c.fechamento.segregacao_justificativa
+           for c in contas):
+        selos['em_lote'].append('fechado por quem montou')
+
+    pagas = [c for c in contas if c.status in ('PAGO', 'PARCIAL')]
+    # A casa 8 é UNIÃO, não campo único: no Fluxo B o dinheiro sai como
+    # adiantamento, antes de existir conta paga. Sem esta perna a régua diria
+    # "não pago" sobre um pedido cujo dinheiro já saiu.
+    adiantamento_baixado = False
+    if pedido.fluxo_pagamento == 'adiantamento':
+        adiantamento_baixado = AdiantamentoFornecedor.query.filter(
+            AdiantamentoFornecedor.pedido_id == pedido.id,
+            AdiantamentoFornecedor.baixado_em.isnot(None)).first() is not None
+    acesa['paga'] = bool(pagas) or adiantamento_baixado
+    if adiantamento_baixado:
+        selos['paga'].append('adiantamento')
+
+    tudo_pago = bool(contas) and all(c.status == 'PAGO' for c in contas)
+    # Pedido LEGADO (sem tríade) não tem recebimento a fechar: exigir
+    # `recebimento_fechado` dele o prenderia para sempre na casa 9, com o
+    # ponteiro apontando uma casa que nunca vai acender. Para ele, encerrar é
+    # pagar.
+    if tem_triade:
+        acesa['encerrada'] = (tudo_pago or adiantamento_baixado) and recebimento_fechado
+    else:
+        acesa['encerrada'] = tudo_pago
 
     casas = [Casa(chave=c, rotulo=ROTULOS[c],
                   grupo='triade' if c in GRUPO_TRIADE else None,
@@ -109,5 +147,16 @@ def etapa_do_pedido(pedido, dados=None):
                   selos=list(selos[c]))
              for c in CHAVES]
 
-    ponteiro = next((c.chave for c in casas if c.aplicavel and not c.acesa), None)
+    # A casa 9 é terminal: quando ela acende, o pedido terminou. Sem este
+    # curto-circuito, uma casa opcional que ficou apagada no caminho realizado
+    # (nota lançada depois do pagamento, pagamento sem lote — nenhuma delas
+    # bloqueia o encerramento, 🔬 confirmado pelos testes
+    # `test_pedido_legado_encerra_so_com_o_pagamento` e
+    # `test_encerrada_exige_pago_e_recebimento_fechado`) prenderia o ponteiro
+    # numa casa que a régua já provou não fazer falta.
+    if acesa['encerrada']:
+        ponteiro = None
+    else:
+        ponteiro = next((c.chave for c in casas if c.aplicavel and not c.acesa),
+                        None)
     return {'casas': casas, 'ponteiro': ponteiro, 'encerrada_por': None}
