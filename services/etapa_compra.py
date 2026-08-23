@@ -100,12 +100,9 @@ def etapa_do_pedido(pedido, dados=None):
                                                'encerrado_com_saldo')
     acesa['material_recebido'] = tem_triade and recebido
 
-    if dados is not None:
-        from services.financeiro_compra import _d
-        valor_notas = sum((_d(n.valor_total) for n in dados['notas']), _d(0))
-    else:
-        from services.financeiro_compra import valor_das_notas
-        valor_notas = valor_das_notas(pedido)
+    from services.financeiro_compra import valor_das_notas
+    valor_notas = valor_das_notas(
+        pedido, notas=dados['notas'] if dados is not None else None)
     acesa['nota_lancada'] = tem_triade and valor_notas > 0
 
     if pedido.situacao_recebimento == 'encerrado_com_saldo':
@@ -154,11 +151,13 @@ def etapa_do_pedido(pedido, dados=None):
     # Pedido LEGADO (sem tríade) não tem recebimento a fechar: exigir
     # `recebimento_fechado` dele o prenderia para sempre na casa 9, com o
     # ponteiro apontando uma casa que nunca vai acender. Para ele, encerrar é
-    # pagar.
+    # pagar — e "pagar" é a mesma união da casa 8: conta PAGA OU adiantamento
+    # baixado. Sem a perna do adiantamento aqui, um legado no Fluxo B fica com
+    # a casa 8 acesa e a 9 apagada para sempre.
     if tem_triade:
         acesa['encerrada'] = (tudo_pago or adiantamento_baixado) and recebimento_fechado
     else:
-        acesa['encerrada'] = tudo_pago
+        acesa['encerrada'] = tudo_pago or adiantamento_baixado
 
     # REJEITADA não é saída lateral: 📖 models.py:80-99, dela se volta para
     # RASCUNHO — "rejeitar não é matar". Vira selo na casa 1, não encerra nada.

@@ -283,6 +283,27 @@ def test_pedido_legado_encerra_so_com_o_pagamento():
     assert regua['ponteiro'] is None
 
 
+def test_pedido_legado_com_adiantamento_baixado_tambem_encerra():
+    """Legado (sem tríade) no Fluxo B: o dinheiro sai como adiantamento, não
+    como conta PAGA. 'Pagar' para o legado é a mesma união da casa 8 —
+    conta PAGA OU adiantamento baixado — senão a casa 8 acende e a 9 fica
+    apagada para sempre."""
+    from datetime import datetime
+
+    from models import AdiantamentoFornecedor
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA,
+                                   exige_atesto=False, fluxo='adiantamento')
+    with app.app_context():
+        db.session.add(AdiantamentoFornecedor(
+            admin_id=admin_id, pedido_id=pedido_id, valor=Decimal('500.00'),
+            baixado_em=datetime(2026, 1, 12, 10, 0)))
+        db.session.commit()
+    regua, casas = _casas(pedido_id)
+    assert casas['paga'].acesa is True
+    assert casas['encerrada'].acesa is True
+    assert regua['ponteiro'] is None
+
+
 def test_encerrada_exige_pago_e_recebimento_fechado():
     admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
     _conta(admin_id, pedido_id, situacao_liberacao='liberada', status='PAGO')

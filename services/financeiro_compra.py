@@ -239,10 +239,16 @@ def lancar_nota(pedido, *, numero, valor_total, data_emissao, usuario,
     return nf
 
 
-def valor_das_notas(pedido):
-    """Σ do valor das notas lançadas no pedido."""
-    from models import NotaFiscalPedido
-    notas = NotaFiscalPedido.query.filter_by(pedido_id=pedido.id).all()
+def valor_das_notas(pedido, notas=None):
+    """Σ do valor das notas lançadas no pedido.
+
+    `notas` é o pré-carregamento opcional (📖 `services/etapa_compra.py`,
+    `ponteiros_de`): quando dado, soma essas linhas em vez de consultar o
+    banco de novo — mesma coerção `_d`, mesmo resultado.
+    """
+    if notas is None:
+        from models import NotaFiscalPedido
+        notas = NotaFiscalPedido.query.filter_by(pedido_id=pedido.id).all()
     total = _d(0)
     for n in notas:
         total += _d(n.valor_total)
