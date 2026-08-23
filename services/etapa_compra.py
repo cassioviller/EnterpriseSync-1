@@ -79,6 +79,30 @@ def etapa_do_pedido(pedido, dados=None):
     aplicavel['aprovada'] = tem_requisicao
     selos = {chave: [] for chave in CHAVES}
 
+    from services.financeiro_compra import valor_das_notas
+
+    # A tríade só existe no regime novo. 📖 templates/compras/index.html:126:
+    # em pedido legado o estoque entrou na emissão, e inventar "não recebido"
+    # ali seria mentir.
+    tem_triade = bool(pedido.exige_atesto)
+    aplicavel['material_recebido'] = tem_triade
+    aplicavel['nota_lancada'] = tem_triade
+
+    recebido = pedido.situacao_recebimento in ('parcial', 'recebido',
+                                               'encerrado_com_saldo')
+    acesa['material_recebido'] = tem_triade and recebido
+    acesa['nota_lancada'] = tem_triade and valor_das_notas(pedido) > 0
+
+    if pedido.situacao_recebimento == 'encerrado_com_saldo':
+        selos['material_recebido'].append('com saldo')
+        selos['encerrada'].append('com saldo')
+
+    recebimento_fechado = pedido.situacao_recebimento in ('recebido',
+                                                          'encerrado_com_saldo')
+
+    # A casa 9 depende do pagamento, entregue na Task 3 — provisória por ora.
+    acesa['encerrada'] = (not tem_triade) and recebimento_fechado
+
     casas = [Casa(chave=c, rotulo=ROTULOS[c],
                   grupo='triade' if c in GRUPO_TRIADE else None,
                   acesa=bool(acesa[c]), aplicavel=bool(aplicavel[c]),

@@ -123,3 +123,57 @@ def test_ponteiro_e_a_primeira_casa_aplicavel_nao_satisfeita():
     _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.RASCUNHO)
     regua, _ = _casas(pedido_id)
     assert regua['ponteiro'] == 'aprovada'
+
+
+def test_recebimento_parcial_acende_material_recebido():
+    _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    with app.app_context():
+        pedido = db.session.get(PedidoCompra, pedido_id)
+        pedido.situacao_recebimento = 'parcial'
+        db.session.commit()
+    _, casas = _casas(pedido_id)
+    assert casas['material_recebido'].acesa is True
+
+
+def test_encerrado_com_saldo_acende_com_selo_nas_casas_4_e_9():
+    """Encerrar com saldo satisfaz a casa — mas a régua não pode esconder que
+    encerramos com falta."""
+    _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    with app.app_context():
+        pedido = db.session.get(PedidoCompra, pedido_id)
+        pedido.situacao_recebimento = 'encerrado_com_saldo'
+        db.session.commit()
+    _, casas = _casas(pedido_id)
+    assert casas['material_recebido'].acesa is True
+    assert 'com saldo' in casas['material_recebido'].selos
+    assert 'com saldo' in casas['encerrada'].selos
+
+
+def test_nao_recebido_deixa_a_casa_4_apagada():
+    _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    _, casas = _casas(pedido_id)
+    assert casas['material_recebido'].acesa is False
+
+
+def test_pedido_legado_sem_atesto_nao_tem_triade_de_material_e_nota():
+    """📖 templates/compras/index.html:126 — em pedido legado inventar 'Não
+    recebido' seria mentir sobre estoque que entrou na emissão."""
+    _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA,
+                            exige_atesto=False)
+    _, casas = _casas(pedido_id)
+    assert casas['material_recebido'].aplicavel is False
+    assert casas['nota_lancada'].aplicavel is False
+
+
+def test_nota_lancada_acende_a_casa_5():
+    from models import NotaFiscalPedido
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CONVERTIDA)
+    with app.app_context():
+        pedido = db.session.get(PedidoCompra, pedido_id)
+        db.session.add(NotaFiscalPedido(
+            admin_id=admin_id, pedido_id=pedido_id, numero='123',
+            fornecedor_id=pedido.fornecedor_id, lancada_por_id=admin_id,
+            valor_total=Decimal('1000.00'), data_emissao=date(2026, 1, 11)))
+        db.session.commit()
+    _, casas = _casas(pedido_id)
+    assert casas['nota_lancada'].acesa is True
