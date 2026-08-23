@@ -2397,6 +2397,7 @@ ausentes; o cabeçalho do `run_tests.sh` diz que vêm "via nix", mas o
 | Arquivo | O que é |
 |---|---|
 | **`ESTADO-ATUAL.md`** | este — leia primeiro |
+| **`docs/planos-em-aberto-2026-08-23.md`** (23/08) | **a varredura de o que ainda está aberto** — os 99 planos, as 31 specs e as branches do `origin` julgados por existência de código na árvore, não por checkbox. Traz o achado da **linhagem partida em 22/07** e do PR #6 (espinha financeira) fora do `main` |
 | **`PLANO-NUCLEO.md`** (31/07, fechado 03/08) | **leia em segundo.** Os 10 pacotes do núcleo, os 12 vereditos, a matriz de 20 conexões, o backlog de 25 automações, as estruturas mortas e as 7 decisões. Onde ele diverge do `FLUXO-IDEAL.md`, **vale ele** |
 | `FLUXO-IDEAL.md` (30/07) | O diagnóstico que originou o plano. Suas ondas 0-3 foram **reordenadas** nos pacotes p1-p10 — traz o aviso no topo |
 | `docs/estudo-fluxo/*.json` (31/07) | Os brutos: conferência adversarial dos 12 vereditos e o levantamento de conexões |

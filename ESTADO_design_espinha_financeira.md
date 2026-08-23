@@ -4,6 +4,20 @@
 > Branch: `design/espinha-financeira-obra` · **PR #6** aberto: https://github.com/cassioviller/EnterpriseSync-1/pull/6
 > Foco do usuário (Cássio): **qualidade**. Trabalho feito fase a fase, com **teste entre cada etapa**.
 
+> 🔴 **23/08 — LEIA ISTO ANTES DO RESTO: o código descrito aqui NÃO está no `main`.**
+> Este documento foi escrito em 15/06, na branch `design/espinha-financeira-obra`
+> (PR #6). Em **22/07 a história do repositório foi recomeçada** — o `main` de hoje
+> tem 476 commits e nenhum ancestral em comum com aquela branch — e o PR nunca foi
+> mesclado. 🔬 conferido em 23/08, arquivo por arquivo: `services/resultado_atividade_service.py`,
+> `services/importar_obra_completa.py`, `services/caixa_obra_service.py`,
+> `services/aprendizado_produtividade.py`, `resultado_views.py`, `templates/resultado/*`
+> e os ~40 testes **não existem na árvore**; `grep` por `resultado_atividade`,
+> `resultado/portfolio` e `por_atividade` no repositório inteiro devolve **zero**.
+> O EVM foi refeito por outro caminho (`services/evm.py`, p10); *resultado por
+> atividade*, o importador de obra por planilha e a lente de caixa, não.
+> Tudo abaixo desta linha descreve a branch, **não o sistema**. Ver
+> `docs/planos-em-aberto-2026-08-23.md` §1.
+
 ## TL;DR — onde estamos
 As **5 fatias da espinha financeira estão implementadas, testadas e no PR** (~40 testes verdes).
 A obra dá, por atividade do cronograma: **Valor agregado − Custo incorrido = Resultado**, com alarme,
