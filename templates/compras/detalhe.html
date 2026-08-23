@@ -157,7 +157,7 @@
         Onde esta compra está
         {% if regua.encerrada_por == 'cancelada' %}
           <span class="badge bg-danger-subtle text-danger ms-2"
-                data-encerrada="cancelada">
+                data-encerrada="cancelada" data-ponteiro="">
             Cancelada em "{{ regua.casas | selectattr('chave', 'equalto', regua.parou_em)
                             | map(attribute='rotulo') | first }}"
           </span>

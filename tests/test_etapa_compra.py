@@ -334,3 +334,17 @@ def test_a_regua_aparece_no_DOM_do_detalhe_do_pedido():
     for chave in CHAVES:
         assert f'data-casa="{chave}"' in html
     assert 'data-ponteiro="material_recebido"' in html
+
+
+def test_a_regua_cancelada_ainda_expoe_data_ponteiro_no_DOM():
+    """O contrato de DOM é universal: o runbook da Task 7 escolhe um pedido
+    qualquer e procura `[data-ponteiro]` — um pedido cancelado que só
+    carregasse `data-encerrada` quebraria essa varredura."""
+    admin_id, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CANCELADA)
+    with app.test_client() as client:
+        _login(client, admin_id)
+        resp = client.get(f'/compras/{pedido_id}')
+        html = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert 'data-encerrada="cancelada"' in html
+    assert 'data-ponteiro=""' in html
