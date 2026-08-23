@@ -44,7 +44,8 @@ GRUPO_TRIADE = ('pedido_emitido', 'material_recebido', 'nota_lancada')
 def etapa_do_pedido(pedido, dados=None):
     """Onde este pedido está. Não escreve nada.
 
-    Devolve {'casas': [Casa...], 'ponteiro': chave|None, 'encerrada_por': None}.
+    Devolve {'casas': [Casa...], 'ponteiro': chave|None,
+    'encerrada_por': 'cancelada'|None, 'parou_em': chave|None}.
     `ponteiro` é None quando não falta nada aplicável, e também quando a casa 9
     (`encerrada`) já acendeu — casa terminal, e casa que ficou apagada no
     caminho que o pedido de fato seguiu (nota lançada depois de pago, ou nunca
@@ -141,6 +142,11 @@ def etapa_do_pedido(pedido, dados=None):
     else:
         acesa['encerrada'] = tudo_pago
 
+    # REJEITADA não é saída lateral: 📖 models.py:80-99, dela se volta para
+    # RASCUNHO — "rejeitar não é matar". Vira selo na casa 1, não encerra nada.
+    if estado == EstadoRequisicao.REJEITADA:
+        selos['requisitada'].append('rejeitada')
+
     casas = [Casa(chave=c, rotulo=ROTULOS[c],
                   grupo='triade' if c in GRUPO_TRIADE else None,
                   acesa=bool(acesa[c]), aplicavel=bool(aplicavel[c]),
@@ -156,7 +162,25 @@ def etapa_do_pedido(pedido, dados=None):
     # numa casa que a régua já provou não fazer falta.
     if acesa['encerrada']:
         ponteiro = None
+        encerrada_por = None
+        parou_em = None
     else:
         ponteiro = next((c.chave for c in casas if c.aplicavel and not c.acesa),
                         None)
-    return {'casas': casas, 'ponteiro': ponteiro, 'encerrada_por': None}
+        # CANCELADA é a única saída lateral que encerra a régua: o ponteiro
+        # dá lugar a um selo que diz em qual casa ela parou. REJEITADA não
+        # entra aqui de propósito (ver comentário acima, e models.py:80-99) —
+        # dela se volta, não é fim de linha. Se a casa 9 já tivesse acendido
+        # estaríamos no ramo acima: o encerramento físico (pago e recebido)
+        # fala mais alto que o cancelamento da requisição-origem, e aquele
+        # ramo não reabre essa conversa.
+        if estado == EstadoRequisicao.CANCELADA:
+            encerrada_por = 'cancelada'
+            parou_em = ponteiro
+            ponteiro = None
+        else:
+            encerrada_por = None
+            parou_em = None
+
+    return {'casas': casas, 'ponteiro': ponteiro,
+            'encerrada_por': encerrada_por, 'parou_em': parou_em}

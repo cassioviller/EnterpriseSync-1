@@ -293,3 +293,23 @@ def test_encerrada_exige_pago_e_recebimento_fechado():
     regua, casas = _casas(pedido_id)
     assert casas['encerrada'].acesa is True
     assert regua['ponteiro'] is None
+
+
+def test_requisicao_cancelada_encerra_a_regua_e_diz_onde_parou():
+    _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.CANCELADA)
+    regua, _ = _casas(pedido_id)
+    assert regua['encerrada_por'] == 'cancelada'
+    assert regua['parou_em'] == 'aprovada'
+    assert regua['ponteiro'] is None
+
+
+def test_rejeitada_NAO_e_saida_lateral_e_sim_selo_na_casa_1():
+    """📖 models.py:80-99 — REJEITADA não é terminal: dela se volta para
+    RASCUNHO. 'Rejeitar não é matar.' Tratá-la como fim repetiria o erro que a
+    Fase 3 já corrigiu."""
+    _, pedido_id = _cenario(estado_requisicao=EstadoRequisicao.REJEITADA)
+    regua, casas = _casas(pedido_id)
+    assert regua['encerrada_por'] is None
+    assert casas['requisitada'].acesa is True
+    assert 'rejeitada' in casas['requisitada'].selos
+    assert regua['ponteiro'] == 'aprovada'
