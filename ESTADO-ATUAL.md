@@ -2408,10 +2408,12 @@ migração nova. Os **seis portadores de estado continuam sendo seis, não
 sete**: a régua lê o que já existia e não abre um sétimo lugar para o mesmo
 fato divergir.
 
-🔬 gate completo (`bash run_tests.sh --gate`), 23/08: **2559 passed, 6 skipped,
-201 deselected, 2 xfailed** em 30min27s, **zero falhas** — inclusive as duas
-falhas conhecidas de 21/08 não reapareceram. 🔬 suíte da fase,
-`tests/test_etapa_compra.py`: **25 passed**.
+🔬 gate completo (`bash run_tests.sh --gate`), 23/08: **2560 passed, 6 skipped,
+201 deselected, 2 xfailed** em 31min00s, **zero falhas** — inclusive as duas
+falhas conhecidas de 21/08 não reapareceram. (Re-rodado inteiro após a onda de
+correções da revisão final — legado com adiantamento encerrando, `valor_das_notas`
+com preload; o verde a mais é o teste dessa onda.) 🔬 suíte da fase,
+`tests/test_etapa_compra.py`: **26 passed**.
 
 🔬 `scripts/runbook_fase4.py`: **14/14 OK**, pela tela, por Playwright — inclusive
 rodado com `--sem-semear`, sobre cenário já existente.
