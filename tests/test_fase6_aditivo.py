@@ -1448,3 +1448,208 @@ def test_aditivo_nao_alcanca_proposta_de_outro_tenant():
         lancs_b = _lancamentos_da_linhagem(admin_b.id, [pb.id])
         assert [float(l.valor_total) for l in lancs_b] == [
             pytest.approx(100000.0)]
+
+
+# ---------------------------------------------------------------------------
+# Task 9 — aditivo ajusta o cronograma sem destruir histórico (D3)
+# ---------------------------------------------------------------------------
+# Item suprimido na revisão ARQUIVA (ativa=False) as tarefas geradas por ele,
+# em cascata nos filhos — nunca DELETE: apagar TarefaCronograma destrói
+# RDOApontamentoCronograma (FK ondelete=CASCADE); o flag `ativa` foi criado
+# na M05 exatamente para este caso. Item alterado é no-op no cronograma
+# (decisão D3: cronograma é planejamento, não derivado do preço). Item novo
+# já era coberto pela idempotência da materialização.
+
+def _no_snapshot(pi_id, servico_nome, filhos_nomes):
+    """Nó nível-0 do `cronograma_default_json` como a rota de preview salva:
+    raiz-serviço marcada + folhas marcadas (sem template/subatividade)."""
+    return {
+        'proposta_item_id': pi_id,
+        'marcado': True,
+        'servico_nome': servico_nome,
+        'servico_id': None,
+        'sem_template': False,
+        'filhos': [
+            {'marcado': True, 'nome': nome, 'duracao_dias': 2,
+             'horas_estimadas': 8, 'filhos': []}
+            for nome in filhos_nomes
+        ],
+    }
+
+
+def _tarefas_da_obra(obra_id, admin_id):
+    from models import TarefaCronograma
+    return (TarefaCronograma.query
+            .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
+            .order_by(TarefaCronograma.id).all())
+
+
+@pytest.mark.integration
+def test_aditivo_suprime_item_arquiva_tarefas_em_cascata_sem_apagar_rdo():
+    """Cenário do Step 1: v1 materializa 2 serviços; a v2 suprime o 2º e
+    acrescenta um 3º. Esperado: tarefas do 1º intactas; as do 2º com
+    ativa=False EM CASCATA (inclusive filho criado à mão, sem
+    gerada_por_proposta_item_id); as do 3º criadas; NENHUMA tarefa apagada;
+    e o apontamento de RDO existente na tarefa suprimida sobrevive — a razão
+    de ser do flag `ativa` (D3)."""
+    from models import (CronogramaVersao, Proposta, PropostaItem, RDO,
+                        RDOApontamentoCronograma, TarefaCronograma)
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        admin_id = admin.id
+        _segundo_item(v1, admin_id)          # v1: Estrutura 100k + Cobertura 30k
+        itens_v1 = {i.item_numero: i for i in PropostaItem.query.filter_by(
+            proposta_id=v1.id).all()}
+        v1.cronograma_default_json = [
+            _no_snapshot(itens_v1[1].id, 'Estrutura metálica',
+                         ['Montagem estrutura']),
+            _no_snapshot(itens_v1[2].id, 'Cobertura', ['Instalação telhas']),
+        ]
+        db.session.commit()
+        _aprovar(v1, admin_id)
+
+        obra_id = _obras_do_tenant(admin_id)[0].id
+        tarefas = _tarefas_da_obra(obra_id, admin_id)
+        por_nome = {t.nome_tarefa: t for t in tarefas}
+        assert set(por_nome) == {'Estrutura metálica', 'Montagem estrutura',
+                                 'Cobertura', 'Instalação telhas'}, (
+            f'materialização da v1 gerou {sorted(por_nome)}')
+        raiz_cob = por_nome['Cobertura']
+        folha_cob = por_nome['Instalação telhas']
+        assert folha_cob.tarefa_pai_id == raiz_cob.id
+
+        # Filho criado À MÃO sob a raiz suprimida (sem vínculo com proposta):
+        # só a cascata por tarefa_pai_id o alcança.
+        manual = TarefaCronograma(
+            obra_id=obra_id, admin_id=admin_id, is_cliente=False,
+            nome_tarefa='Reforço manual da cobertura', duracao_dias=1,
+            data_inicio=date(2026, 2, 1), tarefa_pai_id=raiz_cob.id,
+            ordem=9990, responsavel='empresa')
+        # Apontamento de RDO REAL na tarefa que será suprimida — o ponto do
+        # D3 inteiro: ele tem de sobreviver ao aditivo.
+        rdo = RDO(numero_rdo=f'RDO-T9-{uuid.uuid4().hex[:8]}',
+                  data_relatorio=date(2026, 2, 2), obra_id=obra_id,
+                  admin_id=admin_id)
+        db.session.add_all([manual, rdo])
+        db.session.flush()
+        apontamento = RDOApontamentoCronograma(
+            rdo_id=rdo.id, tarefa_cronograma_id=folha_cob.id,
+            quantidade_executada_dia=1.0, quantidade_acumulada=1.0,
+            percentual_realizado=25.0, admin_id=admin_id)
+        db.session.add(apontamento)
+        db.session.commit()
+        ids_v1 = {t.id for t in tarefas} | {manual.id}
+        apontamento_id, manual_id = apontamento.id, manual.id
+        raiz_cob_id, folha_cob_id = raiz_cob.id, folha_cob.id
+
+        # v2 = clone real (linhagem via proposta_item_origem_id): mantém a
+        # Estrutura (valor ALTERADO — no-op no cronograma), suprime a
+        # Cobertura e acrescenta a Pintura.
+        v2 = Proposta(
+            admin_id=admin_id, numero=f'{v1.numero}-v2', titulo=v1.titulo,
+            cliente_id=v1.cliente_id, cliente_nome=v1.cliente_nome,
+            valor_total=Decimal('160000.00'), status='rascunho',
+            versao=2, proposta_origem_id=v1.id, obra_id=v1.obra_id)
+        db.session.add(v2)
+        db.session.flush()
+        it_estrutura_v2 = PropostaItem(
+            proposta_id=v2.id, admin_id=admin_id, item_numero=1,
+            proposta_item_origem_id=itens_v1[1].id,
+            descricao='Estrutura metálica', quantidade=Decimal('1'),
+            unidade='vb', preco_unitario=Decimal('120000.00'),
+            subtotal=Decimal('120000.00'))
+        it_pintura_v2 = PropostaItem(
+            proposta_id=v2.id, admin_id=admin_id, item_numero=3,
+            descricao='Pintura', quantidade=Decimal('1'), unidade='vb',
+            preco_unitario=Decimal('40000.00'), subtotal=Decimal('40000.00'))
+        db.session.add_all([it_estrutura_v2, it_pintura_v2])
+        db.session.flush()
+        v2.cronograma_default_json = [
+            _no_snapshot(it_estrutura_v2.id, 'Estrutura metálica',
+                         ['Montagem estrutura']),
+            _no_snapshot(it_pintura_v2.id, 'Pintura', ['Pintura final']),
+        ]
+        db.session.commit()
+        _aprovar(v2, admin_id)
+
+        db.session.expire_all()
+        tarefas_v2 = _tarefas_da_obra(obra_id, admin_id)
+        ids_v2 = {t.id for t in tarefas_v2}
+        assert ids_v1 <= ids_v2, (
+            f'tarefas apagadas pelo aditivo: {sorted(ids_v1 - ids_v2)} — '
+            'nunca DELETE, só ativa=False')
+
+        por_id = {t.id: t for t in tarefas_v2}
+        # 2º serviço (suprimido): raiz + folha + filho manual arquivados.
+        for tid, rotulo in [(raiz_cob_id, 'raiz Cobertura'),
+                            (folha_cob_id, 'folha Instalação telhas'),
+                            (manual_id, 'filho manual (cascata)')]:
+            t = por_id[tid]
+            assert t.ativa is False, (
+                f'{rotulo} (id={tid}) continua ativa=True — item suprimido '
+                'no aditivo tem de arquivar a tarefa')
+            assert t.arquivada_em is not None, (
+                f'{rotulo} arquivada sem carimbo arquivada_em')
+
+        # 1º serviço (alterado de valor): no-op — intacto e ativo, sem
+        # duplicata por nome.
+        vivas = [t for t in tarefas_v2 if t.ativa]
+        nomes_vivos = sorted(t.nome_tarefa for t in vivas)
+        assert nomes_vivos == ['Estrutura metálica', 'Montagem estrutura',
+                               'Pintura', 'Pintura final'], (
+            f'cronograma vivo esperado com 4 tarefas, achou {nomes_vivos}')
+
+        # 3º serviço (novo): criado pela idempotência existente.
+        assert 'Pintura final' in {t.nome_tarefa for t in vivas}
+
+        # Apontamento de RDO sobrevive apontando para a MESMA tarefa.
+        ap = db.session.get(RDOApontamentoCronograma, apontamento_id)
+        assert ap is not None, (
+            'apontamento de RDO apagado — o aditivo destruiu histórico')
+        assert ap.tarefa_cronograma_id == folha_cob_id
+
+        # Ruling 5: aditivo não é versão inicial de cronograma — a única
+        # CronogramaVersao segue sendo a nº1 da materialização da v1.
+        versoes = CronogramaVersao.query.filter_by(obra_id=obra_id).all()
+        assert [v.numero for v in versoes] == [1], (
+            f'aditivo criou CronogramaVersao extra: {[v.numero for v in versoes]}')
+
+
+@pytest.mark.integration
+def test_reaprovar_v2_nao_rearquiva_nem_toca_tarefas_ja_arquivadas():
+    """Idempotência: reaprovar a mesma v2 (mesmo emit) não re-arquiva nada —
+    o carimbo `arquivada_em` das tarefas suprimidas não muda e o cronograma
+    vivo fica igual."""
+    from models import Proposta, PropostaItem, TarefaCronograma
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        admin_id = admin.id
+        _segundo_item(v1, admin_id)
+        itens_v1 = {i.item_numero: i for i in PropostaItem.query.filter_by(
+            proposta_id=v1.id).all()}
+        v1.cronograma_default_json = [
+            _no_snapshot(itens_v1[1].id, 'Estrutura metálica',
+                         ['Montagem estrutura']),
+            _no_snapshot(itens_v1[2].id, 'Cobertura', ['Instalação telhas']),
+        ]
+        db.session.commit()
+        _aprovar(v1, admin_id)
+        obra_id = _obras_do_tenant(admin_id)[0].id
+
+        v2 = _clonar_como_revisao(v1, admin_id, herdar_obra=True)  # só item 1
+        _aprovar(v2, admin_id)
+
+        db.session.expire_all()
+        arquivadas = [t for t in _tarefas_da_obra(obra_id, admin_id)
+                      if not t.ativa]
+        assert sorted(t.nome_tarefa for t in arquivadas) == [
+            'Cobertura', 'Instalação telhas']
+        carimbos = {t.id: t.arquivada_em for t in arquivadas}
+
+        _aprovar(v2, admin_id)  # reaprovação (mesmo caminho do emit)
+        db.session.expire_all()
+        depois = {t.id: t.arquivada_em
+                  for t in _tarefas_da_obra(obra_id, admin_id) if not t.ativa}
+        assert depois == carimbos, (
+            'reaprovar a v2 re-arquivou tarefas (carimbo mudou) — a '
+            'supressão tem de ser idempotente')

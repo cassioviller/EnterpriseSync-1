@@ -216,6 +216,27 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
                if com_medicao else "")
         )
 
+    # Fase 6 / Task 9 (D3) — o efeito equivalente no CRONOGRAMA: as tarefas
+    # geradas pelo item suprimido são ARQUIVADAS (ativa=False, em cascata nos
+    # filhos), nunca apagadas — apagar TarefaCronograma destrói apontamento
+    # de RDO (FK CASCADE). A tarefa aponta para o PropostaItem da versão que
+    # a MATERIALIZOU (o ancestral), não para o da versão que suprimiu; por
+    # isso mandamos os ids da linhagem inteira cujo IMC acabou de ser
+    # suprimido — a mesma determinação de "quem saiu do escopo" da Task 7,
+    # sem segunda fonte de verdade. Item ALTERADO é no-op no cronograma por
+    # decisão explícita (D3): cronograma é planejamento, não derivado do
+    # preço. Item NOVO é coberto pela idempotência de
+    # `materializar_cronograma` (chamada depois, no mesmo handler).
+    if orfaos:
+        ids_orfaos = {id(imc) for imc in orfaos}
+        pis_de_suprimidos = [i.id for i in itens_linhagem
+                             if id(_casar(i)) in ids_orfaos]
+        from services.cronograma_proposta import (
+            arquivar_tarefas_de_itens_suprimidos,
+        )
+        arquivar_tarefas_de_itens_suprimidos(
+            obra_id, admin_id, pis_de_suprimidos)
+
     if criados or atualizados or reativados or suprimidos:
         db.session.flush()
         logger.info(

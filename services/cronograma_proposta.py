@@ -36,7 +36,7 @@ Decisões:
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from app import db
@@ -793,3 +793,88 @@ def materializar_cronograma(
             f"para obra={obra_id} proposta={proposta.id}"
         )
     return total_criadas
+
+
+def arquivar_tarefas_de_itens_suprimidos(
+    obra_id: int,
+    admin_id: int,
+    proposta_item_ids,
+) -> int:
+    """Fase 6 / Task 9 (D3) — item suprimido no aditivo ARQUIVA as tarefas
+    que ele gerou, em cascata nos filhos. Nunca DELETE.
+
+    `proposta_item_ids` são os ids de PropostaItem de TODA a linhagem cuja
+    identidade casa com um ItemMedicaoComercial recém-SUPRIMIDO (quem resolve
+    a linhagem é `_propagar_proposta_para_obra`, a mesma verdade da Task 7).
+    A tarefa materializada pode apontar para o id do ANCESTRAL (a v1 que a
+    criou), não para o id da versão que suprimiu — por isso a lista cobre a
+    linhagem inteira.
+
+    Por que `ativa=False` e nunca DELETE: apagar TarefaCronograma destrói
+    `RDOApontamentoCronograma` (FK ondelete=CASCADE) — apontamento de RDO é
+    fato histórico. O flag foi criado na M05 exatamente para isto, e a query
+    canônica `TarefaCronograma.do_cronograma_interno` já filtra `ativa=True`:
+    arquivar tem o efeito certo em todos os consumidores do caminho padrão.
+
+    Cascata por `tarefa_pai_id`: filhos criados à mão sob a raiz do serviço
+    não carregam `gerada_por_proposta_item_id` — só a descida os alcança.
+
+    Só toca a população interna (`is_cliente=False`). A cópia-cliente é uma
+    FOTO regenerada manualmente (`views/obras.py:gerar_cronograma_cliente`)
+    e a decisão sobre ela está com o dono do produto — não arquivar aqui é
+    deliberado, não esquecimento.
+
+    Registro do efeito: `CronogramaImportacaoEvento.importacao_id` é NOT NULL
+    com FK para `cronograma_importacao` — a trilha só aceita origem de
+    import, então o registro fica no log (decisão do brief: não forçar).
+
+    Não commita — o caller (handler do evento) é dono da transação.
+    Idempotente: só considera tarefas `ativa=True`; re-aprovar a mesma
+    revisão não re-arquiva nem re-carimba `arquivada_em`.
+    Devolve o nº de tarefas arquivadas.
+    """
+    ids = [int(i) for i in (proposta_item_ids or []) if i]
+    if not ids:
+        return 0
+
+    alvo: dict[int, TarefaCronograma] = {}
+    sementes = TarefaCronograma.query.filter(
+        TarefaCronograma.obra_id == obra_id,
+        TarefaCronograma.admin_id == admin_id,
+        TarefaCronograma.is_cliente.is_(False),
+        TarefaCronograma.ativa.is_(True),
+        TarefaCronograma.gerada_por_proposta_item_id.in_(ids),
+    ).all()
+    fronteira = [t.id for t in sementes]
+    for t in sementes:
+        alvo[t.id] = t
+    while fronteira:
+        filhos = TarefaCronograma.query.filter(
+            TarefaCronograma.obra_id == obra_id,
+            TarefaCronograma.admin_id == admin_id,
+            TarefaCronograma.is_cliente.is_(False),
+            TarefaCronograma.ativa.is_(True),
+            TarefaCronograma.tarefa_pai_id.in_(fronteira),
+        ).all()
+        fronteira = []
+        for f in filhos:
+            if f.id not in alvo:
+                alvo[f.id] = f
+                fronteira.append(f.id)
+
+    if not alvo:
+        return 0
+
+    agora = datetime.utcnow()
+    for t in alvo.values():
+        t.ativa = False
+        t.arquivada_em = agora
+    db.session.flush()
+    logger.warning(
+        f"[fase6/T9] obra {obra_id}: aditivo suprimiu item(ns) "
+        f"{sorted(set(ids))} — {len(alvo)} tarefa(s) de cronograma "
+        f"arquivada(s) (ativa=False, ids={sorted(alvo)}). Nenhum DELETE; "
+        f"apontamentos de RDO preservados. (Sem trilha em "
+        f"CronogramaImportacaoEvento: a tabela exige importacao_id.)"
+    )
+    return len(alvo)
