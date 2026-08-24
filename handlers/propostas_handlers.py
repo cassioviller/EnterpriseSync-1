@@ -444,15 +444,6 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         _fechar_lead_da_proposta(proposta_id, admin_id)
         return
 
-    # Garantir plano de contas antes de inserir PartidaContabil (FK constraint).
-    # seed_plano_contas_if_needed usa flush (não commit) para não quebrar a
-    # transação atômica gerenciada pela rota chamadora.
-    try:
-        from contabilidade_utils import seed_plano_contas_if_needed
-        seed_plano_contas_if_needed(admin_id)
-    except Exception as _se:
-        logger.warning(f"[WARN] seed_plano_contas_if_needed falhou (proposta {proposta_id}): {_se}")
-
     # Fase 0.6 / D1b — a revisão lança o DELTA, não o valor cheio.
     #
     # Antes, aprovar a v2 de R$ 120.000 sobre a v1 de R$ 100.000 lançava
@@ -489,9 +480,9 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         return
 
     # Delta negativo (revisão para baixo) inverte as partidas: estorna
-    # receita e reduz o valor a receber do cliente.
+    # receita e reduz o valor a receber do cliente (regra de sinal dentro de
+    # `lancar_delta_contrato`).
     estorno = delta < 0
-    valor_partida = float(abs(delta))
     if ja_lancado:
         historico = (
             f"Revisão de proposta #{proposta_id} - {cliente_nome} - "
@@ -501,14 +492,82 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
     else:
         historico = f"Proposta aprovada #{proposta_id} - {cliente_nome}"
 
+    # Fase 6 / Task 8 — o corpo do lançamento (cabeçalho + partidas dobradas,
+    # com a regra de sinal do estorno) virou `lancar_delta_contrato`, o corpo
+    # único compartilhado com `services/contrato_obra.aprovar_aditivo`.
+    lancar_delta_contrato(
+        admin_id=admin_id, delta=delta, origem_id=proposta_id,
+        historico=historico, data_lancamento=data_aprovacao)
+
+    # Task #82: propagar para obra (IMC → OSC). Falha propaga.
+    _propagar_proposta_para_obra(proposta_id, admin_id)
+
+    # Task #102: materializar cronograma. Falha propaga (rota faz rollback).
+    _materializar_cronograma_se_houver()
+
+    # p5 — mesma transação: a obra nasce com os serviços do orçamento
+    # prontos para apontamento, e o lead do CRM fecha com a obra amarrada.
+    _semear_servicos_reais(proposta_id, admin_id)
+    _fechar_lead_da_proposta(proposta_id, admin_id)
+
+    logger.info(f"✅ Handler proposta_aprovada executado - Proposta #{proposta_id} (commit pendente)")
+
+
+def lancar_delta_contrato(*, admin_id: int, delta, origem_id: int,
+                          historico: str, data_lancamento):
+    """Lançamento contábil (partidas dobradas) do DELTA de valor de contrato.
+
+    Fase 6 / Task 8 — corpo ÚNICO das duas portas que mudam o contrato de
+    uma obra (a mesma extração que a Task 4 fez com o congelamento de base):
+
+    - revisão/aprovação de proposta — `handle_proposta_aprovada` (acima);
+    - aprovação de aditivo — `services/contrato_obra.aprovar_aditivo`.
+
+    `origem` é SEMPRE ``'PROPOSTAS'``, inclusive para aditivo — de
+    propósito: `ja_lancado` (em `handle_proposta_aprovada`) soma
+    ``origem == 'PROPOSTAS' AND origem_id IN ids_linhagem``. Um rótulo
+    'ADITIVO' esconderia o lançamento do aditivo da PRÓXIMA revisão da
+    proposta, que voltaria a lançar o valor cheio — o defeito D1b
+    ("R$ 220.000 de receita para um contrato de R$ 120.000") de volta.
+    Quem originou o delta (proposta ou aditivo) fica no `historico`; o
+    `origem_id` tem de ser um id DENTRO da linhagem de propostas da obra.
+
+    Regra de sinal (Fase 0.6/D1b): delta > 0 debita `1.1.02.001` (Clientes
+    a Receber) e credita `4.1.01.001` (Receita de Serviços); delta < 0
+    INVERTE as partidas e a contrapartida vira `4.2.01.001` — ver o
+    comentário nas partidas. Delta zero não é fato contábil: devolve `None`
+    sem criar nada (aditivo de prazo puro cai aqui).
+
+    Não commita nem faz rollback — quem chama é dono da transação
+    (Task #102). O único flush é o que materializa `lancamento.id` para as
+    partidas — seguro nos dois chamadores, que só chegam aqui com o estado
+    da transação completo.
+    """
+    delta = Decimal(str(delta))
+    if delta == 0:
+        return None
+
+    # Garantir plano de contas antes de inserir PartidaContabil (FK composta
+    # admin_id+conta_codigo). seed_plano_contas_if_needed usa flush (não
+    # commit) para não quebrar a transação atômica do chamador.
+    try:
+        from contabilidade_utils import seed_plano_contas_if_needed
+        seed_plano_contas_if_needed(admin_id)
+    except Exception as _se:
+        logger.warning(
+            f"[WARN] seed_plano_contas_if_needed falhou (origem_id {origem_id}): {_se}")
+
+    estorno = delta < 0
+    valor_partida = float(abs(delta))
+
     # 1. Criar lançamento contábil
     lancamento = LancamentoContabil(
         numero=gerar_numero_lancamento(admin_id),
-        data_lancamento=data_aprovacao,
+        data_lancamento=data_lancamento,
         historico=historico,
         valor_total=float(delta),
         origem='PROPOSTAS',
-        origem_id=proposta_id,
+        origem_id=origem_id,
         admin_id=admin_id
     )
     db.session.add(lancamento)
@@ -541,19 +600,7 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         f"{'ESTORNO' if estorno else 'lançamento'} R$ {valor_partida:.2f} "
         f"(1.1.02.001 × {conta_resultado})"
     )
-
-    # Task #82: propagar para obra (IMC → OSC). Falha propaga.
-    _propagar_proposta_para_obra(proposta_id, admin_id)
-
-    # Task #102: materializar cronograma. Falha propaga (rota faz rollback).
-    _materializar_cronograma_se_houver()
-
-    # p5 — mesma transação: a obra nasce com os serviços do orçamento
-    # prontos para apontamento, e o lead do CRM fecha com a obra amarrada.
-    _semear_servicos_reais(proposta_id, admin_id)
-    _fechar_lead_da_proposta(proposta_id, admin_id)
-
-    logger.info(f"✅ Handler proposta_aprovada executado - Proposta #{proposta_id} (commit pendente)")
+    return lancamento
 
 
 def gerar_numero_lancamento(admin_id: int) -> int:

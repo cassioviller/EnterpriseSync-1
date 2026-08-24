@@ -1117,3 +1117,230 @@ def test_aumento_de_item_ja_medido_e_aceito():
             'a guarda barrou o aumento — só redução abaixo do medido é ilegal')
         assert float(imc.percentual_executado_acumulado) == 60.0
         assert imc.status == 'PENDENTE'
+
+
+# ---------------------------------------------------------------------------
+# Task 8 — contabilidade do aditivo: a porta nova lança o delta
+# ---------------------------------------------------------------------------
+# `handle_proposta_aprovada` (porta velha) lança o DELTA da linhagem desde a
+# Fase 0.6/D1b. `aprovar_aditivo` (porta nova, Task 3) mudava o contrato sem
+# lançar nada: a soma dos `LancamentoContabil` da linhagem parava no valor
+# pré-aditivo. O invariante desta seção: soma(linhagem) == contrato vigente.
+#
+# O rótulo do lançamento do aditivo fica `origem='PROPOSTAS'` DE PROPÓSITO:
+# `ja_lancado` (handlers/propostas_handlers.py) soma
+# `origem == 'PROPOSTAS' AND origem_id IN ids_linhagem` — um rótulo
+# 'ADITIVO' esconderia o lançamento da PRÓXIMA revisão de proposta, que
+# voltaria a lançar o valor cheio (o defeito D1b de volta).
+
+def _lancamentos_da_linhagem(admin_id, ids):
+    from models import LancamentoContabil
+    return LancamentoContabil.query.filter(
+        LancamentoContabil.admin_id == admin_id,
+        LancamentoContabil.origem == 'PROPOSTAS',
+        LancamentoContabil.origem_id.in_(ids),
+    ).order_by(LancamentoContabil.id).all()
+
+
+def _soma_da_linhagem(admin_id, ids):
+    return float(sum((Decimal(str(l.valor_total))
+                      for l in _lancamentos_da_linhagem(admin_id, ids)),
+                     Decimal('0')))
+
+
+@pytest.mark.integration
+def test_aprovar_aditivo_lanca_delta_e_soma_da_linhagem_acompanha_contrato():
+    """O invariante do Step 1 pela porta NOVA: aprovado o aditivo, a soma dos
+    LancamentoContabil da linhagem tem de bater com o contrato vigente.
+    Antes da Task 8, o contrato ia a 130k e a soma parava em 100k."""
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        _aprovar(v1, admin.id)
+        obra = _obras_do_tenant(admin.id)[0]
+        assert _soma_da_linhagem(admin.id, [v1.id]) == pytest.approx(100000.0)
+
+        aditivo = abrir_aditivo(obra, tipo='acrescimo',
+                                motivo='fundação extra', valor_novo=130000.0,
+                                proposta_id=v1.id,
+                                criado_por_id=admin.id)
+        db.session.commit()
+        aprovar_aditivo(aditivo, aprovado_por_id=admin.id)
+        db.session.commit()
+        db.session.expire_all()
+
+        obra = db.session.get(Obra, obra.id)
+        assert float(obra.valor_contrato) == pytest.approx(130000.0)
+        lancs = _lancamentos_da_linhagem(admin.id, [v1.id])
+        assert len(lancs) == 2, (
+            'a aprovação do aditivo tem de criar o lançamento do delta '
+            f'(existem {len(lancs)} lançamento(s) na linhagem)')
+        assert float(lancs[-1].valor_total) == pytest.approx(30000.0), (
+            'o aditivo lança o DELTA (130k − 100k), nunca o valor cheio')
+        assert lancs[-1].origem == 'PROPOSTAS'
+        assert _soma_da_linhagem(admin.id, [v1.id]) == pytest.approx(
+            float(obra.valor_contrato)), (
+            'soma(lançamentos da linhagem) tem de bater com o contrato vigente')
+
+        # Reaprovar é no-op idempotente — não lança em dobro.
+        aditivo = db.session.get(AditivoContrato, aditivo.id)
+        aprovar_aditivo(aditivo, aprovado_por_id=admin.id)
+        db.session.commit()
+        assert _soma_da_linhagem(admin.id, [v1.id]) == pytest.approx(130000.0)
+
+
+@pytest.mark.integration
+def test_aditivo_negativo_inverte_partidas_e_usa_conta_de_deducao():
+    """Supressão (100k → 80k): mesmo tratamento da revisão para baixo da
+    porta velha — partidas invertidas (CREDITO em 1.1.02.001) e contrapartida
+    em `4.2.01.001` (dedução), porque um débito na conta de receita ficaria
+    invisível no DRE (que soma só partidas CREDITO em 4.1.x)."""
+    from models import PartidaContabil
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        _aprovar(v1, admin.id)
+        obra = _obras_do_tenant(admin.id)[0]
+
+        aditivo = abrir_aditivo(obra, tipo='supressao',
+                                motivo='corte de escopo', valor_novo=80000.0,
+                                proposta_id=v1.id)
+        db.session.commit()
+        aprovar_aditivo(aditivo, aprovado_por_id=admin.id)
+        db.session.commit()
+        db.session.expire_all()
+
+        lancs = _lancamentos_da_linhagem(admin.id, [v1.id])
+        assert len(lancs) == 2, 'a supressão tem de lançar o estorno do delta'
+        estorno = lancs[-1]
+        assert float(estorno.valor_total) == pytest.approx(-20000.0)
+
+        partidas = PartidaContabil.query.filter_by(
+            lancamento_id=estorno.id).order_by(
+            PartidaContabil.sequencia).all()
+        assert [(p.conta_codigo, p.tipo_partida, float(p.valor))
+                for p in partidas] == [
+            ('1.1.02.001', 'CREDITO', pytest.approx(20000.0)),
+            ('4.2.01.001', 'DEBITO', pytest.approx(20000.0)),
+        ], ('estorno inverte as partidas e usa a conta de dedução '
+            '4.2.01.001 — nunca débito na conta de receita')
+
+        obra = db.session.get(Obra, obra.id)
+        assert float(obra.valor_contrato) == pytest.approx(80000.0)
+        assert _soma_da_linhagem(admin.id, [v1.id]) == pytest.approx(80000.0)
+
+
+@pytest.mark.integration
+def test_aditivo_de_prazo_puro_delta_zero_nao_lanca_nada():
+    """Aditivo de prazo puro é aditivo (abre versão nova — Task 3), mas não é
+    fato contábil: nenhum lançamento novo."""
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        _aprovar(v1, admin.id)
+        obra = _obras_do_tenant(admin.id)[0]
+
+        aditivo = abrir_aditivo(obra, tipo='prazo', motivo='chuvas',
+                                prazo_delta_dias=45, proposta_id=v1.id)
+        db.session.commit()
+        aprovar_aditivo(aditivo, aprovado_por_id=admin.id)
+        db.session.commit()
+        db.session.expire_all()
+
+        lancs = _lancamentos_da_linhagem(admin.id, [v1.id])
+        assert len(lancs) == 1, (
+            'delta zero não lança nada — só o lançamento original da proposta')
+        assert _soma_da_linhagem(admin.id, [v1.id]) == pytest.approx(100000.0)
+        obra = db.session.get(Obra, obra.id)
+        assert float(obra.valor_contrato) == pytest.approx(100000.0)
+
+
+@pytest.mark.integration
+def test_aditivo_sem_proposta_id_lanca_na_raiz_e_revisao_seguinte_nao_duplica():
+    """Aditivo aberto SEM `proposta_id` numa obra nascida de proposta: o
+    `origem_id` cai na RAIZ da linhagem da obra — e a revisão de proposta
+    seguinte ENXERGA o lançamento no `ja_lancado`, lançando só o delta
+    restante. É a coerência que impede o defeito D1b de voltar por esta
+    porta."""
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        _aprovar(v1, admin.id)
+        obra = _obras_do_tenant(admin.id)[0]
+
+        aditivo = abrir_aditivo(obra, tipo='acrescimo',
+                                motivo='escopo extra sem revisão formal',
+                                valor_novo=130000.0)  # proposta_id=None
+        db.session.commit()
+        aprovar_aditivo(aditivo, aprovado_por_id=admin.id)
+        db.session.commit()
+        db.session.expire_all()
+
+        lancs = _lancamentos_da_linhagem(admin.id, [v1.id])
+        assert len(lancs) == 2, (
+            'sem proposta_id o lançamento tem de cair na linhagem da obra '
+            '(raiz) — fora dela, a próxima revisão lançaria em dobro')
+        assert lancs[-1].origem_id == v1.id
+        assert float(lancs[-1].valor_total) == pytest.approx(30000.0)
+
+        # A revisão seguinte (120k) enxerga os 130k já lançados e ESTORNA 10k
+        # — jamais lança os 120k cheios (que dariam 250k de receita).
+        v2 = _clonar_como_revisao(v1, admin.id, herdar_obra=True)
+        _aprovar(v2, admin.id)
+        db.session.expire_all()
+
+        ids = [v1.id, v2.id]
+        lancs = _lancamentos_da_linhagem(admin.id, ids)
+        assert len(lancs) == 3
+        assert float(lancs[-1].valor_total) == pytest.approx(-10000.0), (
+            'a revisão pós-aditivo lança o delta sobre TUDO que a linhagem '
+            'já lançou (100k + 30k) — não o valor cheio')
+        obra = db.session.get(Obra, obra.id)
+        assert float(obra.valor_contrato) == pytest.approx(120000.0)
+        assert _soma_da_linhagem(admin.id, ids) == pytest.approx(120000.0)
+
+
+@pytest.mark.integration
+def test_aditivo_em_obra_sem_linhagem_de_proposta_nao_lanca_nada(ambiente):
+    """Obra de cadastro manual (fixture `ambiente`): o contrato original
+    nunca entrou na contabilidade (as portas manuais não lançam receita),
+    então o aditivo também não lança — lançar só o delta criaria uma receita
+    parcial sem base, e inventar um origem_id fora de linhagem poderia
+    colidir com a linhagem de uma proposta real. Decisão registrada no
+    report da Task 8."""
+    from models import LancamentoContabil
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        obra = db.session.get(Obra, ambiente['obra_id'])
+        aditivo = abrir_aditivo(obra, tipo='acrescimo', motivo='mais escopo',
+                                valor_novo=130000.0)
+        db.session.commit()
+        aprovar_aditivo(aditivo, aprovado_por_id=ambiente['admin_id'])
+        db.session.commit()
+        db.session.expire_all()
+
+        assert LancamentoContabil.query.filter_by(
+            admin_id=ambiente['admin_id']).count() == 0
+        obra = db.session.get(Obra, obra.id)
+        assert float(obra.valor_contrato) == pytest.approx(130000.0)
+
+
+@pytest.mark.integration
+def test_porta_velha_revisao_de_proposta_continua_lancando_so_o_delta():
+    """Regressão da extração: o corpo do lançamento saiu de
+    `handle_proposta_aprovada` para a função reutilizável — a porta velha
+    tem de continuar idêntica (v1 lança 100k, a revisão v2 lança +20k)."""
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        _aprovar(v1, admin.id)
+        v2 = _clonar_como_revisao(v1, admin.id, herdar_obra=True)
+        _aprovar(v2, admin.id)
+        db.session.expire_all()
+
+        ids = [v1.id, v2.id]
+        lancs = _lancamentos_da_linhagem(admin.id, ids)
+        assert [float(l.valor_total) for l in lancs] == [
+            pytest.approx(100000.0), pytest.approx(20000.0)]
+        assert _soma_da_linhagem(admin.id, ids) == pytest.approx(120000.0)
+        obra = _obras_do_tenant(admin.id)[0]
+        assert float(obra.valor_contrato) == pytest.approx(120000.0)

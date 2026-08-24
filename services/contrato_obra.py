@@ -593,6 +593,10 @@ def aprovar_aditivo(aditivo, *, aprovado_por_id=None,
     explícita: NÃO tocamos `Obra.data_previsao_fim` — a versão registra o
     prazo, mexer na data da obra é efeito de negócio de outra alçada.
 
+    Task 8: a aprovação também lança o DELTA contábil
+    (`_lancar_delta_contabil_do_aditivo`, abaixo) — o mesmo corpo de
+    partidas dobradas da porta da proposta; delta zero não lança nada.
+
     Não commita — quem chama decide a transação.
     """
     if aditivo.status == AditivoContrato.STATUS_CANCELADO:
@@ -672,6 +676,13 @@ def aprovar_aditivo(aditivo, *, aprovado_por_id=None,
     # property `MedicaoContrato.valor`.
     repontadas = _repontar_medicoes_nao_recebidas(obra, versao)
 
+    # Task 8 — a porta NOVA lança o delta contábil que a porta da proposta
+    # (handle_proposta_aprovada) sempre lançou. Sem isto, a soma dos
+    # `LancamentoContabil` da linhagem parava no valor pré-aditivo e o
+    # invariante soma(linhagem) == contrato vigente quebrava no primeiro
+    # aditivo aprovado por aqui.
+    _lancar_delta_contabil_do_aditivo(aditivo, obra, valor_anterior)
+
     logger.info(
         '[fase6] obra %s: aditivo %s aprovado (%.2f → %.2f, prazo %s, '
         'versão %s, %d marco(s) repontado(s), usuario=%s)',
@@ -680,6 +691,85 @@ def aprovar_aditivo(aditivo, *, aprovado_por_id=None,
         prazo_novo if prazo_novo is not None else '—',
         versao.versao, repontadas, aprovado_por_id or '—')
     return versao
+
+
+def _lancar_delta_contabil_do_aditivo(aditivo, obra, valor_anterior):
+    """Fase 6 / Task 8 — a aprovação do aditivo lança o DELTA contábil.
+
+    O corpo do lançamento é o MESMO da porta da proposta:
+    `lancar_delta_contrato` (handlers/propostas_handlers.py) — cabeçalho +
+    partidas dobradas, partidas invertidas e conta de dedução `4.2.01.001`
+    para delta negativo, nada para delta zero (aditivo de prazo puro é
+    aditivo, mas não é fato contábil).
+
+    O delta é `valor_novo − valor vigente NA APROVAÇÃO` (o mesmo
+    `valor_anterior` que o congelamento de medições usa, e não
+    `aditivo.valor_anterior`, congelado na abertura): é a transição que ESTA
+    aprovação executa no contrato — é ela que mantém
+    ``soma(lançamentos da linhagem) == contrato vigente`` mesmo se o
+    contrato mudou entre abertura e aprovação.
+
+    `origem_id`: a RAIZ da linhagem de propostas — `aditivo.proposta_id`
+    quando preenchido, senão a proposta ligada à obra; em ambos os casos
+    caminhando até a raiz via `_linhagem_de_proposta`. A raiz é o único id
+    garantidamente presente em QUALQUER `ja_lancado` futuro (uma revisão
+    pode ramificar de uma versão antiga, e a linhagem dela não conteria uma
+    folha) — é o que impede a próxima revisão de proposta de lançar o valor
+    cheio de novo (defeito D1b). `origem` fica `'PROPOSTAS'` pelo mesmo
+    motivo — ver a docstring de `lancar_delta_contrato`.
+
+    Obra SEM nenhuma proposta (contrato nascido por cadastro/edição manual
+    ou importação): NADA a lançar — o valor original dessa obra nunca entrou
+    na contabilidade (as portas manuais não lançam receita), então lançar só
+    o delta criaria uma receita parcial sem base, e um `origem_id` inventado
+    sob o rótulo 'PROPOSTAS' poderia colidir com a linhagem de uma proposta
+    real. Fica o status quo (nenhum lançamento), com warning para auditoria.
+
+    Não commita — quem chama decide a transação. As consultas rodam em
+    `no_autoflush` (disciplina do módulo); o único flush é o de
+    `lancar_delta_contrato` (materializa o id do cabeçalho), seguro aqui
+    porque `aprovar_aditivo` só chama isto com o estado da aprovação
+    completo — aditivo mutado, versão nova reconciliada e cache atualizado.
+    """
+    delta = Decimal(str(aditivo.valor_novo)) - Decimal(str(valor_anterior))
+    if delta == 0:
+        return None
+
+    from handlers.propostas_handlers import (_linhagem_de_proposta,
+                                             lancar_delta_contrato)
+    from models import Proposta
+
+    with db.session.no_autoflush:
+        proposta = None
+        if aditivo.proposta_id is not None:
+            proposta = Proposta.query.filter_by(
+                id=aditivo.proposta_id, admin_id=obra.admin_id).first()
+        if proposta is None:
+            proposta = (Proposta.query
+                        .filter_by(obra_id=obra.id, admin_id=obra.admin_id)
+                        .order_by(Proposta.id.asc()).first())
+        raiz = (_linhagem_de_proposta(proposta, obra.admin_id)[-1]
+                if proposta is not None else None)
+
+    if raiz is None:
+        logger.warning(
+            '[fase6/T8] obra %s: aditivo %s aprovado sem nenhuma proposta na '
+            'linhagem — delta de R$ %.2f NÃO lançado na contabilidade (o '
+            'contrato original desta obra também nunca foi; lançar só o '
+            'delta criaria receita parcial sem base).',
+            obra.id, aditivo.numero, float(delta))
+        return None
+
+    historico = (
+        f'Aditivo {aditivo.numero} aprovado - obra #{obra.id} - '
+        f"{'supressão' if delta < 0 else 'acréscimo'} de "
+        f'R$ {float(abs(delta)):.2f} sobre R$ {float(valor_anterior):.2f}'
+    )
+    quando = (aditivo.aprovado_em.date() if aditivo.aprovado_em
+              else datetime.utcnow().date())
+    return lancar_delta_contrato(
+        admin_id=obra.admin_id, delta=delta, origem_id=raiz.id,
+        historico=historico, data_lancamento=quando)
 
 
 def cancelar_aditivo(aditivo) -> AditivoContrato:
