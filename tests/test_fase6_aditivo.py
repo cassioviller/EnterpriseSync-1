@@ -19,7 +19,7 @@ plano de propósito.
 import os
 import sys
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -1620,7 +1620,7 @@ def test_reaprovar_v2_nao_rearquiva_nem_toca_tarefas_ja_arquivadas():
     """Idempotência: reaprovar a mesma v2 (mesmo emit) não re-arquiva nada —
     o carimbo `arquivada_em` das tarefas suprimidas não muda e o cronograma
     vivo fica igual."""
-    from models import Proposta, PropostaItem, TarefaCronograma
+    from models import PropostaItem
     with app.app_context():
         admin, _cliente, v1 = _ambiente()
         admin_id = admin.id

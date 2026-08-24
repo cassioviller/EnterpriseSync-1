@@ -309,6 +309,56 @@ zero**. Nenhum código foi perdido. Dos 4 itens da retomada, 3 fecharam:
    aborto de boot em produção) foram cobertos pelo gate do item 2 contra
    banco vivo.
 
+A **Fase 6 (orçamento versionado e aditivo contratual) fechou em 24/08 —
+14/14 tasks**, no branch `feat/fase-6-orcamento-versionado` (plano
+`2026-07-21-fase-6-orcamento-versionado-aditivo.md`; ledger de execução com
+todos os rulings em
+`.superpowers/sdd/2026-07-21-fase-6-orcamento-versionado-aditivo/progress.md`).
+
+🔬 **Gate completo VERDE** sobre a fase inteira, com o `main` de 24/08 já
+mesclado na branch: **2658 passed, 6 skipped, 201 deselected, 2 xfailed em
+31min40s**. A referência era 2574 (o `main` do mesmo dia) — a fase acrescentou
+**84 testes** e não quebrou nenhum. 🔬 `ruff`: **100 violações antes, 100
+depois** nos arquivos pré-existentes tocados — zero acrescentadas.
+
+**Migrations 271 a 275**, registradas NA ORDEM (o que governa o runner é a
+ordem da tupla, não o máximo do repo, que é 314), e 🔬 **todas provadas
+idempotentes por dupla execução** no banco de dev. **A 270 continua fora**:
+está `success` em bancos que deployaram de `41f23403`, e uma migração nova com
+esse número seria pulada em silêncio. **A 276 nunca existiu** — o backfill de
+linhagem que ela faria casaria itens por descrição, fabricando história que
+ninguém registrou; foi morta por ruling em 23/07 e a decisão foi mantida.
+
+Entregou: baseline versionado do contrato (`obra_contrato_versao`, 271, com
+backfill da v1 para todo o parque), o documento de aditivo
+(`aditivo_contrato`, 272) com ciclo rascunho→aprovado|cancelado, marco de
+faturamento rastreável à versão (273), a cadeia de revisões do Orçamento
+(274/275: `origem_id` = raiz, `revisao_de_id` = elo, `item_origem_id` no item),
+a trava do orçamento convertido, o comparador de versões de proposta e de
+orçamento (pareamento por linhagem, nunca por descrição), e a porta HTTP —
+extrato de contrato e ciclo do aditivo em `views/aditivos_views.py`, com
+`obra_required(GESTOR)` para aprovar.
+
+**O que ficou em aberto, nomeado:**
+
+- 🟡 **Aprovar aditivo NÃO cria `CronogramaBaseline`** (D9, reafirmado duas
+  vezes). Criar baseline muda o BAC do EVM — efeito financeiro — e a questão
+  das duas verdades congeladas segue sem decisão do dono. Ganhou um motivo a
+  mais em 24/08: o capítulo 24a do manual diz por escrito que revisar linha de
+  base é ato humano com motivo, e automatizar aqui contradiria a norma
+  recém-publicada. Custo se errado: um clique manual por aditivo.
+- 🟡 **A cópia-cliente do cronograma fica defasada** até alguém regenerá-la
+  (`views/obras.py:gerar_cronograma_cliente`). Não é decisão pendente: a cópia
+  é foto manual e sai correta sozinha na regeneração; a janela já existia para
+  a reimportação M05. Se incomodar, o alvo é a regeneração, não o aditivo.
+- 🟡 **`cronograma_scheduler._ids_com_apontamento` conta rascunho** como
+  "tarefa iniciada" para ancorar datas. Deliberadamente não alterado — outra
+  semântica, outro raio, e o comportamento atual erra para o lado conservador.
+- 🟡 **Um `logger.warning` de uma linha** faltando no fallback de `proposta_id`
+  do lançamento contábil (Task 8, `minor deferred`): quando o vínculo errado é
+  descartado, o fallback é bem-sucedido em silêncio, inconsistente com o
+  warning que já existe para o caso irmão.
+
 A **Fase 5 (RDO com ciclo de vida e assinatura) fechou em 24/07 —
 16/16 tasks** no branch `feat/fase-5-rdo-ciclo-vida` (plano
 `fase-5-rdo-ciclo-vida-assinatura.md`; runbook em
