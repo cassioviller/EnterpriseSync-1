@@ -7535,7 +7535,24 @@ class MedicaoContrato(db.Model):
     # contrato vigente, que é o comportamento correto para medição futura.
     valor_base = db.Column(db.Numeric(15, 2), nullable=True)
 
+    # Fase 6 / Task 4 — RASTREABILIDADE: em que versão do baseline
+    # (`ObraContratoVersao`) este marco nasceu — ou para qual foi repontado
+    # pelo último aditivo aprovado enquanto ainda não estava recebido.
+    # NULLABLE de propósito e FORA da property `valor`: quem congela o valor
+    # de marco já recebido é `valor_base` (acima, Fase 0.6/D1c) — esta
+    # coluna só responde "que contrato valia para este marco", sem mudar a
+    # semântica de leitura pela segunda vez. ON DELETE SET NULL: apagar a
+    # versão não apaga o marco.
+    contrato_versao_id = db.Column(db.Integer,
+                                   db.ForeignKey('obra_contrato_versao.id',
+                                                 ondelete='SET NULL'),
+                                   nullable=True, index=True)
+
     obra = db.relationship('Obra', backref='medicoes_contrato')
+    # Sem backref de propósito (mesma razão de ObraContratoVersao.aditivo):
+    # apagar/mudar uma versão não deve arrastar o ORM sobre os marcos.
+    contrato_versao = db.relationship('ObraContratoVersao',
+                                      foreign_keys=[contrato_versao_id])
 
     @property
     def valor(self):

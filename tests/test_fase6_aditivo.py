@@ -51,10 +51,12 @@ def _schema():
     migrações. A 272 é idempotente, então rodá-la aqui é seguro mesmo que a
     tabela já exista de uma execução anterior."""
     from migrations import (_migration_271_obra_contrato_versao,
-                            _migration_272_aditivo_contrato)
+                            _migration_272_aditivo_contrato,
+                            _migration_273_medicao_contrato_versionada)
     with app.app_context():
         _migration_271_obra_contrato_versao()
         _migration_272_aditivo_contrato()
+        _migration_273_medicao_contrato_versionada()
     yield
 
 
@@ -557,3 +559,223 @@ def test_supressao_de_prazo_que_deixa_prazo_negativo_levanta_erro(ambiente):
         assert aditivo.status == 'rascunho', (
             'a recusa não pode deixar o aditivo meio-aprovado')
         assert ObraContratoVersao.query.filter_by(obra_id=obra.id).count() == 1
+
+
+# ---------------------------------------------------------------------------
+# Fase 6 / Task 4 — MedicaoContrato presa à versão do baseline.
+#
+# A coluna `contrato_versao_id` é RASTREABILIDADE (nullable, fora da
+# property `valor` — quem congela valor de marco recebido continua sendo
+# `valor_base`, Fase 0.6/D1c). O entregável de negócio: `aprovar_aditivo`
+# passa a fazer o MESMO congelamento que o caminho da proposta
+# (event_manager) já fazia — sem ele, a porta nova reprecificava
+# retroativamente até o que o cliente já pagou — e reponta os marcos ainda
+# não recebidos para a versão nova.
+# ---------------------------------------------------------------------------
+
+def _novo_marco(obra, nome, pct, recebido_no_mes=None, contrato_versao_id=None):
+    from models import MedicaoContrato
+    marco = MedicaoContrato(
+        obra_id=obra.id, admin_id=obra.admin_id, nome=nome,
+        pct=Decimal(str(pct)), recebido_no_mes=recebido_no_mes,
+        contrato_versao_id=contrato_versao_id)
+    db.session.add(marco)
+    db.session.flush()
+    return marco
+
+
+@pytest.mark.integration
+def test_aprovar_aditivo_congela_recebido_e_reponta_nao_recebido(ambiente):
+    """Cenário do Step 1 do brief: obra de 100k com 2 marcos de 50%; aditivo
+    para 120k. O marco JÁ RECEBIDO continua valendo 50.000 (valor_base
+    congelado na base anterior; contrato_versao_id parado na versão em que
+    nasceu). O marco NÃO recebido passa a valer 60.000 e é repontado para a
+    versão nova."""
+    from models import MedicaoContrato
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        obra = db.session.get(Obra, ambiente['obra_id'])
+        v1 = ObraContratoVersao.query.filter_by(
+            obra_id=obra.id, vigente_ate=None).one()
+        recebido = _novo_marco(obra, 'Marco 1 (pago)', '0.5',
+                               recebido_no_mes='2026-02',
+                               contrato_versao_id=v1.id)
+        futuro = _novo_marco(obra, 'Marco 2 (futuro)', '0.5',
+                             contrato_versao_id=v1.id)
+        db.session.commit()
+        v1_id, recebido_id, futuro_id = v1.id, recebido.id, futuro.id
+        assert float(recebido.valor) == 50000.0
+        assert float(futuro.valor) == 50000.0
+
+        aditivo = abrir_aditivo(obra, tipo='acrescimo',
+                                motivo='acréscimo de escopo',
+                                valor_novo=120000.0)
+        db.session.commit()
+        v2 = aprovar_aditivo(aditivo, aprovado_por_id=ambiente['admin_id'])
+        db.session.commit()
+        v2_id = v2.id
+
+        db.session.expire_all()
+        recebido = db.session.get(MedicaoContrato, recebido_id)
+        futuro = db.session.get(MedicaoContrato, futuro_id)
+
+        assert float(recebido.valor) == 50000.0, (
+            'aditivo reprecificou marco JÁ RECEBIDO — o defeito que a Fase '
+            f'0.6 fechou na porta da proposta: veio {recebido.valor}')
+        assert recebido.valor_base == Decimal('100000.00'), (
+            'aprovar_aditivo tem de congelar valor_base do marco recebido '
+            f'com o valor da versão anterior — veio {recebido.valor_base}')
+        assert recebido.contrato_versao_id == v1_id, (
+            'marco recebido mantém a versão em que nasceu — não se move')
+
+        assert float(futuro.valor) == 60000.0, (
+            'marco não recebido tem de seguir o contrato novo '
+            f'(50% × 120k) — veio {futuro.valor}')
+        assert futuro.valor_base is None, (
+            'marco não recebido NÃO congela — seguir o contrato novo é o '
+            'que um aditivo significa')
+        assert futuro.contrato_versao_id == v2_id, (
+            'marco não recebido tem de ser repontado para a versão nova — '
+            f'ficou em {futuro.contrato_versao_id}')
+
+
+@pytest.mark.integration
+def test_congelamento_nao_recongela_valor_base_ja_congelado(ambiente):
+    """Dois aditivos em sequência: o valor_base congelado pelo primeiro não
+    é sobrescrito pelo segundo — o marco vale o contrato da época em que foi
+    recebido, para sempre (mesmo filtro `valor_base IS NULL` do bloco
+    original do event_manager)."""
+    from models import MedicaoContrato
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        obra = db.session.get(Obra, ambiente['obra_id'])
+        recebido = _novo_marco(obra, 'Marco pago', '0.1',
+                               recebido_no_mes='2026-01')
+        db.session.commit()
+        recebido_id = recebido.id
+
+        a1 = abrir_aditivo(obra, tipo='acrescimo', motivo='primeiro',
+                           valor_novo=120000.0)
+        db.session.commit()
+        aprovar_aditivo(a1)
+        db.session.commit()
+
+        a2 = abrir_aditivo(obra, tipo='acrescimo', motivo='segundo',
+                           valor_novo=150000.0)
+        db.session.commit()
+        aprovar_aditivo(a2)
+        db.session.commit()
+
+        db.session.expire_all()
+        recebido = db.session.get(MedicaoContrato, recebido_id)
+        assert recebido.valor_base == Decimal('100000.00'), (
+            'o segundo aditivo recongelou um valor_base já congelado — '
+            f'veio {recebido.valor_base}')
+        assert float(recebido.valor) == 10000.0
+
+
+@pytest.mark.integration
+def test_caminho_da_proposta_continua_congelando_via_servico(ambiente):
+    """A extração do bloco do event_manager para o serviço não pode mudar o
+    comportamento: a função extraída congela marcos recebidos e ignora os
+    não recebidos e os de outra obra/tenant."""
+    from models import MedicaoContrato
+    from services.contrato_obra import congelar_base_medicoes_recebidas
+    with app.app_context():
+        obra = db.session.get(Obra, ambiente['obra_id'])
+        recebido = _novo_marco(obra, 'Pago', '0.2', recebido_no_mes='2026-03')
+        vazio = _novo_marco(obra, 'Recebido vazio', '0.2', recebido_no_mes='')
+        futuro = _novo_marco(obra, 'Futuro', '0.6')
+
+        outro_admin = _novo_admin('f6ad_outro')
+        outra_obra = _nova_obra(outro_admin)
+        alheio = _novo_marco(outra_obra, 'Alheio pago', '0.5',
+                             recebido_no_mes='2026-03')
+        db.session.commit()
+
+        congeladas = congelar_base_medicoes_recebidas(obra, 100000.0)
+        db.session.commit()
+
+        assert congeladas == 1
+        db.session.expire_all()
+        assert db.session.get(MedicaoContrato, recebido.id).valor_base == \
+            Decimal('100000.00')
+        assert db.session.get(MedicaoContrato, vazio.id).valor_base is None, (
+            "recebido_no_mes == '' não é recebido — mesmo filtro do bloco "
+            'original')
+        assert db.session.get(MedicaoContrato, futuro.id).valor_base is None
+        assert db.session.get(MedicaoContrato, alheio.id).valor_base is None, (
+            'a função congelou marco de OUTRA obra/tenant')
+
+
+@pytest.mark.integration
+def test_importador_preenche_contrato_versao_id():
+    """`_importar_medicoes` cria os marcos já apontando para a versão
+    vigente do baseline (o orquestrador flusha a obra — e a versão aberta
+    por definir_valor_contrato — antes deste passo)."""
+    from models import MedicaoContrato
+    from services.contrato_obra import ORIGEM_IMPORTACAO, definir_valor_contrato
+    from services.importacao_fisico_financeiro import _importar_medicoes
+    with app.app_context():
+        admin = _novo_admin('f6ad_imp')
+        obra = _nova_obra(admin)
+        definir_valor_contrato(obra, 100000.0, origem=ORIGEM_IMPORTACAO,
+                               motivo='import de teste')
+        db.session.flush()  # espelha o flush do orquestrador antes do passo 5
+
+        _importar_medicoes(obra, admin.id, {'medicoes': [
+            {'nome': 'M1', 'pct': 0.5, 'recebido_no_mes': '2026-01'},
+            {'nome': 'M2', 'pct': 0.5},
+        ]})
+        db.session.commit()
+
+        v1 = ObraContratoVersao.query.filter_by(
+            obra_id=obra.id, vigente_ate=None).one()
+        meds = MedicaoContrato.query.filter_by(
+            obra_id=obra.id, admin_id=admin.id).all()
+        assert len(meds) == 2
+        assert {m.contrato_versao_id for m in meds} == {v1.id}, (
+            'o importador tem de preencher a FK ao criar marcos — veio '
+            f'{[m.contrato_versao_id for m in meds]}')
+
+
+@pytest.mark.integration
+def test_migration_273_backfill_aponta_para_vigente_e_e_reexecutavel(ambiente):
+    """Backfill: marco sem FK passa a apontar para a versão VIGENTE da obra;
+    marco já apontado não é tocado; re-executar não falha nem duplica a FK."""
+    from migrations import _migration_273_medicao_contrato_versionada
+    from models import MedicaoContrato
+    from sqlalchemy import text as _text
+    with app.app_context():
+        obra = db.session.get(Obra, ambiente['obra_id'])
+        v1 = ObraContratoVersao.query.filter_by(
+            obra_id=obra.id, vigente_ate=None).one()
+        orfao = _novo_marco(obra, 'Sem FK', '0.5')
+        assert orfao.contrato_versao_id is None
+        # Ids capturados ANTES do commit: qualquer acesso a atributo DEPOIS
+        # dele reabre transação ORM segurando AccessShareLock em
+        # medicao_contrato — e o ALTER TABLE da migration (conexão própria)
+        # ficaria esperando o lock para sempre.
+        orfao_id, v1_id = orfao.id, v1.id
+        db.session.commit()
+
+        _migration_273_medicao_contrato_versionada()
+        _migration_273_medicao_contrato_versionada()  # re-executável
+
+        db.session.expire_all()
+        assert db.session.get(MedicaoContrato, orfao_id).contrato_versao_id \
+            == v1_id, 'o backfill tem de apontar o marco para a vigente'
+
+        fks = db.session.execute(_text("""
+            SELECT count(*)
+            FROM pg_constraint c
+            WHERE c.conrelid = 'medicao_contrato'::regclass
+              AND c.contype = 'f'
+              AND c.conkey = ARRAY[(
+                  SELECT attnum FROM pg_attribute
+                  WHERE attrelid = 'medicao_contrato'::regclass
+                    AND attname = 'contrato_versao_id')]::smallint[]
+        """)).scalar()
+        assert fks == 1, (
+            f'esperava exatamente 1 FK em medicao_contrato.contrato_versao_id, '
+            f'achei {fks} — reexecução não pode duplicar a constraint')

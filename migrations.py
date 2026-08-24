@@ -5906,6 +5906,73 @@ def _migration_272_aditivo_contrato():
         raise
 
 
+def _migration_273_medicao_contrato_versionada():
+    """Fase 6 / Task 4 — `medicao_contrato.contrato_versao_id`: o marco de
+    faturamento passa a registrar em QUE versão do baseline ele nasceu (ou
+    para qual foi repontado por aditivo, enquanto não recebido).
+
+    Coluna NULLABLE de propósito — é rastreabilidade, não semântica de
+    leitura: a property `MedicaoContrato.valor` continua sobre
+    `valor_base`/`obra.valor_contrato` (Fase 0.6/D1c), intocada.
+
+    Backfill: todo marco existente ainda sem FK aponta para a versão VIGENTE
+    da obra (depois da 271, a nº1 para todo o parque). Marco de obra sem
+    nenhuma versão (valor_contrato zero / obra órfã de tenant) fica NULL.
+
+    Idempotente/re-executável: `ADD COLUMN IF NOT EXISTS`, índice com o
+    MESMO nome que o SQLAlchemy gera via `index=True` (create_all antes da
+    migração vira no-op), FK guardada por existência na COLUNA via
+    pg_constraint (mesmo padrão da 272 — em banco fresco o create_all cria a
+    FK inline com o nome padrão do Postgres), e o backfill só toca linha com
+    `contrato_versao_id IS NULL`.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE medicao_contrato "
+                "ADD COLUMN IF NOT EXISTS contrato_versao_id INTEGER"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_medicao_contrato_contrato_versao_id "
+                "ON medicao_contrato(contrato_versao_id)"))
+            conn.execute(sa_text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint c
+                        WHERE c.conrelid = 'medicao_contrato'::regclass
+                          AND c.contype = 'f'
+                          AND c.conkey = ARRAY[(
+                              SELECT attnum FROM pg_attribute
+                              WHERE attrelid = 'medicao_contrato'::regclass
+                                AND attname = 'contrato_versao_id')]::smallint[]
+                    ) THEN
+                        ALTER TABLE medicao_contrato
+                            ADD CONSTRAINT fk_medicao_contrato_versao
+                            FOREIGN KEY (contrato_versao_id)
+                            REFERENCES obra_contrato_versao(id)
+                            ON DELETE SET NULL;
+                    END IF;
+                END $$;
+            """))
+            conn.execute(sa_text("""
+                UPDATE medicao_contrato mc
+                SET contrato_versao_id = v.id
+                FROM obra_contrato_versao v
+                WHERE v.obra_id = mc.obra_id
+                  AND v.vigente_ate IS NULL
+                  AND mc.contrato_versao_id IS NULL
+            """))
+        logger.info("[Migration 273] medicao_contrato.contrato_versao_id "
+                    "criada (FK + índice) e backfill para a versão vigente "
+                    "aplicado.")
+    except Exception as e:
+        logger.error(f"[Migration 273] Falha: {e}", exc_info=True)
+        raise
+
+
 # Tamanho do lote da linha de base (passo 1 da 277). A migração roda dentro
 # do timeout do entrypoint (MIGRATION_TIMEOUT, 300s por padrão): congelar
 # milhares de obras num único INSERT arrisca estourar o relógio e perder o
@@ -7452,6 +7519,7 @@ def executar_migracoes():
             (269, "Fase 9a — remove uq_rdo_assinatura_papel também quando é ÍNDICE (a 268 só tratava constraint)", _migration_269_remover_indice_unico_antigo_de_assinatura),
             (271, "Fase 6 — obra_contrato_versao: baseline versionado do contrato da obra, com backfill da versão nº1 para obras pré-existentes", _migration_271_obra_contrato_versao),
             (272, "Fase 6 — aditivo_contrato (rascunho→aprovado|cancelado) + FK obra_contrato_versao.aditivo_id que a Task 1 deixou pendente (ON DELETE SET NULL)", _migration_272_aditivo_contrato),
+            (273, "Fase 6 — medicao_contrato.contrato_versao_id (FK p/ obra_contrato_versao, SET NULL, índice) + backfill: marco existente aponta para a versão vigente da obra", _migration_273_medicao_contrato_versionada),
             (277, "Editor de cronograma v2 em todo o parque — linha de base primeiro, flag ligada em todos os tenants, default da coluna vira TRUE", _migration_277_editor_v2_em_todo_o_parque),
             (278, "p10 — cronograma_baseline.bac (orçamento congelado junto com o prazo; NULL = baseline anterior)", _migration_278_baseline_bac),
             (279, "E02 — drop de notificacao_cliente, auto-guardado pela contagem (falha e retenta se houver linha)", _migration_279_drop_notificacao_cliente),

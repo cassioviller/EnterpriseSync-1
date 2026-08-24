@@ -678,13 +678,21 @@ def _importar_medicoes(obra, admin_id: int, payload: dict):
     planilha. Extraído literalmente do bloco 5) de importar_fisico_financeiro."""
     from app import db
     from models import MedicaoContrato
+    from services.contrato_obra import contrato_vigente
+
+    # Fase 6 / Task 4 — o marco nasce apontando para a versão vigente do
+    # baseline (rastreabilidade). A versão aberta por definir_valor_contrato
+    # já está no banco: o orquestrador flusha a obra antes deste passo.
+    # Obra sem versão (valor_venda zero) fica com a FK em NULL — nullable.
+    vigente = contrato_vigente(obra.id, admin_id)
     for i, med in enumerate(payload.get('medicoes', [])):
         db.session.add(MedicaoContrato(
             obra_id=obra.id, admin_id=admin_id, nome=med.get('nome'),
             data=_parse_date(med.get('data')),
             pct=Decimal(str(med.get('pct') or 0)),
             recebido_no_mes=med.get('recebido_no_mes'),
-            obs=med.get('obs'), ordem=i))
+            obs=med.get('obs'), ordem=i,
+            contrato_versao_id=vigente.id if vigente is not None else None))
 
     obra.fluxo_caixa_planilha = payload.get('fluxo_caixa_mensal')
 

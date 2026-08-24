@@ -1405,33 +1405,17 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
         if valor_total > 0 and float(obra.valor_contrato or 0) != float(valor_total):
             anterior = float(obra.valor_contrato or 0)
             # Fase 0.6 / D1c — congela a base das medições JÁ EMITIDAS antes
-            # de mexer no contrato. `MedicaoContrato.valor` é property
-            # calculada sobre `obra.valor_contrato` (models.py), então sem
-            # este passo o aditivo reprecificava retroativamente até o que o
-            # cliente já pagou: uma medição de 10% emitida sobre contrato de
-            # 100k valia 10.000 e passava a valer 12.000, sem registro.
-            # Medição ainda não emitida NÃO congela — seguir o contrato novo
-            # é justamente o que um aditivo significa.
-            if anterior > 0:
-                from models import MedicaoContrato as _MC
-                congeladas = _MC.query.filter(
-                    _MC.obra_id == obra.id,
-                    _MC.admin_id == obra.admin_id,
-                    _MC.valor_base.is_(None),
-                    _MC.recebido_no_mes.isnot(None),
-                    _MC.recebido_no_mes != '',
-                ).update({'valor_base': anterior}, synchronize_session=False)
-                if congeladas:
-                    logger.info(
-                        "🔒 Obra %s: %d medição(ões) já emitida(s) congelada(s) "
-                        "na base %.2f antes do aditivo",
-                        obra.codigo, congeladas, anterior)
-            # p9 — escrita pelo ponto único. O congelamento das medições
-            # já emitidas (acima) continua aqui: é regra de aditivo, não de
-            # escrita do campo.
+            # de mexer no contrato (sem isto o aditivo reprecificava
+            # retroativamente até o que o cliente já pagou). O bloco foi
+            # EXTRAÍDO para o serviço na Fase 6/Task 4: `aprovar_aditivo`
+            # precisa da mesma regra e dos mesmos filtros — um só lugar.
+            # p9 — escrita pelo ponto único; o congelamento continua sendo
+            # regra de aditivo, não de escrita do campo.
             from services.contrato_obra import (ORIGEM_ADITIVO,
                                                 ORIGEM_PROPOSTA,
+                                                congelar_base_medicoes_recebidas,
                                                 definir_valor_contrato)
+            congelar_base_medicoes_recebidas(obra, anterior)
             definir_valor_contrato(
                 obra, valor_total,
                 origem=ORIGEM_ADITIVO if anterior else ORIGEM_PROPOSTA,

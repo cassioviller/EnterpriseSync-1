@@ -74,7 +74,7 @@ from decimal import Decimal
 from sqlalchemy import or_
 
 from app import db
-from models import AditivoContrato, ObraContratoVersao
+from models import AditivoContrato, MedicaoContrato, ObraContratoVersao
 
 logger = logging.getLogger(__name__)
 
@@ -304,6 +304,47 @@ def definir_valor_contrato(obra, valor, origem: str, motivo: str = '',
     return novo
 
 
+def congelar_base_medicoes_recebidas(obra, valor_anterior) -> int:
+    """Congela `valor_base` das medições de contrato JÁ RECEBIDAS
+    (`recebido_no_mes` preenchido) com o valor de contrato ANTERIOR, antes
+    de o contrato mudar. Fase 0.6/D1c, extraída de `event_manager.py` na
+    Fase 6/Task 4 — porque `aprovar_aditivo` (abaixo) precisa da MESMA
+    regra: sem ela, a porta nova reprecificava retroativamente até o que o
+    cliente já pagou (medição de 10% recebida sobre contrato de 100k valia
+    10.000 e passava a valer 12.000, em silêncio).
+
+    Mesma regra e mesmos filtros do bloco original:
+      - só medição RECEBIDA (`recebido_no_mes` não nulo E não vazio) — a
+        não recebida segue o contrato novo, que é o que aditivo significa;
+      - só `valor_base IS NULL` — base já congelada não recongela: o marco
+        vale o contrato da época em que foi recebido, para sempre;
+      - `valor_anterior <= 0` é no-op — sem contrato anterior não há base
+        para congelar (o primeiro contrato da obra não é aditivo).
+
+    UPDATE em lote dentro de `no_autoflush` — a disciplina do módulo:
+    executar SQL aqui não pode flushar objetos alheios pela metade (ver
+    `abrir_versao`). Devolve a contagem congelada. Não commita.
+    """
+    anterior = float(valor_anterior or 0)
+    if anterior <= 0 or getattr(obra, 'id', None) is None:
+        return 0
+    with db.session.no_autoflush:
+        congeladas = MedicaoContrato.query.filter(
+            MedicaoContrato.obra_id == obra.id,
+            MedicaoContrato.admin_id == obra.admin_id,
+            MedicaoContrato.valor_base.is_(None),
+            MedicaoContrato.recebido_no_mes.isnot(None),
+            MedicaoContrato.recebido_no_mes != '',
+        ).update({'valor_base': anterior}, synchronize_session=False)
+    if congeladas:
+        # Rastro operacional de produção — preservado da extração.
+        logger.info(
+            "🔒 Obra %s: %d medição(ões) já emitida(s) congelada(s) "
+            "na base %.2f antes do aditivo",
+            obra.codigo, congeladas, anterior)
+    return congeladas
+
+
 # ---------------------------------------------------------------------------
 # Fase 6 / Task 3 — transições do aditivo contratual.
 #
@@ -377,6 +418,30 @@ def _proximo_numero_aditivo(obra, pendentes):
         if m:
             maior = max(maior, int(m.group(1)))
     return f'AD-{maior + 1:03d}'
+
+
+def _repontar_medicoes_nao_recebidas(obra, versao) -> int:
+    """Fase 6 / Task 4 — marcos de `MedicaoContrato` ainda NÃO recebidos
+    (`recebido_no_mes` nulo ou vazio) passam a apontar para `versao`
+    (rastreabilidade: `contrato_versao_id`). Marco já recebido fica na
+    versão em que nasceu — não se move.
+
+    Pela relationship (`contrato_versao = versao`), não por UPDATE em lote:
+    `versao` pode ainda não ter id (aberta na mesma transação, sem flush) —
+    o SQLAlchemy resolve o FK no flush de verdade, do chamador. A consulta
+    roda em `no_autoflush` pela disciplina do módulo. Devolve a contagem."""
+    if obra.id is None:
+        return 0
+    with db.session.no_autoflush:
+        nao_recebidas = MedicaoContrato.query.filter(
+            MedicaoContrato.obra_id == obra.id,
+            MedicaoContrato.admin_id == obra.admin_id,
+            or_(MedicaoContrato.recebido_no_mes.is_(None),
+                MedicaoContrato.recebido_no_mes == ''),
+        ).all()
+    for medicao in nao_recebidas:
+        medicao.contrato_versao = versao
+    return len(nao_recebidas)
 
 
 def abrir_aditivo(obra, tipo: str, motivo: str, *, valor_novo=None,
@@ -538,6 +603,17 @@ def aprovar_aditivo(aditivo, *, aprovado_por_id=None,
     # prazo_novo None cai na herança de abrir_versao — que herda o None da
     # vigente: mesmo resultado, nenhum valor inventado.
 
+    # Task 4 — a MESMA proteção que a porta da proposta (event_manager) já
+    # tinha desde a Fase 0.6/D1c: medição JÁ RECEBIDA congela na base
+    # anterior ANTES de o contrato mudar. O valor anterior é o da versão
+    # vigente NESTE momento — não `aditivo.valor_anterior`, congelado na
+    # abertura: o contrato pode ter mudado entre abertura e aprovação.
+    # Depois das validações acima, de propósito: uma recusa (prazo negativo)
+    # não pode deixar o UPDATE do congelamento aplicado na transação.
+    valor_anterior = (float(vigente.valor) if vigente is not None
+                      else float(obra.valor_contrato or 0))
+    congelar_base_medicoes_recebidas(obra, valor_anterior)
+
     aditivo.status = AditivoContrato.STATUS_APROVADO
     aditivo.aprovado_por_id = aprovado_por_id
     aditivo.aprovado_em = datetime.utcnow()
@@ -551,12 +627,20 @@ def aprovar_aditivo(aditivo, *, aprovado_por_id=None,
     # flush): a relationship resolve o FK na hora do flush de verdade.
     versao.aditivo = aditivo
 
+    # Task 4 — repontamento: marco não recebido passa a apontar para a
+    # versão nova (rastreabilidade); o recebido fica na versão em que
+    # nasceu. O VALOR do marco não muda por esta coluna — quem o muda é o
+    # cache `obra.valor_contrato` (já atualizado por abrir_versao), via
+    # property `MedicaoContrato.valor`.
+    repontadas = _repontar_medicoes_nao_recebidas(obra, versao)
+
     logger.info(
         '[fase6] obra %s: aditivo %s aprovado (%.2f → %.2f, prazo %s, '
-        'versão %s, usuario=%s)', aditivo.obra_id or getattr(obra, 'id', '?'),
+        'versão %s, %d marco(s) repontado(s), usuario=%s)',
+        aditivo.obra_id or getattr(obra, 'id', '?'),
         aditivo.numero, aditivo.valor_anterior, aditivo.valor_novo,
         prazo_novo if prazo_novo is not None else '—',
-        versao.versao, aprovado_por_id or '—')
+        versao.versao, repontadas, aprovado_por_id or '—')
     return versao
 
 
