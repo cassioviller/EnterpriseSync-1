@@ -1453,6 +1453,15 @@ def criar_nova_versao(id):
                 template_origem_id=it.template_origem_id,
                 template_origem_nome=it.template_origem_nome,
                 categoria_titulo=it.categoria_titulo,
+                # Task #36 — clona a medição dimensional. Sem isto, revisar
+                # uma proposta com item medido por dimensão apagava as 6
+                # colunas na v2 e o PDF perdia as dimensões.
+                tipo_medicao_override=it.tipo_medicao_override,
+                dim_largura=it.dim_largura,
+                dim_comprimento=it.dim_comprimento,
+                dim_perimetro=it.dim_perimetro,
+                dim_pe_direito=it.dim_pe_direito,
+                dim_area_manual=it.dim_area_manual,
             ))
 
         # Clonar cláusulas (já revisadas — origem já foi enviada)
