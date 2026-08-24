@@ -571,7 +571,9 @@ def test_post_edicao_com_baseline_nao_muda_valor_nem_cria_versao(
         ambiente, _schema_fase6):
     """Step 1 do brief: POST de edição com `valor_contrato` alterado numa
     obra COM versão vigente não muda o valor e não cria versão nova — a
-    mudança de valor se faz por aditivo."""
+    mudança de valor se faz por aditivo, e o flash explica isso com link
+    (fix round 1: sem esta asserção o bloco do flash podia ser apagado com
+    a suíte verde)."""
     from services.contrato_obra import ORIGEM_PROPOSTA, definir_valor_contrato
     with app.app_context():
         obra_id, admin_id = ambiente['obra_id'], ambiente['admin_id']
@@ -583,10 +585,14 @@ def test_post_edicao_com_baseline_nao_muda_valor_nem_cria_versao(
         form = _form_edicao(obra, valor_contrato='999999')
 
     c = _cliente_http(admin_id)
-    r = c.post(f'/obras/editar/{obra_id}', data=form, follow_redirects=False)
-    assert r.status_code == 302, (
+    r = c.post(f'/obras/editar/{obra_id}', data=form, follow_redirects=True)
+    assert r.status_code == 200, (
         f'o POST de edição deveria ter salvo e redirecionado — veio '
         f'{r.status_code}')
+    html = r.get_data(as_text=True)
+    assert f'/obras/{obra_id}/aditivos' in html, (
+        'a tentativa de mudança com contrato vigente deve ser explicada por '
+        'flash com link para a tela de aditivos')
 
     with app.app_context():
         obra = db.session.get(Obra, obra_id)
@@ -599,6 +605,38 @@ def test_post_edicao_com_baseline_nao_muda_valor_nem_cria_versao(
         vigente = ObraContratoVersao.query.filter_by(
             obra_id=obra_id, vigente_ate=None).one()
         assert vigente.valor == Decimal('150000.00')
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize('valor_form', ['', '0'])
+def test_post_edicao_com_baseline_zerar_contrato_tambem_avisa(
+        ambiente, _schema_fase6, valor_form):
+    """Fix round 1: submeter `valor_contrato` vazio ou zero numa obra COM
+    contrato vigente é tentativa de ZERAR o contrato — o critério do flash
+    é PRESENÇA do campo no form, não truthiness. O valor tampouco muda."""
+    from services.contrato_obra import ORIGEM_PROPOSTA, definir_valor_contrato
+    with app.app_context():
+        obra_id, admin_id = ambiente['obra_id'], ambiente['admin_id']
+        obra = db.session.get(Obra, obra_id)
+        definir_valor_contrato(obra, 150000.0, origem=ORIGEM_PROPOSTA)
+        db.session.commit()
+        form = _form_edicao(obra, valor_contrato=valor_form)
+
+    c = _cliente_http(admin_id)
+    r = c.post(f'/obras/editar/{obra_id}', data=form, follow_redirects=True)
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert f'/obras/{obra_id}/aditivos' in html, (
+        f'valor_contrato={valor_form!r} com contrato vigente é tentativa de '
+        'zerar o contrato — tem de sair flash com link para aditivos')
+
+    with app.app_context():
+        obra = db.session.get(Obra, obra_id)
+        assert float(obra.valor_contrato) == 150000.0, (
+            f'a tentativa de zerar não pode mudar o valor — veio '
+            f'{obra.valor_contrato}')
+        assert ObraContratoVersao.query.filter_by(
+            obra_id=obra_id).count() == 1
 
 
 @pytest.mark.integration

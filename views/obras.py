@@ -886,13 +886,22 @@ def editar_obra(id):
                                                 definir_valor_contrato)
             _valor_form = (float(request.form.get('valor_contrato', 0))
                            if request.form.get('valor_contrato') else 0)
-            _vigente = (contrato_vigente(obra.id, obra.admin_id)
-                        if obra.admin_id is not None else None)
+            # `no_autoflush`: a query roda no meio do POST, com `obra` já
+            # mutada — mesma disciplina que services/contrato_obra.py
+            # impõe às próprias leituras.
+            with db.session.no_autoflush:
+                _vigente = (contrato_vigente(obra.id, obra.admin_id)
+                            if obra.admin_id is not None else None)
             if _vigente is not None:
-                if _valor_form and float(_vigente.valor) != _valor_form:
-                    # Só avisa quando houve TENTATIVA de mudança (o input
-                    # travado nem submete o campo — chegar aqui é POST
-                    # forjado ou página desatualizada).
+                if (request.form.get('valor_contrato') is not None
+                        and _valor_form != float(_vigente.valor)):
+                    # Avisa quando houve TENTATIVA de mudança — o critério é
+                    # PRESENÇA do campo no form, não truthiness: submeter
+                    # valor vazio/zero com contrato vigente é tentativa de
+                    # ZERAR o contrato, e é justamente quando o usuário mais
+                    # precisa da explicação. (O input travado nem submete o
+                    # campo — chegar aqui é POST forjado ou página
+                    # desatualizada.)
                     from markupsafe import Markup
                     # Task 13 cria a rota de aditivos — trocar o href
                     # literal por url_for quando o endpoint existir.
