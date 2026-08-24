@@ -87,7 +87,13 @@ def test_rollup_pondera_por_duracao_e_nao_por_contagem():
 
     Ponderado por duração: 98 * 300 / 305 = 96.39.
     Média simples por item seria 98 * 20 / 25 = 78.40.
-    Este assert grava QUAL das duas está em vigor.
+
+    RULING 2026-08-24: vale a PONDERADA POR DURAÇÃO. A pergunta ficou aberta
+    desde a reunião de 20/08 (o dono descreveu uma queda para ~80%, que só a
+    média simples produz) e foi respondida pela ponderada, para não mexer em
+    curva S, EVM (`bac` congelado na baseline), medição e físico-financeiro.
+    Este assert não descreve um detalhe de implementação: ele trava a decisão.
+    Se alguém o vir falhar em 78.40, a fórmula foi trocada sem passar por aqui.
     """
     admin_id, obra_id, pai_id = _fase_com_filhas(
         [(98.0, 15)] * 20 + [(None, 1)] * 5)
