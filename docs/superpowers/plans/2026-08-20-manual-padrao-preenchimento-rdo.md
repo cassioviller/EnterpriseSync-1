@@ -308,6 +308,19 @@ Enviar o capítulo (ou `/manual` direto) e pedir resposta a três perguntas:
 > (privada; compartilhar pelo menu da página). O envio ao Alan e ao Abel e a
 > coleta das respostas são passo humano — o Step 1 só fecha quando as
 > respostas voltarem.
+>
+> 🔴 **24/08 — o pacote estava mentindo, e foi corrigido.** A página tinha sido
+> publicada a partir do texto ANTERIOR ao commit `e4449443` (do mesmo 21/08), e
+> por isso ainda afirmava que rascunho *"não lança custo **e não alimenta o
+> cronograma**"*. A segunda metade é falsa: 📖 `utils/cronograma_engine.py:1412`
+> (`atualizar_percentual_tarefa`) não filtra apontamento por estado do RDO — é o
+> resíduo registrado em `docs/planos-em-aberto-2026-08-23.md`, seção 6. Mandar
+> essa versão ao Alan e ao Abel seria pedir revisão de uma norma que promete o
+> que o sistema não faz — exatamente o defeito que o `e4449443` extinguiu no
+> capítulo. Página republicada no MESMO link com o texto do capítulo de hoje
+> (§7 corrigido + rodapé redatado), 🔬 paridade conferida linha a linha contra
+> `manual/23a_rdo_padrao_preenchimento.md`. **O Step 1 continua aberto** — o que
+> mudou é que agora o que sai daqui está certo.
 
 - [ ] **Step 2: Aplicar as correções**
 
