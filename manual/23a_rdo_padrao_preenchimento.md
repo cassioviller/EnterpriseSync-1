@@ -19,6 +19,11 @@ RDO lançado dias depois é reconstrução de memória: as horas arredondam, o
 efetivo some e a ocorrência que importava não é registrada. Se o dia não teve
 trabalho na obra, não se cria RDO.
 
+O botão **Duplicar** cria um RDO **com a data de hoje**, para adiantar o
+preenchimento a partir do dia anterior — não para corrigir um RDO que já
+existe. Se hoje já tem RDO, não duplique: abra o que existe. O sistema **não
+impede** dois RDOs no mesmo dia; quem garante o "um por dia" é quem preenche.
+
 ## 1. Efetivo próprio
 
 Registre **todas** as pessoas da equipe própria que estiveram na obra, em cada
