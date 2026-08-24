@@ -72,8 +72,16 @@ def ambiente():
                 dim_comprimento=Decimal('8.0') if i == 1 else None,
             ))
         db.session.commit()
-        yield {'admin_id': admin.id, 'orcamento_id': orc.id}
-        db.session.rollback()
+        dados = {'admin_id': admin.id, 'orcamento_id': orc.id}
+    # O yield fica FORA do app_context de propósito. Com um contexto aberto,
+    # o `test_client` do Flask REUSA o app context ativo em vez de empurrar um
+    # novo — e aí a requisição roda na sessão da fixture, cujo identity map
+    # ainda tem o orçamento como estava antes do teste. O guard leria o objeto
+    # em cache e a trava pareceria não funcionar. É a mesma restrição que os
+    # planos deste repo já registram ("requests de test client ficam fora de
+    # app_context aberto"), aqui pela via do identity map em vez do
+    # Flask-Login.
+    yield dados
 
 
 def test_revisar_grava_a_cadeia_e_a_linhagem_dos_itens(ambiente):
@@ -171,3 +179,125 @@ def test_revisar_nao_reaproveita_numero_do_orcamento(ambiente):
         v2 = criar_revisao(v1, ambiente['admin_id'], motivo='r2')
         db.session.commit()
         assert v2.numero != numero_v1, 'revisão reusou o número do original'
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 11 — trava de edição do orçamento convertido
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Hoje as seis rotas de escrita editam um orçamento já convertido, alterando o
+# custo POR BAIXO de uma proposta que já foi enviada ao cliente. O caminho
+# certo existe desde a Task 10 e é criar revisão — a trava é o que empurra
+# para ele.
+
+def _cliente_de(user_id):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
+
+
+def _rotas_de_escrita(orc, item):
+    """As seis rotas que o plano nomeia, com um payload que MUDA algo.
+
+    Payload que muda é essencial: uma rota que recebe form vazio e não altera
+    nada passaria no teste sem trava nenhuma.
+    """
+    return [
+        ('atualizar', f'/orcamentos/{orc.id}/atualizar',
+         {'titulo': 'TITULO INVADIDO'}),
+        ('adicionar_item', f'/orcamentos/{orc.id}/itens',
+         {'descricao': 'Item invasor', 'unidade': 'un', 'quantidade': '1'}),
+        ('atualizar_item', f'/orcamentos/itens/{item.id}/atualizar',
+         {'descricao': 'DESCRICAO INVADIDA', 'unidade': 'm2',
+          'quantidade': '999'}),
+        ('reset_composicao', f'/orcamentos/itens/{item.id}/reset-composicao',
+         {}),
+        ('remover_item', f'/orcamentos/itens/{item.id}/remover', {}),
+        ('excluir', f'/orcamentos/{orc.id}/excluir', {}),
+    ]
+
+
+def test_orcamento_travado_recusa_as_seis_rotas_de_escrita(ambiente):
+    """Orçamento travado: nenhuma das seis rotas altera nada."""
+    with app.app_context():
+        orc = db.session.get(Orcamento, ambiente['orcamento_id'])
+        orc.travado_em = datetime.utcnow()
+        orc.status = 'convertido'
+        db.session.commit()
+        item = orc.itens[0]
+        titulo, item_id = orc.titulo, item.id
+        desc_item, qtd_item = item.descricao, item.quantidade
+        n_itens = len(orc.itens)
+        alvos = _rotas_de_escrita(orc, item)
+
+    c = _cliente_de(ambiente['admin_id'])
+    for nome, url, data in alvos:
+        r = c.post(url, data=data, follow_redirects=False)
+        assert r.status_code in (302, 303), (
+            f'{nome}: travado deveria redirecionar com flash, veio '
+            f'{r.status_code}')
+        with app.app_context():
+            orc = db.session.get(Orcamento, ambiente['orcamento_id'])
+            assert orc is not None, f'{nome}: EXCLUIU um orçamento travado'
+            assert orc.titulo == titulo, f'{nome}: alterou o título'
+            assert len(orc.itens) == n_itens, (
+                f'{nome}: mudou a quantidade de itens ({n_itens} → '
+                f'{len(orc.itens)})')
+            it = db.session.get(OrcamentoItem, item_id)
+            assert it is not None, f'{nome}: removeu o item'
+            assert it.descricao == desc_item, f'{nome}: alterou a descrição'
+            assert it.quantidade == qtd_item, f'{nome}: alterou a quantidade'
+
+
+def test_orcamento_em_rascunho_continua_editavel(ambiente):
+    """A trava não pode pegar quem não foi travado — o rascunho segue vivo."""
+    with app.app_context():
+        orc = db.session.get(Orcamento, ambiente['orcamento_id'])
+        assert orc.travado_em is None, 'pré-condição: nasce destravado'
+        item_id = orc.itens[0].id
+
+    c = _cliente_de(ambiente['admin_id'])
+    r = c.post(f'/orcamentos/{ambiente["orcamento_id"]}/atualizar',
+               data={'titulo': 'Galpão industrial revisado'},
+               follow_redirects=False)
+    assert r.status_code in (302, 303)
+    with app.app_context():
+        orc = db.session.get(Orcamento, ambiente['orcamento_id'])
+        assert orc.titulo == 'Galpão industrial revisado', (
+            'a trava barrou um orçamento que não está travado')
+        r2 = None
+    r2 = c.post(f'/orcamentos/itens/{item_id}/atualizar',
+                data={'descricao': 'Estrutura metálica reforçada',
+                      'unidade': 'm2', 'quantidade': '12'},
+                follow_redirects=False)
+    assert r2.status_code in (302, 303)
+    with app.app_context():
+        it = db.session.get(OrcamentoItem, item_id)
+        assert it.descricao == 'Estrutura metálica reforçada'
+
+
+def test_legado_convertido_sem_carimbo_nao_e_travado_retroativamente(ambiente):
+    """Guarda de compatibilidade: `status` antigo não trava sozinho.
+
+    Existe orçamento em `fechado`/`convertido` de antes desta fase, com
+    `travado_em` NULL. Travar o estoque pelo status quebraria fluxo em curso
+    sem aviso — só o que passar por `gerar_proposta` daqui em diante trava.
+    """
+    with app.app_context():
+        orc = db.session.get(Orcamento, ambiente['orcamento_id'])
+        orc.status = 'convertido'          # legado: status sim, carimbo não
+        orc.travado_em = None
+        db.session.commit()
+
+    c = _cliente_de(ambiente['admin_id'])
+    r = c.post(f'/orcamentos/{ambiente["orcamento_id"]}/atualizar',
+               data={'titulo': 'Legado ainda editável'},
+               follow_redirects=False)
+    assert r.status_code in (302, 303)
+    with app.app_context():
+        orc = db.session.get(Orcamento, ambiente['orcamento_id'])
+        assert orc.titulo == 'Legado ainda editável', (
+            'orçamento legado convertido foi travado retroativamente pelo '
+            'status — a guarda de compatibilidade caiu')

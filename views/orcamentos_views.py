@@ -7,7 +7,7 @@ Apenas usuários administradores podem ver/editar orçamentos.
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -108,6 +108,33 @@ def _gerar_numero(admin_id: int) -> str:
         if not Orcamento.query.filter_by(admin_id=admin_id, numero=candidato).first():
             return candidato
         count += 1
+
+
+def _bloqueio_por_trava(orc):
+    """Fase 6 / Task 11 — recusa escrita em orçamento travado.
+
+    Um orçamento vira proposta e a proposta vai ao cliente. Editar o custo
+    depois disso muda o chão de um documento já enviado, em silêncio: quem
+    recebeu a proposta continua com o preço antigo e o sistema passa a dizer
+    outro. O caminho certo existe desde a Task 10 e é **criar revisão** — a
+    trava é o que empurra para ele, e por isso a mensagem diz para onde ir.
+
+    **Guarda de compatibilidade, e é deliberada:** a trava olha SÓ para
+    `travado_em`, nunca para `status`. Existe estoque em `fechado`/
+    `convertido` de antes desta fase com `travado_em` NULL, e travá-lo
+    retroativamente pararia fluxo em curso sem ninguém ter sido avisado. Só
+    o que passar por `gerar_proposta` daqui em diante trava.
+
+    Devolve o redirect de recusa, ou `None` quando a escrita pode seguir —
+    para o chamador escrever `if bloqueio: return bloqueio`. Um helper só, em
+    vez de seis cópias da mesma condição: a regra muda num lugar.
+    """
+    if orc is None or orc.travado_em is None:
+        return None
+    flash(
+        f'O orçamento {orc.numero} já virou proposta e está travado para '
+        f'edição. Para mudar valores, crie uma revisão.', 'warning')
+    return redirect(url_for('orcamentos.editar', id=orc.id))
 
 
 # ───────────────────────────── LISTAR ─────────────────────────────
@@ -288,6 +315,9 @@ def editar(id):
 def atualizar(id):
     admin_id = _admin_id()
     orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    bloqueio = _bloqueio_por_trava(orc)
+    if bloqueio:
+        return bloqueio
     try:
         orc.titulo = (request.form.get('titulo') or orc.titulo).strip()
         orc.descricao = request.form.get('descricao') or None
@@ -321,6 +351,9 @@ def atualizar(id):
 def adicionar_item(id):
     admin_id = _admin_id()
     orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    bloqueio = _bloqueio_por_trava(orc)
+    if bloqueio:
+        return bloqueio
     try:
         servico_id = request.form.get('servico_id') or None
         quantidade = _parse_br_decimal(request.form.get('quantidade'), '1')
@@ -389,6 +422,9 @@ def atualizar_item(item_id):
     admin_id = _admin_id()
     item = OrcamentoItem.query.filter_by(id=item_id, admin_id=admin_id).first_or_404()
     orc = item.orcamento
+    bloqueio = _bloqueio_por_trava(orc)
+    if bloqueio:
+        return bloqueio
     try:
         item.descricao = (request.form.get('descricao') or item.descricao).strip()
         item.unidade = (request.form.get('unidade') or item.unidade).strip()
@@ -481,6 +517,10 @@ def reset_composicao(item_id):
     """
     admin_id = _admin_id()
     item = OrcamentoItem.query.filter_by(id=item_id, admin_id=admin_id).first_or_404()
+    orc = item.orcamento
+    bloqueio = _bloqueio_por_trava(orc)
+    if bloqueio:
+        return bloqueio
     if not item.servico_id or not item.servico:
         flash('Este item não está vinculado a um serviço do catálogo.', 'warning')
         return redirect(url_for('orcamentos.editar', id=item.orcamento_id))
@@ -505,6 +545,9 @@ def remover_item(item_id):
     item = OrcamentoItem.query.filter_by(id=item_id, admin_id=admin_id).first_or_404()
     orc_id = item.orcamento_id
     orc = item.orcamento
+    bloqueio = _bloqueio_por_trava(orc)
+    if bloqueio:
+        return bloqueio
     db.session.delete(item)
     db.session.flush()
     recalcular_orcamento(orc)
@@ -520,6 +563,9 @@ def remover_item(item_id):
 def excluir(id):
     admin_id = _admin_id()
     orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    bloqueio = _bloqueio_por_trava(orc)
+    if bloqueio:
+        return bloqueio
     db.session.delete(orc)
     db.session.commit()
     flash('Orçamento excluído.', 'success')
@@ -761,6 +807,12 @@ def gerar_proposta(id):
         orc.ultima_proposta_id = proposta.id
         if orc.status == 'rascunho':
             orc.status = 'fechado'
+        # Fase 6 / Task 11 — daqui em diante o custo deste orçamento não muda
+        # mais por edição: a proposta saiu, e mexer no chão dela em silêncio é
+        # o que a trava impede. Carimba só a PRIMEIRA vez — 1 orçamento gera N
+        # propostas, e a data que interessa é a da primeira saída.
+        if orc.travado_em is None:
+            orc.travado_em = datetime.utcnow()
         db.session.commit()
 
         if template:
