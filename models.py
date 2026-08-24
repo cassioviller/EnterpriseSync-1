@@ -7565,10 +7565,11 @@ class ObraContratoVersao(db.Model):
     `valor` é Numeric(15,2) — diferente de `Obra.valor_contrato` (Float, por
     herança do modelo antigo): o baseline nasce com o tipo certo.
 
-    `aditivo_id` referencia `aditivo_contrato.id`, que só existe a partir da
-    Task 3 (migration 272 planejada). Por isso a coluna é um Integer PLANO
-    aqui — sem `db.ForeignKey` — para não apontar para uma tabela ainda
-    inexistente; a constraint é adicionada junto da Task 3.
+    `aditivo_id` referencia `aditivo_contrato.id`. A Task 1 deixou a coluna
+    como Integer PLANO (a tabela-alvo ainda não existia); a Task 3 criou
+    `AditivoContrato` (abaixo) e a migration 272 adicionou a FK real
+    (`ON DELETE SET NULL` — apagar o aditivo não apaga a versão: a régua
+    do baseline sobrevive ao documento que a originou).
 
     Task 2 / revisão de código (24/08) — `services/contrato_obra.py.abrir_versao`
     já cuida de nunca deixar 2 versões vigentes simultâneas, mas só em
@@ -7605,8 +7606,9 @@ class ObraContratoVersao(db.Model):
     origem_proposta_id = db.Column(db.Integer,
                                    db.ForeignKey('propostas_comerciais.id', ondelete='SET NULL'),
                                    nullable=True)
-    # FK real (aditivo_contrato.id) chega na Task 3 — ver docstring da classe.
-    aditivo_id = db.Column(db.Integer, nullable=True)
+    aditivo_id = db.Column(db.Integer,
+                           db.ForeignKey('aditivo_contrato.id', ondelete='SET NULL'),
+                           nullable=True)
     motivo = db.Column(db.Text, nullable=True)
     criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -7615,9 +7617,80 @@ class ObraContratoVersao(db.Model):
                                                        cascade='all, delete-orphan',
                                                        passive_deletes=True,
                                                        order_by='ObraContratoVersao.vigente_de.desc()'))
+    # Sem backref de propósito: apagar um AditivoContrato NÃO deve arrastar
+    # o ORM a mexer nas versões — o ON DELETE SET NULL do banco resolve.
+    aditivo = db.relationship('AditivoContrato', foreign_keys=[aditivo_id])
 
     def __repr__(self):
         return f'<ObraContratoVersao obra={self.obra_id} v{self.versao} vigente_ate={self.vigente_ate}>'
+
+
+class AditivoContrato(db.Model):
+    """Fase 6 / Task 3 — aditivo contratual da obra.
+
+    O documento que FORMALIZA uma mudança de contrato: quem pediu, por quê
+    (`motivo` NOT NULL — aditivo sem motivo é o que a Fase 6 quer eliminar),
+    de quanto para quanto (`valor_anterior` congelado na abertura →
+    `valor_novo`) e/ou quanto prazo (`prazo_delta_dias`). D2 do plano: o que
+    caracteriza aditivo é a EXISTÊNCIA de contrato vigente, não o delta —
+    aditivo de valor zero (prazo puro) é aditivo.
+
+    Ciclo de vida: `rascunho` → `aprovado` | `cancelado` (transições em
+    `services/contrato_obra.py`, nunca por escrita direta de `status`). Só a
+    APROVAÇÃO toca o baseline: ela abre uma `ObraContratoVersao` nova (via
+    `abrir_versao`, o escritor único) com `origem_tipo='aditivo'` e
+    `aditivo_id` apontando para cá. Cancelar um rascunho não deixa rastro no
+    baseline — o aditivo cancelado fica na tabela como registro do que foi
+    cogitado e desistido.
+
+    `numero` é sequencial por obra (`AD-001`, `AD-002`, …), único por
+    `(obra_id, numero)`. "Só um rascunho por obra de cada vez" é checagem de
+    serviço, não constraint — supressão parcial de concorrência é aceitável
+    aqui e uma constraint parcial complicaria o backfill.
+    """
+    __tablename__ = 'aditivo_contrato'
+    __table_args__ = (
+        db.UniqueConstraint('obra_id', 'numero', name='uq_aditivo_obra_numero'),
+    )
+
+    STATUS_RASCUNHO = 'rascunho'
+    STATUS_APROVADO = 'aprovado'
+    STATUS_CANCELADO = 'cancelado'
+    TIPOS = ('acrescimo', 'supressao', 'prazo', 'misto')
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    numero = db.Column(db.String(30), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default=STATUS_RASCUNHO)
+    motivo = db.Column(db.Text, nullable=False)
+    valor_anterior = db.Column(db.Numeric(15, 2), nullable=False)
+    valor_novo = db.Column(db.Numeric(15, 2), nullable=False)
+    prazo_delta_dias = db.Column(db.Integer, nullable=True)
+    proposta_id = db.Column(db.Integer,
+                            db.ForeignKey('propostas_comerciais.id', ondelete='SET NULL'),
+                            nullable=True)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    aprovado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    aprovado_em = db.Column(db.DateTime, nullable=True)
+
+    obra = db.relationship('Obra', foreign_keys=[obra_id],
+                           backref=db.backref('aditivos_contrato',
+                                              passive_deletes=True,
+                                              order_by='AditivoContrato.criado_em.desc()'))
+
+    @property
+    def valor_delta(self):
+        """Acréscimo (+) ou supressão (−) que o aditivo propõe. Zero é
+        legítimo (aditivo de prazo puro) — ver D2 na docstring."""
+        from decimal import Decimal
+        return (self.valor_novo or Decimal('0')) - (self.valor_anterior or Decimal('0'))
+
+    def __repr__(self):
+        return f'<AditivoContrato obra={self.obra_id} {self.numero} {self.status}>'
 
 
 class MapaConcorrenciaV2(db.Model):

@@ -67,13 +67,14 @@ de um clique em "salvar".
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import or_
 
 from app import db
-from models import ObraContratoVersao
+from models import AditivoContrato, ObraContratoVersao
 
 logger = logging.getLogger(__name__)
 
@@ -283,3 +284,236 @@ def definir_valor_contrato(obra, valor, origem: str, motivo: str = '',
         'usuario=%s)', getattr(obra, 'codigo', None) or getattr(obra, 'id', '?'),
         anterior, novo, origem, motivo or '—', usuario_id or '—')
     return novo
+
+
+# ---------------------------------------------------------------------------
+# Fase 6 / Task 3 — transições do aditivo contratual.
+#
+# Ciclo: rascunho → aprovado | cancelado. Só a APROVAÇÃO toca o baseline
+# (via `abrir_versao`, nunca por escrita direta) — abrir e cancelar um
+# rascunho deixam `ObraContratoVersao` e `obra.valor_contrato` intactos.
+#
+# D2 do plano: o que caracteriza aditivo é a EXISTÊNCIA de contrato vigente,
+# não o delta de valor. Aditivo de valor zero (prazo puro, ou supressão que
+# compensa acréscimo) É aditivo: por isso `aprovar_aditivo` chama
+# `abrir_versao` DIRETO, e não `definir_valor_contrato` — a guarda de
+# idempotência desta última ("mesmo valor não abre versão") transformaria a
+# aprovação de um aditivo delta-zero em no-op silencioso, e o baseline
+# perderia o registro de que houve um aditivo ali.
+#
+# Mesma regra do módulo inteiro: nenhuma destas funções commita.
+# ---------------------------------------------------------------------------
+
+_NUMERO_ADITIVO_RE = re.compile(r'^AD-(\d+)$')
+
+
+def _pendentes_da_obra(obra):
+    """`AditivoContrato` ainda não flushados desta obra, em `db.session.new`.
+
+    Mesmo raciocínio da varredura de pendentes em `abrir_versao` (ver o
+    docstring dela): as consultas destas transições rodam em `no_autoflush`
+    (para não flushar objetos alheios pela metade), então linhas criadas na
+    MESMA transação sem flush não aparecem no SELECT — a checagem "só um
+    rascunho por obra" e a numeração sequencial precisam enxergá-las por
+    aqui."""
+    return [
+        a for a in db.session.new
+        if isinstance(a, AditivoContrato)
+        and (a.obra is obra or (obra.id is not None and a.obra_id == obra.id))
+    ]
+
+
+def _proximo_numero_aditivo(obra, pendentes):
+    """`AD-{n:03d}`, com n = maior sequencial já usado + 1 — inclui os
+    cancelados (número não recicla: o AD-002 depois de um AD-001 cancelado
+    continua sendo AD-002) e os pendentes na sessão. Números fora do padrão
+    `AD-\\d+` (não deveriam existir — só este módulo grava `numero`) são
+    ignorados na conta; a `UNIQUE (obra_id, numero)` é a rede de segurança
+    contra qualquer colisão que sobre."""
+    with db.session.no_autoflush:
+        numeros = [n for (n,) in db.session.query(AditivoContrato.numero)
+                   .filter_by(obra_id=obra.id, admin_id=obra.admin_id).all()]
+    numeros += [p.numero for p in pendentes if p.numero]
+    maior = 0
+    for numero in numeros:
+        m = _NUMERO_ADITIVO_RE.match(numero or '')
+        if m:
+            maior = max(maior, int(m.group(1)))
+    return f'AD-{maior + 1:03d}'
+
+
+def abrir_aditivo(obra, tipo: str, motivo: str, *, valor_novo=None,
+                  prazo_delta_dias=None, proposta_id=None,
+                  criado_por_id=None) -> AditivoContrato:
+    """Abre um aditivo em `rascunho` para a obra. NÃO toca no baseline.
+
+    Exige contrato vigente (D2: sem versão vigente não existe "aditar" —
+    o valor inicial entra por `definir_valor_contrato`, não por aditivo) e
+    `motivo` não-vazio. `valor_anterior` congela o valor vigente NA ABERTURA
+    — é o "de quanto" do documento, imune a edições posteriores do contrato.
+
+    `valor_novo`:
+      - `tipo='prazo'` pode omitir (fica igual ao anterior — delta zero,
+        que É aditivo, ver cabeçalho da seção);
+      - demais tipos exigem o valor explícito — um acréscimo sem valor é
+        erro de preenchimento, não um delta-zero intencional.
+
+    Só um aditivo em `rascunho` por obra de cada vez — checagem de serviço
+    (o brief descarta constraint parcial de propósito; a supressão parcial
+    de concorrência é aceitável aqui).
+
+    Não commita nem flusha — quem chama decide a transação.
+    """
+    if tipo not in AditivoContrato.TIPOS:
+        raise ValueError(
+            f'tipo de aditivo desconhecido: {tipo!r} — use um de '
+            f'{AditivoContrato.TIPOS}')
+    if not (motivo or '').strip():
+        raise ValueError(
+            'aditivo exige motivo — aditivo sem motivo é exatamente o que '
+            'a Fase 6 elimina')
+
+    vigente = None
+    if obra.id is not None and obra.admin_id is not None:
+        with db.session.no_autoflush:
+            vigente = ObraContratoVersao.query.filter_by(
+                obra_id=obra.id, admin_id=obra.admin_id,
+                vigente_ate=None).first()
+    if vigente is None:
+        # Reconciliação com a mesma transação: uma versão recém-aberta e
+        # ainda não flushada não aparece no SELECT acima.
+        vigente = next(
+            (v for v in db.session.new
+             if isinstance(v, ObraContratoVersao) and v.vigente_ate is None
+             and (v.obra is obra or (obra.id is not None and v.obra_id == obra.id))),
+            None)
+    if vigente is None:
+        raise ValueError(
+            f'obra {getattr(obra, "id", "?")} não tem contrato vigente — '
+            'aditivo pressupõe contrato; o valor inicial entra por '
+            'definir_valor_contrato')
+
+    pendentes = _pendentes_da_obra(obra)
+
+    with db.session.no_autoflush:
+        rascunho_no_banco = AditivoContrato.query.filter_by(
+            obra_id=obra.id, admin_id=obra.admin_id,
+            status=AditivoContrato.STATUS_RASCUNHO).first()
+    rascunho = rascunho_no_banco or next(
+        (p for p in pendentes if p.status == AditivoContrato.STATUS_RASCUNHO),
+        None)
+    if rascunho is not None:
+        raise ValueError(
+            f'obra {obra.id} já tem o aditivo {rascunho.numero} em rascunho '
+            '— aprove ou cancele antes de abrir outro')
+
+    valor_anterior = Decimal(str(vigente.valor))
+    if valor_novo is None:
+        if tipo != 'prazo':
+            raise ValueError(
+                f'aditivo de tipo {tipo!r} exige valor_novo — só o de prazo '
+                'puro pode omitir (mantém o valor vigente)')
+        valor_novo_dec = valor_anterior
+    else:
+        valor_novo_dec = Decimal(str(valor_novo))
+
+    aditivo = AditivoContrato(
+        obra=obra,
+        admin_id=obra.admin_id,
+        numero=_proximo_numero_aditivo(obra, pendentes),
+        tipo=tipo,
+        status=AditivoContrato.STATUS_RASCUNHO,
+        motivo=motivo.strip(),
+        valor_anterior=valor_anterior,
+        valor_novo=valor_novo_dec,
+        prazo_delta_dias=prazo_delta_dias,
+        proposta_id=proposta_id,
+        criado_por_id=criado_por_id,
+        criado_em=datetime.utcnow(),
+    )
+    db.session.add(aditivo)
+    logger.info(
+        '[fase6] obra %s: aditivo %s aberto (%s, %.2f → %.2f, prazo %s, '
+        'usuario=%s)', obra.id, aditivo.numero, tipo, valor_anterior,
+        valor_novo_dec, prazo_delta_dias if prazo_delta_dias is not None else '—',
+        criado_por_id or '—')
+    return aditivo
+
+
+def aprovar_aditivo(aditivo, *, aprovado_por_id=None,
+                    vigente_de=None) -> ObraContratoVersao | None:
+    """`rascunho` → `aprovado`: o ÚNICO ponto em que o aditivo toca o
+    baseline — abre a versão seguinte de `ObraContratoVersao` (fechando a
+    vigente) com `origem_tipo='aditivo'` e `aditivo_id` preenchido, mesmo
+    com delta zero (ver cabeçalho da seção). Devolve a versão aberta.
+
+    Idempotente: aprovar um aditivo já `aprovado` é no-op — devolve a versão
+    que a aprovação original abriu (sem recarimbar `aprovado_em` nem abrir
+    outra versão). Aprovar um `cancelado` é erro: cancelado é terminal.
+
+    Não commita — quem chama decide a transação.
+    """
+    if aditivo.status == AditivoContrato.STATUS_CANCELADO:
+        raise ValueError(
+            f'aditivo {aditivo.numero} está cancelado — cancelado é '
+            'terminal, abra um aditivo novo')
+    if aditivo.status == AditivoContrato.STATUS_APROVADO:
+        versao = None
+        # Guarda `aditivo.id is not None`: com id None o filtro viraria
+        # `aditivo_id IS NULL` e casaria qualquer versão SEM aditivo (o
+        # backfill da 271, por exemplo) — a versão errada.
+        if aditivo.id is not None:
+            with db.session.no_autoflush:
+                versao = ObraContratoVersao.query.filter_by(
+                    aditivo_id=aditivo.id, admin_id=aditivo.admin_id).first()
+        if versao is None:
+            versao = next(
+                (v for v in db.session.new
+                 if isinstance(v, ObraContratoVersao)
+                 and v.aditivo is aditivo),
+                None)
+        return versao
+
+    aditivo.status = AditivoContrato.STATUS_APROVADO
+    aditivo.aprovado_por_id = aprovado_por_id
+    aditivo.aprovado_em = datetime.utcnow()
+
+    versao = abrir_versao(
+        aditivo.obra, aditivo.valor_novo, ORIGEM_TIPO[ORIGEM_ADITIVO],
+        aditivo_id=aditivo.id, motivo=aditivo.motivo,
+        criado_por_id=aprovado_por_id, vigente_de=vigente_de)
+    # `aditivo.id` pode ser None (aberto e aprovado na mesma transação, sem
+    # flush): a relationship resolve o FK na hora do flush de verdade.
+    versao.aditivo = aditivo
+
+    logger.info(
+        '[fase6] obra %s: aditivo %s aprovado (%.2f → %.2f, versão %s, '
+        'usuario=%s)', aditivo.obra_id or getattr(aditivo.obra, 'id', '?'),
+        aditivo.numero, aditivo.valor_anterior, aditivo.valor_novo,
+        versao.versao, aprovado_por_id or '—')
+    return versao
+
+
+def cancelar_aditivo(aditivo) -> AditivoContrato:
+    """`rascunho` → `cancelado`. NÃO toca no baseline — cancelar desiste do
+    documento antes de ele produzir efeito; a linha fica na tabela como
+    registro do que foi cogitado (o número não recicla).
+
+    Idempotente: cancelar um já `cancelado` é no-op. Cancelar um `aprovado`
+    é erro — aprovado já mexeu no baseline; desfazer exige um aditivo novo
+    em sentido contrário, nunca apagar história.
+
+    Não commita — quem chama decide a transação.
+    """
+    if aditivo.status == AditivoContrato.STATUS_APROVADO:
+        raise ValueError(
+            f'aditivo {aditivo.numero} já foi aprovado e mexeu no baseline '
+            '— para reverter, abra um aditivo novo em sentido contrário')
+    if aditivo.status == AditivoContrato.STATUS_CANCELADO:
+        return aditivo
+
+    aditivo.status = AditivoContrato.STATUS_CANCELADO
+    logger.info('[fase6] obra %s: aditivo %s cancelado em rascunho',
+                aditivo.obra_id or getattr(aditivo.obra, 'id', '?'),
+                aditivo.numero)
+    return aditivo

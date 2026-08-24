@@ -5823,6 +5823,89 @@ def _migration_271_obra_contrato_versao():
         raise
 
 
+def _migration_272_aditivo_contrato():
+    """Fase 6 / Task 3 — aditivo_contrato + a FK que a Task 1 deixou pendente.
+
+    Cria `aditivo_contrato` (o documento que formaliza mudança de contrato:
+    numero sequencial por obra, tipo, motivo NOT NULL, valor_anterior
+    congelado na abertura → valor_novo, prazo_delta_dias; ciclo rascunho →
+    aprovado | cancelado, transições em services/contrato_obra.py).
+
+    Depois de criar a tabela, resolve a dívida da 271: a Task 1 deixou
+    `obra_contrato_versao.aditivo_id` como Integer PLANO de propósito,
+    porque a tabela-alvo ainda não existia. Aqui a FK real entra —
+    `aditivo_id -> aditivo_contrato.id ON DELETE SET NULL` (apagar o aditivo
+    não apaga a versão do baseline: a régua sobrevive ao documento).
+
+    Idempotente/re-executável: `CREATE TABLE IF NOT EXISTS`, índices com os
+    MESMOS nomes que o SQLAlchemy geraria via `index=True` (se create_all
+    rodar antes, isto vira no-op — mesma razão da 271), e a FK guardada por
+    existência via pg_constraint: o guard procura QUALQUER FK na coluna
+    `aditivo_id` (não um nome fixo), porque um create_all em banco fresco
+    cria a FK inline com o nome padrão do Postgres
+    (obra_contrato_versao_aditivo_id_fkey) — guard por nome duplicaria a
+    constraint nesse cenário.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS aditivo_contrato (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    numero VARCHAR(30) NOT NULL,
+                    tipo VARCHAR(20) NOT NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'rascunho',
+                    motivo TEXT NOT NULL,
+                    valor_anterior NUMERIC(15,2) NOT NULL,
+                    valor_novo NUMERIC(15,2) NOT NULL,
+                    prazo_delta_dias INTEGER,
+                    proposta_id INTEGER
+                        REFERENCES propostas_comerciais(id) ON DELETE SET NULL,
+                    criado_por_id INTEGER REFERENCES usuario(id),
+                    aprovado_por_id INTEGER REFERENCES usuario(id),
+                    criado_em TIMESTAMP NOT NULL DEFAULT now(),
+                    aprovado_em TIMESTAMP,
+                    CONSTRAINT uq_aditivo_obra_numero UNIQUE (obra_id, numero)
+                )
+            """))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_aditivo_contrato_obra_id "
+                "ON aditivo_contrato(obra_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_aditivo_contrato_admin_id "
+                "ON aditivo_contrato(admin_id)"))
+            # FK pendente da Task 1 — ver docstring. O DO $$ guarda por
+            # existência de FK na COLUNA, não por nome de constraint.
+            conn.execute(sa_text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint c
+                        WHERE c.conrelid = 'obra_contrato_versao'::regclass
+                          AND c.contype = 'f'
+                          AND c.conkey = ARRAY[(
+                              SELECT attnum FROM pg_attribute
+                              WHERE attrelid = 'obra_contrato_versao'::regclass
+                                AND attname = 'aditivo_id')]::smallint[]
+                    ) THEN
+                        ALTER TABLE obra_contrato_versao
+                            ADD CONSTRAINT fk_contrato_versao_aditivo
+                            FOREIGN KEY (aditivo_id)
+                            REFERENCES aditivo_contrato(id)
+                            ON DELETE SET NULL;
+                    END IF;
+                END $$;
+            """))
+        logger.info("[Migration 272] aditivo_contrato criada e FK "
+                    "obra_contrato_versao.aditivo_id adicionada.")
+    except Exception as e:
+        logger.error(f"[Migration 272] Falha: {e}", exc_info=True)
+        raise
+
+
 # Tamanho do lote da linha de base (passo 1 da 277). A migração roda dentro
 # do timeout do entrypoint (MIGRATION_TIMEOUT, 300s por padrão): congelar
 # milhares de obras num único INSERT arrisca estourar o relógio e perder o
@@ -7368,6 +7451,7 @@ def executar_migracoes():
             (268, "Fase 9a — unicidade de assinatura por signatário (dois índices parciais)", _migration_268_unicidade_assinatura_por_signatario),
             (269, "Fase 9a — remove uq_rdo_assinatura_papel também quando é ÍNDICE (a 268 só tratava constraint)", _migration_269_remover_indice_unico_antigo_de_assinatura),
             (271, "Fase 6 — obra_contrato_versao: baseline versionado do contrato da obra, com backfill da versão nº1 para obras pré-existentes", _migration_271_obra_contrato_versao),
+            (272, "Fase 6 — aditivo_contrato (rascunho→aprovado|cancelado) + FK obra_contrato_versao.aditivo_id que a Task 1 deixou pendente (ON DELETE SET NULL)", _migration_272_aditivo_contrato),
             (277, "Editor de cronograma v2 em todo o parque — linha de base primeiro, flag ligada em todos os tenants, default da coluna vira TRUE", _migration_277_editor_v2_em_todo_o_parque),
             (278, "p10 — cronograma_baseline.bac (orçamento congelado junto com o prazo; NULL = baseline anterior)", _migration_278_baseline_bac),
             (279, "E02 — drop de notificacao_cliente, auto-guardado pela contagem (falha e retenta se houver linha)", _migration_279_drop_notificacao_cliente),
