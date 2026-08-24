@@ -282,3 +282,183 @@ def test_obra_sem_valor_contrato_nao_ganha_versao(ambiente):
         _migration_271_obra_contrato_versao()
 
         assert ObraContratoVersao.query.filter_by(obra_id=obra_zero.id).count() == 0
+
+
+# ---------------------------------------------------------------------------
+# Task 2 — services/contrato_obra.py: leitura por vigência e o escritor
+# único (`definir_valor_contrato`) abrindo/fechando `ObraContratoVersao`.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+def test_definir_valor_contrato_abre_primeira_versao_vigente(ambiente):
+    """Obra sem nenhuma versão (estado pré-271): a 1ª chamada com valor
+    diferente do atual abre a versão nº1, e obra.valor_contrato reflete a
+    versão vigente — não um valor solto."""
+    from services.contrato_obra import ORIGEM_CADASTRO, definir_valor_contrato
+    with app.app_context():
+        obra_id = ambiente['obra_id']
+        obra = db.session.get(Obra, obra_id)
+        assert ObraContratoVersao.query.filter_by(obra_id=obra_id).count() == 0
+
+        definir_valor_contrato(obra, 150000.0, origem=ORIGEM_CADASTRO,
+                               motivo='teste task2')
+        db.session.commit()
+
+        vigente = ObraContratoVersao.query.filter_by(
+            obra_id=obra_id, vigente_ate=None).one()
+        assert vigente.versao == 1
+        assert vigente.valor == Decimal('150000.00')
+        obra = db.session.get(Obra, obra_id)
+        assert float(obra.valor_contrato) == 150000.0
+
+
+@pytest.mark.integration
+def test_definir_valor_contrato_com_valor_diferente_fecha_a_anterior_e_abre_nova(ambiente):
+    """Uma 2ª chamada com valor diferente fecha a versão vigente (vigente_ate
+    passa a existir) e abre a versão seguinte — a versão fechada nunca muda
+    mais de valor."""
+    from services.contrato_obra import ORIGEM_ADITIVO, definir_valor_contrato
+    with app.app_context():
+        obra_id = ambiente['obra_id']
+        obra = db.session.get(Obra, obra_id)
+
+        # `ambiente` já cria a obra com valor_contrato=100000.0 (sem
+        # nenhuma versão por trás — estado pré-271/pré-Task 2). 80000.0
+        # aqui é DIFERENTE desse valor de partida, para garantir que esta
+        # 1ª chamada é uma mudança real e abre a versão nº1.
+        definir_valor_contrato(obra, 80000.0, origem=ORIGEM_ADITIVO)
+        db.session.commit()
+        v1 = ObraContratoVersao.query.filter_by(obra_id=obra_id, versao=1).one()
+        assert v1.vigente_ate is None
+        valor_v1_antes = v1.valor
+
+        obra = db.session.get(Obra, obra_id)
+        definir_valor_contrato(obra, 120000.0, origem=ORIGEM_ADITIVO,
+                               motivo='aditivo de teste')
+        db.session.commit()
+
+        db.session.expire_all()
+        v1 = ObraContratoVersao.query.filter_by(obra_id=obra_id, versao=1).one()
+        assert v1.vigente_ate is not None, 'a versão 1 deveria ter sido fechada'
+        assert v1.valor == valor_v1_antes, (
+            'versão fechada não pode mudar de valor')
+
+        v2 = ObraContratoVersao.query.filter_by(
+            obra_id=obra_id, vigente_ate=None).one()
+        assert v2.versao == 2
+        assert v2.valor == Decimal('120000.00')
+
+        obra = db.session.get(Obra, obra_id)
+        assert float(obra.valor_contrato) == 120000.0
+
+
+@pytest.mark.integration
+def test_definir_valor_contrato_com_mesmo_valor_nao_abre_nova_versao(ambiente):
+    """Idempotência: gravar o MESMO valor da versão vigente não deve abrir
+    uma versão por save — só uma mudança real de valor abre versão nova."""
+    from services.contrato_obra import ORIGEM_EDICAO, definir_valor_contrato
+    with app.app_context():
+        obra_id = ambiente['obra_id']
+        obra = db.session.get(Obra, obra_id)
+
+        # 150000.0 difere do valor de partida da fixture (100000.0, sem
+        # versão) — a 1ª chamada é uma mudança real e abre a versão nº1.
+        definir_valor_contrato(obra, 150000.0, origem=ORIGEM_EDICAO)
+        db.session.commit()
+        total_apos_primeira = ObraContratoVersao.query.filter_by(obra_id=obra_id).count()
+        assert total_apos_primeira == 1
+
+        obra = db.session.get(Obra, obra_id)
+        # mesmo valor de novo (edição que não mexeu no campo, por exemplo)
+        definir_valor_contrato(obra, 150000.0, origem=ORIGEM_EDICAO,
+                               motivo='reedição sem mudança de valor')
+        db.session.commit()
+
+        total_depois = ObraContratoVersao.query.filter_by(obra_id=obra_id).count()
+        assert total_depois == 1, (
+            f'valor igual ao vigente não deveria abrir versão nova — achei '
+            f'{total_depois}')
+        vigente = ObraContratoVersao.query.filter_by(
+            obra_id=obra_id, vigente_ate=None).one()
+        assert vigente.versao == 1
+
+
+@pytest.mark.integration
+def test_contrato_vigente_devolve_a_versao_sem_vigente_ate(ambiente):
+    from services.contrato_obra import ORIGEM_CADASTRO, contrato_vigente, definir_valor_contrato
+    with app.app_context():
+        obra_id, admin_id = ambiente['obra_id'], ambiente['admin_id']
+        obra = db.session.get(Obra, obra_id)
+
+        assert contrato_vigente(obra_id, admin_id) is None, (
+            'sem nenhuma versão ainda, contrato_vigente deve devolver None')
+
+        # 150000.0 difere do valor de partida da fixture (100000.0, sem
+        # versão) — garante que esta é uma mudança real.
+        definir_valor_contrato(obra, 150000.0, origem=ORIGEM_CADASTRO)
+        db.session.commit()
+
+        v = contrato_vigente(obra_id, admin_id)
+        assert v is not None
+        assert v.vigente_ate is None
+        assert v.valor == Decimal('150000.00')
+
+
+@pytest.mark.integration
+def test_valor_vigente_em_data_anterior_devolve_valor_antigo(ambiente):
+    """`valor_vigente_em` com uma data ANTERIOR à troca devolve o valor da
+    versão que estava em vigor naquele momento — não o valor atual."""
+    from services.contrato_obra import (ORIGEM_ADITIVO,
+                                        definir_valor_contrato,
+                                        valor_vigente_em)
+    with app.app_context():
+        obra_id, admin_id = ambiente['obra_id'], ambiente['admin_id']
+        obra = db.session.get(Obra, obra_id)
+
+        t0 = datetime(2026, 1, 1, 12, 0, 0)
+        # 150000.0 difere do valor de partida da fixture (100000.0, sem
+        # versão) — garante que esta 1ª chamada é uma mudança real e abre
+        # a versão nº1.
+        definir_valor_contrato(obra, 150000.0, origem=ORIGEM_ADITIVO)
+        v1 = ObraContratoVersao.query.filter_by(obra_id=obra_id, versao=1).one()
+        v1.vigente_de = t0
+        db.session.commit()
+
+        t1 = datetime(2026, 3, 1, 12, 0, 0)
+        obra = db.session.get(Obra, obra_id)
+        definir_valor_contrato(obra, 120000.0, origem=ORIGEM_ADITIVO)
+        v2 = ObraContratoVersao.query.filter_by(obra_id=obra_id, versao=2).one()
+        v2.vigente_de = t1
+        db.session.commit()
+
+        antes_da_troca = datetime(2026, 2, 1)
+        depois_da_troca = datetime(2026, 4, 1)
+
+        assert valor_vigente_em(obra_id, admin_id, antes_da_troca) == Decimal('150000.00')
+        assert valor_vigente_em(obra_id, admin_id, depois_da_troca) == Decimal('120000.00')
+
+
+@pytest.mark.integration
+def test_valor_contrato_da_obra_sempre_igual_a_versao_vigente_apos_varias_trocas(ambiente):
+    """Invariante geral: depois de qualquer sequência de chamadas,
+    obra.valor_contrato == valor da versão vigente (vigente_ate IS NULL)."""
+    from services.contrato_obra import ORIGEM_EDICAO, definir_valor_contrato
+    with app.app_context():
+        obra_id = ambiente['obra_id']
+
+        # 150000.0 é a 1ª mudança real vs. o valor de partida da fixture
+        # (100000.0, sem versão); as demais repetições testam a
+        # idempotência no meio da sequência.
+        for valor in (150000.0, 150000.0, 130000.0, 130000.0, 90000.0):
+            obra = db.session.get(Obra, obra_id)
+            definir_valor_contrato(obra, valor, origem=ORIGEM_EDICAO)
+            db.session.commit()
+
+        obra = db.session.get(Obra, obra_id)
+        vigente = ObraContratoVersao.query.filter_by(
+            obra_id=obra_id, vigente_ate=None).one()
+        assert Decimal(str(obra.valor_contrato)) == vigente.valor
+        assert vigente.valor == Decimal('90000.00')
+        # só houve 2 mudanças reais de valor (100k→130k, 130k→90k) além da
+        # abertura inicial — 3 versões no total, não 5.
+        assert ObraContratoVersao.query.filter_by(obra_id=obra_id).count() == 3
