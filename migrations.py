@@ -5714,6 +5714,23 @@ def _migration_271_obra_contrato_versao():
     aditivo_id é Integer SEM FK: aditivo_contrato só nasce na Task 3
     (migration 272 planejada) — ver docstring de ObraContratoVersao em
     models.py.
+
+    EMENDADA em 24/08 (Task 2, revisão de código) — acrescenta 2 índices
+    únicos, sem número de migração novo: esta 271 só existe neste branch
+    ainda não mesclado, então corrigi-la no lugar em vez de empilhar uma
+    272 é seguro (não há histórico de produção rodando com a versão velha).
+      - `uq_contrato_versao_vigente`: parcial, `UNIQUE (obra_id) WHERE
+        vigente_ate IS NULL` — nunca 2 versões vigentes para a mesma obra.
+        Mesmo padrão de `idx_cronograma_baseline_ativa_unica` ("uma ativa
+        por obra"). É a rede de segurança de banco para um bug real que
+        apareceu em `services/contrato_obra.py`: 2 chamadas de
+        `definir_valor_contrato` para a mesma obra na mesma transação
+        não-commitada (sem flush entre elas) produziam 2 linhas `versao=1`
+        ambas vigentes — o código foi corrigido, mas o índice pega
+        qualquer regressão futura no nível certo (constraint, não teste).
+      - `uq_contrato_versao_obra_versao`: `UNIQUE (obra_id, versao)` —
+        nenhuma obra repete número de versão, vigente ou não.
+    `CREATE UNIQUE INDEX IF NOT EXISTS` mantém a migração idempotente.
     """
     from sqlalchemy import text as sa_text
     try:
@@ -5757,6 +5774,19 @@ def _migration_271_obra_contrato_versao():
             conn.execute(sa_text("""
                 CREATE INDEX IF NOT EXISTS idx_contrato_versao_lookup
                     ON obra_contrato_versao(obra_id, vigente_de, vigente_ate)
+            """))
+            # Emenda 24/08 — ver docstring da função. Nomes idênticos aos
+            # de `__table_args__` em models.py (mesma razão do bloco de
+            # índices acima: `create_all()` já pode ter criado com estes
+            # nomes antes da migração rodar).
+            conn.execute(sa_text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_contrato_versao_vigente
+                    ON obra_contrato_versao(obra_id)
+                    WHERE vigente_ate IS NULL
+            """))
+            conn.execute(sa_text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_contrato_versao_obra_versao
+                    ON obra_contrato_versao(obra_id, versao)
             """))
 
             # Backfill: toda obra com valor_contrato > 0 e ainda SEM nenhuma

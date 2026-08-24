@@ -7569,10 +7569,27 @@ class ObraContratoVersao(db.Model):
     Task 3 (migration 272 planejada). Por isso a coluna é um Integer PLANO
     aqui — sem `db.ForeignKey` — para não apontar para uma tabela ainda
     inexistente; a constraint é adicionada junto da Task 3.
+
+    Task 2 / revisão de código (24/08) — `services/contrato_obra.py.abrir_versao`
+    já cuida de nunca deixar 2 versões vigentes simultâneas, mas só em
+    memória/nível de aplicação: duas chamadas de `definir_valor_contrato`
+    para a MESMA obra dentro da mesma transação não-commitada (sem flush
+    entre elas) conseguiam produzir 2 linhas `versao=1` ambas com
+    `vigente_ate IS NULL` — o `no_autoflush` do serviço esconde a 1ª linha
+    pendente da leitura da 2ª chamada. O código foi corrigido para
+    reconciliar contra `db.session.new` também, mas um índice único
+    PARCIAL (o mesmo padrão de `CronogramaBaseline.ix_cronograma_baseline_ativa_unica`,
+    "uma ativa por obra") é a rede de segurança que pega isso mesmo se o
+    código de aplicação regredir — pego pelo banco, não só pela leitura.
+    `UNIQUE (obra_id, versao)` complementa: nenhuma obra pode ter a mesma
+    versão duas vezes, ainda que ambas tenham `vigente_ate` preenchido.
     """
     __tablename__ = 'obra_contrato_versao'
     __table_args__ = (
         db.Index('idx_contrato_versao_lookup', 'obra_id', 'vigente_de', 'vigente_ate'),
+        db.Index('uq_contrato_versao_vigente', 'obra_id', unique=True,
+                 postgresql_where=db.text('vigente_ate IS NULL')),
+        db.UniqueConstraint('obra_id', 'versao', name='uq_contrato_versao_obra_versao'),
     )
 
     id = db.Column(db.Integer, primary_key=True)

@@ -70,6 +70,8 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 
+from sqlalchemy import or_
+
 from app import db
 from models import ObraContratoVersao
 
@@ -123,35 +125,69 @@ def abrir_versao(obra, valor, origem_tipo: str, *, origem_proposta_id=None,
     disparássemos um flush aqui (explícito ou por autoflush de uma query
     comum), a sessão tentaria inserir essa obra pela metade e estouraria a
     constraint. Por isso:
-      - as duas consultas abaixo rodam dentro de `no_autoflush`, para não
-        forçar a sessão a gravar a obra ainda incompleta só porque este
-        módulo precisou fazer um SELECT;
+      - as duas consultas ao banco abaixo rodam dentro de `no_autoflush`,
+        para não forçar a sessão a gravar a obra ainda incompleta só porque
+        este módulo precisou fazer um SELECT;
       - `nova` é ligada por `obra=obra` (relationship), não por
         `obra_id=obra.id` — o SQLAlchemy resolve o FK sozinho na hora do
         flush de verdade (do chamador), na ordem certa, mesmo que `obra.id`
         seja `None` agora;
       - este módulo nunca chama `db.session.flush()` — quem decide a hora
         de gravar continua sendo o chamador, inclusive para obras novas.
-    Nada disso muda o resultado para obra já existente (id != None): as
+
+    Efeito colateral do `no_autoflush` acima (achado em revisão de código,
+    24/08): como as consultas SQL não veem linhas ainda não flushadas, DUAS
+    chamadas a `definir_valor_contrato` para a MESMA obra dentro da MESMA
+    transação, sem commit/flush entre elas, faziam a 2ª chamada não enxergar
+    a versão que a 1ª tinha acabado de criar em memória — resultado: 2
+    linhas `versao=1`, ambas `vigente_ate=None`, só descobertas no commit
+    (ou nunca, se nada mais na mesma transação disparar autoflush antes).
+    Por isso, além da consulta ao banco, esta função também varre
+    `db.session.new` por `ObraContratoVersao` pendentes desta MESMA obra
+    (`o.obra is obra`, comparação de identidade — funciona porque o mapa de
+    identidade do SQLAlchemy garante que a mesma linha, na mesma sessão, é
+    sempre o mesmo objeto Python) e reconcilia contra elas: fecha a
+    pendente vigente, se houver, e usa o maior número de versão entre banco
+    e pendentes. Isso cobre o caso do bug; o índice único parcial
+    `uq_contrato_versao_vigente` (migration 271 / models.py) é a rede de
+    segurança de banco para qualquer regressão futura deste raciocínio —
+    pega no nível de constraint, não só de leitura em memória.
+
+    Nada disso muda o resultado do caso comum — obra já existente (id !=
+    None), uma única chamada por transação, os 5 chamadores de hoje: as
     mesmas consultas acertam a versão vigente e o próximo número de versão
     normalmente.
     """
     vigente_de = vigente_de or datetime.utcnow()
 
-    with db.session.no_autoflush:
-        atual = ObraContratoVersao.query.filter_by(
-            obra_id=obra.id, admin_id=obra.admin_id, vigente_ate=None).first()
-        if atual is not None:
-            atual.vigente_ate = vigente_de
+    pendentes = [
+        o for o in db.session.new
+        if isinstance(o, ObraContratoVersao)
+        and (o.obra is obra or (obra.id is not None and o.obra_id == obra.id))
+    ]
 
-        ultima_versao = db.session.query(
+    with db.session.no_autoflush:
+        atual_no_banco = ObraContratoVersao.query.filter_by(
+            obra_id=obra.id, admin_id=obra.admin_id, vigente_ate=None).first()
+
+        ultima_versao_no_banco = db.session.query(
             db.func.max(ObraContratoVersao.versao)
         ).filter_by(obra_id=obra.id, admin_id=obra.admin_id).scalar()
+
+    if atual_no_banco is not None:
+        atual_no_banco.vigente_ate = vigente_de
+
+    for pendente in pendentes:
+        if pendente.vigente_ate is None:
+            pendente.vigente_ate = vigente_de
+
+    ultima_versao_pendente = max((p.versao for p in pendentes), default=0)
+    proxima_versao = max(ultima_versao_no_banco or 0, ultima_versao_pendente) + 1
 
     nova = ObraContratoVersao(
         obra=obra,
         admin_id=obra.admin_id,
-        versao=(ultima_versao or 0) + 1,
+        versao=proxima_versao,
         valor=Decimal(str(valor or 0)),
         vigente_de=vigente_de,
         vigente_ate=None,
@@ -179,8 +215,6 @@ def valor_vigente_em(obra_id: int, admin_id: int, quando: datetime) -> Decimal:
     """O valor do contrato em vigor no instante `quando` — não necessariamente
     o vigente HOJE. `Decimal('0')` se a obra não tinha nenhuma versão àquela
     altura (antes da primeira, ou obra sem nenhuma versão)."""
-    from sqlalchemy import or_
-
     versao = ObraContratoVersao.query.filter(
         ObraContratoVersao.obra_id == obra_id,
         ObraContratoVersao.admin_id == admin_id,

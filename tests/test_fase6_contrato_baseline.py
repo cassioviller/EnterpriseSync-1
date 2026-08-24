@@ -462,3 +462,46 @@ def test_valor_contrato_da_obra_sempre_igual_a_versao_vigente_apos_varias_trocas
         # só houve 2 mudanças reais de valor (100k→130k, 130k→90k) além da
         # abertura inicial — 3 versões no total, não 5.
         assert ObraContratoVersao.query.filter_by(obra_id=obra_id).count() == 3
+
+
+@pytest.mark.integration
+def test_duas_chamadas_na_mesma_transacao_nao_duplicam_versao_vigente(ambiente):
+    """Bug achado em revisão de código (24/08): 2 chamadas de
+    definir_valor_contrato para a MESMA obra, na MESMA transação, SEM
+    commit/flush entre elas. Antes da correção, o `no_autoflush` das
+    consultas de `abrir_versao` escondia da 2ª chamada a versão que a 1ª
+    tinha acabado de criar em memória — resultado: 2 linhas `versao=1`,
+    ambas `vigente_ate=None`. A correção varre `db.session.new` por
+    `ObraContratoVersao` pendentes desta obra e reconcilia contra elas."""
+    from services.contrato_obra import ORIGEM_EDICAO, definir_valor_contrato
+    with app.app_context():
+        obra_id = ambiente['obra_id']
+        obra = db.session.get(Obra, obra_id)
+
+        # 150000.0 difere do valor de partida da fixture (100000.0, sem
+        # versão) — a 1ª chamada abre a versão nº1. A 2ª, com um valor
+        # diferente da 1ª, deveria fechar a nº1 e abrir a nº2 — tudo isso
+        # SEM nenhum flush/commit no meio, o cenário exato do bug.
+        definir_valor_contrato(obra, 150000.0, origem=ORIGEM_EDICAO)
+        definir_valor_contrato(obra, 180000.0, origem=ORIGEM_EDICAO)
+        db.session.commit()
+
+        vigentes = ObraContratoVersao.query.filter_by(
+            obra_id=obra_id, vigente_ate=None).all()
+        assert len(vigentes) == 1, (
+            f'esperava exatamente 1 versão vigente, achei {len(vigentes)} — '
+            f'{[ (v.versao, v.valor) for v in vigentes ]}')
+        assert vigentes[0].versao == 2
+        assert vigentes[0].valor == Decimal('180000.00')
+
+        todas = ObraContratoVersao.query.filter_by(obra_id=obra_id).order_by(
+            ObraContratoVersao.versao).all()
+        assert [v.versao for v in todas] == [1, 2], (
+            f'esperava versões 1 e 2 (sem duplicata), achei '
+            f'{[v.versao for v in todas]}')
+        assert todas[0].vigente_ate is not None, (
+            'a versão 1 deveria ter sido fechada pela 2ª chamada')
+        assert todas[0].valor == Decimal('150000.00')
+
+        obra = db.session.get(Obra, obra_id)
+        assert float(obra.valor_contrato) == 180000.0
