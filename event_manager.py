@@ -1404,18 +1404,17 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
         # duplicar a obra, a obra existente tem de refletir a revisão.
         if valor_total > 0 and float(obra.valor_contrato or 0) != float(valor_total):
             anterior = float(obra.valor_contrato or 0)
-            # Fase 0.6 / D1c — congela a base das medições JÁ EMITIDAS antes
-            # de mexer no contrato (sem isto o aditivo reprecificava
+            # Fase 0.6 / D1c — a base das medições JÁ EMITIDAS congela antes
+            # de o contrato mudar (sem isto o aditivo reprecificava
             # retroativamente até o que o cliente já pagou). O bloco foi
-            # EXTRAÍDO para o serviço na Fase 6/Task 4: `aprovar_aditivo`
-            # precisa da mesma regra e dos mesmos filtros — um só lugar.
-            # p9 — escrita pelo ponto único; o congelamento continua sendo
-            # regra de aditivo, não de escrita do campo.
+            # EXTRAÍDO para o serviço na Fase 6/Task 4, e na Task 5 o
+            # congelamento subiu para DENTRO de `definir_valor_contrato`
+            # (o escritor único) — a chamada explícita que morava aqui
+            # virou duplicata e saiu; `definir_valor_contrato` congela com
+            # o valor de entrada de `obra.valor_contrato` (== `anterior`).
             from services.contrato_obra import (ORIGEM_ADITIVO,
                                                 ORIGEM_PROPOSTA,
-                                                congelar_base_medicoes_recebidas,
                                                 definir_valor_contrato)
-            congelar_base_medicoes_recebidas(obra, anterior)
             definir_valor_contrato(
                 obra, valor_total,
                 origem=ORIGEM_ADITIVO if anterior else ORIGEM_PROPOSTA,

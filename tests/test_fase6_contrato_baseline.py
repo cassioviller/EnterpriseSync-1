@@ -505,3 +505,214 @@ def test_duas_chamadas_na_mesma_transacao_nao_duplicam_versao_vigente(ambiente):
 
         obra = db.session.get(Obra, obra_id)
         assert float(obra.valor_contrato) == 180000.0
+
+
+# ---------------------------------------------------------------------------
+# Task 5 — fechar a edição livre de `valor_contrato`.
+#
+# O formulário de edição da obra era a última porta de reprecificação
+# in-place: com versão vigente, o POST passa a IGNORAR o campo (mudança de
+# valor é aditivo — Task 13); sem versão (obra manual, pré-baseline), a
+# gravação abre a versão nº1 com origem_tipo='contrato_original' — sempre
+# pelo escritor único. E o congelamento de `valor_base` das medições já
+# recebidas sobe para DENTRO de `definir_valor_contrato` (mesmo movimento
+# do repontamento na Task 4), alcançando as 5 portas — inclusive esta, que
+# nunca congelou nada.
+#
+# Primeiros testes HTTP autenticados da fase: login por injeção de sessão
+# (padrão de tests/test_fase0_autorizacao.py), nunca POST em /login.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope='module')
+def _schema_fase6():
+    """Schema das Tasks 1–4 no banco de teste (SIGE_BOOT_DDL=0 no boot).
+
+    As três migrações são idempotentes — mesmo padrão do `_schema` de
+    tests/test_fase6_aditivo.py."""
+    from migrations import (_migration_271_obra_contrato_versao,
+                            _migration_272_aditivo_contrato,
+                            _migration_273_medicao_contrato_versionada)
+    with app.app_context():
+        _migration_271_obra_contrato_versao()
+        _migration_272_aditivo_contrato()
+        _migration_273_medicao_contrato_versionada()
+    yield
+
+
+def _cliente_http(user_id):
+    """Test client autenticado por injeção de sessão (flask-login)."""
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
+
+
+def _form_edicao(obra, **extra):
+    """Campos mínimos para o POST de /obras/editar/<id> chegar ao commit.
+
+    `cliente_id` do próprio tenant (obrigatório — sem ele a rota redireciona
+    com flash de erro antes de salvar); `ativo` marcado para a obra não ser
+    desativada de tabela; `codigo` presente para não ser regenerado."""
+    dados = {
+        'nome': obra.nome,
+        'endereco': obra.endereco or '',
+        'data_inicio': obra.data_inicio.strftime('%Y-%m-%d'),
+        'codigo': obra.codigo,
+        'cliente_id': str(obra.cliente_id),
+        'ativo': '1',
+    }
+    dados.update(extra)
+    return dados
+
+
+@pytest.mark.integration
+def test_post_edicao_com_baseline_nao_muda_valor_nem_cria_versao(
+        ambiente, _schema_fase6):
+    """Step 1 do brief: POST de edição com `valor_contrato` alterado numa
+    obra COM versão vigente não muda o valor e não cria versão nova — a
+    mudança de valor se faz por aditivo."""
+    from services.contrato_obra import ORIGEM_PROPOSTA, definir_valor_contrato
+    with app.app_context():
+        obra_id, admin_id = ambiente['obra_id'], ambiente['admin_id']
+        obra = db.session.get(Obra, obra_id)
+        # abre o baseline (150000.0 difere dos 100000.0 da fixture — é
+        # mudança real e abre a versão nº1)
+        definir_valor_contrato(obra, 150000.0, origem=ORIGEM_PROPOSTA)
+        db.session.commit()
+        form = _form_edicao(obra, valor_contrato='999999')
+
+    c = _cliente_http(admin_id)
+    r = c.post(f'/obras/editar/{obra_id}', data=form, follow_redirects=False)
+    assert r.status_code == 302, (
+        f'o POST de edição deveria ter salvo e redirecionado — veio '
+        f'{r.status_code}')
+
+    with app.app_context():
+        obra = db.session.get(Obra, obra_id)
+        assert float(obra.valor_contrato) == 150000.0, (
+            'obra com baseline: o formulário de edição NÃO pode mudar '
+            f'valor_contrato — veio {obra.valor_contrato}')
+        total = ObraContratoVersao.query.filter_by(obra_id=obra_id).count()
+        assert total == 1, (
+            f'o POST ignorado não pode ter aberto versão nova — achei {total}')
+        vigente = ObraContratoVersao.query.filter_by(
+            obra_id=obra_id, vigente_ate=None).one()
+        assert vigente.valor == Decimal('150000.00')
+
+
+@pytest.mark.integration
+def test_post_edicao_sem_baseline_abre_versao_contrato_original(
+        ambiente, _schema_fase6):
+    """Obra sem nenhuma versão (criada à mão, pré-baseline): o campo segue
+    editável, e a gravação abre a versão nº1 com
+    origem_tipo='contrato_original' — assim toda obra acaba com baseline."""
+    with app.app_context():
+        obra_id, admin_id = ambiente['obra_id'], ambiente['admin_id']
+        obra = db.session.get(Obra, obra_id)
+        assert ObraContratoVersao.query.filter_by(obra_id=obra_id).count() == 0
+        form = _form_edicao(obra, valor_contrato='250000')
+
+    c = _cliente_http(admin_id)
+    r = c.post(f'/obras/editar/{obra_id}', data=form, follow_redirects=False)
+    assert r.status_code == 302, (
+        f'o POST de edição deveria ter salvo e redirecionado — veio '
+        f'{r.status_code}')
+
+    with app.app_context():
+        obra = db.session.get(Obra, obra_id)
+        assert float(obra.valor_contrato) == 250000.0
+        v = ObraContratoVersao.query.filter_by(obra_id=obra_id).one()
+        assert v.versao == 1
+        assert v.vigente_ate is None
+        assert v.origem_tipo == 'contrato_original', (
+            f"a versão aberta pela edição de obra sem baseline deve nascer "
+            f"como 'contrato_original' — veio {v.origem_tipo!r}")
+        assert v.valor == Decimal('250000.00')
+
+
+@pytest.mark.integration
+def test_definir_valor_contrato_congela_base_de_medicao_recebida(
+        ambiente, _schema_fase6):
+    """O congelamento de `valor_base` (Fase 0.6/D1c) sobe para DENTRO do
+    escritor único: qualquer porta que mude o valor congela a medição JÁ
+    RECEBIDA no valor ANTIGO do contrato, antes da escrita — sem isso a
+    edição manual reprecificava retroativamente o que o cliente já pagou."""
+    from models import MedicaoContrato
+    from services.contrato_obra import ORIGEM_EDICAO, definir_valor_contrato
+    with app.app_context():
+        obra_id = ambiente['obra_id']
+        obra = db.session.get(Obra, obra_id)  # valor_contrato=100000.0
+        recebido = MedicaoContrato(
+            obra_id=obra.id, admin_id=obra.admin_id, nome='Entrada',
+            pct=Decimal('0.10'), recebido_no_mes='2026-02')
+        futuro = MedicaoContrato(
+            obra_id=obra.id, admin_id=obra.admin_id, nome='Entrega',
+            pct=Decimal('0.90'))
+        db.session.add_all([recebido, futuro])
+        db.session.flush()
+        recebido_id, futuro_id = recebido.id, futuro.id
+
+        definir_valor_contrato(obra, 120000.0, origem=ORIGEM_EDICAO,
+                               motivo='teste task5')
+        db.session.commit()
+
+        recebido = db.session.get(MedicaoContrato, recebido_id)
+        futuro = db.session.get(MedicaoContrato, futuro_id)
+        assert recebido.valor_base == Decimal('100000.00'), (
+            'definir_valor_contrato tem de congelar valor_base da medição '
+            'recebida com o valor ANTIGO do contrato antes de escrever o '
+            f'novo — veio {recebido.valor_base}')
+        assert futuro.valor_base is None, (
+            'medição não recebida segue o contrato vigente — valor_base '
+            f'deveria continuar NULL, veio {futuro.valor_base}')
+
+
+@pytest.mark.integration
+def test_form_edicao_trava_campo_e_linka_aditivos_quando_ha_vigente(
+        ambiente, _schema_fase6):
+    """GET do formulário de edição com contrato vigente: input travado
+    (readonly + disabled), badge com a versão vigente e link para
+    /obras/<id>/aditivos (href literal até a Task 13 criar a rota)."""
+    import re as _re
+    from services.contrato_obra import ORIGEM_PROPOSTA, definir_valor_contrato
+    with app.app_context():
+        obra_id, admin_id = ambiente['obra_id'], ambiente['admin_id']
+        obra = db.session.get(Obra, obra_id)
+        definir_valor_contrato(obra, 150000.0, origem=ORIGEM_PROPOSTA)
+        db.session.commit()
+
+    c = _cliente_http(admin_id)
+    r = c.get(f'/obras/editar/{obra_id}')
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+
+    campo = _re.search(r'<input[^>]*name="valor_contrato"[^>]*>', html)
+    assert campo is not None, 'o campo valor_contrato não pode ser removido'
+    assert 'readonly' in campo.group(0) and 'disabled' in campo.group(0), (
+        'com contrato vigente o input de valor_contrato deve estar '
+        f'readonly + disabled — veio: {campo.group(0)}')
+    assert f'/obras/{obra_id}/aditivos' in html, (
+        'faltou o link para a tela de aditivos da obra')
+    assert 'Contrato v1 vigente' in html, (
+        'faltou o badge com a versão vigente do contrato')
+
+
+@pytest.mark.integration
+def test_form_edicao_mantem_campo_editavel_sem_vigente(ambiente, _schema_fase6):
+    """Sem versão vigente o campo continua editável — é por ele que a obra
+    manual ganha o baseline."""
+    import re as _re
+    with app.app_context():
+        obra_id, admin_id = ambiente['obra_id'], ambiente['admin_id']
+
+    c = _cliente_http(admin_id)
+    r = c.get(f'/obras/editar/{obra_id}')
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+
+    campo = _re.search(r'<input[^>]*name="valor_contrato"[^>]*>', html)
+    assert campo is not None
+    assert 'readonly' not in campo.group(0) and 'disabled' not in campo.group(0), (
+        f'sem contrato vigente o campo deve seguir editável — veio: '
+        f'{campo.group(0)}')

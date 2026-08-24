@@ -511,13 +511,36 @@
                                         <label for="valor_contrato" class="form-label">
                                             <i class="fas fa-file-contract"></i>Valor do Contrato (R$)
                                         </label>
-                                        <input type="number" 
-                                               class="form-control" 
-                                               id="valor_contrato" 
-                                               name="valor_contrato" 
+                                        {% if contrato_vigente_obra %}
+                                        {# Fase 6 / Task 5 — com versão vigente o valor só muda por
+                                           aditivo: input travado (disabled nem submete o campo; o
+                                           POST ignora de qualquer forma). O campo NÃO é removido —
+                                           a criação de obra ainda o usa (sem contrato_vigente_obra
+                                           cai no ramo editável abaixo). #}
+                                        <input type="number"
+                                               class="form-control"
+                                               id="valor_contrato"
+                                               name="valor_contrato"
+                                               value="{{ obra.valor_contrato if obra and obra.valor_contrato else '' }}"
+                                               step="0.01"
+                                               readonly disabled>
+                                        <div class="mt-1">
+                                            <span class="badge bg-secondary">Contrato v{{ contrato_vigente_obra.versao }} vigente</span>
+                                            {# Task 13 cria a rota de aditivos — trocar o href
+                                               literal por url_for quando o endpoint existir. #}
+                                            <a href="/obras/{{ obra.id }}/aditivos" class="small ms-1">
+                                                Alterar por aditivo
+                                            </a>
+                                        </div>
+                                        {% else %}
+                                        <input type="number"
+                                               class="form-control"
+                                               id="valor_contrato"
+                                               name="valor_contrato"
                                                value="{{ obra.valor_contrato if obra and obra.valor_contrato else '' }}"
                                                step="0.01"
                                                placeholder="0,00">
+                                        {% endif %}
                                     </div>
                                 </div>
                                 

@@ -874,15 +874,40 @@ def editar_obra(id):
             
             # Valores financeiros
             obra.orcamento = float(request.form.get('orcamento', 0)) if request.form.get('orcamento') else None
-            # p9 — escrita pelo ponto único (services/contrato_obra.py).
-            from services.contrato_obra import (ORIGEM_EDICAO,
+            # Fase 6 / Task 5 — o formulário deixa de ser porta de
+            # reprecificação livre. Com versão vigente do contrato, o campo
+            # do form é IGNORADO: mudança de valor se faz por aditivo
+            # (Task 13). Sem versão (obra manual, pré-baseline), o campo
+            # segue editável e a gravação abre a versão nº1 como contrato
+            # original — sempre pelo escritor único
+            # (services/contrato_obra.py), nunca escrita direta.
+            from services.contrato_obra import (ORIGEM_CONTRATO_ORIGINAL,
+                                                contrato_vigente,
                                                 definir_valor_contrato)
-            definir_valor_contrato(
-                obra,
-                float(request.form.get('valor_contrato', 0))
-                if request.form.get('valor_contrato') else 0,
-                origem=ORIGEM_EDICAO, motivo='formulário de edição da obra',
-                usuario_id=getattr(current_user, 'id', None))
+            _valor_form = (float(request.form.get('valor_contrato', 0))
+                           if request.form.get('valor_contrato') else 0)
+            _vigente = (contrato_vigente(obra.id, obra.admin_id)
+                        if obra.admin_id is not None else None)
+            if _vigente is not None:
+                if _valor_form and float(_vigente.valor) != _valor_form:
+                    # Só avisa quando houve TENTATIVA de mudança (o input
+                    # travado nem submete o campo — chegar aqui é POST
+                    # forjado ou página desatualizada).
+                    from markupsafe import Markup
+                    # Task 13 cria a rota de aditivos — trocar o href
+                    # literal por url_for quando o endpoint existir.
+                    flash(Markup(
+                        'O valor do contrato não muda pelo formulário: a '
+                        f'obra tem a versão nº{_vigente.versao} do contrato '
+                        'vigente. A mudança se faz por '
+                        f'<a href="/obras/{obra.id}/aditivos">aditivo</a>.'),
+                        'warning')
+            else:
+                definir_valor_contrato(
+                    obra, _valor_form, origem=ORIGEM_CONTRATO_ORIGINAL,
+                    motivo='contrato original registrado pelo formulário '
+                           'de edição da obra',
+                    usuario_id=getattr(current_user, 'id', None))
             
             # Novos campos
             obra.area_total_m2 = float(request.form.get('area_total_m2', 0)) if request.form.get('area_total_m2') else None
@@ -1052,9 +1077,16 @@ def editar_obra(id):
                            .filter_by(obra_id=obra.id)
                            .order_by(ObraSignatarioCliente.ativo.desc(),
                                      ObraSignatarioCliente.nome).all())
+    # Fase 6 / Task 5 — com versão vigente o template trava o campo
+    # valor_contrato (readonly + badge + link para aditivos). A rota de
+    # criação não passa esta variável: lá o campo segue sempre editável.
+    from services.contrato_obra import contrato_vigente as _contrato_vigente
+    contrato_vigente_obra = (_contrato_vigente(obra.id, obra.admin_id)
+                             if obra.admin_id is not None else None)
     return render_template('obra_form.html',
                          titulo='Editar Obra',
                          obra=obra,
+                         contrato_vigente_obra=contrato_vigente_obra,
                          funcionarios=funcionarios,
                          servicos_disponiveis=servicos_disponiveis,
                          servicos_obra=servicos_obra,

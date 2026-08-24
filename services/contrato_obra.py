@@ -54,6 +54,16 @@ não cadastrado) não é bloqueada nem cai num rótulo genérico: vira o própri
 texto recebido, para nada ficar oculto — a anomalia já sai logada como
 warning antes disso.
 
+## Fase 6 / Task 5 — o congelamento de base também mora no escritor único
+
+`congelar_base_medicoes_recebidas` (Fase 0.6/D1c, extraída na Task 4) passou
+a ser chamada de DENTRO de `definir_valor_contrato`, antes da escrita: toda
+porta que muda o valor por aqui congela a medição já recebida no valor
+antigo — a chamada explícita que morava em `event_manager.py` saiu (era a
+única porta que congelava; a edição manual, por exemplo, nunca congelou).
+`aprovar_aditivo` mantém a própria chamada porque não passa por
+`definir_valor_contrato` (delta-zero, ver a seção do aditivo).
+
 ## Idempotência: mesmo valor não abre versão nova
 
 `definir_valor_contrato` só chama `abrir_versao` quando o valor novo é
@@ -87,9 +97,14 @@ ORIGEM_ADITIVO = 'aditivo'
 ORIGEM_CADASTRO = 'cadastro_manual'
 ORIGEM_EDICAO = 'edicao_manual'
 ORIGEM_IMPORTACAO = 'importacao_fisico_financeiro'
+# Fase 6 / Task 5 — obra sem NENHUMA versão cujo valor entra pelo formulário
+# de edição: não é reprecificação (edicao_manual), é o contrato original
+# chegando atrasado ao baseline. Distinguir os dois na régua é o que permite
+# ler depois "esta obra nasceu com contrato X" vs "alguém editou para X".
+ORIGEM_CONTRATO_ORIGINAL = 'contrato_original'
 
 ORIGENS = (ORIGEM_PROPOSTA, ORIGEM_ADITIVO, ORIGEM_CADASTRO, ORIGEM_EDICAO,
-           ORIGEM_IMPORTACAO)
+           ORIGEM_IMPORTACAO, ORIGEM_CONTRATO_ORIGINAL)
 
 # origem (vocabulário de log) → origem_tipo (coluna de ObraContratoVersao).
 # Identidade deliberada — ver "Mapeamento origem → origem_tipo" acima.
@@ -280,6 +295,19 @@ def definir_valor_contrato(obra, valor, origem: str, motivo: str = '',
         # `obra.valor_contrato` já sincronizado.
         obra.valor_contrato = novo
         return novo
+
+    # Fase 6 / Task 5 — o congelamento de `valor_base` (Fase 0.6/D1c) sobe
+    # para DENTRO do escritor único, como o repontamento subiu na Task 4:
+    # medição JÁ RECEBIDA congela no valor ANTIGO do contrato (`anterior`,
+    # capturado na entrada) ANTES de a escrita acontecer — qualquer porta
+    # que mude o valor por aqui (edição manual inclusive, que nunca
+    # congelou nada) para de reprecificar retroativamente o que o cliente
+    # já pagou. Idempotente e no-op onde não há medição recebida (filtros
+    # `valor_base IS NULL` / `recebido_no_mes` preenchido), então rodar em
+    # todas as portas é barato. `aprovar_aditivo` não passa por aqui
+    # (chama `abrir_versao` direto, pela razão do delta-zero) e mantém a
+    # própria chamada.
+    congelar_base_medicoes_recebidas(obra, anterior)
 
     if getattr(obra, 'admin_id', None) is None:
         # Obra órfã de tenant: ObraContratoVersao.admin_id é NOT NULL (a
