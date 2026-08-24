@@ -1737,7 +1737,24 @@ def finalizar_rdo(id):
         logger.info(f"[PRODUTIVIDADE] RDO {rdo.numero_rdo}: {len(subs_com_meta)} subatividade(s) calculadas.")
 
         db.session.commit()
-        
+
+        # Publicar o AVANÇO, não só o custo (plano de 24/08). O percentual da
+        # tarefa é escrito no momento em que o apontamento é salvo — e ali o
+        # RDO ainda é rascunho, que desde hoje não conta. Sem esta chamada o
+        # avanço nunca chegaria ao cronograma: nenhum handler de
+        # `rdo_finalizado` e nem `transicionar` mexem em percentual.
+        # Best-effort e FORA da transação, pela mesma razão da exclusão de RDO
+        # (:577): a função comita por tarefa, e percentual velho se conserta
+        # em qualquer sincronização posterior.
+        try:
+            from services.cronograma_apontamento_service import (
+                recalcular_percentuais_do_rdo)
+            recalcular_percentuais_do_rdo(rdo.id, admin_id)
+        except Exception as _e_pct:
+            logger.warning(
+                f"[WARN] RDO {rdo.id} submetido, mas o percentual do "
+                f"cronograma não foi refrescado: {_e_pct}")
+
         # [OK] NOVO: Emitir evento rdo_finalizado para integração com módulo de custos
         try:
             from event_manager import EventManager
@@ -1895,6 +1912,21 @@ def reabrir_rdo(id):
         transicionar(rdo, RASCUNHO, usuario=current_user, motivo=motivo,
                      ip=request.remote_addr)
         db.session.commit()
+
+        # Simétrico do Submeter: o RDO volta a rascunho, e o avanço dele sai
+        # do cronograma junto. Não é um "desfazer" por delta — a fórmula
+        # recalcula a partir dos RDOs que ainda valem, então o avanço vindo de
+        # outro RDO já submetido continua de pé.
+        try:
+            from services.cronograma_apontamento_service import (
+                recalcular_percentuais_do_rdo)
+            recalcular_percentuais_do_rdo(
+                rdo.id, rdo.admin_id or rdo.obra.admin_id)
+        except Exception as _e_pct:
+            logger.warning(
+                f"[WARN] RDO {rdo.id} reaberto, mas o percentual do "
+                f"cronograma não foi refrescado: {_e_pct}")
+
         flash(f'RDO {rdo.numero_rdo} reaberto para edição.', 'success')
     except CicloVidaInvalido as e:
         db.session.rollback()

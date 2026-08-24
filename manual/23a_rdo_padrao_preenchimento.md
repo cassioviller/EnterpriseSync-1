@@ -19,6 +19,11 @@ RDO lançado dias depois é reconstrução de memória: as horas arredondam, o
 efetivo some e a ocorrência que importava não é registrada. Se o dia não teve
 trabalho na obra, não se cria RDO.
 
+O botão **Duplicar** cria um RDO **com a data de hoje**, para adiantar o
+preenchimento a partir do dia anterior — não para corrigir um RDO que já
+existe. Se hoje já tem RDO, não duplique: abra o que existe. O sistema **não
+impede** dois RDOs no mesmo dia; quem garante o "um por dia" é quem preenche.
+
 ## 1. Efetivo próprio
 
 Registre **todas** as pessoas da equipe própria que estiveram na obra, em cada
@@ -111,9 +116,13 @@ Vale a pena entender a sequência antes de precisar dela.
 
 **Rascunho.** É como o RDO nasce, ao ser salvo pela tela de criação. Pode ser
 editado à vontade, quantas vezes for preciso, durante o dia. Rascunho **não
-lança custo**: o custo de mão de obra só entra no razão quando o dia é
-submetido. Um RDO esquecido em rascunho é um dia sem fecho — sem custo, sem
-assinatura, sem valor de documento.
+lança custo e não move o cronograma**: nem o custo de mão de obra, nem o avanço
+das atividades saem do rascunho — os dois entram quando o dia é submetido. Um
+RDO esquecido em rascunho é um dia sem fecho: para o resto do sistema, um dia
+em que ninguém trabalhou.
+
+> Isso vale nos dois sentidos. Aponte à vontade durante o dia: enquanto o RDO
+> for rascunho, a barra da atividade **não vai andar**. Ela anda no Submeter.
 
 **Submeter.** É o fecho do dia, no botão **Submeter** da tela do RDO. É aqui
 que os custos de mão de obra são lançados, a medição é recalculada e o cliente

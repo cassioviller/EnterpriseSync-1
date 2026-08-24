@@ -45,7 +45,7 @@ def _config():
 def _rdo_vazio(obra, admin):
     """RDO sem apontamento de empresa — só o continente do registro da sub."""
     rdo = RDO(numero_rdo=f'RDO-CI-{admin.id}', data_relatorio=date(2026, 7, 5),
-              obra_id=obra.id, admin_id=admin.id)
+              obra_id=obra.id, admin_id=admin.id, estado='preenchido')
     db.session.add(rdo)
     db.session.flush()
     return rdo

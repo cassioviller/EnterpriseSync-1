@@ -422,6 +422,7 @@ def _atualizar_percentual_sem_commit(tarefa, admin_id: int,
     `None` consulta esta tarefa; o laço resolve o lote de uma vez.
     """
     from models import RDOApontamentoCronograma, RDO, db
+    from services.rdo_ciclo_vida import RASCUNHO as _RASCUNHO
 
     ultimo = (
         db.session.query(
@@ -432,6 +433,14 @@ def _atualizar_percentual_sem_commit(tarefa, admin_id: int,
         .filter(
             RDOApontamentoCronograma.tarefa_cronograma_id == tarefa.id,
             RDOApontamentoCronograma.admin_id == admin_id,
+            # Rascunho NÃO conta (plano de 24/08). O dia só passa a existir
+            # para o resto do sistema quando alguém Submete — é a mesma
+            # fronteira que `services.rdo_ciclo_vida.publica_custos` já
+            # aplica ao custo de mão de obra desde 21/08. Exclui SÓ rascunho:
+            # `retificado` continua elegível porque o RDO retificador nasce
+            # em rascunho (services/rdo_assinatura.py:176) e o desempate
+            # abaixo já prefere o retificador sobre o original.
+            RDO.estado != _RASCUNHO,
         )
         # Desempate ESTÁVEL: não há unicidade de RDO por obra+data, então
         # dois RDOs do mesmo dia apontando a mesma tarefa deixariam a
@@ -447,7 +456,12 @@ def _atualizar_percentual_sem_commit(tarefa, admin_id: int,
         percentual_livre = _percentual_livre(admin_id)
 
     if ultimo is None:
-        tarefa.percentual_concluido = 0.0
+        # Espelha a guarda da irmã com commit (`atualizar_percentual_tarefa`):
+        # sem apontamento ELEGÍVEL não há de onde derivar, e gravar 0 aqui
+        # apagaria o percentual da carga inicial do `pct_project`. Esta função
+        # roda em lote (rollup, sincronização), longe de qualquer transição de
+        # estado — então nunca é ela quem tem o direito de zerar.
+        return
     elif (not percentual_livre
             and tarefa.quantidade_total and tarefa.quantidade_total > 0
             and not (historico_em_percentual(tarefa.id, admin_id)
@@ -1409,7 +1423,8 @@ def verificar_consistencia_progresso(obra_id: int, admin_id: int) -> dict:
     return {'tarefas_verificadas': verificadas, 'divergencias': divergencias}
 
 
-def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
+def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int, *,
+                                permitir_zerar: bool = False) -> None:
     """
     Recalcula e persiste o percentual_concluido da TarefaCronograma.
 
@@ -1423,6 +1438,7 @@ def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
     """
     from models import (RDO, RDOApontamentoCronograma,
                         RDOSubempreitadaApontamento, TarefaCronograma, db)
+    from services.rdo_ciclo_vida import RASCUNHO as _RASCUNHO
     from sqlalchemy import func as sqlfunc
 
     tarefa = TarefaCronograma.query.get(tarefa_id)
@@ -1439,6 +1455,14 @@ def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
         .filter(
             RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
             RDOApontamentoCronograma.admin_id == admin_id,
+            # Rascunho NÃO conta (plano de 24/08). O dia só passa a existir
+            # para o resto do sistema quando alguém Submete — é a mesma
+            # fronteira que `services.rdo_ciclo_vida.publica_custos` já
+            # aplica ao custo de mão de obra desde 21/08. Exclui SÓ rascunho:
+            # `retificado` continua elegível porque o RDO retificador nasce
+            # em rascunho (services/rdo_assinatura.py:176) e o desempate
+            # abaixo já prefere o retificador sobre o original.
+            RDO.estado != _RASCUNHO,
         )
         # Desempate ESTÁVEL: não há unicidade de RDO por obra+data, então
         # dois RDOs do mesmo dia apontando a mesma tarefa deixariam a
@@ -1472,7 +1496,17 @@ def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
     # fica no valor derivado por último em vez de voltar a 0. Preferível —
     # zerar ali seria tão arbitrário quanto (a carga inicial já se perdeu) e
     # acontece com o usuário na tela, não silenciosamente.
-    if ultimo is None and not qtd_sub:
+    #
+    # `permitir_zerar` é a ÚNICA porta que atravessa esta guarda, e existe por
+    # causa do Reabrir. Depois que rascunho deixou de contar (24/08), reabrir
+    # um RDO pode deixar a tarefa sem nenhum apontamento elegível — e aí
+    # "nada de onde derivar" quer dizer zero, não "não mexa". Quem chama a
+    # partir de uma TRANSIÇÃO de estado sabe disso; a query, não. Por isso a
+    # decisão fica no chamador (`recalcular_percentuais_do_rdo`) e o default
+    # continua protegendo a carga do `pct_project` em todos os outros
+    # caminhos — inclusive no salvar de um rascunho numa obra recém-importada,
+    # que zeraria o avanço importado se este parâmetro não existisse.
+    if ultimo is None and not qtd_sub and not permitir_zerar:
         return
 
     tem_total = bool(tarefa.quantidade_total and tarefa.quantidade_total > 0)

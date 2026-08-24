@@ -20,6 +20,7 @@ Este manual reúne, em um único lugar, as instruções de uso de **todos os mó
    - RDO (Relatório Diário de Obra)
    - RDO — Padrão de Preenchimento (a norma: o que precisa estar preenchido)
    - Cronograma
+   - Cronograma — Padrão de Revisão (a norma: quando mexer e o que fica registrado)
    - Financeiro
    - Propostas Comerciais
    - Folha de Pagamento

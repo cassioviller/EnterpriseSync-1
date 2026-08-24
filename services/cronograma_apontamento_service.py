@@ -496,3 +496,53 @@ def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
         acum_ant, bool(permitir_retrocesso), justificativa, admin_id,
     )
     return ap
+
+
+def recalcular_percentuais_do_rdo(rdo_id: int, admin_id: int) -> list[int]:
+    """Refresca o `percentual_concluido` das tarefas que este RDO aponta.
+
+    Existe por causa de uma assimetria que o plano de 24/08 mediu: o
+    percentual da tarefa só é escrito no momento em que o apontamento é
+    salvo — e nesse momento o RDO ainda é **rascunho**. Depois que
+    `atualizar_percentual_tarefa` passou a ignorar rascunho, ninguém mais
+    publicaria o avanço no Submeter: nem os dois handlers de
+    `rdo_finalizado` (event_manager.py:662 lança custo, :1731 recalcula
+    medição) nem `services.rdo_ciclo_vida.transicionar` tocam em percentual
+    de cronograma.
+
+    Chamada nas duas pontas da transição, e é simétrica de propósito:
+    submeter publica o avanço do dia, reabrir o retira. Não decide nada —
+    `atualizar_percentual_tarefa` continua sendo a única fórmula, e ela
+    recalcula a partir dos RDOs que valem AGORA, e não do delta deste RDO.
+    Por isso reabrir um RDO não apaga o avanço que veio de outro já
+    submetido.
+
+    Roda FORA da transação de estado (`atualizar_percentual_tarefa` comita
+    por tarefa). Se falhar, o percentual fica velho e qualquer sincronização
+    posterior o corrige — mesma escolha, e mesma razão, da exclusão de RDO
+    em views/rdo.py:577.
+
+    Devolve os ids das tarefas recalculadas.
+    """
+    from models import RDOApontamentoCronograma, db
+    from utils.cronograma_engine import atualizar_percentual_tarefa
+
+    tarefa_ids = [
+        row[0] for row in db.session.query(
+            RDOApontamentoCronograma.tarefa_cronograma_id
+        ).filter(
+            RDOApontamentoCronograma.rdo_id == rdo_id,
+            RDOApontamentoCronograma.admin_id == admin_id,
+        ).distinct().all()
+    ]
+    for tid in tarefa_ids:
+        # `permitir_zerar`: esta função só é chamada a partir de uma TRANSIÇÃO
+        # de estado. Reabrir pode deixar a tarefa sem nenhum apontamento
+        # elegível, e aí zero é a resposta certa — ao contrário do caminho de
+        # salvar, onde "nada elegível" tem de preservar a carga do
+        # `pct_project`. A distinção é do chamador, não da query.
+        atualizar_percentual_tarefa(tid, admin_id, permitir_zerar=True)
+    if tarefa_ids:
+        logger.info('[apontamento] percentual refrescado para %d tarefa(s) '
+                    'do rdo=%s admin=%s', len(tarefa_ids), rdo_id, admin_id)
+    return tarefa_ids

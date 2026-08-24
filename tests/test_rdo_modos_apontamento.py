@@ -68,6 +68,7 @@ def _rdo(ctx, data_rdo):
         numero_rdo=f'RM-{_suffix()[4:]}'[:20],
         obra_id=ctx['obra_id'], admin_id=ctx['admin_id'],
         data_relatorio=data_rdo, local='Campo', status='Finalizado',
+        estado='preenchido',
     )
     db.session.add(r)
     db.session.commit()
@@ -193,7 +194,7 @@ def test_tarefas_rdo_expoe_contrato_de_modos(ctx):
     t_m = _tarefa(ctx, quantidade_total=None, is_marco=True, duracao_dias=0)
     r0 = RDO(numero_rdo=f'RH-{_suffix()[4:]}'[:20], obra_id=ctx['obra_id'],
              admin_id=ctx['admin_id'], data_relatorio=D0, local='Campo',
-             status='Finalizado')
+             status='Finalizado', estado='preenchido')
     db.session.add(r0)
     db.session.commit()
     registrar_apontamento(r0, t_q, quantidade_dia=30.0,
@@ -229,7 +230,7 @@ def test_apontar_producao_percentual_via_http(ctx):
     t = _tarefa(ctx, quantidade_total=None)
     r1 = RDO(numero_rdo=f'RH-{_suffix()[4:]}'[:20], obra_id=ctx['obra_id'],
              admin_id=ctx['admin_id'], data_relatorio=D0, local='Campo',
-             status='Finalizado')
+             status='Finalizado', estado='preenchido')
     db.session.add(r1)
     db.session.commit()
     c = _client_como(ctx['admin_id'])
@@ -246,7 +247,7 @@ def test_apontar_producao_percentual_via_http(ctx):
     # Retrocesso sem justificativa → 422 com mensagem acionável.
     r2 = RDO(numero_rdo=f'RH-{_suffix()[4:]}'[:20], obra_id=ctx['obra_id'],
              admin_id=ctx['admin_id'], data_relatorio=D0 + timedelta(days=1),
-             local='Campo', status='Finalizado')
+             local='Campo', status='Finalizado', estado='preenchido')
     db.session.add(r2)
     db.session.commit()
     resp = c.post(f'/cronograma/rdo/{r2.id}/apontar', json={
@@ -281,6 +282,21 @@ def test_salvar_rdo_flexivel_modo_percentual_via_form(ctx):
     assert ap.percentual_acumulado == 45.5
     assert ap.percentual_incremento_dia == 45.5
     assert ap.quantidade_executada_dia == 0.0
+
+    # O formulario cria o RDO em RASCUNHO, e desde 24/08 rascunho nao move o
+    # cronograma. O apontamento existe (asserts acima); o avanco so chega a
+    # tarefa quando o dia e submetido — que e o que a rota `finalizar_rdo`
+    # faz, e o que este trecho espelha.
+    db.session.refresh(t)
+    assert t.percentual_concluido in (None, 0.0), \
+        'rascunho nao pode mover o percentual da tarefa'
+    from services.cronograma_apontamento_service import (
+        recalcular_percentuais_do_rdo)
+    from services.rdo_ciclo_vida import PREENCHIDO, transicionar
+    rdo = db.session.get(RDO, ap.rdo_id)
+    transicionar(rdo, PREENCHIDO)
+    db.session.commit()
+    recalcular_percentuais_do_rdo(rdo.id, ctx['admin_id'])
     db.session.refresh(t)
     assert t.percentual_concluido == 45.5
 
@@ -301,5 +317,18 @@ def test_salvar_rdo_flexivel_modo_percentual_via_form(ctx):
     assert len(aps) == 2
     assert aps[1].percentual_acumulado == 30.0
     assert aps[1].percentual_incremento_dia == -15.5
+
+    # A correcao tambem nasce em rascunho: enquanto o dia da correcao nao
+    # fecha, o cronograma continua mostrando o que o dia ANTERIOR (submetido)
+    # deixou. Nao e defeito — e a mesma regra, e ela protege o cronograma de
+    # oscilar com correcao pela metade.
+    db.session.refresh(t)
+    assert t.percentual_concluido == 45.5, \
+        'ate o dia da correcao ser submetido, vale o ultimo dia fechado'
+
+    rdo2 = db.session.get(RDO, aps[1].rdo_id)
+    transicionar(rdo2, PREENCHIDO)
+    db.session.commit()
+    recalcular_percentuais_do_rdo(rdo2.id, ctx['admin_id'])
     db.session.refresh(t)
     assert t.percentual_concluido == 30.0

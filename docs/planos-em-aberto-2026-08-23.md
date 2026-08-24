@@ -149,11 +149,17 @@ estão **mescladas** (`ahead=0`). Só a espinha tem entrega distinta pendurada.
 
 ---
 
-## 2. Parados por decisão humana — os únicos com dono nomeado
+## 2. Parados por decisão humana — sobrou um
+
+> ✅ **24/08 — o rollup saiu daqui.** A fórmula do percentual do grupo fica
+> sendo **média ponderada por duração**, que é a que o motor já aplica: Task 3
+> fechada **sem código**, plano concluído. O preço da escolha está escrito no
+> plano — inserir 5 tarefas zeradas de 1 dia numa fase de 98% dá **96,39%**, e
+> não os ~80% descritos na reunião de 20/08. 🔬 3 passed em
+> `tests/test_cronograma_rollup_insercao.py`.
 
 | Plano | O que falta | Quem destrava |
 |---|---|---|
-| `2026-08-20-rollup-percentual-cronograma.md` | Task 3 de 3 (📖 `:351` "BLOQUEADA") | **Paulo**: média ponderada por duração (o que o código faz hoje) ou média simples por item (os ~80% que ele descreveu). Muda curva S, EVM, medição e físico-financeiro em cascata. Tasks 1 e 2 valem nas duas hipóteses e já estão em `main` |
 | `2026-08-20-manual-padrao-preenchimento-rdo.md` | Steps 1–4 (4 caixas abertas de 11) | **Alan e Abel** lerem o capítulo 23a antes de ele virar cobrança. Sem essa rodada o capítulo é opinião do escritório, não acordo |
 
 ---
@@ -244,7 +250,7 @@ Três delas são decisões suas, não trabalho pendente:
 
 | Resíduo | Prova | Por que ficou |
 |---|---|---|
-| 🟡 **RDO em rascunho ainda alimenta o cronograma** | 🔬 23/08: `utils/cronograma_engine.py:1412` (`atualizar_percentual_tarefa`) não menciona `estado` nem `rdo_ciclo_vida` — não filtra apontamento por estado do RDO | O custo foi travado em 21/08; o percentual não. Travar muda a semântica do avanço em dezenas de testes de 20/08. O capítulo 23a foi reescrito para não prometer |
+| ~~🟡 **RDO em rascunho ainda alimenta o cronograma**~~ | ✅ **fechado em 24/08** | O custo foi travado em 21/08; o avanço, agora. `atualizar_percentual_tarefa` e a irmã sem commit filtram `RDO.estado != rascunho`, e `recalcular_percentuais_do_rdo` publica no Submeter / retira no Reabrir — sem ela o avanço teria morrido em silêncio, porque nenhum handler de `rdo_finalizado` tocava em percentual. As "dezenas de testes" eram **dívida de fixture** (RDO criado sem `estado`, que nasce rascunho desde a Fase 5), não semântica. O capítulo 23a voltou a prometer, agora sustentado. Plano: `docs/superpowers/plans/2026-08-24-rascunho-nao-move-cronograma.md` |
 | 📖 **`obra.progresso_conclusao` não existe em Python nenhum** | O card de obra tenta mostrá-lo, o `{% if %}` engole, a barra nunca aparece | Fazer funcionar é funcionalidade nova, não conserto |
 | **Jornada E2E nunca rodada** | `bash run_tests.sh --jornada` | Os 7 blocos (59 passed) e a varredura (48/48) rodaram depois que o Chromium voltou; a jornada, não |
 | **Miniatura do portal × migração de fotos** | Gate da passada 2 da Task 15 da Fase 5 | Único ponto do plano sem recomendação: ou a rota de foto por token (9a) vem antes, ou o portal fica sem miniatura no intervalo |
@@ -286,7 +292,8 @@ o arquivo que ele promete existe — foi o teste aplicado no item 1.
    do `main`, e o documento que a descreve engana quem retomar por ele. Depende do
    item humano nº 2.
 2. ~~**Fase 4 do ciclo** — enumerar as 9 etapas.~~ → ✅ entregue em 23/08 (ver seção 4).
-3. **Rollup Task 3** — uma frase do Paulo destrava.
+3. ~~**Rollup Task 3** — uma frase do Paulo destrava.~~ → ✅ **fechada em 24/08**:
+   ponderada por duração, sem código (ver seção 2).
 4. **Reconferir as 25 automações** — a lista tem 19 dias e pelo menos a A05 já está
    errada.
 5. **Fase 6** — o p9 já deixou a porta aberta, e é a fase com menos incógnita.

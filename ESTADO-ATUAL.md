@@ -406,7 +406,7 @@ em produção e levar o número de "EM EXECUÇÃO sem gestor" ao Cássio (em dev
 | 1 | ~~Rotacionar `SESSION_SECRET` e a senha do Postgres~~ | 🔴 **Decisão do Cássio, 03/08: NÃO rotacionar.** Sai da lista de pendências — não voltar a recomendar. O que fica registrado abaixo é só o contorno do risco aceito |
 | 2 | ~~**`gh auth login`** (a API do GitHub **e agora o `git push`**)~~ → **só a API** | ✅ **23/08: o Cássio subiu `main` manualmente.** 🔬 `git ls-remote origin main` → **`975cb2a1`**, igual ao local: os commits que estavam só nesta máquina e no `gitsafe-backup` estão no GitHub. 🔬 e a **leitura do repositório é anônima** — `git fetch origin design/espinha-financeira-obra` devolve `EXIT=0` sem credencial. Ou seja: ler branch do remoto **nunca** dependeu do `gh`. O que segue faltando é a **API** (`gh auth status` → "not logged into any GitHub hosts"): abrir as 8 issues de `docs/superpowers/issues/` e ler comentário de PR. Diagnóstico velho, como registro: 🔬 03/08 dizia "`git push` funciona — o que falta é só a API". **Isso envelheceu.** 🔬 14/08: `git push origin main` **falha** — `remote: Invalid username or token. Password authentication is not supported for Git operations` / `fatal: Authentication failed`. `gh auth status` segue "not logged into any GitHub hosts" e `GH_TOKEN`/`GITHUB_TOKEN` continuam ausentes. Consequência: 🔬 21/08: **28 commits em `main` não estão no GitHub** (estão no `gitsafe-backup`, que é outra máquina da mesma rede — não é o mesmo que estar fora dela). Refazer o login é interativo — só o humano consegue | |
 | 3 | **Criar o volume persistente** no painel | Vale para `/var/backups/sige` (dumps) **e** para os uploads. O pré-requisito de código caiu em 23/07: a armadilha nº 2 (descasamento do `UPLOADS_PATH`) está corrigida — montar o volume e definir a variável já é seguro |
-| 4 | **Paulo: qual fórmula vale para o percentual do grupo no cronograma** | 📖 `docs/superpowers/plans/2026-08-20-rollup-percentual-cronograma.md`, "DECISÃO PENDENTE". Hoje é média **ponderada por duração** (`utils/cronograma_engine.py`, `rollup_percentual_pos_recalculo` e `rollup_realizado`): 5 tarefas de 1 dia numa fase de ~300 dias levam o pai de 98% para ~96%, **não** para os ~80% que ele descreveu na reunião. Para dar 80% seria média **simples por item** — e isso muda curva S, EVM (`bac` congelado), medição e físico-financeiro em cascata. A Task 3 do plano está travada nisso de propósito; as Tasks 1 e 2 (caracterização em teste + pais por profundidade) valem nas duas hipóteses e já estão em `main` |
+| 4 | ~~**Paulo: qual fórmula vale para o percentual do grupo no cronograma**~~ | ✅ **RESPONDIDA em 24/08: média ponderada por duração** — a fórmula que `utils/cronograma_engine.py` (`rollup_percentual_pos_recalculo` e `rollup_realizado`) já aplica. Task 3 do plano fechada **sem uma linha de código**; curva S, EVM (`bac` congelado), medição e físico-financeiro seguem intactos. ⚠️ consequência aceita: o cenário da reunião (98% caindo para ~80% com 5 itens novos) **não ocorre** — dá 96,39%. Quem vir isso na tela não está diante de um defeito, está diante desta decisão. 🔬 3 passed em `tests/test_cronograma_rollup_insercao.py` (24/08) |
 | 6 | **Rodar a limpeza das obras de teste do tenant demo** | `.pythonlibs/bin/python scripts/limpar_obras_teste_demo.py --apagar` (dry-run sem a flag). 1.280 obras `^Obra #` no admin 1, deixadas por teste até 21/08; o agente é bloqueado em exclusão em massa. ~~Sem isso, `/ponto/lista-obras` segue no limite da varredura~~ — 🔬 21/08 a página foi corrigida no código (`cfd8247a`) e a varredura fecha 48/48 **com** as 1.358 obras. A limpeza continua valendo (o demo não deveria ter 1.280 obras de teste), mas não destrava mais nada |
 | 5 | **Alan e Abel: revisar a norma de preenchimento do RDO** | 📖 `manual/23a_rdo_padrao_preenchimento.md` está no ar (`/manual`), mas é a Task 2 do plano: quem vai ser cobrado pela norma tem de lê-la antes de ela virar cobrança. Sem essa rodada o capítulo é opinião do escritório, não acordo |
 
@@ -2195,7 +2195,7 @@ estado de cada um em `main` (`2a601591`):
 | RDO — efetivo interno e terceiros | ✅ 31/31 | merge `c9283e25` (20/08), migration **312** |
 | Cadastro rápido de funcionário | ✅ 22/22 | resgate `0f4ef7fc` (CPF opcional, migration **313**, lote) + merge `5c32edec` (visão em lista) |
 | Manual do padrão de preenchimento do RDO | 🟡 Task 1 de 2 | merge `a9a30912` — Task 2 é humana (item 5 acima) |
-| Rollup de percentual do cronograma | 🟡 Tasks 1 e 2 de 3 | resgate `0f4ef7fc` — Task 3 **bloqueada** (item 4 acima) |
+| Rollup de percentual do cronograma | ✅ Tasks 1 e 2 (a 3 morreu por decisão) | resgate `0f4ef7fc` — 24/08: **ponderada por duração** confirmada, Task 3 não será executada (item 4 acima) |
 | Linha de base e revisões do cronograma | ✅ 22/22 | merge `2a601591` — migration **314** (🔬 dev: 45.252 baselines numeradas, 264 viraram V2, zero duplicatas por obra+modo); roteiro de navegador 20/20 |
 
 **O que o resgate foi.** A `sdd/reuniao-20-08` saiu do commit dos planos e
@@ -2376,11 +2376,53 @@ fotografa):**
    porque o ciclo de vida não existia; foi repontado para o fluxo real
    (salvar + submeter) — 🔬 13/13, e mais 166 testes das famílias de RDO verdes.
    Teste novo: `tests/test_rdo_rascunho_nao_lanca_custo.py`.
-   🟡 **O que ficou:** o rascunho ainda **alimenta o cronograma** — 📖
-   `utils/cronograma_engine.atualizar_percentual_tarefa` não filtra apontamento
-   por estado do RDO, e os testes de 20/08 apontam em rascunho e esperam o
-   percentual mover. Travar isso é outra decisão (muda a semântica do avanço
-   em dezenas de testes); o capítulo 23a foi reescrito para não prometer.
+   ~~🟡 **O que ficou:** o rascunho ainda alimenta o cronograma.~~
+   ✅ **Fechado em 24/08**, por decisão do Paulo na mesma sessão. O filtro
+   `RDO.estado != rascunho` entrou nas DUAS queries que derivam percentual
+   (`atualizar_percentual_tarefa` e `_atualizar_percentual_sem_commit`) — a
+   origem, não os 5 chamadores, senão qualquer recálculo futuro reintroduziria
+   o avanço do rascunho.
+
+   🔴 **O que a investigação achou e o sintoma escondia:** nenhum dos dois
+   handlers de `rdo_finalizado` (`event_manager.py:662` e `:1731`) toca em
+   percentual de cronograma, e `transicionar()` também não. A única escrita
+   acontecia no salvar, com o RDO ainda em rascunho — então o filtro sozinho
+   não deixaria o avanço correto, deixaria o avanço **morto**, sem erro em log.
+   Daí `services.cronograma_apontamento_service.recalcular_percentuais_do_rdo`,
+   chamada nas duas pontas: o Submeter publica o avanço, o Reabrir o retira.
+   Ela recalcula pela fórmula única, não por delta — reabrir um RDO **não**
+   apaga o avanço vindo de outro já submetido (teste dedicado).
+
+   🔬 **A revisão do próprio diff pegou uma regressão antes do commit.** A
+   guarda `if ultimo is None and not qtd_sub: return` protege o
+   `pct_project` importado; com o filtro, ela passou a ser atingida também
+   quando a tarefa só tem apontamento em rascunho. A primeira tentativa —
+   distinguir "nunca teve apontamento" de "tem, mas nenhum conta" — **zerava o
+   avanço importado do MS Project** assim que alguém abrisse um rascunho numa
+   obra recém-importada: exatamente o bug que aquela guarda existe para
+   impedir. Teste dedicado
+   (`test_rascunho_nao_zera_percentual_importado_do_ms_project`) fixou o
+   defeito antes do conserto.
+
+   O desenho final põe a decisão em quem tem a informação:
+   `atualizar_percentual_tarefa(..., permitir_zerar=False)` por padrão, e só
+   `recalcular_percentuais_do_rdo` — que roda a partir de uma TRANSIÇÃO de
+   estado — passa `True`. A query não sabe se "nada elegível" quer dizer
+   "preserve a carga inicial" ou "o RDO acabou de ser reaberto"; o chamador
+   sabe. A irmã em lote (`_atualizar_percentual_sem_commit`) ganhou a mesma
+   proteção — ela gravava `0.0` sem guarda nenhuma, o que já apagava
+   `pct_project` em sincronização e agora deixou de apagar.
+
+   🔬 As "dezenas de testes" eram **dívida de fixture**, não semântica: os
+   testes criam `RDO(status='Finalizado')` sem setar `estado`, que nasce
+   `rascunho` por default desde a Fase 5. 16 falhas viraram 0 com
+   `estado='preenchido'` nas fixturas que queriam dizer "dia fechado" e com o
+   Submeter explícito nos 3 testes que passam pelo formulário.
+
+   O capítulo 23a **voltou a prometer** o que o `e4449443` teve de retirar em
+   21/08 — agora sustentado pelo código. Teste novo:
+   `tests/test_rascunho_nao_move_cronograma.py` (4). Plano:
+   `docs/superpowers/plans/2026-08-24-rascunho-nao-move-cronograma.md`.
 3. ✅ **A página do RDO mostrava "Finalizado" (o `status` legado) até em
    rascunho** — o bloco "Status" passou a usar `estado_rdo` (`fb9fdf30`), com
    teste (`tests/test_rdo_visualizar_estado_real.py`).
