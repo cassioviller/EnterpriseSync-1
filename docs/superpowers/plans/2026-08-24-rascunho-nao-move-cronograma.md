@@ -64,6 +64,14 @@ sobre o original. Mudar a semântica de `retificado` é decisão separada.
 
 ---
 
+## DECISÃO DO DONO — ✅ TOMADA em 24/08: pode entrar agora
+
+O Paulo autorizou a execução na mesma sessão em que o plano foi escrito. O
+plano está **executado** — o registro abaixo fica como estava, porque é ele que
+explica por que a pergunta precisou ser feita.
+
+---
+
 ## DECISÃO DO DONO — ler antes da Task 1
 
 O fix tem uma consequência visível, e ela não é minha para tomar:
@@ -110,7 +118,7 @@ comportamento no meio da frente que vai ser apresentada ao Guilherme.
 
 ### Task 1: O teste que falha — rascunho não move, Submeter move
 
-- [ ] **Step 1: Escrever `tests/test_rascunho_nao_move_cronograma.py`**
+- [x] **Step 1: Escrever `tests/test_rascunho_nao_move_cronograma.py`**
 
 Três casos, um por comportamento:
 1. RDO em `rascunho` com apontamento de 50% ⇒ `percentual_concluido` fica em 0.
@@ -120,57 +128,125 @@ Três casos, um por comportamento:
 Reaproveitar as fixtures de `tests/test_rdo_recomputo_cadeia.py` (`_rdo`,
 `_tarefa`) — não criar helper novo de ambiente.
 
-- [ ] **Step 2: Rodar e confirmar que 1 e 3 falham e 2 passa**
+- [x] **Step 2: Rodar e confirmar que 1 e 3 falham e 2 passa**
 
 O caso 2 passa hoje por acidente (rascunho já move). Ele existe para pegar a
 regressão do Step seguinte, que é o risco real deste plano.
 
 ### Task 2: O filtro na origem
 
-- [ ] **Step 1: Acrescentar `RDO.estado != RASCUNHO` à query**
+- [x] **Step 1: Acrescentar `RDO.estado != RASCUNHO` à query**
 
 Importar de `services.rdo_ciclo_vida`, não escrever a string solta — o módulo é
 o dono dos estados.
 
-- [ ] **Step 2: Conferir `_atualizar_percentual_sem_commit` (`:413`)**
+- [x] **Step 2: Conferir `_atualizar_percentual_sem_commit` (`:413`)**
 
 Se ela repete a query, aplicar o mesmo filtro. Se delega, não duplicar.
 
-- [ ] **Step 3: Rodar o teste da Task 1** — casos 1 e 3 passam; o caso 2 **deve quebrar**.
+- [x] **Step 3: Rodar o teste da Task 1** — casos 1 e 3 passam; o caso 2 **deve quebrar**.
 
 Se o caso 2 continuar verde, pare: significa que existe outro escritor de
 percentual que esta investigação não achou, e o mapa está errado.
 
 ### Task 3: Recalcular no Submeter e no Reabrir
 
-- [ ] **Step 1: Depois de `transicionar(rdo, PREENCHIDO)` (`views/rdo.py:1711`), recalcular**
+- [x] **Step 1: Depois de `transicionar(rdo, PREENCHIDO)` (`views/rdo.py:1711`), recalcular**
 
 As tarefas alcançadas saem de `RDOApontamentoCronograma.filter_by(rdo_id=rdo.id)`
 — mesmo padrão que a exclusão de RDO já usa (`views/rdo.py:558-562`). Fora da
 transação de estado, como o comentário de `:577` justifica.
 
-- [ ] **Step 2: Simétrico em `reabrir` (`views/rdo.py:1895`)**
-- [ ] **Step 3: Rodar o teste da Task 1** — os três casos verdes.
+- [x] **Step 2: Simétrico em `reabrir` (`views/rdo.py:1895`)**
+- [x] **Step 3: Rodar o teste da Task 1** — os três casos verdes.
 
 ### Task 4: Pagar a dívida de fixture
 
-- [ ] **Step 1: Rodar a suíte inteira e listar as falhas**
+- [x] **Step 1: Rodar a suíte inteira e listar as falhas**
 
 `bash run_tests.sh` (gate de referência: 2560 passed, 6 skipped, 2 xfailed).
 
-- [ ] **Step 2: Para cada falha, decidir caso a caso**
+- [x] **Step 2: Para cada falha, decidir caso a caso**
 
 Regra: se a fixture cria RDO com `status='Finalizado'` e espera avanço, ela quer
 dizer **submetido** ⇒ `estado='preenchido'`. Se o teste é sobre rascunho, o
 valor esperado é que mudou ⇒ ajustar o assert, não a fixture.
 **Não** aplicar `sed` em massa: a distinção acima é a razão de o plano existir.
 
-- [ ] **Step 3: Gate verde** e commit.
+- [x] **Step 3: Gate verde** e commit.
 
 ### Task 5: Fechar o resíduo na documentação
 
-- [ ] **Step 1: `docs/planos-em-aberto-2026-08-23.md` seção 6** — riscar a linha do resíduo.
-- [ ] **Step 2: `ESTADO-ATUAL.md`** — registrar com a prova.
-- [ ] **Step 3: Capítulo 23a** — hoje ele descreve o comportamento **desejado**;
+- [x] **Step 1: `docs/planos-em-aberto-2026-08-23.md` seção 6** — riscar a linha do resíduo.
+- [x] **Step 2: `ESTADO-ATUAL.md`** — registrar com a prova.
+- [x] **Step 3: Capítulo 23a** — hoje ele descreve o comportamento **desejado**;
       conferir se alguma frase precisa deixar de ser aspiracional. Se nada mudar,
       registrar que foi conferido.
+
+---
+
+## Achado adjacente — deliberadamente NÃO alterado
+
+🔬 `services/cronograma_scheduler._ids_com_apontamento` (`:466`) — o predicado
+"tarefa iniciada" que ancora datas no replanejamento — conta apontamento de
+**qualquer** estado, rascunho incluído. Pela lógica deste plano, uma tarefa
+tocada só por rascunho não deveria estar "iniciada".
+
+**Não foi alterado, e é escolha, não esquecimento:**
+
+- é outra semântica (âncora de data, não avanço) e teria outro raio de teste;
+- o comportamento atual é o **conservador**: ancorar por rascunho evita mover a
+  data de um serviço que fisicamente já começou, mesmo que o documento do dia
+  não tenha fechado. Errar para esse lado é mais barato;
+- a regra do debugging sistemático que este plano seguiu é uma mudança por vez.
+  Misturar as duas tornaria impossível saber qual delas quebrou o quê.
+
+Se virar problema, é plano próprio — e a conversa começa por qual das duas
+leituras de "iniciada" o planejamento quer.
+
+## Varredura dos outros leitores — feita em 24/08
+
+🔬 Conferidos um a um os módulos que leem `RDOApontamentoCronograma`, para
+garantir que o filtro não deixou porta aberta:
+
+| Módulo | Deriva percentual? | Situação |
+|---|---|---|
+| `utils/cronograma_engine.py` | **sim**, as duas funções | ✅ filtradas |
+| `portal_obras_views.py:985` | não — lista o conteúdo de UM RDO que o cliente já pode ver | sem vazamento |
+| `services/cronograma_dedup.py:130` | não — só remapeia `tarefa_cronograma_id` de duplicatas | indiferente |
+| `services/cronograma_scheduler.py:466` | não — predicado de âncora de data | ver acima |
+| `services/progresso_subatividade.py` | compara sincronização, não deriva | indiferente |
+
+---
+
+## O que a execução mudou no plano (24/08)
+
+O plano previu 5 tasks e elas valeram. O que ele **não** previu foi achado na
+revisão do próprio diff, antes do commit, e mudou o desenho da Task 2:
+
+**A guarda do `pct_project` vira uma armadilha depois do filtro.**
+`if ultimo is None and not qtd_sub: return` existe para não sobrescrever o
+percentual importado do MS Project. Com o filtro, ela passa a ser atingida
+também quando a tarefa tem apontamento **só em rascunho** — e aí o Reabrir não
+devolvia o valor.
+
+A primeira tentativa foi distinguir "nunca teve apontamento" de "tem, mas
+nenhum conta agora". **Estava errada:** numa obra recém-importada, abrir um
+rascunho e apontar passaria a ZERAR o avanço importado — o bug exato que a
+guarda existe para impedir. `test_rascunho_nao_zera_percentual_importado_do_ms_project`
+fixa isso.
+
+O desenho final põe a decisão em quem tem a informação:
+
+- `atualizar_percentual_tarefa(..., permitir_zerar=False)` por padrão;
+- só `recalcular_percentuais_do_rdo`, que roda a partir de uma **transição de
+  estado**, passa `True`.
+
+A query não consegue distinguir "nada elegível porque a obra acabou de ser
+importada" de "nada elegível porque o RDO acabou de ser reaberto". O chamador
+consegue. Foi o único ponto do plano em que valeu tirar a decisão da origem e
+devolvê-la ao chamador — e a razão está escrita no código, não só aqui.
+
+**Bônus não planejado:** `_atualizar_percentual_sem_commit` gravava `0.0` sem
+guarda nenhuma, o que já apagava `pct_project` em sincronização em lote. Ganhou
+a mesma proteção da irmã.

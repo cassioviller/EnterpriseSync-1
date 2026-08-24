@@ -250,7 +250,7 @@ Três delas são decisões suas, não trabalho pendente:
 
 | Resíduo | Prova | Por que ficou |
 |---|---|---|
-| 🟡 **RDO em rascunho ainda alimenta o cronograma** | 🔬 23/08: `utils/cronograma_engine.py:1412` (`atualizar_percentual_tarefa`) não menciona `estado` nem `rdo_ciclo_vida` — não filtra apontamento por estado do RDO | O custo foi travado em 21/08; o percentual não. Travar muda a semântica do avanço em dezenas de testes de 20/08. O capítulo 23a foi reescrito para não prometer |
+| ~~🟡 **RDO em rascunho ainda alimenta o cronograma**~~ | ✅ **fechado em 24/08** | O custo foi travado em 21/08; o avanço, agora. `atualizar_percentual_tarefa` e a irmã sem commit filtram `RDO.estado != rascunho`, e `recalcular_percentuais_do_rdo` publica no Submeter / retira no Reabrir — sem ela o avanço teria morrido em silêncio, porque nenhum handler de `rdo_finalizado` tocava em percentual. As "dezenas de testes" eram **dívida de fixture** (RDO criado sem `estado`, que nasce rascunho desde a Fase 5), não semântica. O capítulo 23a voltou a prometer, agora sustentado. Plano: `docs/superpowers/plans/2026-08-24-rascunho-nao-move-cronograma.md` |
 | 📖 **`obra.progresso_conclusao` não existe em Python nenhum** | O card de obra tenta mostrá-lo, o `{% if %}` engole, a barra nunca aparece | Fazer funcionar é funcionalidade nova, não conserto |
 | **Jornada E2E nunca rodada** | `bash run_tests.sh --jornada` | Os 7 blocos (59 passed) e a varredura (48/48) rodaram depois que o Chromium voltou; a jornada, não |
 | **Miniatura do portal × migração de fotos** | Gate da passada 2 da Task 15 da Fase 5 | Único ponto do plano sem recomendação: ou a rota de foto por token (9a) vem antes, ou o portal fica sem miniatura no intervalo |

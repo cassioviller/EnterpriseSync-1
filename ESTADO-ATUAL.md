@@ -2376,11 +2376,53 @@ fotografa):**
    porque o ciclo de vida não existia; foi repontado para o fluxo real
    (salvar + submeter) — 🔬 13/13, e mais 166 testes das famílias de RDO verdes.
    Teste novo: `tests/test_rdo_rascunho_nao_lanca_custo.py`.
-   🟡 **O que ficou:** o rascunho ainda **alimenta o cronograma** — 📖
-   `utils/cronograma_engine.atualizar_percentual_tarefa` não filtra apontamento
-   por estado do RDO, e os testes de 20/08 apontam em rascunho e esperam o
-   percentual mover. Travar isso é outra decisão (muda a semântica do avanço
-   em dezenas de testes); o capítulo 23a foi reescrito para não prometer.
+   ~~🟡 **O que ficou:** o rascunho ainda alimenta o cronograma.~~
+   ✅ **Fechado em 24/08**, por decisão do Paulo na mesma sessão. O filtro
+   `RDO.estado != rascunho` entrou nas DUAS queries que derivam percentual
+   (`atualizar_percentual_tarefa` e `_atualizar_percentual_sem_commit`) — a
+   origem, não os 5 chamadores, senão qualquer recálculo futuro reintroduziria
+   o avanço do rascunho.
+
+   🔴 **O que a investigação achou e o sintoma escondia:** nenhum dos dois
+   handlers de `rdo_finalizado` (`event_manager.py:662` e `:1731`) toca em
+   percentual de cronograma, e `transicionar()` também não. A única escrita
+   acontecia no salvar, com o RDO ainda em rascunho — então o filtro sozinho
+   não deixaria o avanço correto, deixaria o avanço **morto**, sem erro em log.
+   Daí `services.cronograma_apontamento_service.recalcular_percentuais_do_rdo`,
+   chamada nas duas pontas: o Submeter publica o avanço, o Reabrir o retira.
+   Ela recalcula pela fórmula única, não por delta — reabrir um RDO **não**
+   apaga o avanço vindo de outro já submetido (teste dedicado).
+
+   🔬 **A revisão do próprio diff pegou uma regressão antes do commit.** A
+   guarda `if ultimo is None and not qtd_sub: return` protege o
+   `pct_project` importado; com o filtro, ela passou a ser atingida também
+   quando a tarefa só tem apontamento em rascunho. A primeira tentativa —
+   distinguir "nunca teve apontamento" de "tem, mas nenhum conta" — **zerava o
+   avanço importado do MS Project** assim que alguém abrisse um rascunho numa
+   obra recém-importada: exatamente o bug que aquela guarda existe para
+   impedir. Teste dedicado
+   (`test_rascunho_nao_zera_percentual_importado_do_ms_project`) fixou o
+   defeito antes do conserto.
+
+   O desenho final põe a decisão em quem tem a informação:
+   `atualizar_percentual_tarefa(..., permitir_zerar=False)` por padrão, e só
+   `recalcular_percentuais_do_rdo` — que roda a partir de uma TRANSIÇÃO de
+   estado — passa `True`. A query não sabe se "nada elegível" quer dizer
+   "preserve a carga inicial" ou "o RDO acabou de ser reaberto"; o chamador
+   sabe. A irmã em lote (`_atualizar_percentual_sem_commit`) ganhou a mesma
+   proteção — ela gravava `0.0` sem guarda nenhuma, o que já apagava
+   `pct_project` em sincronização e agora deixou de apagar.
+
+   🔬 As "dezenas de testes" eram **dívida de fixture**, não semântica: os
+   testes criam `RDO(status='Finalizado')` sem setar `estado`, que nasce
+   `rascunho` por default desde a Fase 5. 16 falhas viraram 0 com
+   `estado='preenchido'` nas fixturas que queriam dizer "dia fechado" e com o
+   Submeter explícito nos 3 testes que passam pelo formulário.
+
+   O capítulo 23a **voltou a prometer** o que o `e4449443` teve de retirar em
+   21/08 — agora sustentado pelo código. Teste novo:
+   `tests/test_rascunho_nao_move_cronograma.py` (4). Plano:
+   `docs/superpowers/plans/2026-08-24-rascunho-nao-move-cronograma.md`.
 3. ✅ **A página do RDO mostrava "Finalizado" (o `status` legado) até em
    rascunho** — o bloco "Status" passou a usar `estado_rdo` (`fb9fdf30`), com
    teste (`tests/test_rdo_visualizar_estado_real.py`).
