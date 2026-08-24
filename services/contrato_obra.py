@@ -768,6 +768,18 @@ def _lancar_delta_contabil_do_aditivo(aditivo, obra, valor_anterior):
             proposta = Proposta.query.filter_by(
                 id=aditivo.proposta_id, admin_id=obra.admin_id,
                 obra_id=obra.id).first()
+            if proposta is None:
+                # Sem esta linha o descarte é bem-sucedido em SILÊNCIO: só a
+                # coluna `proposta_id` guarda o vínculo errado, auditável por
+                # inspeção manual e não por alerta — inconsistente com o
+                # warning do caso irmão (`raiz is None`), logo abaixo.
+                logger.warning(
+                    '[fase6/T8] obra %s: aditivo %s aponta para a proposta %s, '
+                    'que não é desta obra (ou não é deste tenant) — vínculo '
+                    'DESCARTADO; o delta será lançado na linhagem da própria '
+                    'obra. A coluna proposta_id do aditivo segue com o valor '
+                    'errado e precisa de correção manual.',
+                    obra.id, aditivo.numero, aditivo.proposta_id)
         if proposta is None:
             proposta = (Proposta.query
                         .filter_by(obra_id=obra.id, admin_id=obra.admin_id)

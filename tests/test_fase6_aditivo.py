@@ -1411,6 +1411,58 @@ def test_proposta_id_de_outra_obra_do_tenant_nao_desvia_o_lancamento():
 
 
 @pytest.mark.integration
+def test_proposta_id_descartado_deixa_rastro_no_log(caplog):
+    """Resíduo nomeado no fecho da Fase 6: quando o `proposta_id` de OUTRA
+    obra é descartado pelo filtro e o fallback acha a proposta da própria
+    obra, o lançamento é bem-sucedido em SILÊNCIO — nem log, nem menção no
+    histórico. Só a coluna `AditivoContrato.proposta_id` guarda o vínculo
+    errado, auditável por inspeção manual e não por alerta. Inconsistente
+    com o warning que JÁ existe para o caso irmão (raiz is None)."""
+    import logging as _logging
+
+    from models import Proposta, PropostaItem
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        admin, _cliente, pa = _ambiente()
+        _aprovar(pa, admin.id)
+        obra_a = _obras_do_tenant(admin.id)[0]
+
+        pb = Proposta(
+            admin_id=admin.id, numero=f'{pa.numero}-B', titulo='Outra obra',
+            cliente_id=pa.cliente_id, cliente_nome=pa.cliente_nome,
+            valor_total=Decimal('50000.00'), status='enviada', versao=1)
+        db.session.add(pb)
+        db.session.flush()
+        db.session.add(PropostaItem(
+            proposta_id=pb.id, admin_id=admin.id, item_numero=1,
+            descricao='Serviço B', quantidade=Decimal('1'), unidade='vb',
+            preco_unitario=Decimal('50000.00'), subtotal=Decimal('50000.00')))
+        db.session.commit()
+        _aprovar(pb, admin.id)
+
+        aditivo = abrir_aditivo(obra_a, tipo='acrescimo',
+                                motivo='vínculo documental errado',
+                                valor_novo=130000.0, proposta_id=pb.id)
+        db.session.commit()
+        pb_id = pb.id
+
+        with caplog.at_level(_logging.WARNING,
+                             logger='services.contrato_obra'):
+            caplog.clear()
+            aprovar_aditivo(aditivo, aprovado_por_id=admin.id)
+            db.session.commit()
+
+        avisos = [r.getMessage() for r in caplog.records
+                  if '[fase6/T8]' in r.getMessage()]
+        assert len(avisos) == 1, (
+            'descartar o proposta_id de outra obra tem de deixar rastro no '
+            f'log, como o caso irmão (raiz is None) já faz — vieram: {avisos}')
+        assert str(pb_id) in avisos[0], (
+            'o warning precisa nomear o proposta_id descartado, senão não '
+            f'serve para auditar o vínculo errado: {avisos[0]}')
+
+
+@pytest.mark.integration
 def test_aditivo_nao_alcanca_proposta_de_outro_tenant():
     """fix round 1: aditivo do tenant A com `proposta_id` apontando para
     proposta do tenant B não pode alcançá-la — nem para usar o id dela como

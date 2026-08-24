@@ -354,10 +354,14 @@ extrato de contrato e ciclo do aditivo em `views/aditivos_views.py`, com
 - 🟡 **`cronograma_scheduler._ids_com_apontamento` conta rascunho** como
   "tarefa iniciada" para ancorar datas. Deliberadamente não alterado — outra
   semântica, outro raio, e o comportamento atual erra para o lado conservador.
-- 🟡 **Um `logger.warning` de uma linha** faltando no fallback de `proposta_id`
-  do lançamento contábil (Task 8, `minor deferred`): quando o vínculo errado é
-  descartado, o fallback é bem-sucedido em silêncio, inconsistente com o
-  warning que já existe para o caso irmão.
+- ✅ ~~**Um `logger.warning` de uma linha** faltando no fallback de
+  `proposta_id` do lançamento contábil (Task 8, `minor deferred`).~~
+  **Fechado em 24/08, depois do merge da fase em `main`.** O descarte do
+  vínculo errado agora emite warning nomeando `obra`, `aditivo` e o
+  `proposta_id` recusado, e diz que a coluna segue errada no banco —
+  `services/contrato_obra.py`, no ramo do filtro por `obra_id`. Feito por
+  TDD: 🔬 RED conferido (`avisos == []`) antes da linha existir. Guardado por
+  `test_proposta_id_descartado_deixa_rastro_no_log`.
 
 A **Fase 5 (RDO com ciclo de vida e assinatura) fechou em 24/07 —
 16/16 tasks** no branch `feat/fase-5-rdo-ciclo-vida` (plano
