@@ -336,3 +336,50 @@ def test_medicao_ja_emitida_nao_e_reprecificada_pela_revisao(cenario):
             'medição ainda não emitida deveria seguir o contrato novo — '
             'é o que um aditivo significa'
         )
+
+
+def test_revisao_reponta_marco_nao_recebido_para_versao_nova(cenario):
+    """Fase 6 / Task 4 (fix round 1) — o espelho exato do que
+    `aprovar_aditivo` já assere: a trilha `contrato_versao_id` significa a
+    MESMA coisa qualquer que seja a porta. Aprovar uma revisão de proposta
+    que muda o valor deixa o marco NÃO recebido apontando para a versão
+    nova do baseline, e o JÁ recebido parado na versão em que nasceu."""
+    from models import ObraContratoVersao
+    with app.app_context():
+        v1p = _proposta(cenario, 100000, 1)
+        _aprovar(cenario, v1p, 100000, dia=1)
+
+        versao1 = ObraContratoVersao.query.filter_by(
+            obra_id=cenario['obra_id'], vigente_ate=None).one()
+        emitida = MedicaoContrato(
+            obra_id=cenario['obra_id'], admin_id=cenario['admin_id'],
+            nome='1ª medição', data=date(2026, 7, 5), pct=Decimal('0.10'),
+            recebido_no_mes='07/2026', contrato_versao_id=versao1.id,
+        )
+        pendente = MedicaoContrato(
+            obra_id=cenario['obra_id'], admin_id=cenario['admin_id'],
+            nome='2ª medição', data=date(2026, 8, 5), pct=Decimal('0.10'),
+            contrato_versao_id=versao1.id,
+        )
+        db.session.add_all([emitida, pendente])
+        v1_id, emitida_id, pendente_id = versao1.id, None, None
+        db.session.flush()
+        emitida_id, pendente_id = emitida.id, pendente.id
+        db.session.commit()
+
+        v2p = _proposta(cenario, 120000, 2, origem_id=v1p.id)
+        _aprovar(cenario, v2p, 120000, dia=15)
+
+        versao2 = ObraContratoVersao.query.filter_by(
+            obra_id=cenario['obra_id'], vigente_ate=None).one()
+        assert versao2.id != v1_id, 'a revisão deveria ter aberto versão nova'
+
+        emitida = db.session.get(MedicaoContrato, emitida_id)
+        pendente = db.session.get(MedicaoContrato, pendente_id)
+        assert emitida.contrato_versao_id == v1_id, (
+            'marco já recebido tem de ficar parado na versão em que nasceu '
+            f'— foi para {emitida.contrato_versao_id}')
+        assert pendente.contrato_versao_id == versao2.id, (
+            'marco não recebido tem de ser repontado para a versão nova '
+            f'pela porta da PROPOSTA também — ficou em '
+            f'{pendente.contrato_versao_id}')

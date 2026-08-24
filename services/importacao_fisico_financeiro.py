@@ -684,7 +684,12 @@ def _importar_medicoes(obra, admin_id: int, payload: dict):
     # baseline (rastreabilidade). A versão aberta por definir_valor_contrato
     # já está no banco: o orquestrador flusha a obra antes deste passo.
     # Obra sem versão (valor_venda zero) fica com a FK em NULL — nullable.
-    vigente = contrato_vigente(obra.id, admin_id)
+    # `no_autoflush` (fix round 1): o SELECT não pode disparar flush de
+    # objetos pela metade nesta transação — a classe de bug da regressão
+    # da Task 2; a ordem segura do orquestrador mora em outro arquivo e
+    # não é garantia deste módulo.
+    with db.session.no_autoflush:
+        vigente = contrato_vigente(obra.id, admin_id)
     for i, med in enumerate(payload.get('medicoes', [])):
         db.session.add(MedicaoContrato(
             obra_id=obra.id, admin_id=admin_id, nome=med.get('nome'),

@@ -5962,6 +5962,13 @@ def _migration_273_medicao_contrato_versionada():
                 SET contrato_versao_id = v.id
                 FROM obra_contrato_versao v
                 WHERE v.obra_id = mc.obra_id
+                  -- Mesmo filtro de tenant do leitor em runtime
+                  -- (contrato_vigente filtra por admin_id): sem ele, uma
+                  -- versão gravada em tenant divergente (precedente real:
+                  -- migration 266) entraria na FK que o leitor considera
+                  -- inexistente. IS NOT DISTINCT FROM, não `=`: a 271
+                  -- deriva admin_id de obra.admin_id, que é nullable.
+                  AND v.admin_id IS NOT DISTINCT FROM mc.admin_id
                   AND v.vigente_ate IS NULL
                   AND mc.contrato_versao_id IS NULL
             """))

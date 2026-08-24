@@ -293,9 +293,19 @@ def definir_valor_contrato(obra, valor, origem: str, motivo: str = '',
         obra.valor_contrato = novo
     else:
         origem_tipo = ORIGEM_TIPO.get(origem, origem)
-        abrir_versao(obra, novo, origem_tipo, motivo=motivo or None,
-                    criado_por_id=usuario_id)
+        nova = abrir_versao(obra, novo, origem_tipo, motivo=motivo or None,
+                            criado_por_id=usuario_id)
         # abrir_versao já gravou obra.valor_contrato = float(nova.valor).
+        #
+        # Fase 6 / Task 4 (fix round 1) — repontamento em TODAS as portas
+        # que abrem versão por aqui (proposta, cadastro, edição, import),
+        # não só no aditivo: a trilha `MedicaoContrato.contrato_versao_id`
+        # tem de significar a MESMA coisa qualquer que seja a porta. Pelo
+        # OBJETO `nova`, não por nova consulta: numa transação sem flush,
+        # um SELECT (`contrato_vigente`) não enxergaria a versão
+        # recém-criada — a mesma classe de problema que `abrir_versao`
+        # reconcilia via `db.session.new`.
+        _repontar_medicoes_nao_recebidas(obra, nova)
 
     logger.info(
         '[p9] obra %s: valor_contrato %.2f → %.2f (origem=%s, motivo=%s, '
