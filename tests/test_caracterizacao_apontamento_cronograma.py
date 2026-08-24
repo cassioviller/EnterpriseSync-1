@@ -159,17 +159,46 @@ def _post_rdo_flexivel(client, ambiente, data_rdo, apontamentos: dict):
     r = client.post('/salvar-rdo-flexivel', data=form, follow_redirects=False)
     assert r.status_code in (200, 302, 303), \
         f'POST /salvar-rdo-flexivel falhou (status={r.status_code})'
+    _submeter(ambiente, data_rdo)
     return r
 
 
+def _submeter(ambiente, data_rdo):
+    """Fecha o dia, como o botao Submeter da tela faz.
+
+    O RDO nasce em rascunho pelo formulario, e desde 24/08 rascunho nao move o
+    cronograma. Estes testes caracterizam o avanco DEPOIS do fecho do dia, que
+    e a jornada real — por isso o Submeter entra aqui, e nao um estado
+    fabricado na fixture. Espelha a rota `finalizar_rdo` (views/rdo.py:1739):
+    transicao + recalculo, nesta ordem.
+    """
+    from services.cronograma_apontamento_service import (
+        recalcular_percentuais_do_rdo)
+    from services.rdo_ciclo_vida import PREENCHIDO, RASCUNHO, transicionar
+    with app.app_context():
+        rdos = RDO.query.filter_by(
+            obra_id=ambiente['obra_id'], admin_id=ambiente['admin_id'],
+            data_relatorio=data_rdo, estado=RASCUNHO).all()
+        for rdo in rdos:
+            transicionar(rdo, PREENCHIDO)
+        db.session.commit()
+        for rdo in rdos:
+            recalcular_percentuais_do_rdo(rdo.id, ambiente['admin_id'])
+
+
 def _criar_rdo_direto(ambiente, data_rdo):
-    """Cria um RDO direto no banco (para o caminho B, que aponta em RDO já existente)."""
+    """Cria um RDO direto no banco (para o caminho B, que aponta em RDO já existente).
+
+    Nasce SUBMETIDO: o caminho B caracteriza o apontamento num RDO que já é
+    documento do dia, e rascunho não move o cronograma desde 24/08.
+    """
     suf = _suffix()
     with app.app_context():
         rdo = RDO(
             numero_rdo=f'RC-{suf[4:]}'[:20],  # varchar(20)
             obra_id=ambiente['obra_id'], admin_id=ambiente['admin_id'],
             data_relatorio=data_rdo, local='Campo', status='Finalizado',
+            estado='preenchido',
         )
         db.session.add(rdo)
         db.session.commit()

@@ -125,6 +125,10 @@ def _rdo_com_apontamento(obra, admin, tarefa, acumulada=40.0, pct=40.0):
         data_relatorio=date(2026, 7, 10),
         obra_id=obra.id,
         admin_id=admin.id,
+        # RDO submetido. `estado` nasceu na Fase 5 com default 'rascunho' e
+        # este helper e anterior a ela; desde 24/08 rascunho nao move o
+        # cronograma, e todo teste que usa este helper quer um dia fechado.
+        estado='preenchido',
     )
     db.session.add(rdo)
     db.session.flush()
