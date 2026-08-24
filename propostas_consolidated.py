@@ -967,6 +967,32 @@ def criar():
         flash(f'Erro ao criar proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.nova', **_args_form))
 
+@propostas_bp.route('/<int:id>/comparar/<int:outra_id>')
+@login_required
+@admin_required
+def comparar(id, outra_id):
+    """Fase 6 / Task 12 — o que mudou de uma versão para outra.
+
+    `id` é a origem (a versão que valia) e `outra_id` o destino (a que está
+    sendo proposta). A ordem importa: inverter troca o sinal do impacto, e é
+    por isso que a tela rotula "De" e "Para" em vez de mostrar duas colunas
+    anônimas.
+
+    As duas propostas são carregadas com filtro de tenant — comparar é leitura,
+    mas leitura cruzada entre tenants é vazamento igual.
+    """
+    from services.proposta_diff import diff_versoes, total_do_diff
+
+    admin_id = get_admin_id()
+    origem = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    destino = Proposta.query.filter_by(
+        id=outra_id, admin_id=admin_id).first_or_404()
+    linhas = diff_versoes(origem, destino)
+    return render_template('propostas/comparar.html',
+                           origem=origem, destino=destino, linhas=linhas,
+                           impacto=total_do_diff(linhas))
+
+
 @propostas_bp.route('/<int:id>')
 @login_required
 @admin_required

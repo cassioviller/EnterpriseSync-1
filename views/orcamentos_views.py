@@ -610,6 +610,42 @@ def duplicar(id):
         return redirect(url_for('orcamentos.editar', id=id))
 
 
+# ───────────────────── COMPARAR REVISÕES ─────────────────────
+@orcamentos_bp.route('/<int:id>/comparar/<int:outro_id>')
+@login_required
+@admin_required
+def comparar(id, outro_id):
+    """Fase 6 / Task 12 — o que mudou de uma revisão para outra.
+
+    `id` é a origem e `outro_id` o destino. A ordem importa: inverter troca o
+    sinal do impacto, e é por isso que a tela rotula "De" e "Para".
+
+    As duas revisões não precisam ser adjacentes — o diff sobe a corrente de
+    `item_origem_id` sozinho.
+    """
+    from services.orcamento_versao import diff_revisoes
+
+    admin_id = _admin_id()
+    origem = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    destino = Orcamento.query.filter_by(
+        id=outro_id, admin_id=admin_id).first_or_404()
+    linhas = diff_revisoes(origem, destino)
+    # O impacto do orçamento soma os itens: `venda_total` do cabeçalho é
+    # derivado da composição e pode estar desatualizado entre recálculos.
+    from decimal import Decimal as _D
+    impacto = _D('0')
+    for l in linhas:
+        if l['delta_valor'] is not None:
+            impacto += l['delta_valor']
+        elif l['situacao'] == 'incluido':
+            impacto += _D(str(l['destino'].venda_total or 0))
+        else:
+            impacto -= _D(str(l['origem'].venda_total or 0))
+    return render_template('orcamentos/comparar.html',
+                           origem=origem, destino=destino, linhas=linhas,
+                           impacto=impacto)
+
+
 # ───────────────────── GERAR PROPOSTA ─────────────────────
 @orcamentos_bp.route('/<int:id>/gerar-proposta', methods=['POST'])
 @login_required

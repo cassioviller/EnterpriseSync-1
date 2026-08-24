@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import date
+from decimal import Decimal
 
 from models import Orcamento, OrcamentoItem, db
 
@@ -142,3 +143,87 @@ def criar_revisao(orc: Orcamento, admin_id: int, motivo: str | None = None
         "motivo=%r", orc.id, orc.versao, novo.id, versao_nova,
         novo.origem_id, motivo)
     return novo
+
+
+def _raiz_do_item(item, cache: dict) -> int:
+    """Sobe a corrente de `item_origem_id` até o item que a começou.
+
+    `OrcamentoItem.item_origem_id` guarda o **elo** (o item da revisão
+    imediatamente anterior), não a raiz. Elo carrega mais informação — dá para
+    reconstruir a raiz subindo, e não o contrário — mas obriga a subir aqui,
+    senão comparar v1 com v3 acusaria a revisão inteira como suprimida +
+    incluída.
+
+    `visto` guarda contra ciclo: `item_origem_id` é uma self-FK e nada no banco
+    impede que uma correção manual a feche em anel.
+    """
+    visto, atual = set(), item
+    while atual is not None and atual.item_origem_id and atual.id not in visto:
+        visto.add(atual.id)
+        proximo = cache.get(atual.item_origem_id)
+        if proximo is None:
+            proximo = db.session.get(OrcamentoItem, atual.item_origem_id)
+            if proximo is not None:
+                cache[proximo.id] = proximo
+        if proximo is None:      # elo apontando para item apagado (SET NULL
+            break                # não alcança quem já foi lido nesta sessão)
+        atual = proximo
+    return atual.id if atual is not None else item.id
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v or 0))
+
+
+def diff_revisoes(origem: Orcamento, destino: Orcamento) -> list[dict]:
+    """Compara duas revisões de orçamento, item a item, PELA LINHAGEM.
+
+    Contrato (idêntico ao de `services.proposta_diff.diff_versoes`, para que os
+    dois templates sejam simétricos)::
+
+        [{'situacao': 'mantido'|'alterado'|'incluido'|'suprimido',
+          'origem': OrcamentoItem | None,
+          'destino': OrcamentoItem | None,
+          'delta_quantidade': Decimal | None,
+          'delta_valor': Decimal | None}]
+
+    **Nunca casa por descrição.** Descrição é texto editável: casar por ela
+    produz falso "mantido" quando alguém corrige uma vírgula, e falso
+    "suprimido + incluído" quando renomeia de verdade. Renomear é ALTERAR, e é
+    assim que sai daqui.
+
+    `delta_*` só existe quando os dois lados existem — incluído e suprimido
+    devolvem `None`, e não zero: zero diria "não mudou".
+
+    As duas revisões não precisam ser adjacentes.
+    """
+    cache: dict = {}
+    por_raiz_origem = {}
+    for it in origem.itens:
+        por_raiz_origem[_raiz_do_item(it, cache)] = it
+
+    linhas, casados = [], set()
+    for it in sorted(destino.itens, key=lambda i: (i.ordem or 0, i.id)):
+        raiz = _raiz_do_item(it, cache)
+        anterior = por_raiz_origem.get(raiz)
+        if anterior is None:
+            linhas.append({'situacao': 'incluido', 'origem': None,
+                           'destino': it, 'delta_quantidade': None,
+                           'delta_valor': None})
+            continue
+        casados.add(raiz)
+        dq = _dec(it.quantidade) - _dec(anterior.quantidade)
+        dv = _dec(it.venda_total) - _dec(anterior.venda_total)
+        mudou = (dq != 0 or dv != 0
+                 or (it.descricao or '') != (anterior.descricao or '')
+                 or (it.unidade or '') != (anterior.unidade or ''))
+        linhas.append({'situacao': 'alterado' if mudou else 'mantido',
+                       'origem': anterior, 'destino': it,
+                       'delta_quantidade': dq, 'delta_valor': dv})
+
+    for raiz, it in por_raiz_origem.items():
+        if raiz not in casados:
+            linhas.append({'situacao': 'suprimido', 'origem': it,
+                           'destino': None, 'delta_quantidade': None,
+                           'delta_valor': None})
+    return linhas

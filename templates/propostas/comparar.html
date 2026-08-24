@@ -1,0 +1,96 @@
+{% extends "base_completo.html" %}
+{% block title %}Comparar versões — {{ origem.numero }} × {{ destino.numero }}{% endblock %}
+{% block content %}
+{#
+  Fase 6 / Task 12 — comparação entre duas versões de proposta.
+  Simétrico de templates/orcamentos/comparar.html: o serviço de diff devolve o
+  MESMO contrato nos dois lados, então quem lê uma tela entende a outra.
+#}
+<div class="container-fluid py-3">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="fas fa-code-compare me-2"></i> Comparar versões</h4>
+    <a href="{{ url_for('propostas.visualizar', id=destino.id) }}" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left me-1"></i> Voltar à proposta
+    </a>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row align-items-center g-3">
+        <div class="col-md-4">
+          <div class="text-muted small text-uppercase">De</div>
+          <div class="fw-bold">{{ origem.numero }} <span class="badge bg-secondary">v{{ origem.versao }}</span></div>
+          <div class="small text-muted">{{ origem.titulo }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="text-muted small text-uppercase">Para</div>
+          <div class="fw-bold">{{ destino.numero }} <span class="badge bg-dark">v{{ destino.versao }}</span></div>
+          <div class="small text-muted">{{ destino.titulo }}</div>
+          {% if destino.motivo_revisao is defined and destino.motivo_revisao %}
+            <div class="small"><i class="fas fa-quote-left me-1 text-muted"></i>{{ destino.motivo_revisao }}</div>
+          {% endif %}
+        </div>
+        <div class="col-md-4 text-md-end">
+          <div class="text-muted small text-uppercase">Impacto</div>
+          <div class="fs-4 fw-bold {% if impacto > 0 %}text-danger{% elif impacto < 0 %}text-success{% endif %}">
+            {% if impacto > 0 %}+{% endif %}{{ 'R$ %.2f'|format(impacto)|replace('.', ',') }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:7rem">Situação</th>
+            <th>Item</th>
+            <th class="text-end">Qtd. antes</th>
+            <th class="text-end">Qtd. depois</th>
+            <th class="text-end">Δ Qtd.</th>
+            <th class="text-end">Valor antes</th>
+            <th class="text-end">Valor depois</th>
+            <th class="text-end">Δ Valor</th>
+          </tr>
+        </thead>
+        <tbody style="font-variant-numeric: tabular-nums">
+        {% for l in linhas %}
+          {% set item = l.destino or l.origem %}
+          <tr class="{{ {'incluido': 'table-success', 'suprimido': 'table-danger', 'alterado': 'table-warning'}.get(l.situacao, '') }}">
+            <td>
+              <span class="badge {{ {'mantido': 'bg-secondary', 'alterado': 'bg-warning text-dark', 'incluido': 'bg-success', 'suprimido': 'bg-danger'}[l.situacao] }}">
+                {{ {'mantido': 'Mantido', 'alterado': 'Alterado', 'incluido': 'Incluído', 'suprimido': 'Suprimido'}[l.situacao] }}
+              </span>
+            </td>
+            <td>
+              {{ item.descricao }}
+              {# Renomear é ALTERAR, não suprimir+incluir — a linhagem é que diz isso. #}
+              {% if l.origem and l.destino and l.origem.descricao != l.destino.descricao %}
+                <div class="small text-muted"><s>{{ l.origem.descricao }}</s></div>
+              {% endif %}
+            </td>
+            <td class="text-end">{{ l.origem and '%.2f'|format(l.origem.quantidade or 0)|replace('.', ',') or '—' }}</td>
+            <td class="text-end">{{ l.destino and '%.2f'|format(l.destino.quantidade or 0)|replace('.', ',') or '—' }}</td>
+            <td class="text-end">{{ l.delta_quantidade is not none and ('%.2f'|format(l.delta_quantidade)|replace('.', ',')) or '—' }}</td>
+            <td class="text-end">{{ l.origem and '%.2f'|format(l.origem.subtotal or 0)|replace('.', ',') or '—' }}</td>
+            <td class="text-end">{{ l.destino and '%.2f'|format(l.destino.subtotal or 0)|replace('.', ',') or '—' }}</td>
+            <td class="text-end fw-semibold">{{ l.delta_valor is not none and ('%.2f'|format(l.delta_valor)|replace('.', ',')) or '—' }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">As duas versões não têm itens.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="text-muted small mt-3 mb-0">
+    O pareamento é feito pela <strong>linhagem</strong> do item, nunca pela descrição —
+    por isso renomear uma linha aparece como <em>alterado</em>, e não como um item
+    suprimido mais um incluído.
+  </p>
+</div>
+{% endblock %}
