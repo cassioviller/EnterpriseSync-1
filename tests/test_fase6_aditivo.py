@@ -1653,3 +1653,122 @@ def test_reaprovar_v2_nao_rearquiva_nem_toca_tarefas_ja_arquivadas():
         assert depois == carimbos, (
             'reaprovar a v2 re-arquivou tarefas (carimbo mudou) — a '
             'supressão tem de ser idempotente')
+
+
+@pytest.mark.integration
+def test_v3_reinclui_item_suprimido_e_reativa_as_tarefas_arquivadas():
+    """A assimetria que a Task 9 criou, e que a Task 7 já resolvia do seu lado.
+
+    A Task 7 decidiu que SUPRIMIDO descreve o escopo VIGENTE e não é lápide:
+    re-incluir o item numa versão posterior devolve o IMC a PENDENTE. Depois
+    da Task 9, o cronograma passou a ser arquivado junto na supressão — mas
+    nada o desarquivava na volta. O contrato dizia "o serviço está de volta" e
+    o cronograma vivo continuava sem ele, em silêncio.
+
+    Antes da Task 9 esse buraco não existia (a supressão não mexia em tarefa),
+    então ele é defeito DELA, não pedido novo.
+    """
+    from models import Proposta, PropostaItem, TarefaCronograma
+    from models import ItemMedicaoComercial
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        admin_id = admin.id
+        _segundo_item(v1, admin_id)
+        itens_v1 = {i.item_numero: i for i in PropostaItem.query.filter_by(
+            proposta_id=v1.id).all()}
+        v1.cronograma_default_json = [
+            _no_snapshot(itens_v1[1].id, 'Estrutura metálica',
+                         ['Montagem estrutura']),
+            _no_snapshot(itens_v1[2].id, 'Cobertura', ['Instalação telhas']),
+        ]
+        db.session.commit()
+        _aprovar(v1, admin_id)
+
+        obra_id = _obras_do_tenant(admin_id)[0].id
+        por_nome = {t.nome_tarefa: t
+                    for t in _tarefas_da_obra(obra_id, admin_id)}
+        raiz_cob_id = por_nome['Cobertura'].id
+        folha_cob_id = por_nome['Instalação telhas'].id
+
+        # Filho à mão: a cascata da supressão o arquiva, e a volta tem de
+        # trazê-lo junto — senão o serviço reaparece sem as subtarefas.
+        manual = TarefaCronograma(
+            obra_id=obra_id, admin_id=admin_id, is_cliente=False,
+            nome_tarefa='Reforço manual da cobertura', duracao_dias=1,
+            data_inicio=date(2026, 2, 1), tarefa_pai_id=raiz_cob_id,
+            ordem=9990, responsavel='empresa')
+        db.session.add(manual)
+        db.session.commit()
+        manual_id = manual.id
+
+        # v2 SUPRIME a Cobertura (ela some da lista de itens).
+        v2 = Proposta(
+            admin_id=admin_id, numero=f'{v1.numero}-v2', titulo=v1.titulo,
+            cliente_id=v1.cliente_id, cliente_nome=v1.cliente_nome,
+            valor_total=Decimal('100000.00'), status='rascunho',
+            versao=2, proposta_origem_id=v1.id, obra_id=v1.obra_id)
+        db.session.add(v2)
+        db.session.flush()
+        it_estrutura_v2 = PropostaItem(
+            proposta_id=v2.id, admin_id=admin_id, item_numero=1,
+            proposta_item_origem_id=itens_v1[1].id,
+            descricao='Estrutura metálica', quantidade=Decimal('1'),
+            unidade='vb', preco_unitario=Decimal('100000.00'),
+            subtotal=Decimal('100000.00'))
+        db.session.add(it_estrutura_v2)
+        db.session.commit()
+        _aprovar(v2, admin_id)
+
+        db.session.expire_all()
+        por_id = {t.id: t for t in _tarefas_da_obra(obra_id, admin_id)}
+        assert por_id[raiz_cob_id].ativa is False, 'pré-condição: v2 arquivou'
+        assert por_id[manual_id].ativa is False, 'pré-condição: cascata'
+
+        # v3 RE-INCLUI a Cobertura, com linhagem apontando para a v1.
+        v3 = Proposta(
+            admin_id=admin_id, numero=f'{v1.numero}-v3', titulo=v1.titulo,
+            cliente_id=v1.cliente_id, cliente_nome=v1.cliente_nome,
+            valor_total=Decimal('135000.00'), status='rascunho',
+            versao=3, proposta_origem_id=v2.id, obra_id=v1.obra_id)
+        db.session.add(v3)
+        db.session.flush()
+        db.session.add_all([
+            PropostaItem(
+                proposta_id=v3.id, admin_id=admin_id, item_numero=1,
+                proposta_item_origem_id=it_estrutura_v2.id,
+                descricao='Estrutura metálica', quantidade=Decimal('1'),
+                unidade='vb', preco_unitario=Decimal('100000.00'),
+                subtotal=Decimal('100000.00')),
+            PropostaItem(
+                proposta_id=v3.id, admin_id=admin_id, item_numero=2,
+                proposta_item_origem_id=itens_v1[2].id,   # volta a Cobertura
+                descricao='Cobertura', quantidade=Decimal('1'),
+                unidade='vb', preco_unitario=Decimal('35000.00'),
+                subtotal=Decimal('35000.00')),
+        ])
+        db.session.commit()
+        _aprovar(v3, admin_id)
+
+        db.session.expire_all()
+        # A Task 7 já devolve o IMC — é a pré-condição do que se cobra abaixo.
+        imc = ItemMedicaoComercial.query.filter_by(
+            obra_id=obra_id, admin_id=admin_id, nome='Cobertura').first()
+        assert imc is not None and imc.status != 'SUPRIMIDO', (
+            'pré-condição: a Task 7 devolve o IMC a PENDENTE na re-inclusão')
+
+        por_id = {t.id: t for t in _tarefas_da_obra(obra_id, admin_id)}
+        for tid, rotulo in [(raiz_cob_id, 'raiz Cobertura'),
+                            (folha_cob_id, 'folha Instalação telhas'),
+                            (manual_id, 'filho manual (cascata)')]:
+            t = por_id[tid]
+            assert t.ativa is True, (
+                f'{rotulo} (id={tid}) continua arquivada — o item voltou ao '
+                'escopo e o cronograma vivo não acompanhou')
+            assert t.arquivada_em is None, (
+                f'{rotulo} reativada mas com carimbo arquivada_em pendurado')
+
+        # E sem duplicar: a re-inclusão reusa a tarefa, não cria outra.
+        vivas = [t for t in por_id.values() if t.ativa]
+        nomes = sorted(t.nome_tarefa for t in vivas)
+        assert nomes.count('Cobertura') == 1, (
+            f're-inclusão duplicou a raiz: {nomes}')

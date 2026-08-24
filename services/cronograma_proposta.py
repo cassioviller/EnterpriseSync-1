@@ -878,3 +878,80 @@ def arquivar_tarefas_de_itens_suprimidos(
         f"CronogramaImportacaoEvento: a tabela exige importacao_id.)"
     )
     return len(alvo)
+
+
+def reativar_tarefas_de_itens_reincluidos(
+    obra_id: int,
+    admin_id: int,
+    proposta_item_ids,
+) -> int:
+    """Fase 6 / Task 9 — simétrico de `arquivar_tarefas_de_itens_suprimidos`.
+
+    A Task 7 decidiu que `SUPRIMIDO` descreve o escopo VIGENTE e não é lápide:
+    se uma revisão posterior re-inclui o item, o `ItemMedicaoComercial` volta a
+    `PENDENTE` (`handlers/propostas_handlers.py:143-145`). Sem esta função o
+    cronograma não acompanhava a volta — o contrato dizia "o serviço está de
+    novo no escopo" e o cronograma vivo seguia sem ele, **em silêncio**,
+    porque `natural_key_index` (`services/cronograma_dedup.py:97-102`) indexa
+    tarefa arquivada junto com viva: a materialização REUSA a tarefa
+    arquivada e não a reativa.
+
+    A assimetria nasceu com a Task 9, não antes dela — enquanto a supressão
+    não mexia em tarefa, não havia o que desfazer.
+
+    Desce a mesma cascata da irmã, sobre tarefas `ativa=False`, e limpa o
+    carimbo `arquivada_em`.
+
+    **Contrapartida assumida, e é a razão de a cascata ser por pai e não por
+    carimbo:** uma tarefa que estava arquivada por OUTRO motivo (reimportação
+    M05, por exemplo) e que por acaso viva sob a raiz re-incluída volta junto.
+    Não há coluna que registre o motivo do arquivamento, e inventar uma para
+    este caso seria caro; ressuscitar uma tarefa a mais é visível na tela e
+    corrigível com um clique, enquanto o serviço voltar sem as subtarefas é
+    silencioso. Escolhemos o erro que aparece.
+
+    Não commita — o caller é dono da transação. Idempotente: só considera
+    tarefas `ativa=False`. Devolve o nº de tarefas reativadas.
+    """
+    ids = [int(i) for i in (proposta_item_ids or []) if i]
+    if not ids:
+        return 0
+
+    alvo: dict[int, TarefaCronograma] = {}
+    sementes = TarefaCronograma.query.filter(
+        TarefaCronograma.obra_id == obra_id,
+        TarefaCronograma.admin_id == admin_id,
+        TarefaCronograma.is_cliente.is_(False),
+        TarefaCronograma.ativa.is_(False),
+        TarefaCronograma.gerada_por_proposta_item_id.in_(ids),
+    ).all()
+    fronteira = [t.id for t in sementes]
+    for t in sementes:
+        alvo[t.id] = t
+    while fronteira:
+        filhos = TarefaCronograma.query.filter(
+            TarefaCronograma.obra_id == obra_id,
+            TarefaCronograma.admin_id == admin_id,
+            TarefaCronograma.is_cliente.is_(False),
+            TarefaCronograma.ativa.is_(False),
+            TarefaCronograma.tarefa_pai_id.in_(fronteira),
+        ).all()
+        fronteira = []
+        for f in filhos:
+            if f.id not in alvo:
+                alvo[f.id] = f
+                fronteira.append(f.id)
+
+    if not alvo:
+        return 0
+
+    for t in alvo.values():
+        t.ativa = True
+        t.arquivada_em = None
+    db.session.flush()
+    logger.warning(
+        f"[fase6/T9] obra {obra_id}: revisao RE-INCLUIU item(ns) "
+        f"{sorted(set(ids))} — {len(alvo)} tarefa(s) de cronograma "
+        f"reativada(s) (ativa=True, ids={sorted(alvo)})."
+    )
+    return len(alvo)

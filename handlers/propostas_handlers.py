@@ -118,6 +118,7 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
         return None
 
     criados = atualizados = reativados = 0
+    imcs_reincluidos = []
     for it in itens:
         # Strict 1:1: um ItemMedicaoComercial por PropostaItem.
         # Se nome estiver vazio, fallback para "Item N"; se valor for 0,
@@ -142,6 +143,11 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
                 # continuam válidas nas duas direções.
                 existente.status = 'PENDENTE'
                 reativados += 1
+                # Fase 6 / Task 9 — o cronograma tem de acompanhar a volta.
+                # Guardamos o IMC aqui, na MESMA volta em que a Task 7 o
+                # devolve a PENDENTE, para não haver segunda fonte de verdade
+                # sobre "quem voltou ao escopo".
+                imcs_reincluidos.append(existente)
             if existente.proposta_item_id == it.id:
                 continue  # mesma versão reaprovada — nada a fazer
 
@@ -236,6 +242,21 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
         )
         arquivar_tarefas_de_itens_suprimidos(
             obra_id, admin_id, pis_de_suprimidos)
+
+    # Simétrico: item que VOLTOU ao escopo tem de voltar ao cronograma vivo.
+    # Sem isto o contrato dizia "o serviço está de novo no escopo" e o
+    # cronograma seguia sem ele em silêncio — `natural_key_index` reusa a
+    # tarefa arquivada sem reativá-la. Mesma resolução de linhagem da
+    # supressão, pelo mesmo `_casar`.
+    if imcs_reincluidos:
+        ids_reincluidos = {id(imc) for imc in imcs_reincluidos}
+        pis_de_reincluidos = [i.id for i in itens_linhagem
+                              if id(_casar(i)) in ids_reincluidos]
+        from services.cronograma_proposta import (
+            reativar_tarefas_de_itens_reincluidos,
+        )
+        reativar_tarefas_de_itens_reincluidos(
+            obra_id, admin_id, pis_de_reincluidos)
 
     if criados or atualizados or reativados or suprimidos:
         db.session.flush()
