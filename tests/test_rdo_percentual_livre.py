@@ -126,6 +126,7 @@ def _rdo(ctx, data_rdo):
         numero_rdo=f'PL-{_suf()}'[:20],
         obra_id=ctx['obra_id'], admin_id=ctx['admin_id'],
         data_relatorio=data_rdo, local='Campo', status='Finalizado',
+        estado='preenchido',
     )
     db.session.add(r)
     db.session.commit()

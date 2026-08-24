@@ -59,6 +59,9 @@ def _rdo(obra, admin, dia):
         data_relatorio=dia,
         obra_id=obra.id,
         admin_id=admin.id,
+        # RDO submetido: desde 24/08 rascunho nao move o cronograma, e o que
+        # estes testes caracterizam e o avanco de um dia fechado.
+        estado='preenchido',
     )
     db.session.add(r)
     db.session.flush()
