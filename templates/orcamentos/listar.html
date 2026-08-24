@@ -43,8 +43,8 @@
                 <i class="fas fa-edit"></i>
               </a>
               <form method="POST" action="{{ url_for('orcamentos.duplicar', id=o.id) }}" class="d-inline"
-                    onsubmit="return confirm('Duplicar orçamento {{ o.numero }}?');">
-                <button class="btn btn-sm btn-outline-secondary" title="Duplicar"><i class="fas fa-copy"></i></button>
+                    onsubmit="return confirm('Criar nova revisão de {{ o.numero }}?');">
+                <button class="btn btn-sm btn-outline-secondary" title="Criar revisão"><i class="fas fa-copy"></i></button>
               </form>
               <form method="POST" action="{{ url_for('orcamentos.excluir', id=o.id) }}" class="d-inline"
                     onsubmit="return confirm('Excluir orçamento {{ o.numero }}?');">

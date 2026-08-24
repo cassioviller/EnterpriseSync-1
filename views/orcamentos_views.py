@@ -531,63 +531,36 @@ def excluir(id):
 @login_required
 @admin_required
 def duplicar(id):
-    """Cria uma cópia integral do orçamento (rev) preservando composições e overrides.
+    """Cria a próxima REVISÃO do orçamento, preservando composições, overrides
+    e dimensionais — e agora também a linhagem.
 
-    Útil para gerar revisões V2/V3 antes de uma nova proposta.
+    Fase 6 / Task 10: o corpo migrou para
+    `services.orcamento_versao.criar_revisao`, que faz o mesmo que esta rota
+    fazia MAIS gravar a cadeia (`origem_id`/`revisao_de_id`/`versao`/
+    `motivo_revisao`) e a linhagem de cada item (`item_origem_id`). Antes, a
+    cópia nascia órfã e a história se perdia.
+
+    O ENDPOINT não muda: `templates/orcamentos/listar.html` e
+    `templates/orcamentos/editar.html` apontam para ele. O que muda é o
+    resultado — o título deixa de ser "(cópia)" e passa a "(rev. N)".
+
+    `motivo` é opcional e vem do form quando a tela oferecer o campo; um
+    motivo em branco vira NULL, não string vazia.
     """
+    from services.orcamento_versao import criar_revisao
+
     admin_id = _admin_id()
     orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     try:
-        novo = Orcamento(
-            admin_id=admin_id,
-            numero=_gerar_numero(admin_id),
-            titulo=f"{orc.titulo} (cópia)",
-            descricao=orc.descricao,
-            cliente_id=orc.cliente_id,
-            cliente_nome=orc.cliente_nome,
-            imposto_pct_global=orc.imposto_pct_global,
-            margem_pct_global=orc.margem_pct_global,
-            criado_por=current_user.id,
-            status='rascunho',
-        )
-        db.session.add(novo)
-        db.session.flush()
-
-        for it in orc.itens:
-            novo_it = OrcamentoItem(
-                admin_id=admin_id,
-                orcamento_id=novo.id,
-                ordem=it.ordem,
-                servico_id=it.servico_id,
-                descricao=it.descricao,
-                unidade=it.unidade,
-                quantidade=it.quantidade,
-                imposto_pct=it.imposto_pct,
-                margem_pct=it.margem_pct,
-                composicao_snapshot=it.composicao_snapshot or [],
-                observacao=it.observacao,
-                cronograma_template_override_id=it.cronograma_template_override_id,
-                # Task #18: copia inclusos/exclusos por serviço na revisão
-                itens_inclusos=it.itens_inclusos,
-                itens_exclusos=it.itens_exclusos,
-                # Task #36: copia medição dimensional na revisão
-                tipo_medicao_override=it.tipo_medicao_override,
-                dim_largura=it.dim_largura,
-                dim_comprimento=it.dim_comprimento,
-                dim_perimetro=it.dim_perimetro,
-                dim_pe_direito=it.dim_pe_direito,
-                dim_area_manual=it.dim_area_manual,
-            )
-            db.session.add(novo_it)
-        db.session.flush()
-        recalcular_orcamento(novo)
+        motivo = (request.form.get('motivo_revisao') or '').strip() or None
+        novo = criar_revisao(orc, admin_id, motivo=motivo)
         db.session.commit()
-        flash(f'Orçamento duplicado como {novo.numero}.', 'success')
+        flash(f'Revisão {novo.numero} criada (v{novo.versao}).', 'success')
         return redirect(url_for('orcamentos.editar', id=novo.id))
     except Exception as e:
         db.session.rollback()
-        logger.exception('erro ao duplicar orcamento')
-        flash(f'Erro ao duplicar: {e}', 'error')
+        logger.exception('erro ao criar revisao do orcamento')
+        flash(f'Erro ao criar revisão: {e}', 'error')
         return redirect(url_for('orcamentos.editar', id=id))
 
 

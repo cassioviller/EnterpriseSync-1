@@ -5988,6 +5988,142 @@ def _migration_273_medicao_contrato_versionada():
 _LOTE_BASELINE_277 = 200
 
 
+def _migration_274_orcamento_cadeia_revisao():
+    """Fase 6 / Task 10 — a cadeia de revisões do Orçamento.
+
+    Hoje `duplicar` faz uma cópia integral e a relação com o original se perde:
+    o novo orçamento nasce órfão, com título "(cópia)". Não dá para responder
+    "de qual revisão este preço veio" nem "quais são as revisões deste
+    orçamento" — que é a pergunta que o aditivo faz.
+
+    Duas colunas de linhagem, de propósito:
+      - `revisao_de_id`: o ELO, a revisão imediatamente anterior;
+      - `origem_id`: o ATALHO, a RAIZ da cadeia.
+    Só o elo obrigaria a subir a corrente para achar a raiz, e é a raiz que
+    agrupa a cadeia inteira num `filter_by`; só a raiz perderia a ordem.
+
+    `versao` entra NOT NULL DEFAULT 1: todo orçamento existente É a v1 da sua
+    própria cadeia, então o backfill é o próprio default — sem UPDATE.
+
+    `travado_em` pertence à Task 11 (trava do orçamento convertido) e nasce
+    aqui para não gastar um número de migration só por ela. Nasce NULL para
+    TODO o estoque: travar retroativamente o que já está convertido quebraria
+    fluxo em curso sem aviso (guarda de compatibilidade da Task 11).
+
+    Idempotente: ADD COLUMN IF NOT EXISTS, índices com o MESMO nome que o
+    SQLAlchemy gera via `index=True` (create_all antes da migração vira
+    no-op) e FKs guardadas por existência na COLUNA via pg_constraint —
+    mesmo padrão da 272/273.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE orcamento "
+                "ADD COLUMN IF NOT EXISTS origem_id INTEGER"))
+            conn.execute(sa_text(
+                "ALTER TABLE orcamento "
+                "ADD COLUMN IF NOT EXISTS revisao_de_id INTEGER"))
+            conn.execute(sa_text(
+                "ALTER TABLE orcamento "
+                "ADD COLUMN IF NOT EXISTS versao INTEGER NOT NULL DEFAULT 1"))
+            conn.execute(sa_text(
+                "ALTER TABLE orcamento "
+                "ADD COLUMN IF NOT EXISTS motivo_revisao TEXT"))
+            conn.execute(sa_text(
+                "ALTER TABLE orcamento "
+                "ADD COLUMN IF NOT EXISTS travado_em TIMESTAMP"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_orcamento_origem_id "
+                "ON orcamento(origem_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_orcamento_revisao_de_id "
+                "ON orcamento(revisao_de_id)"))
+            for coluna, nome_fk in (('origem_id', 'fk_orcamento_origem'),
+                                    ('revisao_de_id', 'fk_orcamento_revisao_de')):
+                conn.execute(sa_text(f"""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1
+                            FROM pg_constraint c
+                            WHERE c.conrelid = 'orcamento'::regclass
+                              AND c.contype = 'f'
+                              AND c.conkey = ARRAY[(
+                                  SELECT attnum FROM pg_attribute
+                                  WHERE attrelid = 'orcamento'::regclass
+                                    AND attname = '{coluna}')]::smallint[]
+                        ) THEN
+                            ALTER TABLE orcamento
+                                ADD CONSTRAINT {nome_fk}
+                                FOREIGN KEY ({coluna})
+                                REFERENCES orcamento(id)
+                                ON DELETE SET NULL;
+                        END IF;
+                    END $$;
+                """))
+        logger.info("[Migration 274] orcamento: cadeia de revisao "
+                    "(origem_id, revisao_de_id, versao, motivo_revisao, "
+                    "travado_em) OK")
+        return True
+    except Exception as e:
+        logger.error("[Migration 274] falhou: %s", e)
+        raise
+
+
+def _migration_275_orcamento_item_linhagem():
+    """Fase 6 / Task 10 — `orcamento_item.item_origem_id`.
+
+    De qual item da revisão ANTERIOR este item veio. Elo a elo, como o
+    orçamento: sem ele o diff entre duas revisões (Task 12) teria de casar
+    item por descrição — e descrição é texto editável, então "mantido" e
+    "suprimido + incluído" ficariam indistinguíveis assim que alguém
+    corrigisse uma vírgula no nome do serviço.
+
+    NULL para todo o estoque e para todo item de raiz: item que não veio de
+    outro não tem origem. Nunca houve revisão rastreada antes desta migration,
+    então não há o que backfillar — inventar elo por descrição seria fabricar
+    linhagem que ninguém registrou.
+
+    Idempotente pelo mesmo padrão da 274.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE orcamento_item "
+                "ADD COLUMN IF NOT EXISTS item_origem_id INTEGER"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_orcamento_item_item_origem_id "
+                "ON orcamento_item(item_origem_id)"))
+            conn.execute(sa_text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint c
+                        WHERE c.conrelid = 'orcamento_item'::regclass
+                          AND c.contype = 'f'
+                          AND c.conkey = ARRAY[(
+                              SELECT attnum FROM pg_attribute
+                              WHERE attrelid = 'orcamento_item'::regclass
+                                AND attname = 'item_origem_id')]::smallint[]
+                    ) THEN
+                        ALTER TABLE orcamento_item
+                            ADD CONSTRAINT fk_orcamento_item_origem
+                            FOREIGN KEY (item_origem_id)
+                            REFERENCES orcamento_item(id)
+                            ON DELETE SET NULL;
+                    END IF;
+                END $$;
+            """))
+        logger.info("[Migration 275] orcamento_item.item_origem_id OK")
+        return True
+    except Exception as e:
+        logger.error("[Migration 275] falhou: %s", e)
+        raise
+
+
 def _migration_277_editor_v2_em_todo_o_parque():
     """Liga o editor de cronograma v2 em TODOS os tenants — decisão de 03/08/2026.
 
@@ -7527,6 +7663,8 @@ def executar_migracoes():
             (271, "Fase 6 — obra_contrato_versao: baseline versionado do contrato da obra, com backfill da versão nº1 para obras pré-existentes", _migration_271_obra_contrato_versao),
             (272, "Fase 6 — aditivo_contrato (rascunho→aprovado|cancelado) + FK obra_contrato_versao.aditivo_id que a Task 1 deixou pendente (ON DELETE SET NULL)", _migration_272_aditivo_contrato),
             (273, "Fase 6 — medicao_contrato.contrato_versao_id (FK p/ obra_contrato_versao, SET NULL, índice) + backfill: marco existente aponta para a versão vigente da obra", _migration_273_medicao_contrato_versionada),
+            (274, "Fase 6 — orcamento: cadeia de revisoes (origem_id=raiz, revisao_de_id=elo, versao NOT NULL default 1, motivo_revisao) + travado_em da Task 11, NULL para todo o estoque", _migration_274_orcamento_cadeia_revisao),
+            (275, "Fase 6 — orcamento_item.item_origem_id: linhagem elo a elo do item, para o diff entre revisoes nao depender de casar por descricao", _migration_275_orcamento_item_linhagem),
             (277, "Editor de cronograma v2 em todo o parque — linha de base primeiro, flag ligada em todos os tenants, default da coluna vira TRUE", _migration_277_editor_v2_em_todo_o_parque),
             (278, "p10 — cronograma_baseline.bac (orçamento congelado junto com o prazo; NULL = baseline anterior)", _migration_278_baseline_bac),
             (279, "E02 — drop de notificacao_cliente, auto-guardado pela contagem (falha e retenta se houver linha)", _migration_279_drop_notificacao_cliente),

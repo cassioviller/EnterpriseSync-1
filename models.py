@@ -8632,6 +8632,24 @@ class Orcamento(db.Model):
     lucro_total = db.Column(db.Numeric(15, 2), default=0)
 
     status = db.Column(db.String(30), default='rascunho', index=True)  # rascunho, fechado, convertido
+    # ── Fase 6 / Task 10 — cadeia de revisões ───────────────────────────
+    # A cadeia é DUPLA de propósito: `revisao_de_id` é o elo (a revisão
+    # imediatamente anterior) e `origem_id` é o atalho (a RAIZ da cadeia).
+    # Só o elo obrigaria a subir a corrente inteira para achar a raiz, e é
+    # a raiz que agrupa "todas as revisões deste orçamento" numa query só;
+    # só a raiz perderia a ordem. Os dois são baratos e respondem perguntas
+    # diferentes. A raiz tem os dois NULL — não é revisão de ninguém.
+    origem_id = db.Column(db.Integer,
+                          db.ForeignKey('orcamento.id', ondelete='SET NULL'),
+                          nullable=True, index=True)
+    revisao_de_id = db.Column(db.Integer,
+                              db.ForeignKey('orcamento.id', ondelete='SET NULL'),
+                              nullable=True, index=True)
+    versao = db.Column(db.Integer, nullable=False, default=1)
+    motivo_revisao = db.Column(db.Text, nullable=True)
+    # Task 11 usa esta coluna (a trava do orçamento convertido); nasce aqui,
+    # na mesma migration, para não gastar um número só por ela.
+    travado_em = db.Column(db.DateTime, nullable=True)
     # DEPRECATED (Task #115 v2): mantido apenas para compatibilidade com dados existentes.
     # Use a relação 1→N via Proposta.orcamento_id (`propostas_geradas` abaixo).
     ultima_proposta_id = db.Column('proposta_id', db.Integer,
@@ -8709,6 +8727,13 @@ class OrcamentoItem(db.Model):
     dim_perimetro = db.Column(db.Numeric(15, 4), nullable=True)
     dim_pe_direito = db.Column(db.Numeric(15, 4), nullable=True)
     dim_area_manual = db.Column(db.Numeric(15, 4), nullable=True)
+    # Fase 6 / Task 10 — de qual item da revisão ANTERIOR este veio. Elo a
+    # elo, como o orçamento: a linhagem se percorre subindo, e é o que
+    # permite o diff item a item entre duas revisões (Task 12).
+    item_origem_id = db.Column(db.Integer,
+                               db.ForeignKey('orcamento_item.id',
+                                             ondelete='SET NULL'),
+                               nullable=True, index=True)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
     servico = db.relationship('Servico', foreign_keys=[servico_id])
