@@ -1311,13 +1311,18 @@
                 </div>
             </div>
             {% if obra.valor_contrato and obra.valor_contrato > 0 %}
-            <div class="kpi-card" style="--kpi-color: #06b6d4; --kpi-color-light: #22d3ee;">
+            {# Fase 6 / Task 13 — o card do contrato vira a porta do extrato:
+               é dali que se responde "por que este valor é este hoje". #}
+            <a href="{{ url_for('aditivos.listar', obra_id=obra.id) }}"
+               class="kpi-card text-decoration-none text-reset"
+               style="--kpi-color: #06b6d4; --kpi-color-light: #22d3ee;"
+               title="Ver contrato, aditivos e o histórico de versões">
                 <i class="fas fa-file-contract kpi-icon"></i>
                 <div>
                     <div class="kpi-value">R$ {{ '{:,.2f}'.format(obra.valor_contrato).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                    <div class="kpi-label">Contrato</div>
+                    <div class="kpi-label">Contrato e aditivos <i class="fas fa-arrow-right ms-1 small"></i></div>
                 </div>
-            </div>
+            </a>
             {% endif %}
             {% if obra.valor_contrato and kpis and kpis.custo_total > 0 %}
             {% set _margem = ((obra.valor_contrato - kpis.custo_total) / obra.valor_contrato * 100) if obra.valor_contrato > 0 else 0 %}

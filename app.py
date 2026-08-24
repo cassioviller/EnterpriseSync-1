@@ -937,6 +937,20 @@ with app.app_context():
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint CRONOGRAMA: {e}", exc_info=True)
 
+    # Fase 6 / Task 13 — Blueprint ADITIVOS (contrato versionado da obra).
+    # Registrado JUNTO DOS VIZINHOS DE OBRA e não no topo: a ordem de import
+    # em app.py é contrato não declarado (ESTADO-ATUAL.md, armadilha 5) —
+    # subir este bloco muda quando `models` e os serviços de obra são
+    # importados, e isso já quebrou registro de rota antes.
+    try:
+        from views.aditivos_views import aditivos_bp
+        app.register_blueprint(aditivos_bp)
+        logging.info("[OK] Blueprint ADITIVOS (Fase 6) registrado")
+    except ImportError as e:
+        logging.warning(f"[WARN] Blueprint ADITIVOS não encontrado: {e}", exc_info=True)
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint ADITIVOS: {e}", exc_info=True)
+
     # Task #62 — Auditoria de vínculos Cronograma↔Subatividade↔Serviço↔MO
     try:
         from vinculos_audit_views import vinculos_audit_bp

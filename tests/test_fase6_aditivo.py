@@ -1772,3 +1772,180 @@ def test_v3_reinclui_item_suprimido_e_reativa_as_tarefas_arquivadas():
         nomes = sorted(t.nome_tarefa for t in vivas)
         assert nomes.count('Cobertura') == 1, (
             f're-inclusão duplicou a raiz: {nomes}')
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 13 — a porta HTTP: extrato de contrato e ciclo do aditivo
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _cliente_de(user_id):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
+
+
+def _obra_com_contrato():
+    """Admin + obra com contrato vigente (v1). Devolve ids, fora do contexto."""
+    from services.contrato_obra import ORIGEM_CADASTRO, definir_valor_contrato
+    with app.app_context():
+        suf = uuid.uuid4().hex[:10]
+        admin = Usuario(
+            username=f'adt_{suf}', email=f'adt_{suf}@test.local',
+            nome='Aditivo Fase 6',
+            password_hash=generate_password_hash('Senha@2026'),
+            tipo_usuario=TipoUsuario.ADMIN, ativo=True, versao_sistema='v2')
+        db.session.add(admin)
+        db.session.flush()
+        cli = Cliente(admin_id=admin.id, nome=f'Cli {suf}',
+                      email=f'cli_{suf}@test.local', telefone='11999998888')
+        db.session.add(cli)
+        db.session.flush()
+        obra = Obra(nome=f'Obra Aditivo {suf}', codigo=f'ADT-{suf}',
+                    admin_id=admin.id, cliente_id=cli.id,
+                    status='Em andamento', data_inicio=date(2026, 1, 10))
+        db.session.add(obra)
+        db.session.flush()
+        definir_valor_contrato(obra, 100000.0, ORIGEM_CADASTRO,
+                               motivo='contrato original')
+        db.session.commit()
+        return {'admin_id': admin.id, 'obra_id': obra.id}
+
+
+def test_extrato_de_contrato_mostra_versao_vigente():
+    ctx = _obra_com_contrato()
+    r = _cliente_de(ctx['admin_id']).get(f"/obras/{ctx['obra_id']}/aditivos")
+    assert r.status_code == 200, f'extrato não renderizou ({r.status_code})'
+    html = r.get_data(as_text=True)
+    assert 'Contrato e aditivos' in html
+    assert '100.000,00' in html or '100000,00' in html, (
+        'o extrato não mostra o valor vigente do contrato')
+
+
+def test_ciclo_completo_do_aditivo_pela_porta_http():
+    """Abrir em rascunho, ver no extrato, aprovar e o contrato mudar.
+
+    É o caminho que a fase inteira existe para oferecer — até a Task 12 tudo
+    isso só era alcançável por serviço, ou seja, por ninguém.
+    """
+    ctx = _obra_com_contrato()
+    c = _cliente_de(ctx['admin_id'])
+
+    r = c.post(f"/obras/{ctx['obra_id']}/aditivos/novo", data={
+        'tipo': 'acrescimo', 'valor_novo': '130000,00',
+        'motivo': 'ampliação da cobertura pedida pelo cliente',
+    }, follow_redirects=False)
+    assert r.status_code in (302, 303), f'abrir aditivo falhou ({r.status_code})'
+
+    with app.app_context():
+        adt = AditivoContrato.query.filter_by(obra_id=ctx['obra_id']).one()
+        assert adt.status == 'rascunho', (
+            'aditivo tem de nascer em rascunho — aprovar é outro clique')
+        assert float(adt.valor_anterior) == 100000.0
+        assert float(adt.valor_novo) == 130000.0
+        aid = adt.id
+
+    r = c.post(f"/obras/{ctx['obra_id']}/aditivos/{aid}/aprovar",
+               follow_redirects=False)
+    assert r.status_code in (302, 303)
+
+    with app.app_context():
+        adt = db.session.get(AditivoContrato, aid)
+        assert adt.status == 'aprovado'
+        vigente = (ObraContratoVersao.query
+                   .filter_by(obra_id=ctx['obra_id'], vigente_ate=None).one())
+        assert float(vigente.valor) == 130000.0, (
+            'aprovar tem de abrir a versão seguinte do contrato')
+        assert vigente.versao == 2
+        assert vigente.aditivo_id == aid, (
+            'a versão nova tem de apontar para o aditivo que a abriu')
+
+
+def test_quem_nao_e_gestor_da_obra_nao_aprova_aditivo():
+    """Aprovar mexe no baseline: exige GESTOR.
+
+    O plano pedia 403; a resposta é **404**, e de propósito — é a escolha já
+    travada em `tests/test_cronograma_permissoes.py`, para não vazar a
+    existência de obra que o usuário não alcança. O decorator `obra_required`
+    da Fase 1 é quem aplica isso.
+    """
+    from models import PapelObra, UsuarioObra
+    from scripts.flag_escopo_obra import definir_flag
+    ctx = _obra_com_contrato()
+    # A flag `escopo_obra_ativo` do tenant PRECISA estar ligada, senão
+    # `papel_de_usuario_na_obra` devolve GESTOR para todo mundo do tenant
+    # (utils/autorizacao.py, o `if not _escopo_ativo(tenant)`) e a guarda
+    # colapsa. O colapso é conhecido, é igual ao do resto do app e foi aceito
+    # no ruling de 23/07 — mas ele significa que ESTE teste só prova alguma
+    # coisa com a flag ligada. Sem isto, ele passaria hoje por acidente e
+    # deixaria de avisar no dia em que a autorização quebrasse.
+    with app.app_context():
+        definir_flag(ctx['admin_id'], True)
+        db.session.commit()
+    c = _cliente_de(ctx['admin_id'])
+    c.post(f"/obras/{ctx['obra_id']}/aditivos/novo", data={
+        'tipo': 'acrescimo', 'valor_novo': '130000,00', 'motivo': 'x'})
+
+    with app.app_context():
+        aid = AditivoContrato.query.filter_by(obra_id=ctx['obra_id']).one().id
+        suf = uuid.uuid4().hex[:8]
+        apontador = Usuario(
+            username=f'apt_{suf}', email=f'apt_{suf}@test.local',
+            nome='Apontador', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            versao_sistema='v2', admin_id=ctx['admin_id'])
+        db.session.add(apontador)
+        db.session.flush()
+        db.session.add(UsuarioObra(
+            usuario_id=apontador.id, obra_id=ctx['obra_id'],
+            papel=PapelObra.APONTADOR, admin_id=ctx['admin_id'], ativo=True))
+        db.session.commit()
+        apontador_id = apontador.id
+
+    ca = _cliente_de(apontador_id)
+    r = ca.post(f"/obras/{ctx['obra_id']}/aditivos/{aid}/aprovar",
+                follow_redirects=False)
+    assert r.status_code == 404, (
+        f'apontador conseguiu chegar em aprovar ({r.status_code}) — aprovar '
+        'aditivo exige papel de gestor da obra')
+
+    with app.app_context():
+        assert db.session.get(AditivoContrato, aid).status == 'rascunho', (
+            'o aditivo foi aprovado por quem não é gestor')
+
+
+def test_cancelar_aditivo_aprovado_e_recusado_com_mensagem():
+    """Aprovado já mexeu no baseline: desfazer exige aditivo em sentido
+    contrário, nunca apagar história. A view traduz o erro do serviço em
+    mensagem, em vez de estourar 500."""
+    ctx = _obra_com_contrato()
+    c = _cliente_de(ctx['admin_id'])
+    c.post(f"/obras/{ctx['obra_id']}/aditivos/novo", data={
+        'tipo': 'acrescimo', 'valor_novo': '130000,00', 'motivo': 'y'})
+    with app.app_context():
+        aid = AditivoContrato.query.filter_by(obra_id=ctx['obra_id']).one().id
+    c.post(f"/obras/{ctx['obra_id']}/aditivos/{aid}/aprovar")
+
+    r = c.post(f"/obras/{ctx['obra_id']}/aditivos/{aid}/cancelar",
+               follow_redirects=True)
+    assert r.status_code == 200, 'cancelar aprovado devolveu erro cru'
+    with app.app_context():
+        assert db.session.get(AditivoContrato, aid).status == 'aprovado', (
+            'cancelar desfez um aditivo que já produziu efeito')
+
+
+def test_obra_de_outro_tenant_devolve_404_no_extrato():
+    ctx = _obra_com_contrato()
+    with app.app_context():
+        suf = uuid.uuid4().hex[:8]
+        outro = Usuario(
+            username=f'out_{suf}', email=f'out_{suf}@test.local',
+            nome='Outro', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.ADMIN, ativo=True, versao_sistema='v2')
+        db.session.add(outro)
+        db.session.commit()
+        outro_id = outro.id
+    r = _cliente_de(outro_id).get(f"/obras/{ctx['obra_id']}/aditivos")
+    assert r.status_code == 404, (
+        f'tenant alheio alcançou o extrato de contrato ({r.status_code})')

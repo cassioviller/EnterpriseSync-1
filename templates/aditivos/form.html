@@ -1,0 +1,62 @@
+{% extends "base_completo.html" %}
+{% block title %}Novo aditivo — {{ obra.nome }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <h4 class="mb-1"><i class="fas fa-file-signature me-2"></i> Novo aditivo</h4>
+  <div class="text-muted small mb-3">{{ obra.nome }}</div>
+
+  {% if not vigente %}
+    <div class="alert alert-warning">
+      Esta obra não tem contrato vigente. O valor inicial entra pela proposta aprovada
+      ou pelo cadastro da obra — aditivo altera um contrato que já existe.
+    </div>
+  {% endif %}
+
+  <form method="POST" class="card">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Tipo</label>
+          <select name="tipo" class="form-select" required>
+            <option value="acrescimo">Acréscimo</option>
+            <option value="supressao">Supressão</option>
+            <option value="prazo">Prazo</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Valor do contrato depois do aditivo</label>
+          <div class="input-group">
+            <span class="input-group-text">R$</span>
+            <input type="text" name="valor_novo" class="form-control" inputmode="decimal"
+                   placeholder="{% if vigente %}{{ '%.2f'|format(vigente.valor)|replace('.', ',') }}{% else %}0,00{% endif %}">
+          </div>
+          <div class="form-text">
+            Valor TOTAL do contrato, não o delta. Hoje:
+            {% if vigente %}R$ {{ '%.2f'|format(vigente.valor)|replace('.', ',') }}{% else %}—{% endif %}.
+            Aditivo só de prazo pode deixar em branco.
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Prazo (dias)</label>
+          <input type="number" name="prazo_delta_dias" class="form-control" placeholder="0">
+          <div class="form-text">Positivo prorroga, negativo antecipa.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Motivo</label>
+          <textarea name="motivo" class="form-control" rows="3" required
+                    placeholder="O que mudou no escopo e por quê. É o que sustenta a conversa com o cliente depois."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer d-flex justify-content-between align-items-center">
+      <span class="text-muted small">
+        O aditivo nasce em <strong>rascunho</strong> — nada muda no contrato até alguém aprovar.
+      </span>
+      <div class="d-flex gap-2">
+        <a href="{{ url_for('aditivos.listar', obra_id=obra.id) }}" class="btn btn-outline-secondary">Cancelar</a>
+        <button class="btn btn-primary"><i class="fas fa-save me-1"></i> Abrir aditivo</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
