@@ -11,12 +11,19 @@
 **Spec:** Não há spec escrito. Este plano nasce da sessão de brainstorming de 2026-08-20 (reunião com o Paulo). O critério de aceite verbal foi: "inseri 5 itens zerados numa fase que estava em 98% e ela tinha que cair para ~80%".
 
 
-## Estado — 2026-08-21
+## Estado — 2026-08-24 · ✅ PLANO CONCLUÍDO
 
 Tasks 1 e 2 **executadas e mescladas no `main`** (resgatadas da branch
-`sdd/reuniao-20-08`, que ficou fora do merge do dia 20). A Task 3 **não tem
-checkbox de propósito**: ela continua BLOQUEADA na decisão do Paulo sobre qual
-fórmula vale — não confunda "0 pendentes" com plano concluído.
+`sdd/reuniao-20-08`, que ficou fora do merge do dia 20).
+
+**A Task 3 fechou em 2026-08-24 sem uma linha de código**: a decisão foi
+**manter a média ponderada por duração**, que é o que o motor já faz. Ver
+"DECISÃO TOMADA" abaixo. O plano está completo — Task 3 continua sem checkbox
+porque não houve passo a executar, e não porque sobrou trabalho.
+
+🔬 Verificado em 24/08: `python -m pytest tests/test_cronograma_rollup_insercao.py -v`
+→ **3 passed**, com `test_rollup_pondera_por_duracao_e_nao_por_contagem`
+travando o `96.39`.
 
 ## Global Constraints
 
@@ -27,7 +34,23 @@ fórmula vale — não confunda "0 pendentes" com plano concluído.
 - Rodar teste: `python -m pytest tests/<arquivo>.py -v`
 - Commits em português, prefixo `fix(cronograma):` / `test(cronograma):`.
 
-## DECISÃO PENDENTE — ler antes da Task 3
+## DECISÃO TOMADA — 2026-08-24 · média ponderada por duração
+
+**Vale a média ponderada por duração — a fórmula que já está no código.**
+Nada muda em `cronograma_engine`, e a cascata que a troca ameaçava (curva S,
+EVM, medição, físico-financeiro) fica intacta.
+
+⚠️ **O que essa escolha custa, dito por extenso:** o cenário narrado na reunião
+de 20/08 **não vai acontecer**. Inserir 5 tarefas zeradas de 1 dia numa fase de
+98% leva o pai para **96,39%**, não para os ~80% descritos. Quem olhar a tela
+esperando a queda de 20 pontos vai achar que o rollup está quebrado — ele não
+está, está obedecendo esta decisão. Se o incômodo voltar, o caminho não é
+"consertar o rollup", é reabrir esta linha.
+
+O texto abaixo é o registro da pergunta como ela foi colocada, mantido para
+quem precisar reconstruir o porquê.
+
+---
 
 A fórmula do rollup hoje é **média ponderada pela duração das filhas**
 (`utils/cronograma_engine.py:610`, e a gêmea `rollup_realizado` em `:1010`).
@@ -348,11 +371,13 @@ git commit -m "fix(cronograma): rollup dos pais por profundidade, nao por ordem"
 
 ---
 
-### Task 3: BLOQUEADA — troca da fórmula para média simples por item
+### Task 3: ❌ NÃO SERÁ EXECUTADA — decisão de 2026-08-24
 
-**Não execute sem a confirmação descrita em "DECISÃO PENDENTE".**
+**A confirmação veio e foi pela ponderada por duração.** Esta task existia só
+para o cenário oposto; ela morre aqui. Não execute nada do que está descrito
+abaixo — o texto fica como registro do caminho não tomado.
 
-Se o Paulo confirmar que o percentual do grupo deve ser **média simples por
+~~Se o Paulo confirmar que~~ o percentual do grupo deve ser **média simples por
 quantidade de itens** (98% com 20 itens + 5 itens zerados ⇒ 78,4%), a mudança é
 trocar o peso `max(f.duracao_dias or 1, 1)` por `1` nas DUAS funções
 (`rollup_percentual_pos_recalculo` e `rollup_realizado`) e atualizar o valor
