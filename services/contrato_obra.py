@@ -98,7 +98,7 @@ ORIGEM_TIPO = {o: o for o in ORIGENS}
 
 def abrir_versao(obra, valor, origem_tipo: str, *, origem_proposta_id=None,
                  aditivo_id=None, motivo=None, criado_por_id=None,
-                 vigente_de=None) -> ObraContratoVersao:
+                 vigente_de=None, prazo_dias=None) -> ObraContratoVersao:
     """Abre uma nova versão do contrato, fechando a vigente atual.
 
     Ordem (é o que garante nunca haver 2 versões vigentes ao mesmo tempo,
@@ -158,6 +158,13 @@ def abrir_versao(obra, valor, origem_tipo: str, *, origem_proposta_id=None,
     None), uma única chamada por transação, os 5 chamadores de hoje: as
     mesmas consultas acertam a versão vigente e o próximo número de versão
     normalmente.
+
+    `prazo_dias` (fix round 1 da Task 3): o prazo contratual vigente, em
+    dias. Quando NÃO é passado (todos os chamadores exceto
+    `aprovar_aditivo`), a versão nova HERDA o `prazo_dias` da versão que
+    está fechando — sem a herança, o prazo gravado por um aditivo de prazo
+    evaporaria na primeira reprecificação/proposta seguinte, que não sabe
+    de prazo. Quem muda prazo passa o valor novo explicitamente.
     """
     vigente_de = vigente_de or datetime.utcnow()
 
@@ -175,6 +182,16 @@ def abrir_versao(obra, valor, origem_tipo: str, *, origem_proposta_id=None,
             db.func.max(ObraContratoVersao.versao)
         ).filter_by(obra_id=obra.id, admin_id=obra.admin_id).scalar()
 
+    if prazo_dias is None:
+        # Herança do prazo — ver docstring. Capturada ANTES de fechar as
+        # janelas abaixo (depois delas não há mais como saber quem era a
+        # vigente). Pendente vigente tem precedência sobre a do banco: se
+        # ambas existissem, a pendente é a mais recente.
+        anterior_vigente = next(
+            (p for p in pendentes if p.vigente_ate is None), None) or atual_no_banco
+        if anterior_vigente is not None:
+            prazo_dias = anterior_vigente.prazo_dias
+
     if atual_no_banco is not None:
         atual_no_banco.vigente_ate = vigente_de
 
@@ -190,6 +207,7 @@ def abrir_versao(obra, valor, origem_tipo: str, *, origem_proposta_id=None,
         admin_id=obra.admin_id,
         versao=proxima_versao,
         valor=Decimal(str(valor or 0)),
+        prazo_dias=prazo_dias,
         vigente_de=vigente_de,
         vigente_ate=None,
         origem_tipo=origem_tipo,
@@ -307,6 +325,25 @@ def definir_valor_contrato(obra, valor, origem: str, motivo: str = '',
 _NUMERO_ADITIVO_RE = re.compile(r'^AD-(\d+)$')
 
 
+def _versao_vigente_da_obra(obra):
+    """Versão vigente da obra: a do banco (consultada em `no_autoflush`) ou,
+    se a mesma transação acabou de abrir uma e ainda não flushou, a pendente
+    em `db.session.new` — a mesma reconciliação de `abrir_versao`."""
+    vigente = None
+    if obra.id is not None and obra.admin_id is not None:
+        with db.session.no_autoflush:
+            vigente = ObraContratoVersao.query.filter_by(
+                obra_id=obra.id, admin_id=obra.admin_id,
+                vigente_ate=None).first()
+    if vigente is None:
+        vigente = next(
+            (v for v in db.session.new
+             if isinstance(v, ObraContratoVersao) and v.vigente_ate is None
+             and (v.obra is obra or (obra.id is not None and v.obra_id == obra.id))),
+            None)
+    return vigente
+
+
 def _pendentes_da_obra(obra):
     """`AditivoContrato` ainda não flushados desta obra, em `db.session.new`.
 
@@ -373,20 +410,7 @@ def abrir_aditivo(obra, tipo: str, motivo: str, *, valor_novo=None,
             'aditivo exige motivo — aditivo sem motivo é exatamente o que '
             'a Fase 6 elimina')
 
-    vigente = None
-    if obra.id is not None and obra.admin_id is not None:
-        with db.session.no_autoflush:
-            vigente = ObraContratoVersao.query.filter_by(
-                obra_id=obra.id, admin_id=obra.admin_id,
-                vigente_ate=None).first()
-    if vigente is None:
-        # Reconciliação com a mesma transação: uma versão recém-aberta e
-        # ainda não flushada não aparece no SELECT acima.
-        vigente = next(
-            (v for v in db.session.new
-             if isinstance(v, ObraContratoVersao) and v.vigente_ate is None
-             and (v.obra is obra or (obra.id is not None and v.obra_id == obra.id))),
-            None)
+    vigente = _versao_vigente_da_obra(obra)
     if vigente is None:
         raise ValueError(
             f'obra {getattr(obra, "id", "?")} não tem contrato vigente — '
@@ -451,6 +475,21 @@ def aprovar_aditivo(aditivo, *, aprovado_por_id=None,
     que a aprovação original abriu (sem recarimbar `aprovado_em` nem abrir
     outra versão). Aprovar um `cancelado` é erro: cancelado é terminal.
 
+    `prazo_dias` da versão nova (fix round 1 — ruling: a propagação do
+    prazo é desta task, porque só aqui o delta e a versão aberta se
+    encontram): `base + (prazo_delta_dias or 0)`, onde `base` é o
+    `prazo_dias` da versão vigente; se ela não tem (todo o parque hoje — o
+    backfill da 271 deixou NULL), a base deriva de
+    `(obra.data_previsao_fim - obra.data_inicio).days`. Sem
+    `data_previsao_fim` também, a versão nova fica com `prazo_dias = None`
+    — base desconhecida + delta é desconhecida; nunca inventar um zero. O
+    delta segue auditável no próprio `AditivoContrato`. Prazo RESULTANTE
+    negativo é contrato impossível (obra de duração negativa): a aprovação
+    recusa com `ValueError` em vez de gravar ou clampar em silêncio, e o
+    rascunho fica intacto para correção. Fora de escopo por decisão
+    explícita: NÃO tocamos `Obra.data_previsao_fim` — a versão registra o
+    prazo, mexer na data da obra é efeito de negócio de outra alçada.
+
     Não commita — quem chama decide a transação.
     """
     if aditivo.status == AditivoContrato.STATUS_CANCELADO:
@@ -474,22 +513,49 @@ def aprovar_aditivo(aditivo, *, aprovado_por_id=None,
                 None)
         return versao
 
+    # `aditivo.obra` pode ser lazy-load (aditivo vindo do banco): resolver
+    # FORA de `no_autoflush` dispararia autoflush — a classe de bug da
+    # regressão da Task 2, que o resto do módulo blinda.
+    with db.session.no_autoflush:
+        obra = aditivo.obra
+
+    # Prazo da versão nova — computado ANTES de mutar o aditivo, para a
+    # recusa do prazo negativo não deixar um aditivo meio-aprovado.
+    vigente = _versao_vigente_da_obra(obra)
+    base = vigente.prazo_dias if vigente is not None else None
+    if base is None and obra.data_previsao_fim is not None:
+        # data_inicio é NOT NULL no banco; só data_previsao_fim é opcional.
+        base = (obra.data_previsao_fim - obra.data_inicio).days
+    prazo_novo = None
+    if base is not None:
+        prazo_novo = base + (aditivo.prazo_delta_dias or 0)
+        if prazo_novo < 0:
+            raise ValueError(
+                f'aditivo {aditivo.numero}: prazo resultante negativo '
+                f'({base} {(aditivo.prazo_delta_dias or 0):+d} = {prazo_novo} dias) '
+                '— contrato de duração negativa é impossível; corrija o '
+                'delta no rascunho')
+    # prazo_novo None cai na herança de abrir_versao — que herda o None da
+    # vigente: mesmo resultado, nenhum valor inventado.
+
     aditivo.status = AditivoContrato.STATUS_APROVADO
     aditivo.aprovado_por_id = aprovado_por_id
     aditivo.aprovado_em = datetime.utcnow()
 
     versao = abrir_versao(
-        aditivo.obra, aditivo.valor_novo, ORIGEM_TIPO[ORIGEM_ADITIVO],
+        obra, aditivo.valor_novo, ORIGEM_TIPO[ORIGEM_ADITIVO],
         aditivo_id=aditivo.id, motivo=aditivo.motivo,
-        criado_por_id=aprovado_por_id, vigente_de=vigente_de)
+        criado_por_id=aprovado_por_id, vigente_de=vigente_de,
+        prazo_dias=prazo_novo)
     # `aditivo.id` pode ser None (aberto e aprovado na mesma transação, sem
     # flush): a relationship resolve o FK na hora do flush de verdade.
     versao.aditivo = aditivo
 
     logger.info(
-        '[fase6] obra %s: aditivo %s aprovado (%.2f → %.2f, versão %s, '
-        'usuario=%s)', aditivo.obra_id or getattr(aditivo.obra, 'id', '?'),
+        '[fase6] obra %s: aditivo %s aprovado (%.2f → %.2f, prazo %s, '
+        'versão %s, usuario=%s)', aditivo.obra_id or getattr(obra, 'id', '?'),
         aditivo.numero, aditivo.valor_anterior, aditivo.valor_novo,
+        prazo_novo if prazo_novo is not None else '—',
         versao.versao, aprovado_por_id or '—')
     return versao
 

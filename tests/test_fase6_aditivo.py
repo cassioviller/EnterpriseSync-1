@@ -438,3 +438,122 @@ def test_fk_aditivo_id_e_on_delete_set_null(ambiente):
         assert v is not None, 'a versão do baseline não pode sumir com o aditivo'
         assert v.aditivo_id is None
         assert v.valor == Decimal('130000.00')
+
+
+# ---------------------------------------------------------------------------
+# Fix round 1 — prazo_dias da versão: propagação do aditivo de prazo
+# (ruling do controlador: ObraContratoVersao.prazo_dias não tinha dono; a
+# Task 3 assume porque aprovar_aditivo é o único ponto que conhece o delta
+# e a versão sendo aberta ao mesmo tempo).
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+def test_aditivo_de_prazo_deriva_base_das_datas_da_obra_quando_versao_sem_prazo(ambiente):
+    """Versão vigente com prazo_dias NULL (caso de todo o parque: backfill da
+    271) e obra COM data_previsao_fim: a base vem de
+    (data_previsao_fim - data_inicio).days, e a versão nova carrega
+    base + delta."""
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        obra = db.session.get(Obra, ambiente['obra_id'])
+        obra.data_previsao_fim = date(2026, 7, 10)  # data_inicio: 2026-01-10
+        db.session.commit()
+        base = (obra.data_previsao_fim - obra.data_inicio).days
+        assert base == 181
+
+        vigente = ObraContratoVersao.query.filter_by(
+            obra_id=obra.id, vigente_ate=None).one()
+        assert vigente.prazo_dias is None, 'o cenário exige base NULL na versão'
+
+        aditivo = abrir_aditivo(obra, tipo='prazo', motivo='chuvas',
+                                prazo_delta_dias=45)
+        db.session.commit()
+        aprovar_aditivo(aditivo)
+        db.session.commit()
+
+        v2 = ObraContratoVersao.query.filter_by(
+            obra_id=obra.id, vigente_ate=None).one()
+        assert v2.versao == 2
+        assert v2.prazo_dias == base + 45, (
+            f'esperava prazo derivado {base}+45={base + 45}, veio {v2.prazo_dias}')
+
+
+@pytest.mark.integration
+def test_aditivo_de_prazo_sem_base_conhecida_mantem_prazo_none(ambiente):
+    """Versão sem prazo_dias E obra sem data_previsao_fim: base desconhecida
+    + delta é desconhecida — a versão nova fica NULL (nunca inventar zero);
+    o delta continua auditável no próprio AditivoContrato."""
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        obra = db.session.get(Obra, ambiente['obra_id'])
+        assert obra.data_previsao_fim is None
+
+        aditivo = abrir_aditivo(obra, tipo='prazo', motivo='chuvas',
+                                prazo_delta_dias=45)
+        db.session.commit()
+        aprovar_aditivo(aditivo)
+        db.session.commit()
+
+        v2 = ObraContratoVersao.query.filter_by(
+            obra_id=obra.id, vigente_ate=None).one()
+        assert v2.versao == 2
+        assert v2.prazo_dias is None
+        assert aditivo.prazo_delta_dias == 45, 'o delta fica auditável no aditivo'
+
+
+@pytest.mark.integration
+def test_versao_aberta_por_outro_caminho_herda_prazo_dias(ambiente):
+    """Sem herança, o prazo evaporaria na primeira versão aberta por outro
+    caminho (reprecificação, proposta): definir_valor_contrato depois do
+    aditivo de prazo mantém o prazo_dias da versão que está fechando."""
+    from services.contrato_obra import (ORIGEM_EDICAO, abrir_aditivo,
+                                        aprovar_aditivo,
+                                        definir_valor_contrato)
+    with app.app_context():
+        obra = db.session.get(Obra, ambiente['obra_id'])
+        obra.data_previsao_fim = date(2026, 7, 10)
+        db.session.commit()
+
+        aditivo = abrir_aditivo(obra, tipo='prazo', motivo='chuvas',
+                                prazo_delta_dias=45)
+        db.session.commit()
+        aprovar_aditivo(aditivo)
+        db.session.commit()
+        v2 = ObraContratoVersao.query.filter_by(
+            obra_id=obra.id, vigente_ate=None).one()
+        assert v2.prazo_dias == 181 + 45
+
+        obra = db.session.get(Obra, obra.id)
+        definir_valor_contrato(obra, 175000.0, origem=ORIGEM_EDICAO,
+                               motivo='reprecificação pós-aditivo')
+        db.session.commit()
+
+        v3 = ObraContratoVersao.query.filter_by(
+            obra_id=obra.id, vigente_ate=None).one()
+        assert v3.versao == 3
+        assert v3.prazo_dias == 181 + 45, (
+            'a versão aberta por outro caminho tem de HERDAR o prazo, '
+            f'não zerá-lo — veio {v3.prazo_dias}')
+
+
+@pytest.mark.integration
+def test_supressao_de_prazo_que_deixa_prazo_negativo_levanta_erro(ambiente):
+    """Delta negativo funciona pela mesma conta, mas um prazo RESULTANTE
+    negativo é contrato impossível — a aprovação recusa e o aditivo continua
+    em rascunho (nada foi mutado antes do erro)."""
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        obra = db.session.get(Obra, ambiente['obra_id'])
+        obra.data_previsao_fim = date(2026, 7, 10)  # base 181
+        db.session.commit()
+
+        aditivo = abrir_aditivo(obra, tipo='prazo', motivo='corte impossível',
+                                prazo_delta_dias=-200)
+        db.session.commit()
+
+        with pytest.raises(ValueError, match='negativo'):
+            aprovar_aditivo(aditivo)
+
+        assert aditivo.status == 'rascunho', (
+            'a recusa não pode deixar o aditivo meio-aprovado')
+        assert ObraContratoVersao.query.filter_by(obra_id=obra.id).count() == 1
