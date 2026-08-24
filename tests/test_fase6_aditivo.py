@@ -1341,6 +1341,110 @@ def test_porta_velha_revisao_de_proposta_continua_lancando_so_o_delta():
         lancs = _lancamentos_da_linhagem(admin.id, ids)
         assert [float(l.valor_total) for l in lancs] == [
             pytest.approx(100000.0), pytest.approx(20000.0)]
+        # fix round 1: historico e data_lancamento são exatamente os campos
+        # que a extração parametrizou — travá-los fixa o contrato de
+        # `lancar_delta_contrato` na porta velha.
+        assert lancs[0].historico == (
+            f'Proposta aprovada #{v1.id} - {v1.cliente_nome}')
+        assert lancs[1].historico == (
+            f'Revisão de proposta #{v2.id} - {v2.cliente_nome} - '
+            f'aditivo sobre R$ 100000.00')
+        assert [l.data_lancamento for l in lancs] == [date.today()] * 2
         assert _soma_da_linhagem(admin.id, ids) == pytest.approx(120000.0)
         obra = _obras_do_tenant(admin.id)[0]
         assert float(obra.valor_contrato) == pytest.approx(120000.0)
+
+
+@pytest.mark.integration
+def test_proposta_id_de_outra_obra_do_tenant_nao_desvia_o_lancamento():
+    """fix round 1: `abrir_aditivo` aceita `proposta_id` livre (a Task 13
+    vai ligar um <select> a ele). Um id de proposta de OUTRA obra do MESMO
+    tenant não pode lançar o delta na linhagem alheia — quebraria o
+    invariante das duas obras e envenenaria o `ja_lancado` da próxima
+    revisão de lá. O filtro amarra a proposta à obra e o fallback degrada
+    para a linhagem da própria obra do aditivo."""
+    from models import Proposta, PropostaItem
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        admin, _cliente, pa = _ambiente()
+        _aprovar(pa, admin.id)
+        obra_a = _obras_do_tenant(admin.id)[0]
+
+        # Obra B do MESMO tenant, nascida de outra proposta (pb).
+        pb = Proposta(
+            admin_id=admin.id, numero=f'{pa.numero}-B', titulo='Outra obra',
+            cliente_id=pa.cliente_id, cliente_nome=pa.cliente_nome,
+            valor_total=Decimal('50000.00'), status='enviada', versao=1)
+        db.session.add(pb)
+        db.session.flush()
+        db.session.add(PropostaItem(
+            proposta_id=pb.id, admin_id=admin.id, item_numero=1,
+            descricao='Serviço B', quantidade=Decimal('1'), unidade='vb',
+            preco_unitario=Decimal('50000.00'), subtotal=Decimal('50000.00')))
+        db.session.commit()
+        _aprovar(pb, admin.id)
+
+        aditivo = abrir_aditivo(obra_a, tipo='acrescimo',
+                                motivo='vínculo documental errado',
+                                valor_novo=130000.0, proposta_id=pb.id)
+        db.session.commit()
+        aprovar_aditivo(aditivo, aprovado_por_id=admin.id)
+        db.session.commit()
+        db.session.expire_all()
+
+        # O delta caiu na linhagem da obra A (raiz pa)…
+        lancs_a = _lancamentos_da_linhagem(admin.id, [pa.id])
+        assert [float(l.valor_total) for l in lancs_a] == [
+            pytest.approx(100000.0), pytest.approx(30000.0)]
+        obra_a = db.session.get(Obra, obra_a.id)
+        assert float(obra_a.valor_contrato) == pytest.approx(130000.0)
+        assert _soma_da_linhagem(admin.id, [pa.id]) == pytest.approx(130000.0)
+
+        # …e a linhagem da obra B ficou intocada (só o lançamento da própria
+        # proposta pb) — soma == contrato de B.
+        lancs_b = _lancamentos_da_linhagem(admin.id, [pb.id])
+        assert [float(l.valor_total) for l in lancs_b] == [
+            pytest.approx(50000.0)], (
+            'a linhagem da obra alheia não pode ganhar o delta do aditivo')
+        obra_b = db.session.get(Obra, pb.obra_id)
+        assert float(obra_b.valor_contrato) == pytest.approx(50000.0)
+
+
+@pytest.mark.integration
+def test_aditivo_nao_alcanca_proposta_de_outro_tenant():
+    """fix round 1: aditivo do tenant A com `proposta_id` apontando para
+    proposta do tenant B não pode alcançá-la — nem para usar o id dela como
+    raiz, nem para tocar a contabilidade de B. O delta cai na linhagem da
+    própria obra A (fallback filtrado por admin_id + obra_id)."""
+    from models import LancamentoContabil
+    from services.contrato_obra import abrir_aditivo, aprovar_aditivo
+    with app.app_context():
+        admin_a, _ca, pa = _ambiente()
+        _aprovar(pa, admin_a.id)
+        obra_a = _obras_do_tenant(admin_a.id)[0]
+
+        admin_b, _cb, pb = _ambiente()
+        _aprovar(pb, admin_b.id)
+
+        aditivo = abrir_aditivo(obra_a, tipo='acrescimo',
+                                motivo='id de outro tenant',
+                                valor_novo=130000.0, proposta_id=pb.id)
+        db.session.commit()
+        aprovar_aditivo(aditivo, aprovado_por_id=admin_a.id)
+        db.session.commit()
+        db.session.expire_all()
+
+        # Tenant A: delta na PRÓPRIA linhagem (raiz pa), invariante fechado.
+        lancs_a = _lancamentos_da_linhagem(admin_a.id, [pa.id])
+        assert [float(l.valor_total) for l in lancs_a] == [
+            pytest.approx(100000.0), pytest.approx(30000.0)]
+        assert _soma_da_linhagem(admin_a.id, [pa.id]) == pytest.approx(130000.0)
+
+        # Nenhum lançamento do tenant A referencia a proposta do tenant B…
+        assert LancamentoContabil.query.filter_by(
+            admin_id=admin_a.id, origem='PROPOSTAS',
+            origem_id=pb.id).count() == 0
+        # …e a contabilidade do tenant B ficou intocada.
+        lancs_b = _lancamentos_da_linhagem(admin_b.id, [pb.id])
+        assert [float(l.valor_total) for l in lancs_b] == [
+            pytest.approx(100000.0)]

@@ -467,6 +467,10 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
     delta = valor_total - ja_lancado
 
     if delta == 0:
+        # Task 8: o seed do plano de contas saiu deste caminho (mudou para
+        # dentro de `lancar_delta_contrato`). Seguro: delta zero implica
+        # `ja_lancado > 0`, logo um lançamento anterior já rodou o seed
+        # deste tenant — e este ramo não insere partida nenhuma.
         logger.info(
             f"⏭️ Proposta {proposta_id}: revisão sem mudança de valor "
             f"(linhagem já lançou R$ {float(ja_lancado):.2f}) — nenhum "

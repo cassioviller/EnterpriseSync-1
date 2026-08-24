@@ -710,13 +710,23 @@ def _lancar_delta_contabil_do_aditivo(aditivo, obra, valor_anterior):
     contrato mudou entre abertura e aprovação.
 
     `origem_id`: a RAIZ da linhagem de propostas — `aditivo.proposta_id`
-    quando preenchido, senão a proposta ligada à obra; em ambos os casos
-    caminhando até a raiz via `_linhagem_de_proposta`. A raiz é o único id
-    garantidamente presente em QUALQUER `ja_lancado` futuro (uma revisão
-    pode ramificar de uma versão antiga, e a linhagem dela não conteria uma
+    quando preenchido (validado contra a obra, ver comentário no filtro),
+    senão a proposta ligada à obra; em ambos os casos caminhando até a raiz
+    via `_linhagem_de_proposta`. A raiz é o id garantidamente presente em
+    qualquer `ja_lancado` futuro DA MESMA LINHAGEM (uma revisão pode
+    ramificar de uma versão antiga, e a linhagem dela não conteria uma
     folha) — é o que impede a próxima revisão de proposta de lançar o valor
     cheio de novo (defeito D1b). `origem` fica `'PROPOSTAS'` pelo mesmo
     motivo — ver a docstring de `lancar_delta_contrato`.
+
+    # limitação conhecida: a garantia da raiz é INTRA-linhagem. Se a mesma
+    # obra tiver DUAS linhagens de proposta independentes (segunda proposta
+    # comercial anexada depois, ou revisão legada re-ligada), a raiz
+    # escolhida é a da linhagem encontrada primeiro, e um `ja_lancado`
+    # calculado a partir da OUTRA linhagem não a enxerga. Esse buraco já
+    # existe sem aditivo nenhum — duas linhagens da mesma obra já se
+    # ignoram mutuamente no `ja_lancado` da porta da proposta — e não é
+    # introduzido nem ampliado por esta função.
 
     Obra SEM nenhuma proposta (contrato nascido por cadastro/edição manual
     ou importação): NADA a lançar — o valor original dessa obra nunca entrou
@@ -742,8 +752,22 @@ def _lancar_delta_contabil_do_aditivo(aditivo, obra, valor_anterior):
     with db.session.no_autoflush:
         proposta = None
         if aditivo.proposta_id is not None:
+            # `obra_id=obra.id` no filtro (fix round 1): `abrir_aditivo`
+            # aceita `proposta_id` livre e a Task 13 vai ligar um <select> a
+            # ele — um id de OUTRA obra do mesmo tenant lançaria o delta
+            # DESTE contrato na linhagem alheia, quebrando o invariante das
+            # duas obras e envenenando o `ja_lancado` da próxima revisão de
+            # lá. Degradar para o fallback (linhagem da própria obra) em vez
+            # de recusar com erro, de propósito: o delta é um fato DESTE
+            # contrato e a contabilidade certa não depende da sanidade da
+            # referência documental — recusar no meio da aprovação
+            # bloquearia um aditivo válido por um vínculo corrigível, e a
+            # validação de ENTRADA pertence à porta que cria o documento
+            # (Task 13). O filtro também blinda linhas legadas já gravadas
+            # com referência errada.
             proposta = Proposta.query.filter_by(
-                id=aditivo.proposta_id, admin_id=obra.admin_id).first()
+                id=aditivo.proposta_id, admin_id=obra.admin_id,
+                obra_id=obra.id).first()
         if proposta is None:
             proposta = (Proposta.query
                         .filter_by(obra_id=obra.id, admin_id=obra.admin_id)
