@@ -171,6 +171,11 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
             existente.valor_comercial = valor_total
             existente.servico_id = getattr(it, 'servico_id', None)
             existente.quantidade = quantidade
+            # `proposta_item_id` é UNIQUE global, mas o reapontamento nunca
+            # precisa de flush intermediário: o valor novo é sempre o id de
+            # um PropostaItem recém-clonado, que nenhum outro IMC segura —
+            # não há swap. Se mudar a ordem deste laço ou a origem do id,
+            # revisite (flush entre liberar e reatribuir).
             existente.proposta_item_id = it.id
             atualizados += 1
             continue

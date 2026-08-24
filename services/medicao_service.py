@@ -177,7 +177,11 @@ def gerar_medicao_quinzenal(obra_id, admin_id, periodo_inicio=None, periodo_fim=
 
         item.percentual_executado_acumulado = perc_atual
         item.valor_executado_acumulado = valor_acum.quantize(Decimal('0.01'))
-        if perc_atual >= 100:
+        # Fase 6 / Task 7 — SUPRIMIDO é estado de ESCOPO (gravado pela
+        # aprovacao de revisao), nao de execucao: a medicao nao pode
+        # apaga-lo, senao o item suprimido 100% medido perde a marca em
+        # silencio no proximo recalculo.
+        if perc_atual >= 100 and item.status != 'SUPRIMIDO':
             item.status = 'CONCLUIDO'
 
     entrada_proporcional = Decimal('0')
@@ -297,7 +301,11 @@ def _recalcular_imc_avanco(obra_id, admin_id):
 
         item.percentual_executado_acumulado = perc_atual
         item.valor_executado_acumulado = valor_acum
-        if perc_atual >= Decimal('100') and getattr(item, 'status', None) != 'CONCLUIDO':
+        # Fase 6 / Task 7 — mesmo guard do gerador de medicao: SUPRIMIDO e
+        # estado de escopo e este recalculo roda a CADA RDO finalizado
+        # (event_manager.py:1761) — sem o guard ele apagaria a supressao.
+        if perc_atual >= Decimal('100') and \
+                getattr(item, 'status', None) not in ('CONCLUIDO', 'SUPRIMIDO'):
             try:
                 item.status = 'CONCLUIDO'
             except Exception:

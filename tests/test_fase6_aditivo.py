@@ -984,3 +984,136 @@ def test_reducao_de_item_abaixo_do_ja_medido_e_recusada():
         assert float(imc.valor_comercial) == 100000.0, (
             'a recusa não pode deixar o valor reduzido para trás')
         assert float(imc.percentual_executado_acumulado) == 60.0
+
+
+# ---------------------------------------------------------------------------
+# Task 7 — fix round 1: SUPRIMIDO tem de ser durável, e os caminhos comuns
+# da guarda ganham guardião
+# ---------------------------------------------------------------------------
+
+def _cenario_com_supressao():
+    """v1 (100k + 30k) aprovada, v2 (120k, só item 1) aprovada.
+
+    Devolve (admin_id, obra_id, id do IMC suprimido 'Cobertura')."""
+    admin, _cliente, v1 = _ambiente()
+    admin_id = admin.id
+    _segundo_item(v1, admin_id)
+    _aprovar(v1, admin_id)
+    obra_id = _obras_do_tenant(admin_id)[0].id
+    v2 = _clonar_como_revisao(v1, admin_id, herdar_obra=True)
+    _aprovar(v2, admin_id)
+    db.session.expire_all()
+    por_nome = {i.nome: i for i in _imcs_da_obra(obra_id, admin_id)}
+    suprimido = por_nome['Cobertura']
+    assert suprimido.status == 'SUPRIMIDO'
+    return admin_id, obra_id, suprimido.id, v2
+
+
+@pytest.mark.integration
+def test_recalculo_de_avanco_nao_apaga_suprimido():
+    """`_recalcular_imc_avanco` roda a cada RDO finalizado e escrevia
+    status='CONCLUIDO' em qualquer item 100% medido — inclusive num
+    SUPRIMIDO, apagando em silêncio o estado que a supressão acabou de
+    gravar. O item suprimido 100% executado é exatamente o caso que a regra
+    'nunca DELETE, marque estado' existe para proteger."""
+    from models import ItemMedicaoComercial, ItemMedicaoCronogramaTarefa, TarefaCronograma
+    from services.medicao_service import _recalcular_imc_avanco
+    with app.app_context():
+        admin_id, obra_id, imc_id, _v2 = _cenario_com_supressao()
+
+        # O item suprimido estava 100% executado: tarefa concluída vinculada.
+        tarefa = TarefaCronograma(
+            obra_id=obra_id, admin_id=admin_id, ordem=1,
+            nome_tarefa='Cobertura', percentual_concluido=100)
+        db.session.add(tarefa)
+        db.session.flush()
+        db.session.add(ItemMedicaoCronogramaTarefa(
+            item_medicao_id=imc_id, cronograma_tarefa_id=tarefa.id,
+            peso=Decimal('100'), admin_id=admin_id))
+        db.session.commit()
+
+        _recalcular_imc_avanco(obra_id, admin_id)
+        db.session.commit()
+
+        db.session.expire_all()
+        imc = db.session.get(ItemMedicaoComercial, imc_id)
+        assert float(imc.percentual_executado_acumulado) == 100.0
+        assert float(imc.valor_executado_acumulado) == 30000.0, (
+            'o executado do item suprimido é devido — o valor tem de contar')
+        assert imc.status == 'SUPRIMIDO', (
+            f"o recálculo apagou a supressão: status virou '{imc.status}' — "
+            'SUPRIMIDO tem de sobreviver ao RDO/medição seguinte')
+
+
+@pytest.mark.integration
+def test_reaprovar_v2_nao_re_suprime_nem_re_loga(caplog):
+    """Idempotência da supressão: reaprovar a MESMA v2 não re-suprime nem
+    re-emite o warning #82/T7 — órfão já SUPRIMIDO é caso encerrado."""
+    import logging as _logging
+    with app.app_context():
+        admin_id, obra_id, imc_id, v2 = _cenario_com_supressao()
+
+        with caplog.at_level(_logging.WARNING,
+                             logger='handlers.propostas_handlers'):
+            caplog.clear()
+            _aprovar(v2, admin_id)   # segunda aprovação da mesma v2
+
+        db.session.expire_all()
+        imcs = _imcs_da_obra(obra_id, admin_id)
+        assert len(imcs) == 2
+        por_nome = {i.nome: i for i in imcs}
+        assert por_nome['Cobertura'].status == 'SUPRIMIDO'
+        relogs = [r for r in caplog.records if '#82/T7' in r.getMessage()]
+        assert not relogs, (
+            f'reaprovar a mesma v2 re-logou a supressão: '
+            f'{[r.getMessage() for r in relogs]}')
+
+
+@pytest.mark.integration
+def test_aumento_de_item_ja_medido_e_aceito():
+    """O happy path do aditivo em produção: item com 60% medidos cujo valor
+    SOBE (100k → 150k). A guarda não pode barrar aumento — só redução
+    abaixo do medido."""
+    from decimal import Decimal as D
+    from event_manager import EventManager
+    from models import Proposta, PropostaItem
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        admin_id = admin.id
+        _aprovar(v1, admin_id)
+        obra_id = _obras_do_tenant(admin_id)[0].id
+        imc = _imcs_da_obra(obra_id, admin_id)[0]
+        imc.percentual_executado_acumulado = D('60')
+        imc.valor_executado_acumulado = D('60000.00')
+        db.session.commit()
+
+        v2 = Proposta(
+            admin_id=admin_id, numero=f'{v1.numero}-v2', titulo=v1.titulo,
+            cliente_id=v1.cliente_id, cliente_nome=v1.cliente_nome,
+            valor_total=D('150000.00'), status='aprovada',
+            versao=(v1.versao or 1) + 1, proposta_origem_id=v1.id,
+            obra_id=v1.obra_id,
+        )
+        db.session.add(v2)
+        db.session.flush()
+        db.session.add(PropostaItem(
+            proposta_id=v2.id, admin_id=admin_id, item_numero=1,
+            descricao='Estrutura metálica', quantidade=D('1'), unidade='vb',
+            preco_unitario=D('150000.00'), subtotal=D('150000.00')))
+        db.session.flush()
+
+        EventManager.emit('proposta_aprovada', {
+            'proposta_id': v2.id,
+            'admin_id': admin_id,
+            'cliente_nome': v2.cliente_nome,
+            'valor_total': float(v2.valor_total),
+            'data_aprovacao': date.today().isoformat(),
+        }, admin_id, raise_on_error=True)
+        db.session.commit()
+
+        db.session.expire_all()
+        imc = _imcs_da_obra(obra_id, admin_id)[0]
+        assert float(imc.valor_comercial) == 150000.0, (
+            'a guarda barrou o aumento — só redução abaixo do medido é ilegal')
+        assert float(imc.percentual_executado_acumulado) == 60.0
+        assert imc.status == 'PENDENTE'
