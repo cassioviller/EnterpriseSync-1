@@ -69,6 +69,11 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
     Agora o item da revisão ATUALIZA o item de medição que já existe (mesmo
     `id`, então as medições já feitas contra ele continuam válidas) e só cria
     o que é genuinamente novo no escopo.
+
+    Fase 6 / Task 7 — dois complementos: item que saiu da versão aprovada
+    vira `status='SUPRIMIDO'` (nunca DELETE; volta a PENDENTE se uma versão
+    posterior o re-incluir), e reduzir um item abaixo do que já foi medido
+    recusa o aditivo com ValueError (a rota faz rollback).
     """
     from models import Proposta, PropostaItem, ItemMedicaoComercial
     proposta = Proposta.query.filter_by(id=proposta_id, admin_id=admin_id).first()
@@ -112,7 +117,7 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
                 return achado
         return None
 
-    criados = atualizados = 0
+    criados = atualizados = reativados = 0
     for it in itens:
         # Strict 1:1: um ItemMedicaoComercial por PropostaItem.
         # Se nome estiver vazio, fallback para "Item N"; se valor for 0,
@@ -128,8 +133,40 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
 
         existente = _casar(it)
         if existente is not None:
+            if existente.status == 'SUPRIMIDO':
+                # Fase 6 / Task 7 — decisão de negócio: SUPRIMIDO descreve o
+                # escopo aprovado VIGENTE, não é lápide. Se uma versão
+                # posterior re-inclui o item, ele volta a PENDENTE — mantê-lo
+                # SUPRIMIDO faria o escopo ativo da obra divergir do contrato
+                # aprovado, e as medições já executadas contra ele (mesmo id)
+                # continuam válidas nas duas direções.
+                existente.status = 'PENDENTE'
+                reativados += 1
             if existente.proposta_item_id == it.id:
                 continue  # mesma versão reaprovada — nada a fazer
+
+            # Fase 6 / Task 7 — a guarda aritmética: reduzir um item abaixo
+            # do que já foi medido tornaria o executado maior que o contrato
+            # do item (percentual > 100%). É o único motivo aritmético que
+            # recusa um aditivo; a exceção propaga pelo emit(raise_on_error=
+            # True) e a rota faz rollback de tudo.
+            ja_medido = Decimal(str(existente.valor_executado_acumulado or 0))
+            pct_medido = Decimal(str(existente.percentual_executado_acumulado or 0))
+            if ja_medido <= 0 and pct_medido > 0:
+                # medição registrada só em percentual: converte contra o
+                # valor VIGENTE do item (base sobre a qual foi medida).
+                ja_medido = (pct_medido / Decimal('100')
+                             * Decimal(str(existente.valor_comercial or 0)))
+            if pct_medido > 0 and valor_total < ja_medido:
+                raise ValueError(
+                    f"Aditivo recusado: o item '{existente.nome}' já tem "
+                    f"R$ {float(ja_medido):.2f} medidos "
+                    f"({float(pct_medido):.2f}%) e a revisão tentou reduzir "
+                    f"seu valor para R$ {float(valor_total):.2f}. Reduzir um "
+                    f"item abaixo do que já foi medido é ilegal — ajuste o "
+                    f"valor do item ou estorne a medição antes do aditivo."
+                )
+
             existente.nome = nome_item[:200]
             existente.valor_comercial = valor_total
             existente.servico_id = getattr(it, 'servico_id', None)
@@ -150,28 +187,37 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
         ))
         criados += 1
 
-    # Itens que existiam numa versão anterior e sumiram desta NÃO são
-    # apagados: podem ter medição executada contra eles, e retirar escopo já
-    # medido é decisão de negócio (Fase 6 — orçamento versionado e aditivo).
-    # Mas o silêncio seria pior do que o aviso.
+    # Fase 6 / Task 7 — o WARNING de D1 virou estado. Itens que existiam numa
+    # versão anterior e sumiram desta NÃO são apagados (pode haver
+    # MedicaoObraItem apontando para eles): viram status='SUPRIMIDO', com o
+    # valor_comercial preservado para histórico. Nunca DELETE.
     imcs_atuais = {id(_casar(i)) for i in itens} - {id(None)}
     orfaos = {id(imc): imc for imc in imc_por_chave.values()
               if id(imc) not in imcs_atuais}
-    orfaos = list(orfaos.values())
-    if orfaos:
+    orfaos = [imc for imc in orfaos.values() if imc.status != 'SUPRIMIDO']
+    suprimidos = 0
+    for imc in orfaos:
+        imc.status = 'SUPRIMIDO'
+        suprimidos += 1
+    if suprimidos:
+        com_medicao = [i.id for i in orfaos
+                       if (i.percentual_executado_acumulado or 0) > 0]
         logger.warning(
-            f"#82/D1: proposta {proposta_id} (obra {obra_id}) removeu "
-            f"{len(orfaos)} item(ns) que existiam na versão anterior: "
-            f"{[i.id for i in orfaos]}. Mantidos — retirar escopo já medido "
-            f"é decisão de negócio, não do handler."
+            f"#82/T7: proposta {proposta_id} (obra {obra_id}) suprimiu "
+            f"{suprimidos} item(ns) que existiam na versão anterior: "
+            f"{[i.id for i in orfaos]} → status='SUPRIMIDO', valor mantido "
+            f"para histórico."
+            + (f" Atenção: {com_medicao} já tinham medição executada."
+               if com_medicao else "")
         )
 
-    if criados or atualizados:
+    if criados or atualizados or reativados or suprimidos:
         db.session.flush()
         logger.info(
             f"#82: obra {obra_id} (proposta {proposta_id}) — "
             f"{criados} ItemMedicaoComercial criado(s), "
-            f"{atualizados} atualizado(s) pela revisão"
+            f"{atualizados} atualizado(s), {reativados} reativado(s), "
+            f"{suprimidos} suprimido(s) pela revisão"
         )
     return criados
 

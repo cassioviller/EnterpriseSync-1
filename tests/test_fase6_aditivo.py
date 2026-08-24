@@ -779,3 +779,208 @@ def test_migration_273_backfill_aponta_para_vigente_e_e_reexecutavel(ambiente):
         assert fks == 1, (
             f'esperava exatamente 1 FK em medicao_contrato.contrato_versao_id, '
             f'achei {fks} — reexecução não pode duplicar a constraint')
+
+
+# ---------------------------------------------------------------------------
+# Task 7 — revisão de proposta: item suprimido vira estado, redução abaixo
+# do medido é recusada
+# ---------------------------------------------------------------------------
+# Os helpers de `test_proposta_revisao_nao_duplica_obra` disparam o
+# `EventManager.emit` REAL — o mesmo caminho das rotas de aprovação.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from test_proposta_revisao_nao_duplica_obra import (  # noqa: E402
+    _ambiente,
+    _aprovar,
+    _clonar_como_revisao,
+    _obras_do_tenant,
+)
+
+
+def _segundo_item(proposta, admin_id, descricao='Cobertura',
+                  valor=Decimal('30000.00')):
+    """Acrescenta um 2º item à proposta e ajusta o total."""
+    from models import PropostaItem
+    db.session.add(PropostaItem(
+        proposta_id=proposta.id, admin_id=admin_id, item_numero=2,
+        descricao=descricao, quantidade=Decimal('1'), unidade='vb',
+        preco_unitario=valor, subtotal=valor))
+    proposta.valor_total = (proposta.valor_total or 0) + valor
+    db.session.commit()
+
+
+def _imcs_da_obra(obra_id, admin_id):
+    from models import ItemMedicaoComercial
+    return ItemMedicaoComercial.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id).order_by(
+        ItemMedicaoComercial.id).all()
+
+
+@pytest.mark.integration
+def test_revisao_reconcilia_item_sem_duplicar_nem_estourar_saldo():
+    """Comportamento pós-Fase 0.6/D1, asserido pelo caminho real do emit:
+    aprovar a v2 (100k → 120k) ATUALIZA o item de medição existente.
+
+    1 IMC somando 120.000, 1 OSC, saldo (contrato − itens) == 0. Os números
+    do defeito extinto de §1.1 (2 IMC, 220k, saldo -100k) não voltam."""
+    from models import ObraServicoCusto
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        admin_id = admin.id
+        _aprovar(v1, admin_id)
+        obra = _obras_do_tenant(admin_id)[0]
+        obra_id = obra.id
+
+        v2 = _clonar_como_revisao(v1, admin_id, herdar_obra=True)
+        _aprovar(v2, admin_id)
+
+        db.session.expire_all()
+        imcs = _imcs_da_obra(obra_id, admin_id)
+        assert len(imcs) == 1, (
+            f'{len(imcs)} itens de medição — a revisão duplicou')
+        assert float(imcs[0].valor_comercial) == 120000.0
+        oscs = ObraServicoCusto.query.filter_by(
+            obra_id=obra_id, admin_id=admin_id).all()
+        assert len(oscs) == 1, f'{len(oscs)} OSC para 1 item'
+        obra = db.session.get(Obra, obra_id)
+        saldo = float(obra.valor_contrato or 0) - sum(
+            float(i.valor_comercial or 0) for i in imcs)
+        assert saldo == pytest.approx(0.0), (
+            f'saldo {saldo:,.2f} — contrato {obra.valor_contrato}')
+
+
+@pytest.mark.integration
+def test_item_suprimido_na_revisao_vira_estado_e_nao_some():
+    """v1 tem 2 itens; a v2 mantém só o 1º. O IMC do item que saiu NÃO é
+    apagado (pode haver MedicaoObraItem apontando) — ele vira
+    status='SUPRIMIDO', com o valor_comercial preservado para histórico."""
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        admin_id = admin.id
+        _segundo_item(v1, admin_id)          # v1: 100k + 30k
+        _aprovar(v1, admin_id)
+        obra_id = _obras_do_tenant(admin_id)[0].id
+        assert len(_imcs_da_obra(obra_id, admin_id)) == 2
+
+        v2 = _clonar_como_revisao(v1, admin_id, herdar_obra=True)  # só item 1
+        _aprovar(v2, admin_id)
+
+        db.session.expire_all()
+        imcs = _imcs_da_obra(obra_id, admin_id)
+        assert len(imcs) == 2, (
+            'o item suprimido sumiu do banco — nunca DELETE, só estado')
+        por_nome = {i.nome: i for i in imcs}
+        suprimido = por_nome['Cobertura']
+        assert suprimido.status == 'SUPRIMIDO', (
+            f"item removido da v2 ficou '{suprimido.status}' — o WARNING "
+            'tinha de virar estado')
+        assert float(suprimido.valor_comercial) == 30000.0, (
+            'o valor histórico do item suprimido foi perdido')
+        mantido = por_nome['Estrutura metálica (revisada)']
+        assert mantido.status == 'PENDENTE'
+        assert float(mantido.valor_comercial) == 120000.0
+
+
+@pytest.mark.integration
+def test_item_suprimido_que_volta_em_versao_posterior_e_reativado():
+    """Decisão de negócio da Task 7: SUPRIMIDO descreve o escopo APROVADO
+    vigente, não é lápide. Se a v3 re-inclui o item, ele volta a PENDENTE —
+    deixá-lo SUPRIMIDO faria o escopo ativo da obra divergir do contrato."""
+    from models import Proposta, PropostaItem
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        admin_id = admin.id
+        _segundo_item(v1, admin_id)
+        _aprovar(v1, admin_id)
+        obra_id = _obras_do_tenant(admin_id)[0].id
+
+        v2 = _clonar_como_revisao(v1, admin_id, herdar_obra=True)  # sem item 2
+        _aprovar(v2, admin_id)
+
+        # v3 re-inclui o item 2 (mesmo item_numero — o elo de linhagem).
+        v3 = Proposta(
+            admin_id=admin_id, numero=f'{v2.numero}-v3', titulo=v2.titulo,
+            cliente_id=v2.cliente_id, cliente_nome=v2.cliente_nome,
+            valor_total=Decimal('150000.00'), status='rascunho',
+            versao=(v2.versao or 2) + 1, proposta_origem_id=v2.id,
+            obra_id=v2.obra_id,
+        )
+        db.session.add(v3)
+        db.session.flush()
+        db.session.add(PropostaItem(
+            proposta_id=v3.id, admin_id=admin_id, item_numero=1,
+            descricao='Estrutura metálica (revisada)', quantidade=Decimal('1'),
+            unidade='vb', preco_unitario=Decimal('120000.00'),
+            subtotal=Decimal('120000.00')))
+        db.session.add(PropostaItem(
+            proposta_id=v3.id, admin_id=admin_id, item_numero=2,
+            descricao='Cobertura', quantidade=Decimal('1'), unidade='vb',
+            preco_unitario=Decimal('30000.00'), subtotal=Decimal('30000.00')))
+        db.session.commit()
+        _aprovar(v3, admin_id)
+
+        db.session.expire_all()
+        imcs = _imcs_da_obra(obra_id, admin_id)
+        assert len(imcs) == 2, 'a volta do item não pode inserir um 3º IMC'
+        por_nome = {i.nome: i for i in imcs}
+        reativado = por_nome['Cobertura']
+        assert reativado.status == 'PENDENTE', (
+            f"item re-incluído na v3 ficou '{reativado.status}' — "
+            'SUPRIMIDO não é lápide')
+        assert float(reativado.valor_comercial) == 30000.0
+
+
+@pytest.mark.integration
+def test_reducao_de_item_abaixo_do_ja_medido_e_recusada():
+    """A guarda aritmética: item com R$ 60.000 já medidos não pode cair para
+    R$ 50.000. O aditivo é recusado com item, medido e tentado na mensagem,
+    e o rollback da rota (emit raise_on_error=True) desfaz tudo."""
+    from decimal import Decimal as D
+    from event_manager import EventManager
+    from models import Proposta, PropostaItem
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        admin_id = admin.id
+        _aprovar(v1, admin_id)
+        obra_id = _obras_do_tenant(admin_id)[0].id
+        imc = _imcs_da_obra(obra_id, admin_id)[0]
+        imc.percentual_executado_acumulado = D('60')
+        imc.valor_executado_acumulado = D('60000.00')
+        db.session.commit()
+
+        # v2 tenta reduzir o item de 100k para 50k (< 60k já medidos).
+        v2 = Proposta(
+            admin_id=admin_id, numero=f'{v1.numero}-v2', titulo=v1.titulo,
+            cliente_id=v1.cliente_id, cliente_nome=v1.cliente_nome,
+            valor_total=D('50000.00'), status='aprovada',
+            versao=(v1.versao or 1) + 1, proposta_origem_id=v1.id,
+            obra_id=v1.obra_id,
+        )
+        db.session.add(v2)
+        db.session.flush()
+        db.session.add(PropostaItem(
+            proposta_id=v2.id, admin_id=admin_id, item_numero=1,
+            descricao='Estrutura metálica', quantidade=D('1'), unidade='vb',
+            preco_unitario=D('50000.00'), subtotal=D('50000.00')))
+        db.session.flush()
+
+        with pytest.raises(ValueError) as exc:
+            EventManager.emit('proposta_aprovada', {
+                'proposta_id': v2.id,
+                'admin_id': admin_id,
+                'cliente_nome': v2.cliente_nome,
+                'valor_total': float(v2.valor_total),
+                'data_aprovacao': date.today().isoformat(),
+            }, admin_id, raise_on_error=True)
+        db.session.rollback()
+
+        msg = str(exc.value)
+        assert 'Estrutura metálica' in msg, f'mensagem sem o item: {msg}'
+        assert 'R$ 60000.00' in msg, f'mensagem sem o valor já medido: {msg}'
+        assert 'R$ 50000.00' in msg, f'mensagem sem o valor tentado: {msg}'
+
+        # Nada mudou: o rollback da rota desfaz o aditivo inteiro.
+        db.session.expire_all()
+        imc = _imcs_da_obra(obra_id, admin_id)[0]
+        assert float(imc.valor_comercial) == 100000.0, (
+            'a recusa não pode deixar o valor reduzido para trás')
+        assert float(imc.percentual_executado_acumulado) == 60.0
