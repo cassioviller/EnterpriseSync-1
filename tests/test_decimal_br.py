@@ -99,3 +99,24 @@ def test_o_default_tambem_respeita_a_faixa():
 
 def test_sentinela_e_distinguivel_de_none():
     assert SEM_DEFAULT is not None
+
+
+def test_os_tres_espacos_invisiveis_sao_removidos():
+    """Um espaço invisível não sobrevive a copiar-e-colar.
+
+    A primeira versão deste módulo perdeu o U+202F (o separador estreito que
+    o `Intl.NumberFormat` do navegador produz em pt-BR) — ele virou um
+    segundo U+0020, em silêncio, e `1 500,00` passou a ser recusado.
+    Por isso este teste afirma sobre os CODEPOINTS, não só sobre o parse.
+    """
+    from utils.decimal_br import _LIXO
+    espacos = {c for c in _LIXO if len(c) == 1}
+    assert espacos == {' ', '\xa0', ' '}, (
+        f'faltou um espaço invisível: {[hex(ord(c)) for c in espacos]}')
+
+
+@pytest.mark.parametrize('entrada', ['1 500,00', '1 500,00',
+                                     '1 500,00'])
+def test_milhar_com_qualquer_espaco_invisivel_parseia(entrada):
+    """A vírgula decimal já desambigua — o espaço é só ruído de formatação."""
+    assert parse_decimal_br(entrada) == Decimal('1500.00')

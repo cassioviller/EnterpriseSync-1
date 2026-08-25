@@ -25,9 +25,10 @@ class ValorAmbiguo(ValorInvalido):
 
 SEM_DEFAULT = object()
 
-# 'R$', espaço comum, espaço não-quebrável e o separador estreito que o
-# `Intl.NumberFormat` do navegador produz em pt-BR.
-_LIXO = ('R$', 'r$', ' ', '\xa0', ' ')
+# Escapes explícitas, nunca o caractere literal: um espaço invisível não
+# sobrevive a copiar-e-colar, e a primeira versão deste módulo perdeu o
+# U+202F exatamente assim — virou um segundo U+0020, silenciosamente.
+_LIXO = ('R$', 'r$', ' ', '\xa0', '\u202f')
 
 
 def _limpar(texto):
