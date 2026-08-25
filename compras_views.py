@@ -1886,11 +1886,16 @@ def _itens_do_form():
         if not desc:
             continue
 
-        def _num(lista, idx, padrao='0'):
+        def _num(lista, idx, padrao='0', campo='valor'):
             bruto = (lista[idx] if idx < len(lista) else '') or padrao
             try:
-                return float(parse_decimal_br(bruto, campo='valor',
-                                              default=Decimal(str(padrao))))
+                # SEM `default`: um campo genuinamente vazio já virou `padrao`
+                # na linha do `or` acima. O que chega aqui é texto de
+                # verdade — e texto que se esvazia na limpeza ('   ', 'R$',
+                # um NBSP sozinho) é LIXO, não "vazio", e lixo vale zero.
+                # Passar `default` aqui fazia o parser satisfazer esse caso
+                # sozinho e o ramo do zero nunca rodava.
+                return float(parse_decimal_br(bruto, campo=campo))
             except ValorAmbiguo:
                 # `1.500` tanto pode ser mil e quinhentos quanto um e meio, e
                 # aqui isso vale para PREÇO e para QUANTIDADE. Sobe para o
@@ -1912,8 +1917,8 @@ def _itens_do_form():
         itens.append({
             'descricao': desc[:200],
             'unidade': ((unidades[i] if i < len(unidades) else '') or 'un')[:20],
-            'quantidade': _num(quantidades, i, '1'),
-            'preco': _num(precos, i, '0'),
+            'quantidade': _num(quantidades, i, '1', campo=f'quantidade de {desc!r}'),
+            'preco': _num(precos, i, '0', campo=f'preço de {desc!r}'),
             'almoxarifado_item_id': int(almox_bruto) if almox_bruto else None,
         })
     return itens

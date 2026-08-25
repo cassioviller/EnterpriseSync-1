@@ -328,3 +328,47 @@ def test_num_distingue_campo_vazio_de_campo_com_lixo():
             f'{item2.quantidade}')
         assert _D(str(item2.preco_estimado)) == _D('0'), (
             f'lixo em preço devia virar 0, veio {item2.preco_estimado}')
+
+
+@pytest.mark.parametrize('bruto,rotulo', [
+    ('   ', 'so-espacos'),
+    ('R$', 'so-simbolo'),
+    ('\xa0', 'so-nbsp'),
+    ('\u202f', 'so-narrow-nbsp'),
+])
+def test_quantidade_que_se_esvazia_na_limpeza_vale_zero(bruto, rotulo):
+    """"Vazio malformado" é LIXO, não "vazio" — e lixo vale zero.
+
+    Campo genuinamente vazio já virou `padrao` na linha do `or`, antes do
+    parser. O que chega aqui é texto que `_limpar()` esvazia ('   ', 'R$',
+    um NBSP sozinho) — e isso não pode satisfazer nenhum `default`: se
+    satisfizesse, viraria `padrao` (quantidade 1), que parece um pedido
+    plausível e pode ser comprada sem que ninguém repare. Regrediu quando
+    `_num` passou `default=Decimal(str(padrao))` para `parse_decimal_br` —
+    correção deste round.
+    """
+    from decimal import Decimal as _D
+
+    from models import RequisicaoCompra, RequisicaoCompraItem
+    with app.app_context():
+        admin = _novo_admin(f'onda1_{rotulo}')
+        obra = _nova_obra(admin)
+        db.session.commit()
+        admin_id, obra_id = admin.id, obra.id
+
+    resposta = _cliente_admin(admin_id).post(
+        '/compras/requisicoes/nova',
+        data={'obra_id': str(obra_id), 'justificativa': 'teste',
+              'item_descricao[]': ['Item'], 'item_unidade[]': ['un'],
+              'item_quantidade[]': [bruto], 'item_preco[]': ['10,00'],
+              'item_almoxarifado_id[]': ['']},
+        follow_redirects=False)
+    assert resposta.status_code == 302
+
+    with app.app_context():
+        req = RequisicaoCompra.query.filter_by(admin_id=admin_id).first()
+        assert req is not None
+        item = RequisicaoCompraItem.query.filter_by(requisicao_id=req.id).one()
+        assert _D(str(item.quantidade)) == _D('0'), (
+            f'{rotulo!r} ({bruto!r}) devia esvaziar na limpeza e virar 0, '
+            f'não o padrão (1); veio {item.quantidade}')
