@@ -101,8 +101,14 @@ def parse_decimal_br(raw, *, campo='valor', default=SEM_DEFAULT,
             raise
         except (InvalidOperation, ValueError, ArithmeticError):
             raise ValorInvalido(f'{campo}: {raw!r} não é um valor válido')
-        if not valor.is_finite():
-            raise ValorInvalido(f'{campo}: {raw!r} não é um valor válido')
+
+    # `is_finite()` cobria só o ramo de string, e os ramos de Decimal/int/float
+    # passavam por baixo: `Decimal('NaN')` chegava inteiro em `_conferir_faixa`,
+    # onde `valor > maximo` levanta `InvalidOperation` sem captura. Quem chama
+    # espera `ValorInvalido` — e `_para_teto`, que promete NUNCA levantar, virava
+    # 500 na tela de alçadas.
+    if not valor.is_finite():
+        raise ValorInvalido(f'{campo}: {raw!r} não é um valor válido')
 
     return _conferir_faixa(valor, campo, minimo, maximo)
 

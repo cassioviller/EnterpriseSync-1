@@ -419,3 +419,12 @@ def test_teto_zero_e_negativo_continuam_recusados():
         erros = []
         assert _para_teto(ruim, erros) is None
         assert erros, ruim
+
+
+@pytest.mark.parametrize('entrada', [Decimal('NaN'), float('nan')])
+def test_para_teto_nunca_levanta_nem_com_nao_finito(entrada):
+    """O contrato de `_para_teto` é acumular em `erros`, jamais levantar."""
+    from services.faixa_alcada_admin import _para_teto
+    erros = []
+    assert _para_teto(entrada, erros) is None
+    assert erros

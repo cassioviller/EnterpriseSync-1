@@ -130,3 +130,19 @@ def test_milhar_com_qualquer_espaco_invisivel_parseia(entrada, rotulo):
     numera `_0/_1/_2` e a colisão fica invisível no relatório.
     """
     assert parse_decimal_br(entrada) == Decimal('1500.00'), rotulo
+
+
+@pytest.mark.parametrize('entrada', [
+    Decimal('NaN'), Decimal('-NaN'), Decimal('Infinity'), Decimal('-Infinity'),
+    float('nan'), float('inf'), float('-inf'),
+])
+def test_recusa_nao_finito_em_qualquer_tipo(entrada):
+    """A guarda de finitude cobria só o ramo de string.
+
+    Decimal e float passavam por baixo e chegavam em `_conferir_faixa`, onde a
+    comparacao com `maximo` levanta `InvalidOperation` — uma excecao que quem
+    chama nao espera. `_para_teto` promete NUNCA levantar: era 500 na tela de
+    alcadas.
+    """
+    with pytest.raises(ValorInvalido):
+        parse_decimal_br(entrada, campo='teto')

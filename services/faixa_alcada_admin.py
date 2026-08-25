@@ -204,8 +204,8 @@ def _para_teto(bruto, erros):
     Não levanta: acumula em `erros`, que é o contrato que `_violacoes` espera.
     """
     try:
-        # 🔬 LIMITE_TETO = Decimal('999999999.99') (`:50`) — já é Decimal,
-        # então entra direto como `maximo` e a mensagem sai idêntica à de antes.
+        # 🔬 LIMITE_TETO já é Decimal, então entra direto como `maximo` e a
+        # mensagem sai idêntica à de antes.
         valor = parse_decimal_br(bruto, campo='teto', default=None,
                                  maximo=LIMITE_TETO)
     except ValorInvalido as erro:
