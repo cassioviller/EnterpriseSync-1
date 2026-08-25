@@ -230,10 +230,17 @@ def test_item_quantidade_ambigua_na_requisicao_nova_e_recusada():
 
 def test_item_nao_numerico_na_requisicao_nova_continua_virando_padrao():
     """Achado #5 (já corrigido antes desta task) não pode regressar: entrada
-    não-numérica ('abc') não é ambígua — vale o padrão de cada campo (1 para
-    quantidade, 0 para preço) e a linha entra assim mesmo, para o usuário ver
-    e corrigir na tela, em vez de perder o formulário inteiro."""
-    from models import RequisicaoCompra
+    não-numérica ('abc') não é ambígua — vale ZERO (não o `padrao`) e a
+    linha entra assim mesmo, para o usuário ver e corrigir na tela, em vez
+    de perder o formulário inteiro.
+
+    Zero, e não `padrao`, de propósito: uma quantidade 1 "chutada" parece um
+    pedido plausível e pode ser comprada sem que ninguém repare; zero é o
+    valor que grita na tela.
+    """
+    from decimal import Decimal as _D
+
+    from models import RequisicaoCompra, RequisicaoCompraItem
     with app.app_context():
         admin = _novo_admin('onda1_itabc')
         obra = _nova_obra(admin)
@@ -250,6 +257,74 @@ def test_item_nao_numerico_na_requisicao_nova_continua_virando_padrao():
     assert resposta.status_code == 302
 
     with app.app_context():
-        assert RequisicaoCompra.query.filter_by(admin_id=admin_id).count() == 1, (
-            'entrada não-numérica não pode impedir a requisição de existir'
-        )
+        req = RequisicaoCompra.query.filter_by(admin_id=admin_id).first()
+        assert req is not None, (
+            'entrada não-numérica não pode impedir a requisição de existir')
+        item = RequisicaoCompraItem.query.filter_by(requisicao_id=req.id).one()
+        assert _D(str(item.quantidade)) == _D('0'), (
+            f'lixo em quantidade devia virar 0 (grita na tela), veio '
+            f'{item.quantidade}')
+        assert _D(str(item.preco_estimado)) == _D('0'), (
+            f'lixo em preço devia virar 0, veio {item.preco_estimado}')
+
+
+def test_num_distingue_campo_vazio_de_campo_com_lixo():
+    """Os dois casos são diferentes de propósito, e nenhum teste os fixava
+    antes desta correção.
+
+    Campo VAZIO vira o `padrao` (quantidade 1, preço 0) — resolvido antes do
+    parser, na linha do `or`. Campo com LIXO ('abc') cai no `except
+    ValorInvalido` e vira ZERO nos dois campos — porque zero grita na tela e
+    uma quantidade 1 parece um pedido plausível, que pode ser comprada.
+    """
+    from decimal import Decimal as _D
+
+    from models import RequisicaoCompra, RequisicaoCompraItem
+    with app.app_context():
+        admin = _novo_admin('onda1_itvazio')
+        obra = _nova_obra(admin)
+        db.session.commit()
+        admin_id, obra_id = admin.id, obra.id
+
+    # Campo vazio: quantidade some do form, preço vem em branco.
+    resposta = _cliente_admin(admin_id).post(
+        '/compras/requisicoes/nova',
+        data={'obra_id': str(obra_id), 'justificativa': 'teste',
+              'item_descricao[]': ['Item vazio'], 'item_unidade[]': ['un'],
+              'item_quantidade[]': [''], 'item_preco[]': [''],
+              'item_almoxarifado_id[]': ['']},
+        follow_redirects=False)
+    assert resposta.status_code == 302
+
+    with app.app_context():
+        req = RequisicaoCompra.query.filter_by(admin_id=admin_id).first()
+        assert req is not None
+        item = RequisicaoCompraItem.query.filter_by(requisicao_id=req.id).one()
+        assert _D(str(item.quantidade)) == _D('1'), (
+            f'campo vazio de quantidade devia virar o padrão (1), veio '
+            f'{item.quantidade}')
+        assert _D(str(item.preco_estimado)) == _D('0'), (
+            f'campo vazio de preço devia virar o padrão (0), veio '
+            f'{item.preco_estimado}')
+
+    # Campo com lixo: 'abc' não é vazio e não é ambíguo — vira zero, não o
+    # padrão (senão uma quantidade 1 "chutada" passaria por pedido real).
+    resposta = _cliente_admin(admin_id).post(
+        '/compras/requisicoes/nova',
+        data={'obra_id': str(obra_id), 'justificativa': 'teste',
+              'item_descricao[]': ['Item lixo'], 'item_unidade[]': ['un'],
+              'item_quantidade[]': ['abc'], 'item_preco[]': ['xyz'],
+              'item_almoxarifado_id[]': ['']},
+        follow_redirects=False)
+    assert resposta.status_code == 302
+
+    with app.app_context():
+        req2 = (RequisicaoCompra.query.filter_by(admin_id=admin_id)
+                .order_by(RequisicaoCompra.id.desc()).first())
+        assert req2 is not None
+        item2 = RequisicaoCompraItem.query.filter_by(requisicao_id=req2.id).one()
+        assert _D(str(item2.quantidade)) == _D('0'), (
+            f'lixo em quantidade devia virar 0, não o padrão (1); veio '
+            f'{item2.quantidade}')
+        assert _D(str(item2.preco_estimado)) == _D('0'), (
+            f'lixo em preço devia virar 0, veio {item2.preco_estimado}')

@@ -1898,10 +1898,15 @@ def _itens_do_form():
                 raise
             except ValorInvalido:
                 # Entrada não-numérica ('abc', vazio malformado) não pode
-                # virar HTTP 500 — vale o padrão e a linha entra com esse
-                # valor, que o usuário vê e corrige, em vez de perder o
-                # formulário. Decisão deliberada, preservada de antes.
-                return float(padrao)
+                # virar HTTP 500 — vale ZERO e a linha entra com valor zero,
+                # que o usuário vê e corrige, em vez de perder o formulário.
+                #
+                # Zero, e não `padrao`, de propósito: os dois casos são
+                # diferentes. Campo VAZIO já virou `padrao` na linha do `or`
+                # acima (quantidade 1, preço 0). Campo com LIXO cai aqui, e
+                # zero é o valor que grita na tela — uma quantidade 1 parece
+                # um pedido plausível e pode ser comprada.
+                return 0.0
 
         almox_bruto = almox_ids[i] if i < len(almox_ids) else ''
         itens.append({
