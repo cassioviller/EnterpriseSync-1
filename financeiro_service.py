@@ -8,6 +8,7 @@ from typing import List, Dict
 from sqlalchemy import and_, func
 from sqlalchemy.orm import joinedload
 from app import db
+from utils.decimal_br import parse_decimal_br
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, LancamentoContabil, PartidaContabil, GestaoCustoPai, GestaoCustoFilho, FluxoCaixa
 )
@@ -105,6 +106,12 @@ class FinanceiroService:
                     f"Conta {conta_id} tem pagamento anterior por outro caminho "
                     f"bancário (banco_id={conta.banco_id}); complete pelo mesmo "
                     f"banco ou estorne primeiro")
+
+            # A view não é a única porta: este serviço tem outros chamadores.
+            # `-100` creditava o banco (`saldo_atual -= -100`), deixava a conta
+            # PENDENTE com saldo MAIOR que o original, e a tela dizia sucesso.
+            valor_pago = parse_decimal_br(valor_pago, campo='valor pago',
+                                          minimo=Decimal('0.01'))
 
             # Atualizar valores
             conta.valor_pago += valor_pago

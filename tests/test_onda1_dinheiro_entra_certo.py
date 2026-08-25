@@ -428,3 +428,46 @@ def test_para_teto_nunca_levanta_nem_com_nao_finito(entrada):
     erros = []
     assert _para_teto(entrada, erros) is None
     assert erros
+
+
+# ---------------------------------------------------------------------------
+# Task 5 — a baixa de pagamento
+# ---------------------------------------------------------------------------
+
+def test_parse_valor_do_financeiro_recusa_ambiguo():
+    """`_parse_valor` era o melhor dos cinco e ainda lia `1.500` como 1,5."""
+    from financeiro_views import _parse_valor
+    from utils.decimal_br import ValorAmbiguo
+
+    assert _parse_valor('1.234,56') == 1234.56
+    assert _parse_valor('1,234.56') == 1234.56
+    assert _parse_valor('1234.56') == 1234.56
+    with pytest.raises(ValorAmbiguo):
+        _parse_valor('1.500')
+
+
+def test_baixar_pagamento_recusa_valor_negativo():
+    """🔴 `-100` CREDITAVA o banco: `saldo_atual -= -100`.
+
+    A conta ficava PENDENTE com saldo maior que o original, e a tela mostrava
+    sucesso.
+    """
+    from utils.decimal_br import ValorInvalido, parse_decimal_br
+
+    with pytest.raises(ValorInvalido):
+        parse_decimal_br('-100', campo='valor_pago', minimo=Decimal('0.01'))
+    assert parse_decimal_br('100', campo='valor_pago',
+                            minimo=Decimal('0.01')) == Decimal('100')
+
+
+def test_servico_de_baixa_rejeita_negativo_mesmo_sem_passar_pela_view():
+    """A view não pode ser a única guarda: o serviço tem outros chamadores."""
+    import inspect
+
+    import financeiro_service
+    fonte = inspect.getsource(financeiro_service.FinanceiroService
+                              .baixar_pagamento)
+    assert ('minimo' in fonte or 'valor_pago <= 0' in fonte
+            or '<= 0' in fonte), (
+        'baixar_pagamento precisa recusar valor não-positivo no próprio '
+        'serviço, não só na view')

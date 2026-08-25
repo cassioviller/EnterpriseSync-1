@@ -7,6 +7,7 @@ from flask_login import login_required, current_user
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 from app import db
+from utils.decimal_br import ValorInvalido, parse_decimal_br
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, Fornecedor, 
     PlanoContas, Obra, CentroCusto, GestaoCustoPai, GestaoCustoFilho, FluxoCaixa,
@@ -25,24 +26,10 @@ financeiro_bp = Blueprint('financeiro', __name__, url_prefix='/financeiro')
 
 def _parse_valor(raw: str) -> float:
     """Converte string de valor em float suportando formatos BRL e internacionais.
-    
+
     Suporta: '100.00', '100,00', '1.234,56', '1,234.56'
     """
-    raw = raw.strip().replace(' ', '').replace('R$', '').replace('\xa0', '')
-    if not raw:
-        return 0.0
-    # Formato BRL: separador de milhar = '.', decimal = ',' (ex: 1.234,56)
-    if ',' in raw and '.' in raw:
-        if raw.rfind(',') > raw.rfind('.'):
-            # último separador é vírgula → BRL (1.234,56)
-            raw = raw.replace('.', '').replace(',', '.')
-        else:
-            # último separador é ponto → EN (1,234.56)
-            raw = raw.replace(',', '')
-    elif ',' in raw:
-        # somente vírgula → substituir por ponto
-        raw = raw.replace(',', '.')
-    return float(raw)
+    return float(parse_decimal_br(raw, campo='valor', default=Decimal('0')))
 
 
 def _parse_data_arg(nome: str):
@@ -522,7 +509,9 @@ def pagar_conta(conta_id):
 
     if request.method == 'POST':
         try:
-            valor_pago = Decimal(request.form.get('valor_pago'))
+            valor_pago = parse_decimal_br(
+                request.form.get('valor_pago'), campo='valor pago',
+                minimo=Decimal('0.01'))
             data_pagamento = datetime.strptime(
                 request.form.get('data_pagamento'),
                 '%Y-%m-%d'
@@ -837,7 +826,9 @@ def receber_conta(conta_id):
 
     if request.method == 'POST':
         try:
-            valor_recebido = Decimal(request.form.get('valor_recebido'))
+            valor_recebido = parse_decimal_br(
+                request.form.get('valor_recebido'), campo='valor recebido',
+                minimo=Decimal('0.01'))
             data_recebimento = datetime.strptime(
                 request.form.get('data_recebimento'),
                 '%Y-%m-%d'
