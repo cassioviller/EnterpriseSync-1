@@ -25,6 +25,7 @@ extrato é leitura e basta ter acesso à obra.
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 
 from flask import (Blueprint, flash, redirect, render_template, request,
                    url_for)
@@ -33,6 +34,7 @@ from werkzeug.exceptions import HTTPException
 
 from models import AditivoContrato, Obra, ObraContratoVersao, PapelObra, db
 from utils.autorizacao import obra_required
+from utils.decimal_br import parse_decimal_br
 from utils.tenant import get_tenant_admin_id
 
 logger = logging.getLogger(__name__)
@@ -94,13 +96,18 @@ def novo(obra_id: int):
 
     try:
         prazo = (request.form.get('prazo_delta_dias') or '').strip()
-        valor = (request.form.get('valor_novo') or '').strip()
+        # `default=None`: aditivo de prazo puro não traz valor, e isso é
+        # legítimo (D2 da Fase 6). O que não pode é ADIVINHAR um valor
+        # ambíguo — `ValorAmbiguo` é `ValueError` e cai no `except` de baixo,
+        # que devolve 400 com a mensagem na tela.
+        valor_novo = parse_decimal_br(
+            request.form.get('valor_novo'), campo='valor do aditivo',
+            default=None, minimo=Decimal('0'))
         aditivo = abrir_aditivo(
             obra,
             tipo=(request.form.get('tipo') or '').strip(),
             motivo=(request.form.get('motivo') or '').strip(),
-            valor_novo=(valor.replace('.', '').replace(',', '.')
-                        if valor else None),
+            valor_novo=valor_novo,
             prazo_delta_dias=int(prazo) if prazo else None,
             criado_por_id=getattr(current_user, 'id', None),
         )
