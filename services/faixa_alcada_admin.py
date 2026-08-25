@@ -37,10 +37,11 @@ consertar remove código sem acrescentar nenhum.
 """
 import logging
 from collections import namedtuple
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from models import FaixaAlcada, db
 from services.alcada_compras import CONDICOES_CONHECIDAS
+from utils.decimal_br import ValorInvalido, parse_decimal_br
 
 logger = logging.getLogger('faixa_alcada_admin')
 
@@ -195,27 +196,26 @@ def _para_inteiro(bruto, campo, erros, minimo=0):
 def _para_teto(bruto, erros):
     """O teto da faixa. Vazio é o TETO ABERTO (NULL), não zero.
 
-    Aceita `30000.00` e `30.000,00` — a tela mostra no formato brasileiro e
-    quem copia da tela cola de volta com ponto de milhar. Tratar isso como
-    erro de digitação seria culpar o operador pelo formato que a própria tela
-    lhe deu.
+    Aceita `30000.00` e `30.000,00`. **Recusa `30.000`**: o ponto com três
+    casas tanto pode ser milhar quanto decimal, e adivinhar transformava o
+    teto de trinta mil em trinta reais — em silêncio, porque a escada
+    continuava monotônica e `_violacoes` não tinha o que reclamar.
+
+    Não levanta: acumula em `erros`, que é o contrato que `_violacoes` espera.
     """
-    texto = str(bruto if bruto is not None else '').strip()
-    if not texto:
-        return None
-    if ',' in texto:
-        texto = texto.replace('.', '').replace(',', '.')
     try:
-        valor = Decimal(texto)
-    except (InvalidOperation, TypeError, ValueError):
-        erros.append(f'teto: {bruto!r} não é um valor válido')
+        # 🔬 LIMITE_TETO = Decimal('999999999.99') (`:50`) — já é Decimal,
+        # então entra direto como `maximo` e a mensagem sai idêntica à de antes.
+        valor = parse_decimal_br(bruto, campo='teto', default=None,
+                                 maximo=LIMITE_TETO)
+    except ValorInvalido as erro:
+        erros.append(str(erro))
+        return None
+    if valor is None:
         return None
     if valor <= 0:
         erros.append('teto: precisa ser maior que zero (deixe em branco para '
                      'a faixa de teto aberto)')
-        return None
-    if valor > LIMITE_TETO:
-        erros.append(f'teto: acima do limite de {LIMITE_TETO}')
         return None
     return valor.quantize(Decimal('0.01'))
 

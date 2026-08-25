@@ -372,3 +372,50 @@ def test_quantidade_que_se_esvazia_na_limpeza_vale_zero(bruto, rotulo):
         assert _D(str(item.quantidade)) == _D('0'), (
             f'{rotulo!r} ({bruto!r}) devia esvaziar na limpeza e virar 0, '
             f'não o padrão (1); veio {item.quantidade}')
+
+
+# ---------------------------------------------------------------------------
+# Task 4 — o teto da faixa de alçada
+# ---------------------------------------------------------------------------
+
+def test_teto_com_ponto_de_milhar_nao_vira_trinta_reais():
+    """🔴 `services/faixa_alcada_admin.py:206`: `'30.000'` virava R$ 30,00.
+
+    A escada seguia monotônica, `_violacoes` não levantava nada, e a primeira
+    faixa do tenant passava a cobrir só compras abaixo de R$ 30.
+    """
+    from services.faixa_alcada_admin import _para_teto
+
+    erros = []
+    assert _para_teto('30.000', erros) is None
+    assert erros, 'ambíguo precisa virar erro visível, não R$ 30,00'
+    assert any('ambíguo' in e for e in erros), erros
+
+
+def test_teto_continua_aceitando_os_dois_formatos_inequivocos():
+    """O que a tela produz de fato continua entrando."""
+    from services.faixa_alcada_admin import _para_teto
+
+    for entrada in ('30000.00', '30.000,00', '30000'):
+        erros = []
+        assert _para_teto(entrada, erros) == Decimal('30000.00'), entrada
+        assert erros == [], (entrada, erros)
+
+
+def test_teto_vazio_continua_sendo_teto_aberto():
+    """`valor_ate` NULL é o teto aberto — invariante da faixa. Não regrediu."""
+    from services.faixa_alcada_admin import _para_teto
+
+    for vazio in ('', '   ', None):
+        erros = []
+        assert _para_teto(vazio, erros) is None
+        assert erros == []
+
+
+def test_teto_zero_e_negativo_continuam_recusados():
+    from services.faixa_alcada_admin import _para_teto
+
+    for ruim in ('0', '-5'):
+        erros = []
+        assert _para_teto(ruim, erros) is None
+        assert erros, ruim
