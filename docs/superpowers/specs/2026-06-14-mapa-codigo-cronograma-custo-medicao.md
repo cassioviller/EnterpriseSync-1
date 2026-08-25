@@ -1,5 +1,11 @@
 # Mapa de código — Cronograma ↔ Custo ↔ Medição (SIGE)
 
+> **Estado em 2026-08-25 (varredura de fecho):** 📖 **REFERÊNCIA — não é spec de mudança** — mapa/estudo de código, não promete mudança. Nada a fechar.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 > Referência do estado REAL do subsistema, levantada por leitura de código (views, handlers,
 > services, templates), não de suposição. Base para implementar a espinha financeira
 > (`2026-06-14-espinha-financeira-obra-design.md`). Data: 2026-06-14.

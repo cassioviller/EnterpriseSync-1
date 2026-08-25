@@ -1,5 +1,11 @@
 # Custo e cronograma fiéis às fontes + regime de medição por obra
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **REALIZADA** — o plano correspondente foi executado e o código está na árvore.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 > Spec de design. Data: **2026-06-27**.
 > Obra-piloto: **Baia (Fazenda Santa Mônica)**. Modelo desenhado para ser geral.
 

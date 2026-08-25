@@ -1,5 +1,11 @@
 # Fase 8 — o plano de contas passa a significar uma coisa só
 
+> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **VIVA — tem plano, falta executar** — o plano de execução existe desde 24/08: `docs/superpowers/plans/2026-08-24-fase-8-plano-de-contas-canonico.md`. ⚠️ **quatro números desta spec envelheceram** e estão corrigidos lá: as migrations são 315/316 (não 310/311), a pergunta nova de `medir_producao` é a q8 (não a q7), o canônico tem 35 contas (não 28), e as linhas de `PlanoContas`/`PartidaContabil` andaram. O plano abre ainda uma decisão **D6** que esta spec não previu.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 **Data:** 2026-08-17
 **Origem:** o plano aprovado (Fase 8, *"Financeiro avançado + exportação Domínio"*), com o
 escopo ampliado pela análise `docs/maturidade-financeira-rfa.md`.

@@ -1,5 +1,13 @@
 # Rodada B6 — varredura dos quatro itens que a B5 deixou citados — 2026-08-06
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO, com resíduo nomeado** — 🔬 15/20. Resíduo: os quatro testes `tests/test_b6_404_{obras,frota,cauda,miscelanea}.py` nunca foram escritos — o recorte entregue foi `test_b6_estorno_recebimento.py` e `test_b6_familia2_reembolso_import.py`. 🔬 15/20 dos arquivos prometidos existem na árvore.
+>
+> A entrega aconteceu; sobrou algo pequeno e nomeado abaixo. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: `superpowers:subagent-driven-development`
 > ou `superpowers:executing-plans`. Os passos usam checkbox (`- [ ]`).
 

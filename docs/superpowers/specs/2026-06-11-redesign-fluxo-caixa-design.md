@@ -1,5 +1,11 @@
 # Design — Redesenho da Visualização do Fluxo de Caixa (Dashboard Híbrido)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **REALIZADA** — o plano correspondente foi executado e o código está na árvore.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 **Data:** 2026-06-11
 **Autor:** Cássio + Claude
 **Status:** Aprovado (design) — revisado após sessão de grilling (decisões Q1–Q8)

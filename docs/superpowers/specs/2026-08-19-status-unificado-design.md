@@ -1,5 +1,11 @@
 # Fase 4 do ciclo de compras — o status unificado — 2026-08-19
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **REALIZADA** — Fase 4 do ciclo, entregue e mesclada em 23/08 (`05c2c639`). As **9 casas da régua**, que nunca tinham sido enumeradas em lugar nenhum, foram decididas em 23/08 e estão na seção do fim desta spec — `services/etapa_compra.py` as implementa.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 **O que é.** Uma resposta única para *"onde está esta compra?"*, em vez das seis
 respostas parciais que o sistema dá hoje, cada uma numa tabela diferente.
 

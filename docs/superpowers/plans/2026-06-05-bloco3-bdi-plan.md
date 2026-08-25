@@ -1,5 +1,13 @@
 # Plano de Implementação — Bloco 3: BDI completo (TCU)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO, com resíduo nomeado** — BDI entregue. Resíduo: `scripts/preflight_migracao.py` nunca existiu. 🔬 3/4 dos arquivos prometidos existem na árvore.
+>
+> A entrega aconteceu; sobrou algo pequeno e nomeado abaixo. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 - **Data:** 2026-06-05
 - **Spec de origem:** `docs/superpowers/specs/2026-06-05-bloco3-bdi-design.md`
 - **ADR:** `docs/adr/0001-bdi-por-dentro-padrao-tcu.md` (accepted)

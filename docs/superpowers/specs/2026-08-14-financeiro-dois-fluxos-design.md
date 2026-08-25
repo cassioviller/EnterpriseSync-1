@@ -1,5 +1,11 @@
 # Financeiro em dois fluxos — a obrigação passa a nascer do que chegou
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **REALIZADA** — Fases 1–3 do ciclo de compras, entregues com runbook rodado por script. **Leia os 📌 no corpo** — são as divergências que a execução descobriu contra o plano. ⚠️ o code review de 25/08 achou defeitos vivos neste módulo.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 **Data:** 2026-08-14
 **Origem:** pedido do Cássio — "ciclo completo de compras, da solicitação no campo até o
 lançamento no fluxo de caixa, com rastreabilidade por um número único".

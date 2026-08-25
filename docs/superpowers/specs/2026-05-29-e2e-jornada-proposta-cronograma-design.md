@@ -1,5 +1,11 @@
 # Spec — Teste E2E Playwright: Catálogo → Proposta → Link do Cliente → Cronograma
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **REALIZADA** — o plano correspondente foi executado e o código está na árvore.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 **Data:** 2026-05-29
 **Autor:** Cássio Viller (via brainstorming)
 **Status:** Aprovado para implementação

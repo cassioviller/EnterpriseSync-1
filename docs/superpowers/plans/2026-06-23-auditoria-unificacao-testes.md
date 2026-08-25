@@ -1,5 +1,13 @@
 # Auditoria & Unificação da Suíte de Testes
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — plano da linhagem anterior a 22/07. 🔬 **todos** os arquivos que ele promete existem na árvore — o código foi mesclado antes da fratura. A data do plano não o torna órfão; o teste é a existência do arquivo. 🔬 3/3 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > Gerado em 2026-06-23. Auditoria de 77 arquivos em `tests/` (≈471 testes coletados pelo pytest).
 > Objetivo: revisar, atualizar, des-duplicar e unificar a suíte ("antigos, repetidos").
 

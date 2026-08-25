@@ -1,5 +1,13 @@
 # Plano de Implementação — Bloco 1: Blindagem de Acesso (B → A)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO, com resíduo nomeado** — código entregue e mesclado. Resíduo: `tests/test_isolamento_tenant_bloco1.py` nunca foi escrito com esse nome — o isolamento é coberto hoje por `tests/test_p1_isolamento_relatorios.py`, `test_gestao_custo_filho_tenant.py` e `test_arreio_almoxarifado_e_tenant.py`. ⚠️ o code review de 25/08 achou **furos de tenant vivos** (`multitenant_helper.py:25`, `transporte_views.py:204`, `veiculos_services.py:167`) — a blindagem deste bloco não cobriu o parque inteiro. 🔬 2/3 dos arquivos prometidos existem na árvore.
+>
+> A entrega aconteceu; sobrou algo pequeno e nomeado abaixo. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 - **Data:** 2026-06-02
 - **Spec de origem:** `docs/superpowers/specs/2026-06-02-remediacao-auditoria-design.md`
 - **Escopo:** apenas o Bloco 1 (autenticação/decorators + isolamento de tenant). C (segredos) e D (BDI) têm planos próprios.

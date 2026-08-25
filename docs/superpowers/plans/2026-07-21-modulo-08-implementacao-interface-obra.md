@@ -1,5 +1,13 @@
 # Módulo 08 — Interface de Cronograma na Obra — Implementation Plan
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — M01–M10 do cronograma .mpp, entregues. **É por causa deles que a Fase 7 virou obsoleta**. 🔬 5/5 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > Fonte: spec `2026-07-17-modulo-08-interface-obra.md`. Em conflito, este plano
 > vence (reconcilia com o modelo vivo pós-M07, medido 2026-07-21).
 

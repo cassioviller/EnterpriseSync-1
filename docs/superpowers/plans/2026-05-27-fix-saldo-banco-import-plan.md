@@ -1,5 +1,13 @@
 # Plano de Implementação — Fix #1: Saldo Bancário
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — plano da linhagem anterior a 22/07. 🔬 **todos** os arquivos que ele promete existem na árvore — o código foi mesclado antes da fratura. A data do plano não o torna órfão; o teste é a existência do arquivo.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 **Spec:** `docs/superpowers/specs/2026-05-27-fix-saldo-banco-import.md`  
 **Data:** 2026-05-27
 

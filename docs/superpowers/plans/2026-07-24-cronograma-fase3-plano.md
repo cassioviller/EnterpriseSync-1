@@ -1,5 +1,13 @@
 # Plano de Implementação — Fase 3: Desfazer/refazer (`cronograma_editor_v2`)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — entregue; 🔬 todos os arquivos prometidos existem. 🔬 3/3 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 Spec: `docs/superpowers/specs/2026-07-24-cronograma-editavel-design.md` (seções 1, 3 e 6). Base: Fase 2 mergeada em `6c9b60d2`. Tudo atrás da flag `cronograma_editor_v2` — **flag OFF = comportamento byte-idêntico**, exceto o conserto explícito de `ativa` descrito no Step D (decisão do usuário).
 
 ## Contexto verificado no código

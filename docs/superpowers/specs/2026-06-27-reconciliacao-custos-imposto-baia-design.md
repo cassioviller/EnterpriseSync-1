@@ -1,5 +1,11 @@
 # Reconciliação de custos e imposto — obra Baia (Planilha1 REV01)
 
+> **Estado em 2026-08-25 (varredura de fecho):** 📖 **REFERÊNCIA — não é spec de mudança** — documento de **uma obra específica** (Baia REV10), insumo do trabalho da espinha financeira. Não é spec de produto e não entra em nenhum plano em aberto.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 > Design doc. Data: 2026-06-27.
 > Objetivo: reconciliar 100% o JSON `tests/fixtures/cronograma_fisico_financeiro_baias.json`
 > com a aba `Planilha1` do `Planilha de Custos REV01 (2).xlsx`, **corrigindo** as

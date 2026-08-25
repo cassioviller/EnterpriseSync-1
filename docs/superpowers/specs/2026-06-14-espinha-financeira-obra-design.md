@@ -1,5 +1,11 @@
 # Design — Espinha Financeira da Obra: Resultado real por Atividade (SIGE)
 
+> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **VIVA — tem plano, falta executar** — o plano de porte existe desde 24/08: `docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md`. O código desta spec foi escrito e testado, mas vive na branch `design/espinha-financeira-obra` (PR #6), fora do `main`.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 > Data: 2026-06-14. Status: design para revisão.
 > Objetivo: dar ao gestor da obra o **Resultado real por Atividade, diário** — quanto cada
 > atividade do cronograma está dando de resultado de verdade enquanto a obra acontece — com

@@ -1,5 +1,13 @@
 # Rodada B5 — varredura das cinco dívidas sem Task — 2026-08-06
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO, com resíduo nomeado** — 🔬 18/19. Resíduo: `tests/test_b5_curva_baseline.py` nunca foi escrito. 🔬 18/19 dos arquivos prometidos existem na árvore.
+>
+> A entrega aconteceu; sobrou algo pequeno e nomeado abaixo. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: `superpowers:subagent-driven-development`
 > ou `superpowers:executing-plans`. Os passos usam checkbox (`- [ ]`).
 

@@ -1,5 +1,13 @@
 # Painel Financeiro da Obra — Implementation Plan
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — plano da linhagem anterior a 22/07. 🔬 **todos** os arquivos que ele promete existem na árvore — o código foi mesclado antes da fratura. A data do plano não o torna órfão; o teste é a existência do arquivo. 🔬 7/7 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Transformar a aba "Financeiro" da página da obra no Painel Financeiro estilo `dashboard_baias` — KPIs, custo por etapa clicável/editável, Curva S com 4 séries (incl. custo realizado no tempo), doughnut Veks×Fat, caixa por mês e medições — com Verba Disponível = caixa (recebido − realizado).

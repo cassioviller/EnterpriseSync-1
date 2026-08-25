@@ -1,5 +1,13 @@
 # Plano — Fatia 5: Inteligência (learning loop + roll-up de portfólio)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ❌ **OBSOLETO — não executar** — **não executar como está.** O código destes planos existe, mas na branch `design/espinha-financeira-obra` (PR #6), do outro lado da fratura de linhagem de 22/07 — 🔬 `services/resultado_atividade_service.py`, `services/importar_obra_completa.py`, `services/caixa_obra_service.py` e `services/aprendizado_produtividade.py` **não estão na árvore**. O porte, com as correções que 476 commits de divergência exigem, está em `2026-08-24-resgate-espinha-financeira.md`. Parte foi refeita por outro caminho: `services/evm.py`, `medicao_service.py` e `progresso_subatividade.py` vieram dos pacotes p4/p10. 🔬 1/5 dos arquivos prometidos existem na árvore.
+>
+> Este plano não deve virar código como está escrito. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > Data: 2026-06-15. Obedece ao plano-mestre (DC1, DC10). Depende das Fatias 1–3. **Sem migration.**
 > Spec §Fatia 5.
 

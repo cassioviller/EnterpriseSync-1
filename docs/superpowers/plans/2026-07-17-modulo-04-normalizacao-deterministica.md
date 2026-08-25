@@ -1,5 +1,13 @@
 # Módulo 4 — Normalização e Classificação Determinística (substitui a integração com API externa)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — M01–M10 do cronograma .mpp, entregues. **É por causa deles que a Fase 7 virou obsoleta**. 🔬 4/4 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > Parte do plano mestre `2026-07-17-cronograma-mpp-rdo-master-plan.md`. **Decisão D1: sem API externa.** Este módulo entrega, por lógica determinística + revisão manual, o que a spec original delegava ao Claude: normalizar nomes, gerar fingerprints, classificar, sugerir vínculos e apontar inconsistências. O ponto de extensão futuro opcional está no master plan §9.
 
 ## 1. Objetivo

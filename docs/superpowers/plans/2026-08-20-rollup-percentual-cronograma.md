@@ -1,5 +1,13 @@
 # Rollup de Percentual do Cronograma — Implementation Plan
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — fechado em 24/08. A Task 3 caiu **sem código**: a fórmula fica sendo média ponderada por duração, que é a que o motor já aplica. O preço está escrito no plano — 5 tarefas zeradas de 1 dia numa fase de 98% dá 96,39%, não os ~80% da reunião. 🔬 3 passed. 🔬 5/5 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fazer o percentual do grupo (tarefa resumo) reagir de forma correta e previsível quando tarefas novas são inseridas no meio da fase.

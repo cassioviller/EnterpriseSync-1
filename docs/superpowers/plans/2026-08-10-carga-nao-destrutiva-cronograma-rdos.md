@@ -1,5 +1,13 @@
 # Plano — carga não-destrutiva de cronograma + RDOs (export → mescla → upsert) — 2026-08-10
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — entregue. 🔬 9/9 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 **O problema.** Colocar numa obra EXISTENTE de produção (caso concreto: Angela)
 o cronograma novo (.mpp com %) e RDOs vindos do WhatsApp, **sem** o reimport
 físico-financeiro — que apaga RDOs/tarefas/medições e é recusado em obra já

@@ -1,5 +1,13 @@
 # Plano de execução — CRM, os quatro ajustes — 2026-08-07
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — entregue. 🔬 5/5 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: `superpowers:executing-plans`.
 
 **O que é.** O plano de execução do spec

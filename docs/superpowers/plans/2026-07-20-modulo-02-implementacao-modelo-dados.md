@@ -1,5 +1,13 @@
 # Módulo 02 — Modelo de Dados e Migrations — Implementation Plan
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — M01–M10 do cronograma .mpp, entregues. **É por causa deles que a Fase 7 virou obsoleta**. 🔬 1/1 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recomendado) ou superpowers:executing-plans, tarefa a tarefa. A spec de origem é `2026-07-17-modulo-02-modelo-dados-migrations.md` — as tabelas de colunas de lá (§4) são o dicionário de dados canônico; este plano as materializa em código.
 
 **Goal:** Criar as 5 entidades de importação/versionamento de cronograma e as colunas de identidade estável/apontamento semântico — aditivo, idempotente, tenant-scoped, zero mudança de comportamento.

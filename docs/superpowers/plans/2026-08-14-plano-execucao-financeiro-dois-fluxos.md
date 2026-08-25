@@ -1,5 +1,13 @@
 # Plano de execução — Financeiro em dois fluxos — 2026-08-14
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — Fases 1–3 do ciclo de compras, entregues com runbook rodado por script. ⚠️ o code review de 25/08 achou defeitos vivos neste módulo — ver `docs/auditoria/achados-code-review-2026-08-25.md` §5. 🔬 8/8 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 **O que é.** O plano de execução do spec
 `docs/superpowers/specs/2026-08-14-financeiro-dois-fluxos-design.md`. As decisões e o
 diagnóstico vivem lá e não são repetidos aqui; **quando divergirem, o spec vence**.

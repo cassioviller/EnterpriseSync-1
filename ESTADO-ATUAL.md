@@ -1,7 +1,8 @@
 # ESTADO ATUAL — SIGE / Veks
 
-> Snapshot de **2026-08-21** (7ª revisão — a reunião de 20/08 integrada em
-> `main`; a 6ª, de 03/08, fechou o `PLANO-NUCLEO.md` com os dez pacotes).
+> Snapshot de **2026-08-25** (8ª revisão — o fecho de todos os planos e a
+> varredura de code review do app inteiro; a 7ª, de 21/08, integrou a reunião de
+> 20/08; a 6ª, de 03/08, fechou o `PLANO-NUCLEO.md` com os dez pacotes).
 > Este é o documento a ler PRIMEIRO ao retomar. Os demais (`PLANO-NUCLEO.md`,
 > `DEVOLUTIVA.md`, `DOSSIE-REPO.md`, `docs/archive/FECHO-FASE-0.5.md`) são o
 > detalhe; este é o mapa.
@@ -2514,11 +2515,78 @@ com preload; o verde a mais é o teste dessa onda.) 🔬 suíte da fase,
 🔬 `scripts/runbook_fase4.py`: **14/14 OK**, pela tela, por Playwright — inclusive
 rodado com `--sem-semear`, sobre cenário já existente.
 
+### 🔴 25/08 — os planos foram zerados, e a varredura achou o que nenhum plano previa
+
+**Os 103 planos e as 43 specs foram julgados um a um e estampados no próprio
+corpo**, logo abaixo do título, com veredito e prova. O índice é
+`docs/planos-em-aberto-2026-08-25.md`.
+
+O teste aplicado foi **existência do arquivo que o plano promete**, medido
+mecanicamente contra a árvore — nunca checkbox, nunca mensagem de commit. 🔬 Somando
+as caixas dos 103 planos, o repositório *parecia* ter **~2.900 itens em aberto**. O
+número verdadeiro de planos com trabalho de código pendente é **três**: a Fase 8
+(`2026-08-24-fase-8-plano-de-contas-canonico`), o resgate da Espinha
+(`2026-08-24-resgate-espinha-financeira`) e a Fase 9a/9b. Um quarto está parado por
+pessoa, não por código: o manual de preenchimento do RDO espera **Alan e Abel**.
+Oito planos foram **riscados** — a Fase 7 (reescrita pelo p10), a Fase 8 velha, e o
+plano mestre + as cinco fatias da espinha, cujo código existe mas vive no PR #6.
+
+🔬 **Cinco "ausências" eram falso alarme** e foram derrubadas:
+`test_cronograma_importacao_playwright.py` foi **renomeado**;
+`templates/obras.html` e `templates/cronograma/obra.html` foram **apagados** na
+limpeza; `utils/maquina_estados.py` nunca existiu com esse nome;
+`handlers/financeiro_handlers.py` é da linhagem velha. E os **70 planos anteriores a
+22/07 não são órfãos**: medidos um a um, quase todos têm 100% dos arquivos
+prometidos na árvore.
+
+#### O que a varredura achou que nenhum plano previa
+
+Dez passadas de `/code-review` por módulo sobre **286.517 linhas em 649 arquivos**
+acharam **114 defeitos, 33 graves** — em
+`docs/auditoria/achados-code-review-2026-08-25.md`. **Isto muda a ordem de
+prioridade do repositório:** os três planos abertos são funcionalidade nova; vários
+dos 33 graves são dinheiro errado e vazamento entre tenants **em código que já está
+em produção**.
+
+Os quatro que mais pesam:
+
+- 🔴 📖 `multitenant_helper.py:25` — `get_admin_id()` só mapeia `funcionario`; todo
+  outro papel não-admin cai em `return current_user.id`. `GESTOR_EQUIPES` e
+  `ALMOXARIFE` são papéis vivos, e um gestor com `id=42, admin_id=7` escreve num
+  **tenant que não existe**. 🔬 `utils/tenant` e `auth.py` tratam esses papéis
+  corretamente — esta é a **única cópia divergente**.
+- 🔴 📖 `views/aditivos_views.py:102` — o parser BR infla o contrato **100×**:
+  `150000.00` vira R$ 15.000.000,00, gravado em `obra.valor_contrato` **e** lançado
+  no razão. **Isto bloqueia o push dos 25 commits.**
+- 🔴 📖 `almoxarifado_utils.py:602` — `quantidade_disponivel` não é mantida na saída
+  manual: **as mesmas unidades podem ser emitidas duas vezes.**
+- 🔴 📖 `contabilidade_utils.py:621` e `:871` — a DRE conta só um lado das partidas
+  (estorno nunca reduz o resultado) e o balancete põe saldo credor na coluna de
+  débito. **Os dois relatórios não fecham, e discordam entre si.**
+
+Duas confirmações cruzadas, chegadas por caminho independente: 📖
+`folha_pagamento_views.py:148` (reprocessar folha **dobra** o valor no contas a
+pagar e no razão) **é a automação A12**, que a reconferência de 23/08 lista como
+ABERTA; e o furo de tenant é prova de que a blindagem do bloco 1 **não cobriu o
+parque**.
+
+O roteiro de fecho, em seis ondas agrupadas por **causa comum** e não por arquivo,
+é `docs/superpowers/plans/2026-08-25-fecho-dos-114-achados.md`. Ele abre **três
+decisões suas** — a mais cara é a **D2**: corrigir `financeiro_service.py:619`
+exige alterar um teste hoje verde (`tests/test_b5_fluxo_gemeos_e_orfaos.py:100`),
+que afirma o defeito como intencional.
+
+⚠️ **Nada disso foi corrigido.** A varredura foi de leitura; a árvore está como
+estava.
+
 ## Mapa dos documentos
 
 | Arquivo | O que é |
 |---|---|
 | **`ESTADO-ATUAL.md`** | este — leia primeiro |
+| **`docs/planos-em-aberto-2026-08-25.md`** (25/08) | **o índice de estado dos 103 planos e das 43 specs** — cada arquivo estampado no próprio corpo com veredito e prova. Julgado por existência de código, nunca por checkbox. **Substitui o de 23/08.** Sobram **três** planos com trabalho de código |
+| **`docs/auditoria/achados-code-review-2026-08-25.md`** (25/08) | **os 114 defeitos** que o code review do app inteiro achou, em dez passadas por módulo sobre 286.517 linhas. 33 graves. Cada um com `arquivo:linha` e cenário de falha. **Nenhum corrigido** |
+| **`docs/superpowers/plans/2026-08-25-fecho-dos-114-achados.md`** (25/08) | o roteiro de fecho dos 114, em **seis ondas por causa comum** — não por arquivo. Abre as decisões **D1** (o push está bloqueado), **D2** (um teste verde afirma o defeito como intencional) e **D3** (as seis rotas mortas de veículos) |
 | **`docs/planos-em-aberto-2026-08-23.md`** (23/08) | **a varredura de o que ainda está aberto** — os 99 planos, as 31 specs e as branches do `origin` julgados por existência de código na árvore, não por checkbox. Traz o achado da **linhagem partida em 22/07** e do PR #6 (espinha financeira) fora do `main` |
 | **`PLANO-NUCLEO.md`** (31/07, fechado 03/08) | **leia em segundo.** Os 10 pacotes do núcleo, os 12 vereditos, a matriz de 20 conexões, o backlog de 25 automações, as estruturas mortas e as 7 decisões. Onde ele diverge do `FLUXO-IDEAL.md`, **vale ele** |
 | `FLUXO-IDEAL.md` (30/07) | O diagnóstico que originou o plano. Suas ondas 0-3 foram **reordenadas** nos pacotes p1-p10 — traz o aviso no topo |

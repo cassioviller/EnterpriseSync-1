@@ -1,5 +1,11 @@
 # Separação de casos de uso — importação, cronograma, RDO, custos e medições
 
+> **Estado em 2026-08-25 (varredura de fecho):** 📖 **REFERÊNCIA — não é spec de mudança** — mapa/estudo de código, não promete mudança. Nada a fechar.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 > Módulo 01 passo 8 do plano `2026-07-17-cronograma-mpp-rdo-master-plan.md`.
 > Este documento fixa QUEM é responsável por QUAL escrita. Um caso de uso não
 > pode "aproveitar" o serviço de outro — foi exatamente esse aproveitamento

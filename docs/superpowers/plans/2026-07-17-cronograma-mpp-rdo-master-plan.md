@@ -1,5 +1,13 @@
 # Plano Mestre — Cronograma .mpp por Obra + RDO Quantitativo/Percentual (100% determinístico, sem API externa)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — M01–M10 do cronograma .mpp, entregues. **É por causa deles que a Fase 7 virou obsoleta**. 🔬 6/6 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **Para agentes executores:** este é o documento mestre. A implementação segue os 10 planos modulares `2026-07-17-modulo-NN-*.md` nesta pasta, na ordem definida na seção "Ordem de implementação". Use superpowers:subagent-driven-development ou superpowers:executing-plans por módulo.
 
 **Objetivo:** transformar o fluxo de importação físico-financeira usado no piloto das baias em uma funcionalidade genérica por obra: upload de `.mpp` dentro da obra → parser local determinístico → normalização determinística → prévia de diferenças → aplicação transacional versionada — preservando RDOs, fotos, medições, custos e histórico.

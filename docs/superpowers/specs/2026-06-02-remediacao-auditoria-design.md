@@ -1,5 +1,11 @@
 # Design — Remediação da Auditoria de Segurança e Lógica (SIGE)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **REALIZADA** — o plano correspondente foi executado e o código está na árvore.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 - **Data:** 2026-06-02
 - **Autor:** Cássio Viller + Claude
 - **Status:** proposto (aguardando revisão)

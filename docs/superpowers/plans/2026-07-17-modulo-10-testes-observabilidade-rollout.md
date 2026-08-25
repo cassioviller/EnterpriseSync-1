@@ -1,5 +1,13 @@
 # Módulo 10 — Testes, Observabilidade e Implantação
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — 🔬 o único arquivo dado como ausente, `tests/test_cronograma_importacao_playwright.py`, foi **renomeado** para `tests/test_cronograma_importacao_obra_playwright.py`. Falso alarme. 🔬 17/18 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > Parte do plano mestre `2026-07-17-cronograma-mpp-rdo-master-plan.md`. Transversal: cada módulo entrega seus testes; este módulo consolida a malha E2E, métricas, flag e rollout.
 
 ## 1. Objetivo

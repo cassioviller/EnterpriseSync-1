@@ -1,5 +1,13 @@
 # Módulo 04 — Normalização Determinística — Implementation Plan
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — M01–M10 do cronograma .mpp, entregues. **É por causa deles que a Fase 7 virou obsoleta**. 🔬 4/4 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** fonte: spec `2026-07-17-modulo-04-normalizacao-deterministica.md`
 > (decisão D1: sem API externa; tudo determinístico). Em conflito spec×este plano, este
 > plano vence — ele reconcilia a spec com o contrato REAL do M03 já commitado.

@@ -1,5 +1,11 @@
 # Custos unificados por grupo + módulo de períodos (Previsão × Realizado)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **REALIZADA** — o plano correspondente foi executado e o código está na árvore.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 > Data: 2026-06-29. Obra-piloto: Baia.
 > Contexto de partida: ver `2026-06-27-custo-cronograma-fieis-regime-medicao-design.md`
 > (modelo custo↔cronograma, custo de período, etapas no painel Financeiro).

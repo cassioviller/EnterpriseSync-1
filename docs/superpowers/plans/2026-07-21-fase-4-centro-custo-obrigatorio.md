@@ -1,5 +1,13 @@
 # Fase 4 — Centro de Custo Obrigatório
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — fechada com gate verde. 🔬 8/8 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fazer com que nenhum lançamento de custo do SIGE possa existir sem um destino contábil — ou uma **obra**, ou o **centro de custo administrativo do tenant** — eliminando o furo em que uma despesa salva sem obra some do orçado×real sem erro e sem alerta.

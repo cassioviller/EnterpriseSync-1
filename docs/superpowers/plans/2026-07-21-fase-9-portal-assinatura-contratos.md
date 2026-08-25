@@ -1,5 +1,13 @@
 # Fase 9 — Portal do cliente: endurecimento + assinatura de medição (9a) e Contratos/Drive/Notificações (9b)
 
+> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — trabalho real pendente** — nunca começada. 🔬 19 de 35 arquivos prometidos existem — o que existe veio por outros caminhos (portal, medição, ciência). Faltam `services/assinatura_documento.py`, `services/contrato_service.py`, `services/drive_client.py`, `scripts/portal_acessos.py`. A decisão nº 2 já caiu: o dono do `valor_contrato` é a Fase 6, então a 9b vira camada documental. 🔬 19/35 dos arquivos prometidos existem na árvore.
+>
+> Este é um dos poucos planos que ainda pedem código. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Transformar o portal do cliente — hoje um sistema de identidade paralelo onde a URL *é* a credencial, sem expiração, sem escopo e sem trilha — num canal com capability tokens escopados, expiráveis, revogáveis e auditados; e, só então, entregar a assinatura de medição pelo cliente com valor probatório defensável (autoria, carimbo de tempo, IP/dispositivo e hash do documento exato assinado).

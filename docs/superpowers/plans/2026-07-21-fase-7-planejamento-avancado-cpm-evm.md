@@ -1,5 +1,13 @@
 # Fase 7 — Planejamento Avançado: CPM, Baseline e EVM
 
+> **Estado em 2026-08-25 (varredura de fecho):** ❌ **OBSOLETO — não executar** — **reescrita pelo p10.** Executá-la ao pé da letra criaria uma segunda rede de predecessoras e uma segunda baseline, concorrendo com as que os módulos M01–M10 entregaram. CPM, baseline e EVM estão vivos em `services/evm.py` e no motor do cronograma. 🔬 19/32 dos arquivos prometidos existem na árvore.
+>
+> Este plano não deve virar código como está escrito. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > # ❌ PLANO OBSOLETO — NÃO EXECUTE
 >
 > **Substituído pelo `PLANO-NUCLEO.md` §p10, entregue em 03/08** (commits

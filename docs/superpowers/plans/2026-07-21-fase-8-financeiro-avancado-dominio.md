@@ -1,5 +1,13 @@
 # Fase 8 — Financeiro avançado + exportação contábil para o Domínio (layout 11758)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ❌ **OBSOLETO — não executar** — **substituída** por `2026-08-24-fase-8-plano-de-contas-canonico.md`, escrito sobre a spec nova de 17/08. Serve de referência histórica, nunca de roteiro. 🔬 13/35 dos arquivos prometidos existem na árvore.
+>
+> Este plano não deve virar código como está escrito. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fechar o ciclo financeiro do SIGE (conciliação bancária, competência × caixa, DRE por obra) e entregar a exportação mensal dos lançamentos de caixa para o Domínio Contabilidade no layout 11758, com de/para editável pela contabilidade e relatório de pendências.

@@ -1,5 +1,11 @@
 # Quebra dos Serviços em Atividades (passos executáveis) — Obra Baia REV10
 
+> **Estado em 2026-08-25 (varredura de fecho):** 📖 **REFERÊNCIA — não é spec de mudança** — documento de **uma obra específica** (Baia REV10), insumo do trabalho da espinha financeira. Não é spec de produto e não entra em nenhum plano em aberto.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 > Cada Serviço do orçamento quebrado nas **Atividades** (passos) que fazem sentido, na ordem de
 > execução, para virar linhas do cronograma com apontamento diário (quantidade) e carregar
 > custo+venda. Levantado por pesquisa do método executivo real + leitura dos projetos da obra

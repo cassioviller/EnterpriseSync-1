@@ -1,5 +1,13 @@
 # Plano de Implementação — RDO em porcentagem livre (`rdo_percentual_livre`)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — entregue; 🔬 todos os arquivos prometidos existem. 🔬 6/6 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 Spec: `docs/superpowers/specs/2026-07-24-rdo-percentual-livre-design.md`
 (aprovado 2026-07-24, abordagem A). Tudo atrás da flag de tenant nova —
 **flag OFF = byte-idêntico**.

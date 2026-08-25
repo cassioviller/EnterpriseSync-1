@@ -1,5 +1,13 @@
 # Fase 6 — Orçamento versionado e aditivo contratual
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — fechada em 24/08 (`3f28c4db`). ⚠️ o code review de 25/08 achou **9 defeitos** no que ela entregou, um deles grave (`views/aditivos_views.py:102`, contrato inflado 100×) — ver `docs/auditoria/achados-code-review-2026-08-25.md` §1. 🔬 33/33 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Dar ao contrato da obra um baseline versionado e imutável, e transformar "revisar a proposta de uma obra já vendida" — hoje um evento que duplica silenciosamente itens de medição, duplica receita contábil e reprecifica marcos já faturados — num **aditivo contratual explícito, aprovado e rastreável item a item**.

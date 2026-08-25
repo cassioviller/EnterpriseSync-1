@@ -1,5 +1,11 @@
 # A nota e a liberação — o Fluxo A ganha as duas telas que faltam
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **REALIZADA** — Fases 1–3 do ciclo de compras, entregues com runbook rodado por script. **Leia os 📌 no corpo** — são as divergências que a execução descobriu contra o plano. ⚠️ o code review de 25/08 achou defeitos vivos neste módulo.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 **Data:** 2026-08-17
 **Origem:** conferência do fluxo de compras ponta a ponta, pedida em 17/08 depois do merge
 das alçadas em `main`.

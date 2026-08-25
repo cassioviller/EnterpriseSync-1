@@ -1,5 +1,11 @@
 # Cronograma refinado (Pareto POR SERVIÇO + Linha de Balanço) — Obra Baia REV10
 
+> **Estado em 2026-08-25 (varredura de fecho):** 📖 **REFERÊNCIA — não é spec de mudança** — documento de **uma obra específica** (Baia REV10), insumo do trabalho da espinha financeira. Não é spec de produto e não entra em nenhum plano em aberto.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 > Decisão de engenharia: **o que vale metrificar** no cronograma da Baia. Parte da quebra completa
 > (`2026-06-14-quebra-atividades-baia-rev10.md`, ~80 passos = dicionário de método) e a enxuga.
 > **Base do Pareto (corrigida): a importância de cada PASSO dentro do SEU serviço** — não o custo do

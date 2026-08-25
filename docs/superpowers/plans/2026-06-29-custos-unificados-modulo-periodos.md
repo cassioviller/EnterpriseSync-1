@@ -1,5 +1,13 @@
 # Custos unificados por grupo + módulo de períodos (Previsão × Realizado) — Implementation Plan
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — plano da linhagem anterior a 22/07. 🔬 **todos** os arquivos que ele promete existem na árvore — o código foi mesclado antes da fratura. A data do plano não o torna órfão; o teste é a existência do arquivo. 🔬 6/6 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** No detalhe da obra → aba **Financeiro**, ao clicar numa etapa, colapsar as linhas de custo recorrentes (hoje "uma linha por mês") numa **linha por grupo `(descrição-base, fonte)`**, e abrir um **modal** com os períodos em duas abas — **Previsão** (campo `valor`) e **Realizado** (novo campo `valor_realizado`, lançamento manual) — alimentando KPI, Curva S e caixa.

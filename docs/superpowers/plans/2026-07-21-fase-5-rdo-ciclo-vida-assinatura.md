@@ -1,5 +1,13 @@
 # Fase 5 — RDO com ciclo de vida e assinatura
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — fechada; `RDO.estado` e `services/rdo_ciclo_vida.ESTADOS` são desta fase. 🔬 19/19 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Dar ao RDO um ciclo de vida com guardas de transição, uma assinatura vinculada à identidade real da pessoa (`Usuario.funcionario_id`, Fase 1) e imutabilidade após a assinatura — hoje o RDO nasce `'Finalizado'` por decreto (`models.py:860`), é reescrito por oito caminhos de escrita diferentes sem nenhuma guarda, e não existe registro nenhum de quem respondeu por ele.

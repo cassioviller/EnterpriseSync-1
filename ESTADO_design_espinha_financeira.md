@@ -15,8 +15,21 @@
 > `resultado/portfolio` e `por_atividade` no repositório inteiro devolve **zero**.
 > O EVM foi refeito por outro caminho (`services/evm.py`, p10); *resultado por
 > atividade*, o importador de obra por planilha e a lente de caixa, não.
-> Tudo abaixo desta linha descreve a branch, **não o sistema**. Ver
-> `docs/planos-em-aberto-2026-08-23.md` §1.
+> Tudo abaixo desta linha descreve a branch, **não o sistema**.
+>
+> ✅ **25/08 — o porte agora tem plano, e ele corrige um defeito que este documento não sabia ter.**
+> `docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md` traz o porte em 10 tasks.
+> 🔴 O achado que impede um `git checkout` simples: 🔬 `services/resultado_atividade_service.py`
+> nesta branch tem **zero** ocorrências de `status`, `estado` ou `'Finalizado'` — ele soma
+> `RDOCustoDiario` e `RDOMaoObra` de **todo** RDO que encontrar; e
+> `services/aprendizado_produtividade.py` filtra `RDO.status == 'Finalizado'`, **que não filtra
+> nada**, porque todo RDO nasce `'Finalizado'`. Em 15/06 os dois estavam certos: `RDO.estado`
+> só nasceu na Fase 5. Portados como estão, fazem **RDO em rascunho contar como custo real**,
+> alimentando alarme, CPI/EAC e o catálogo de produtividade — exatamente o defeito que o `main`
+> fechou em 24/08 do outro lado (`95eb585f`). O plano torna inegociável: todo leitor de RDO
+> portado filtra por `RDO.estado`, com teste próprio provando que rascunho não entra na conta.
+>
+> Índice de estado de todos os planos e specs: `docs/planos-em-aberto-2026-08-25.md`.
 
 ## TL;DR — onde estamos
 As **5 fatias da espinha financeira estão implementadas, testadas e no PR** (~40 testes verdes).

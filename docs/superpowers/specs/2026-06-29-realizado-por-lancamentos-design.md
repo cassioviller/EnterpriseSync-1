@@ -1,5 +1,11 @@
 # Realizado por lançamentos (Pedaço 1)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **REALIZADA** — o plano correspondente foi executado e o código está na árvore.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 > Data: 2026-06-29. Obra-piloto: Baia.
 > Parte 1 de uma iniciativa maior ("custo realizado por lançamentos amarrados à etapa").
 > Contexto de partida: `2026-06-29-custos-unificados-modulo-periodos-design.md`

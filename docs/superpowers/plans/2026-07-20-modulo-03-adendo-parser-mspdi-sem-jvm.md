@@ -1,5 +1,13 @@
 # Adendo ao Módulo 3 — caminho MSPDI XML sem JVM
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — M01–M10 do cronograma .mpp, entregues. **É por causa deles que a Fase 7 virou obsoleta**. 🔬 4/4 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development ou superpowers:executing-plans. Este documento **revisa** `2026-07-17-modulo-03-upload-parser-mpp.md` §4.1/§4.2/§19/§20 — não o substitui. Ler o M03 antes.
 
 **Goal:** Permitir que produção importe cronograma sem JVM, aceitando MSPDI XML (`.xml`) parseado com a stdlib, mantendo o caminho `.mpp`/MPXJ como opcional.

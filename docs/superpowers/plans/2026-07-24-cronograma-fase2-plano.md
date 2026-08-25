@@ -1,5 +1,13 @@
 # Plano de Implementação — Fase 2: Grade tipo planilha (`cronograma_editor_v2`)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — entregue; 🔬 todos os arquivos prometidos existem. 🔬 3/3 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 Spec: `docs/superpowers/specs/2026-07-24-cronograma-editavel-design.md` (seções 4 e 9). Base: Fase 1 mergeada em `73f58d3e`. Tudo atrás da flag `cronograma_editor_v2` — **flag OFF = comportamento byte-idêntico ao atual** (dblclick para editar, sem toolbar nova, rotas novas devolvem 404 opaco como as de vínculo).
 
 ## Contexto verificado no código

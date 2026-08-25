@@ -1,5 +1,13 @@
 # Fase 8 — o plano de contas passa a significar uma coisa só
 
+> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — trabalho real pendente** — escrito em 24/08, **não executado** — 🔬 3 de 21 arquivos existem. Bloqueado por dois pontos nomeados no próprio plano: a Task 1 é humana (medir produção) e a **D6** (os dois seeders aposentados trocam o significado de `5.1.01` e `5.1.02` entre si). 🔬 3/21 dos arquivos prometidos existem na árvore.
+>
+> Este é um dos poucos planos que ainda pedem código. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recomendado) ou superpowers:executing-plans para executar este plano task a task. Os passos usam checkbox (`- [ ]`) para acompanhamento.
 
 **Goal:** Fazer com que um código de conta contábil signifique a mesma coisa em todo o parque, e usar isso para entregar margem de contribuição, DFC pelos três grupos, indicadores com procedência e a exportação Domínio.

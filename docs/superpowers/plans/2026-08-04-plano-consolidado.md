@@ -1,5 +1,14 @@
 # Plano consolidado — 2026-08-04
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO, com resíduo nomeado** — os 10 pacotes p1–p10 estão entregues e no GitHub. 🔬 54 de 59 arquivos existem, e a medição mecânica produziu **dois falsos alarmes, derrubados em 25/08**: (1) `tests/test_a05_custo_mensalista_por_rota.py` **não foi esquecido — foi deliberadamente não criado**, com a razão escrita na nota da Task B1.5 (`:812`): o arreio B0.3 `tests/test_arreio_custo_rdo_rotas.py` já posta nas rotas com mensalista (🔬 11 ocorrências) e afirma sobre `GestaoCustoFilho`/`CustoObra`/`RDOCustoDiario`, e um arquivo separado seria segunda cópia da mesma prova. (2) A mesma nota diz *'nada desta Task foi feito'* — 🔬 **envelheceu**: 📖 `views/rdo.py:2175` registra a saída da chamada direta a `gerar_custos_mao_obra_rdo`. A nota é de 04/08; o trabalho veio depois.
+> **Resíduo real, um só:** 🔬 zero testes citam `entrada_ja_lancada` — a automação **A09** foi dada como ENTREGUE por leitura de código, sem teste guardando, e o furo de tenant do dedup (`almoxarifado_utils.py:257`) é a prova do custo disso. `handlers/financeiro_handlers.py` é da linhagem velha e não volta. 🔬 54/59 dos arquivos prometidos existem na árvore.
+>
+> A entrega aconteceu; sobrou algo pequeno e nomeado abaixo. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use `superpowers:subagent-driven-development`
 > (recomendado) ou `superpowers:executing-plans` para executar tarefa a tarefa.
 > Os passos usam checkbox (`- [ ]`).

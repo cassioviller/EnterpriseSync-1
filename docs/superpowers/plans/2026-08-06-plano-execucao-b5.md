@@ -1,5 +1,13 @@
 # Plano de execução da rodada B5 — 2026-08-06
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — executado. 🔬 1/1 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: `superpowers:executing-plans`.
 > Os passos usam checkbox (`- [ ]`).
 

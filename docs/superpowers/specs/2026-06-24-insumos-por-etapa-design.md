@@ -1,5 +1,11 @@
 # Design — Edição de insumos (linhas de custo) por etapa no painel Financeiro
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **REALIZADA** — o plano correspondente foi executado e o código está na árvore.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 **Data:** 2026-06-24
 **Branch:** `feat/insumos-por-etapa`
 **Arquivos:** `models.py`, `migrations.py`, `views/obras.py`,

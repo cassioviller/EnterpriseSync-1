@@ -1,5 +1,13 @@
 # Módulo 03 — Upload e Parser de Cronograma — Implementation Plan
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — M01–M10 do cronograma .mpp, entregues. **É por causa deles que a Fase 7 virou obsoleta**. 🔬 10/10 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development ou superpowers:executing-plans, tarefa a tarefa. Fontes: spec `2026-07-17-modulo-03-upload-parser-mpp.md` **revisada pelo adendo** `2026-07-20-modulo-03-adendo-parser-mspdi-sem-jvm.md` (MSPDI primário; validado contra export real do Project — 103 tarefas, zero divergências). Em conflito spec×adendo, o adendo vence.
 
 **Goal:** Upload de cronograma dentro da obra (`.xml` MSPDI primário, `.mpp` opcional com Java), validado, com hash/dedup, persistido, parseado para o contrato JSON do §10 da spec, registrado em `CronogramaImportacao` (M02) com eventos.

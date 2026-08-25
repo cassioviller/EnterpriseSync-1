@@ -1,5 +1,13 @@
 # Manual do Padrão de Preenchimento do RDO — Implementation Plan
 
+> **Estado em 2026-08-25 (varredura de fecho):** ⏸️ **PARADO POR PESSOA, não por código** — Steps 1–4 abertos (4 de 11 caixas). **Não é trabalho de código:** falta Alan e Abel lerem o capítulo 23a antes de ele virar cobrança. Sem essa rodada o capítulo é opinião do escritório, não acordo. 🔬 1/1 dos arquivos prometidos existem na árvore.
+>
+> Nenhuma linha de código destrava isto. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Escrever a **norma de preenchimento** do RDO — o que conta como um RDO aceitável — para que a cobrança ao encarregado seja sobre um documento e não sobre memória de conversa: "está escrito aqui".

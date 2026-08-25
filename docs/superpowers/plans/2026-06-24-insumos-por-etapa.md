@@ -1,5 +1,13 @@
 # Insumos (linhas de custo) por etapa — Implementation Plan
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — plano da linhagem anterior a 22/07. 🔬 **todos** os arquivos que ele promete existem na árvore — o código foi mesclado antes da fratura. A data do plano não o torna órfão; o teste é a existência do arquivo. 🔬 5/5 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Permitir ver/editar as linhas de custo (insumos) de cada etapa no painel Financeiro, com o custo da etapa derivado da soma das linhas.

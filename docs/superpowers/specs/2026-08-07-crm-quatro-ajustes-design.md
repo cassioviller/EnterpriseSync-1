@@ -1,5 +1,11 @@
 # CRM — quatro ajustes: dropdowns, tag Validado, prazo e exportação
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **REALIZADA** — o plano correspondente foi executado e o código está na árvore.
+>
+> Veredito dado por **existência de código na árvore**, não por checkbox nem por
+> mensagem de commit. Índice completo em `docs/planos-em-aberto-2026-08-25.md`.
+
+
 **Data:** 2026-08-07
 **Origem:** pedido do Cássio em sessão, ao abrir o módulo CRM.
 **Escopo:** quatro itens fechados. O quinto pedido — **Indicadores** (conversão, funil,

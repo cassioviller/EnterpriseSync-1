@@ -1,5 +1,13 @@
 # Plano de Remediação — Saúde do App (pós-iterações e2e)
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO, com resíduo nomeado** — resíduo: `services/tenant_config.py` nunca existiu. 🔬 2/3 dos arquivos prometidos existem na árvore.
+>
+> A entrega aconteceu; sobrou algo pequeno e nomeado abaixo. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 - **Data:** 2026-06-08
 - **Origem:** achados das iterações sobre `test_browser_all_modules.py` (87→115 testes) e da implementação do Bloco 3 (BDI). Ver [[bloco3-bdi-estado]].
 - **Branch:** trabalhar a partir de `main` (já contém Bloco 3 + fix de folha). Cada bloco abaixo em sua própria branch; push/merge/deploy só sob autorização.

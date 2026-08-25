@@ -1,5 +1,13 @@
 # Módulo 05 — Reconciliação e Versionamento — Fecho
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — M01–M10 do cronograma .mpp, entregues. **É por causa deles que a Fase 7 virou obsoleta**. 🔬 3/3 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > Fecha o M05 conforme o plano `2026-07-20-modulo-05-implementacao-reconciliacao.md`
 > (que reconcilia a spec `2026-07-17-modulo-05-reconciliacao-versionamento.md` com o
 > modelo vivo). Em conflito, o plano bite-sized vence; as divergências de execução

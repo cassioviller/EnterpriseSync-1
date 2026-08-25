@@ -1,5 +1,13 @@
 # Plano de execução — Correções da Fase 1 (recebimento e atesto) — 2026-08-12
 
+> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO** — Fases 1–3 do ciclo de compras, entregues com runbook rodado por script. ⚠️ o code review de 25/08 achou defeitos vivos neste módulo — ver `docs/auditoria/achados-code-review-2026-08-25.md` §5. 🔬 6/6 dos arquivos prometidos existem na árvore.
+>
+> Não há trabalho pendente aqui. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 **O que é.** O plano de correção dos 15 defeitos que a revisão em nível `max` confirmou
 no branch `feat/recebimento-atesto`, antes de a fase ser mesclada e de a flag ser ligada
 em tenant real. O spec `docs/superpowers/specs/2026-08-11-recebimento-atesto-design.md`

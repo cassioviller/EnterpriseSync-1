@@ -1,5 +1,13 @@
 # Resgate da Espinha Financeira — trazer o PR #6 para o `main` de hoje
 
+> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — trabalho real pendente** — escrito em 24/08, **não executado** — 🔬 7 de 20 arquivos existem. Porte de 2.542 linhas do PR #6. Uma única task presa a decisão de negócio (verba/lucro do telhado viga I). 🔬 7/20 dos arquivos prometidos existem na árvore.
+>
+> Este é um dos poucos planos que ainda pedem código. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
+> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
+> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
+> arquivo na árvore**, nunca por contagem de caixa.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recomendado) ou superpowers:executing-plans para executar este plano task a task. Os passos usam checkbox (`- [ ]`) para acompanhamento.
 
 **Goal:** Trazer para o `main` o *Resultado por Atividade* — valor agregado menos custo incorrido, por atividade do cronograma, com alarme, EVM, lente de caixa e roll-up de portfólio — junto com o importador de obra por planilha, que hoje vivem apenas na branch `design/espinha-financeira-obra` (PR #6), do outro lado da fratura de linhagem de 22/07.
