@@ -111,12 +111,22 @@ def test_os_tres_espacos_invisiveis_sao_removidos():
     """
     from utils.decimal_br import _LIXO
     espacos = {c for c in _LIXO if len(c) == 1}
-    assert espacos == {' ', '\xa0', ' '}, (
+    assert espacos == {' ', '\xa0', '\u202f'}, (
         f'faltou um espaço invisível: {[hex(ord(c)) for c in espacos]}')
 
 
-@pytest.mark.parametrize('entrada', ['1 500,00', '1 500,00',
-                                     '1 500,00'])
-def test_milhar_com_qualquer_espaco_invisivel_parseia(entrada):
-    """A vírgula decimal já desambigua — o espaço é só ruído de formatação."""
-    assert parse_decimal_br(entrada) == Decimal('1500.00')
+@pytest.mark.parametrize('entrada,rotulo', [
+    ('1 500,00', 'espaco-comum-U+0020'),
+    ('1\xa0500,00', 'nbsp-U+00A0'),
+    ('1\u202f500,00', 'narrow-nbsp-U+202F'),
+], ids=lambda v: v if isinstance(v, str) and v.startswith(('espaco', 'nbsp', 'narrow')) else None)
+def test_milhar_com_qualquer_espaco_invisivel_parseia(entrada, rotulo):
+    """A vírgula decimal já desambigua — o espaço é só ruído de formatação.
+
+    Os três casos são escritos com ESCAPE, nunca com o caractere literal: a
+    primeira versão deste teste tinha os três como U+0020 e não cobria nada,
+    porque os invisíveis não sobreviveram ao caminho até aqui. O `rotulo`
+    existe para que o id do caso diga qual espaço é qual — sem ele, pytest
+    numera `_0/_1/_2` e a colisão fica invisível no relatório.
+    """
+    assert parse_decimal_br(entrada) == Decimal('1500.00'), rotulo
