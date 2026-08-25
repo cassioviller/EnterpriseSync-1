@@ -7,7 +7,7 @@ a correção chegou ao caminho vivo.
 import os
 import sys
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -461,13 +461,70 @@ def test_baixar_pagamento_recusa_valor_negativo():
 
 
 def test_servico_de_baixa_rejeita_negativo_mesmo_sem_passar_pela_view():
-    """A view não pode ser a única guarda: o serviço tem outros chamadores."""
-    import inspect
+    """A view não pode ser a única guarda: o serviço tem outros chamadores.
 
-    import financeiro_service
-    fonte = inspect.getsource(financeiro_service.FinanceiroService
-                              .baixar_pagamento)
-    assert ('minimo' in fonte or 'valor_pago <= 0' in fonte
-            or '<= 0' in fonte), (
-        'baixar_pagamento precisa recusar valor não-positivo no próprio '
-        'serviço, não só na view')
+    Invoca o serviço diretamente com valor negativo, verificando que:
+    - ValorInvalido é levantado
+    - Nada foi escrito (conta e banco permanecem inalterados)
+    """
+    from financeiro_service import FinanceiroService
+    from utils.decimal_br import ValorInvalido
+    from models import BancoEmpresa, ContaPagar
+
+    with app.app_context():
+        admin = _novo_admin('onda1_svco')
+        obra = _nova_obra(admin)
+
+        # Criar banco com saldo conhecido
+        banco = BancoEmpresa(
+            admin_id=admin.id, nome_banco='Banco Teste', agencia='0001',
+            conta='123456', saldo_atual=Decimal('5000.00')
+        )
+        db.session.add(banco)
+        db.session.flush()
+
+        # Criar conta a pagar com estado conhecido
+        conta = ContaPagar(
+            admin_id=admin.id, descricao='Conta Teste Negativo',
+            valor_original=Decimal('1000.00'), valor_pago=Decimal('0'),
+            saldo=Decimal('1000.00'), data_emissao=date.today(),
+            data_vencimento=date.today() + timedelta(days=10),
+            status='PENDENTE'
+        )
+        db.session.add(conta)
+        db.session.commit()
+
+        admin_id = admin.id
+        conta_id = conta.id
+        banco_id = banco.id
+        saldo_original = banco.saldo_atual
+        valor_pago_original = conta.valor_pago
+
+    # Tentar baixa com valor negativo — deve levantar e NÃO escrever
+    with pytest.raises(ValorInvalido):
+        with app.app_context():
+            FinanceiroService.baixar_pagamento(
+                conta_id=conta_id,
+                admin_id=admin_id,
+                valor_pago=Decimal('-100'),
+                data_pagamento=date.today(),
+                forma_pagamento='PIX',
+                banco_id=banco_id
+            )
+
+    # Verificar que nada foi escrito
+    with app.app_context():
+        conta = db.session.get(ContaPagar, conta_id)
+        banco = db.session.get(BancoEmpresa, banco_id)
+        assert conta.valor_pago == valor_pago_original, (
+            'valor_pago foi modificado apesar da exception'
+        )
+        assert conta.saldo == Decimal('1000.00'), (
+            'saldo foi modificado apesar da exception'
+        )
+        assert conta.status == 'PENDENTE', (
+            'status foi modificado apesar da exception'
+        )
+        assert banco.saldo_atual == saldo_original, (
+            'saldo do banco foi modificado apesar da exception'
+        )
