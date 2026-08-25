@@ -14,6 +14,7 @@ from models import (AlmoxarifadoItem, AlmoxarifadoEstoque, AlmoxarifadoMovimento
                     PedidoCompra, PedidoCompraItem, RequisicaoCompra,
                     RequisicaoCompraItem, GestaoCustoPai, GestaoCustoFilho,
                     Usuario)
+from utils.decimal_br import ValorAmbiguo, ValorInvalido, parse_decimal_br
 from utils.tenant import get_tenant_admin_id, is_v2_active
 
 # Fase 3 — governança de compras. Imports no topo de propósito: estes
@@ -1888,13 +1889,19 @@ def _itens_do_form():
         def _num(lista, idx, padrao='0'):
             bruto = (lista[idx] if idx < len(lista) else '') or padrao
             try:
-                return float(str(bruto).replace('.', '').replace(',', '.')
-                             if ',' in str(bruto) else str(bruto))
-            except (TypeError, ValueError):
+                return float(parse_decimal_br(bruto, campo='valor',
+                                              default=Decimal(str(padrao))))
+            except ValorAmbiguo:
+                # `1.500` tanto pode ser mil e quinhentos quanto um e meio, e
+                # aqui isso vale para PREÇO e para QUANTIDADE. Sobe para o
+                # chamador recusar com mensagem: adivinhar erra por 1000x.
+                raise
+            except ValorInvalido:
                 # Entrada não-numérica ('abc', vazio malformado) não pode
-                # virar HTTP 500 — vale 0 e a linha entra com valor zero,
-                # que o usuário vê e corrige, em vez de perder o formulário.
-                return 0.0
+                # virar HTTP 500 — vale o padrão e a linha entra com esse
+                # valor, que o usuário vê e corrige, em vez de perder o
+                # formulário. Decisão deliberada, preservada de antes.
+                return float(padrao)
 
         almox_bruto = almox_ids[i] if i < len(almox_ids) else ''
         itens.append({
@@ -2034,7 +2041,13 @@ def requisicao_nova_post():
                 id=candidato, obra_id=obra_id, admin_id=admin_id).first():
             mapa_id = candidato
 
-    itens = _itens_do_form()
+    try:
+        itens = _itens_do_form()
+    except ValorAmbiguo as erro:
+        # `1.500` em preço OU quantidade não pode virar 1,5 sem que ninguém
+        # perceba: a requisição nem chega a existir com um valor adivinhado.
+        flash(str(erro), 'danger')
+        return redirect(url_for('compras.requisicao_nova'))
     if not itens:
         flash('Adicione pelo menos um item à requisição.', 'danger')
         return redirect(url_for('compras.requisicao_nova'))
@@ -2479,7 +2492,14 @@ def requisicao_itens(requisicao_id):
         return redirect(url_for('compras.requisicao_detalhe',
                                 requisicao_id=requisicao_id))
 
-    itens = _itens_do_form()
+    try:
+        itens = _itens_do_form()
+    except ValorAmbiguo as erro:
+        # Mesma recusa de `requisicao_nova_post`: preço ou quantidade
+        # ambíguos não substituem os itens em silêncio.
+        flash(str(erro), 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
     if not itens:
         # Zerar os itens deixaria uma requisição que a guarda do envio recusa e
         # que não tem como voltar a ter conteúdo pela mesma tela.
@@ -2847,15 +2867,18 @@ def requisicao_emitir_pedido(requisicao_id):
     valor_total = 0.0
     for idx, item in enumerate(itens_requisicao):
         bruto = (precos_reais[idx] if idx < len(precos_reais) else '') or ''
-        bruto = str(bruto).strip()
-        if bruto:
-            try:
-                preco = float(bruto.replace('.', '').replace(',', '.')
-                              if ',' in bruto else bruto)
-            except ValueError:
-                preco = float(item.preco_estimado or 0)
-        else:
-            preco = float(item.preco_estimado or 0)
+        # Campo vazio = vale o estimado da requisição (regra do comprador).
+        # Campo AMBÍGUO não é vazio: recusar é a única saída, porque o valor
+        # errado seria MENOR que o estimado e a guarda 3 o deixaria passar.
+        try:
+            preco_lido = parse_decimal_br(
+                bruto, campo=f'preço real de {item.descricao!r}', default=None)
+        except ValorInvalido as erro:
+            flash(str(erro), 'danger')
+            return redirect(url_for('compras.requisicao_detalhe',
+                                    requisicao_id=requisicao_id))
+        preco = float(preco_lido if preco_lido is not None
+                      else (item.preco_estimado or 0))
         qtd = float(item.quantidade or 0)
         subtotal = round(qtd * preco, 2)
         valor_total += subtotal

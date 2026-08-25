@@ -142,3 +142,114 @@ def test_aditivo_recusa_valor_ambiguo_em_vez_de_adivinhar():
         from models import AditivoContrato
         assert AditivoContrato.query.filter_by(obra_id=obra_id).count() == 0, (
             'entrada ambígua não pode abrir aditivo nenhum')
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — a emissão do pedido
+# ---------------------------------------------------------------------------
+
+def test_preco_real_ambiguo_nao_vira_um_milesimo():
+    """🔴 `compras_views.py:2853`: `'1.500'` virava `1.5`.
+
+    E como 1,5 é MENOR que o estimado, a guarda 3 (`valor_total > aprovado`)
+    deixava passar em silêncio.
+
+    Testado no nível do parser porque a emissão exige requisição aprovada,
+    fornecedor e alçada — cenário que `tests/test_fase3_alcada.py` já monta.
+    O que esta task muda é a leitura, e é ela que se prova aqui.
+    """
+    from utils.decimal_br import ValorAmbiguo, parse_decimal_br
+    with pytest.raises(ValorAmbiguo):
+        parse_decimal_br('1.500', campo='preço real')
+    # e o que NÃO é ambíguo continua entrando
+    assert parse_decimal_br('1500,00', campo='preço real') == Decimal('1500.00')
+    assert parse_decimal_br('1500.00', campo='preço real') == Decimal('1500.00')
+
+
+def _cliente_admin(admin_id):
+    cliente = app.test_client()
+    with cliente.session_transaction() as sessao:
+        sessao['_user_id'] = str(admin_id)
+        sessao['_fresh'] = True
+    return cliente
+
+
+def test_item_preco_ambiguo_na_requisicao_nova_e_recusado():
+    """🔴 `compras_views.py:1891`: o `_num()` do laço de itens tinha o mesmo
+    parser artesanal do achado #6 — e ele lê tanto PREÇO quanto QUANTIDADE.
+
+    `1.500` no preço do item não pode virar `1.5` silenciosamente: a
+    requisição não pode nem chegar a existir com um valor adivinhado.
+    """
+    from models import RequisicaoCompra
+    with app.app_context():
+        admin = _novo_admin('onda1_itpreco')
+        obra = _nova_obra(admin)
+        db.session.commit()
+        admin_id, obra_id = admin.id, obra.id
+
+    resposta = _cliente_admin(admin_id).post(
+        '/compras/requisicoes/nova',
+        data={'obra_id': str(obra_id), 'justificativa': 'teste',
+              'item_descricao[]': ['Item'], 'item_unidade[]': ['un'],
+              'item_quantidade[]': ['10'], 'item_preco[]': ['1.500'],
+              'item_almoxarifado_id[]': ['']},
+        follow_redirects=True)
+    assert resposta.status_code == 200
+    assert 'ambíguo' in resposta.get_data(as_text=True)
+
+    with app.app_context():
+        assert RequisicaoCompra.query.filter_by(admin_id=admin_id).count() == 0, (
+            'entrada ambígua não pode abrir requisição nenhuma')
+
+
+def test_item_quantidade_ambigua_na_requisicao_nova_e_recusada():
+    """A mesma ambiguidade na QUANTIDADE é igualmente perigosa: `1.500`
+    unidades lidas como `1.5` erra por 1000× do outro lado da conta."""
+    from models import RequisicaoCompra
+    with app.app_context():
+        admin = _novo_admin('onda1_itqtd')
+        obra = _nova_obra(admin)
+        db.session.commit()
+        admin_id, obra_id = admin.id, obra.id
+
+    resposta = _cliente_admin(admin_id).post(
+        '/compras/requisicoes/nova',
+        data={'obra_id': str(obra_id), 'justificativa': 'teste',
+              'item_descricao[]': ['Item'], 'item_unidade[]': ['un'],
+              'item_quantidade[]': ['1.500'], 'item_preco[]': ['10,00'],
+              'item_almoxarifado_id[]': ['']},
+        follow_redirects=True)
+    assert resposta.status_code == 200
+    assert 'ambíguo' in resposta.get_data(as_text=True)
+
+    with app.app_context():
+        assert RequisicaoCompra.query.filter_by(admin_id=admin_id).count() == 0, (
+            'entrada ambígua não pode abrir requisição nenhuma')
+
+
+def test_item_nao_numerico_na_requisicao_nova_continua_virando_padrao():
+    """Achado #5 (já corrigido antes desta task) não pode regressar: entrada
+    não-numérica ('abc') não é ambígua — vale o padrão de cada campo (1 para
+    quantidade, 0 para preço) e a linha entra assim mesmo, para o usuário ver
+    e corrigir na tela, em vez de perder o formulário inteiro."""
+    from models import RequisicaoCompra
+    with app.app_context():
+        admin = _novo_admin('onda1_itabc')
+        obra = _nova_obra(admin)
+        db.session.commit()
+        admin_id, obra_id = admin.id, obra.id
+
+    resposta = _cliente_admin(admin_id).post(
+        '/compras/requisicoes/nova',
+        data={'obra_id': str(obra_id), 'justificativa': 'teste',
+              'item_descricao[]': ['Item'], 'item_unidade[]': ['un'],
+              'item_quantidade[]': ['abc'], 'item_preco[]': ['xyz'],
+              'item_almoxarifado_id[]': ['']},
+        follow_redirects=False)
+    assert resposta.status_code == 302
+
+    with app.app_context():
+        assert RequisicaoCompra.query.filter_by(admin_id=admin_id).count() == 1, (
+            'entrada não-numérica não pode impedir a requisição de existir'
+        )
