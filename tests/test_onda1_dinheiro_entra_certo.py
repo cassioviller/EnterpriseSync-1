@@ -528,3 +528,104 @@ def test_servico_de_baixa_rejeita_negativo_mesmo_sem_passar_pela_view():
         assert banco.saldo_atual == saldo_original, (
             'saldo do banco foi modificado apesar da exception'
         )
+
+
+# ---------------------------------------------------------------------------
+# Task 6 — o último parser artesanal
+# ---------------------------------------------------------------------------
+
+def test_parse_br_decimal_do_orcamento_recusa_ambiguo():
+    """Continua aceitando o que aceitava; para de engolir o ambíguo."""
+    from utils.decimal_br import ValorAmbiguo
+    from views.orcamentos_views import _parse_br_decimal
+
+    assert _parse_br_decimal('1.234,56') == Decimal('1234.56')
+    assert _parse_br_decimal('25') == Decimal('25')
+    assert _parse_br_decimal('') == Decimal('0')
+    assert _parse_br_decimal(None) == Decimal('0')
+    assert _parse_br_decimal(Decimal('7.25')) == Decimal('7.25')
+    with pytest.raises(ValorAmbiguo):
+        _parse_br_decimal('1.500')
+
+
+def test_parse_br_number_do_orcamento_recusa_ambiguo():
+    """_parse_br_number é o irmão `float` de _parse_br_decimal, mas com
+
+    dois caminhos de erro (mesmo desenho de `_num()` em `compras_views.py`,
+    Task 3): ambíguo levanta; qualquer outro lixo continua sendo engolido,
+    porque `tests/test_orcamento_formato_br.py` pina esse swallow como
+    comportamento deliberado. Esta pinagem garante que a distinção nunca mais
+    quebre em silêncio.
+    """
+    from utils.decimal_br import ValorAmbiguo
+    from views.orcamentos_views import _parse_br_number
+
+    assert _parse_br_number('1.234,56') == 1234.56
+    assert _parse_br_number('25') == 25.0
+    with pytest.raises(ValorAmbiguo):
+        _parse_br_number('1.500')
+    assert _parse_br_number('lixo') == 0.0
+    assert _parse_br_number('lixo', default=3) == 3.0
+
+
+def test_nenhum_parser_artesanal_de_dinheiro_sobrou():
+    """A onda fecha quando o `replace` à mão sai dos cinco arquivos.
+
+    Se este teste falhar, um parser novo nasceu — leia a Onda 1 antes de
+    escrever o sexto.
+    """
+    import inspect
+
+    import compras_views
+    import financeiro_views
+    import services.faixa_alcada_admin as faixa
+    import views.aditivos_views as aditivos
+    import views.orcamentos_views as orcamentos
+
+    padrao = "replace('.', '').replace(',', '.')"
+    for modulo in (aditivos, compras_views, faixa, financeiro_views,
+                   orcamentos):
+        fonte = inspect.getsource(modulo)
+        assert padrao not in fonte, (
+            f'{modulo.__name__} ainda tem parser artesanal de dinheiro')
+
+
+def test_nenhum_invisivel_literal_nos_arquivos_da_onda():
+    """U+00A0 e U+202F vazaram por copy-paste SEIS vezes nesta onda.
+
+    Invisivel em codigo so como escape ('\\xa0', '\\u202f'), nunca literal —
+    literal nao sobrevive a copy-paste e vira cobertura fantasma.
+    """
+    import inspect
+
+    import compras_views
+    import financeiro_service
+    import financeiro_views
+    import services.faixa_alcada_admin as faixa
+    import utils.decimal_br as decimal_br
+    import views.aditivos_views as aditivos
+    import views.orcamentos_views as orcamentos
+
+    proibidos = ('\xa0', '\u202f')
+
+    modulos = (
+        decimal_br, aditivos, compras_views, faixa, financeiro_views,
+        financeiro_service, orcamentos,
+    )
+    for modulo in modulos:
+        fonte = inspect.getsource(modulo)
+        for caractere in proibidos:
+            assert caractere not in fonte, (
+                f'{modulo.__name__} tem {caractere!r} literal — use escape')
+
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    arquivos_teste = (
+        os.path.join(repo_root, 'tests', 'test_decimal_br.py'),
+        os.path.join(repo_root, 'tests', 'test_onda1_dinheiro_entra_certo.py'),
+    )
+    for caminho in arquivos_teste:
+        with open(caminho, encoding='utf-8') as f:
+            fonte = f.read()
+        for caractere in proibidos:
+            assert caractere not in fonte, (
+                f'{caminho} tem {caractere!r} literal — use escape')

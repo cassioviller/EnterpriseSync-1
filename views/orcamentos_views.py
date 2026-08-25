@@ -25,6 +25,7 @@ from models import (
 from services.orcamento_view_service import (
     snapshot_from_servico, recalcular_item, recalcular_orcamento,
 )
+from utils.decimal_br import ValorAmbiguo, ValorInvalido, parse_decimal_br
 
 logger = logging.getLogger(__name__)
 
@@ -38,45 +39,34 @@ def _admin_id() -> int:
 def _parse_br_number(raw, default=0.0) -> float:
     """Task #165: aceita valores em pt-BR ('1.234,56') ou en-US ('1234.56').
 
-    Regras:
-      - None / '' → default
-      - Números (int/float/Decimal) → float()
-      - Se contém vírgula: assume pt-BR. Remove '.' (milhar) e troca ',' → '.'.
-      - Se só tem ponto: trata como decimal en-US.
-      - Em qualquer falha de parse, devolve default (não levanta).
+    Onda 1 (25/08): delega para `utils.decimal_br.parse_decimal_br`, mas com
+    dois caminhos de erro — o mesmo desenho de `_num()` em `compras_views.py`
+    (Task 3): ambíguo (`ValorAmbiguo`, ex. '1.500') **levanta**, porque errar
+    esse silenciosamente custa 1000x; qualquer outro lixo não numérico
+    (`ValorInvalido`) continua devolvendo o default em silêncio, porque
+    `tests/test_orcamento_formato_br.py` pina esse swallow como comportamento
+    deliberado. A assimetria com `_parse_br_decimal` (que levanta para
+    qualquer entrada inválida) é intencional: nenhuma rede de segurança pina
+    o caso de lixo do Decimal.
     """
-    if raw is None:
-        return float(default)
-    if isinstance(raw, (int, float)):
-        return float(raw)
-    if isinstance(raw, Decimal):
-        return float(raw)
-    s = str(raw).strip()
-    if not s:
-        return float(default)
-    if ',' in s:
-        s = s.replace('.', '').replace(',', '.')
     try:
-        return float(s)
-    except (TypeError, ValueError):
-        return float(default)
+        return float(parse_decimal_br(raw, campo='valor', default=Decimal(str(default))))
+    except ValorAmbiguo:
+        raise  # erro de 1000x: o operador precisa desambiguar
+    except ValorInvalido:
+        return float(default)  # o swallow documentado que a rede fixa
 
 
 def _parse_br_decimal(raw, default='0') -> Decimal:
-    """Task #165: versão Decimal de _parse_br_number, para colunas Numeric."""
-    if raw is None or (isinstance(raw, str) and not raw.strip()):
-        return Decimal(str(default))
-    if isinstance(raw, Decimal):
-        return raw
-    if isinstance(raw, (int, float)):
-        return Decimal(str(raw))
-    s = str(raw).strip()
-    if ',' in s:
-        s = s.replace('.', '').replace(',', '.')
-    try:
-        return Decimal(s)
-    except Exception:
-        return Decimal(str(default))
+    """Task #165: versão Decimal de _parse_br_number, para colunas Numeric.
+
+    Onda 1 (25/08): delega para `utils.decimal_br.parse_decimal_br`. Aceita o
+    mesmo que aceitava; **levanta** para qualquer entrada inválida (não só
+    ambígua), onde antes devolvia o default em silêncio. Ao contrário de
+    `_parse_br_number`, aqui não há assimetria: nenhuma rede de segurança pina
+    o caso de lixo, então o contrato muda por inteiro.
+    """
+    return parse_decimal_br(raw, campo='valor', default=Decimal(str(default)))
 
 
 def _parse_template_override(raw: Optional[str], admin_id: int) -> Optional[int]:

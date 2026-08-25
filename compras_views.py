@@ -1128,7 +1128,7 @@ def _quantidade_do_form(valor):
     if not texto:
         return Decimal('0'), None
 
-    bruto = texto.replace(' ', '').replace(' ', '')
+    bruto = texto.replace(' ', '').replace('\xa0', '')
     tem_virgula = ',' in bruto
     tem_ponto = '.' in bruto
 
