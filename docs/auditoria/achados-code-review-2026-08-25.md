@@ -2,7 +2,16 @@
 
 > **O que é:** o resultado bruto da varredura pedida em 25/08 ("code review no app
 > inteiro"), fatiada por módulo. Cada achado traz `arquivo:linha` e o cenário de
-> falha. **Nenhum foi corrigido** — este documento é insumo, não conserto.
+> falha. Quando foi escrito, **nenhum tinha sido corrigido** — este documento é
+> insumo, não conserto.
+>
+> **Atualização de 2026-08-25 — Onda 1 fechada.** Os cinco achados de parser de
+> dinheiro estão corrigidos e marcados ✅ inline, na branch
+> `sdd/onda-1-parser-de-dinheiro` (13 commits, gate verde: 2726 passed). Os cinco
+> parsers artesanais viraram um só, `utils/decimal_br.parse_decimal_br`, que
+> **recusa** o ambíguo (`'1.500'`) em vez de escolher sozinho entre R$ 1,50 e
+> R$ 1.500,00. Dois testes de varredura guardam a porta: se um sexto parser
+> nascer, ou se um espaço invisível voltar como literal, eles falham.
 >
 > **Como foi feito:** a árvore está limpa e `main` não tinha diff contra si mesmo,
 > então cada passada leu os arquivos-alvo inteiros, não um diff. As afirmações
@@ -31,7 +40,7 @@
 
 ## 1. Fase 6 — os 25 commits que ainda não foram empurrados
 
-🔴 **`views/aditivos_views.py:102` — o parser BR infla o contrato 100×.**
+🔴 ✅ **CORRIGIDO** (Onda 1, Task 2 — commit `169ddd68`). **`views/aditivos_views.py:102` — o parser BR infla o contrato 100×.**
 `valor.replace('.', '').replace(',', '.')` num campo `<input type="text"
 inputmode="decimal">` (`templates/aditivos/form.html:31`). Digitar `150000.00` —
 o que um teclado numérico produz — vira `"15000000"`. O aditivo nasce valendo
@@ -172,7 +181,7 @@ Mais um `NameError` puro em :876 (`custo_per_km` × o parâmetro `custo_por_km`)
 produto cartesiano em :512 que junta `CustoVeiculo` e `UsoVeiculo` pelo mesmo
 `Veiculo` e soma os dois num GROUP BY, inflando `custo_por_km` ~10×.
 
-🟡 `financeiro_views.py:525` — `Decimal(request.form.get('valor_pago'))` sem
+🟡 ✅ **CORRIGIDO** (Onda 1, Task 5 — commits `be90b0b1`, `4e390e00`; a guarda entrou também em `financeiro_service.py`, porque a view não pode ser a única). `financeiro_views.py:525` — `Decimal(request.form.get('valor_pago'))` sem
 validação de sinal nem de ordem de grandeza, e `FinanceiroService.baixar_pagamento`
 (:110, :127) também não. Digitar `-100` **credita** o banco
 (`saldo_atual -= -100`), deixa `saldo = 1100`, mantém PENDENTE e mostra sucesso.
@@ -209,7 +218,7 @@ banco/fornecedor/subempreiteiro gravadas de valores de formulário não validado
 depois do lote fechado e auditado) · `financeiro_service.py:1011` (KPI de vencidos
 conta por `data_criacao`, ignorando `data_vencimento`) · `custos_views.py:250`
 (`order_by('mes').limit(12)` plota os doze meses **mais velhos**) ·
-`financeiro_views.py:36` (`_parse_valor` não trata entrada só com ponto: `1.500`
+`financeiro_views.py:36` ✅ **CORRIGIDO** (Onda 1, Task 5 — commit `be90b0b1`) (`_parse_valor` não trata entrada só com ponto: `1.500`
 vira R$ 1,50) · `services/custo_orcado.py:84` (o fallback "linha vence agregado" no
 nível da obra é tudo-ou-nada enquanto o por serviço é por serviço, então o BAC do
 EVM subestima obra mista) · `custos_escritorio_views.py:220`
@@ -360,13 +369,13 @@ serializada é carimbado com a obra de id 1 — obra arbitrária, possivelmente 
 outro tenant — e a obra real se perde. `relatorios.py:214` (consumo por obra) lê
 exatamente essa coluna.
 
-🟡 **`compras_views.py:2853` — o pedido é gravado a 1/1000 do preço negociado.**
+🟡 ✅ **CORRIGIDO** (Onda 1, Task 3 — commits `f2567fcb`, `995efb5c`, `37397333`; os dois últimos porque `_num()` primeiro perdeu a distinção entre campo vazio e campo com lixo, e depois voltou a aceitar lixo que a limpeza esvazia). **`compras_views.py:2853` — o pedido é gravado a 1/1000 do preço negociado.**
 `float(bruto.replace('.','').replace(',','.') if ',' in bruto else bruto)` para o
 preço unitário real na emissão: `"1.500"` → `1.5`. E porque o valor é **menor** que
 o estimado aprovado, a guarda 3 (`valor_total > aprovado`) deixa passar — GCP,
 ContaPagar e a entrada no almoxarifado herdam o número errado. É o achado nº 6 da
 revisão da Fase 3, ainda vivo no caminho de emissão (`nota()` em :1518 reconhece).
-🟡 `services/faixa_alcada_admin.py:206` — `_para_teto` só tira o ponto de milhar
+🟡 ✅ **CORRIGIDO** (Onda 1, Task 4 — commits `c16f3a90`, `f8f86e0e`). `services/faixa_alcada_admin.py:206` — `_para_teto` só tira o ponto de milhar
 quando há vírgula. `"30.000"` vira `Decimal('30.000')` → R$ 30,00. A escada segue
 monotônica, `_violacoes` não levanta nada, e a primeira faixa do tenant passa a
 cobrir só compras abaixo de R$ 30. Mesma ambiguidade de 1000× que
