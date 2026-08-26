@@ -193,11 +193,32 @@ manutenção. A Task 4.5 assume apagar; diga se prefere o contrário.
 >    idioma da correção já existe: `views/rdo.py` usa `except HTTPException: raise` em
 >    8 lugares, e a Task 3 acrescentou o nono. Faltam 6 handlers.
 >
-> ⚠️ **Item humano em aberto:** `scripts/medir_tenant_fantasma.py` foi rodado em DEV
-> ("nenhuma linha"), mas dev não tem nenhum GESTOR_EQUIPES nem ALMOXARIFE — provou a
-> forma, não a ausência. **A medição que decide é a de produção**, e ela precisa rodar
-> ANTES do deploy: corrigir o resolvedor torna invisível, de uma vez, todo dado que foi
-> carimbado no tenant fantasma.
+> ⚠️ **Item humano em aberto:** `scripts/medir_tenant_fantasma.py` precisa rodar em
+> **PRODUÇÃO, ANTES do deploy** — corrigir o resolvedor torna invisível, de uma vez, todo
+> dado que foi carimbado no tenant fantasma. A `main` já carrega a correção (merge
+> `fed8f19b`), então a janela fecha no próximo deploy do EasyPanel, que é manual.
+>
+> 🔬 **26/08 — o que a medição de DEV realmente diz, e por que ela nunca valeu.** Ao
+> preparar a rodada de produção, o script foi consertado (`d53ec3fc`) e a execução honesta
+> **contradiz o que este documento afirmava**:
+> - Não é verdade que "dev não tem nenhum GESTOR_EQUIPES nem ALMOXARIFE": dev tem **48
+>   usuários de papel afetado** que distinguem os dois resolvedores.
+> - O "nenhuma linha" era artefato do próprio defeito do script: `import app` rodava
+>   `create_all()`, que **criava vazias** as tabelas `reembolso` e `custo_escritorio` —
+>   que **não existem** em dev. Contar zero numa tabela que o próprio script acabou de
+>   criar não é medição.
+> - Com o guard, o veredito de dev é **"medição parcial, 288/384 pares"**, saída 1. Nas 6
+>   tabelas consultáveis, nenhuma linha.
+>
+> 🔴 **Os dois defeitos do script, corrigidos em `d53ec3fc`:** (1) a docstring prometia
+> "SÓ LÊ" mas `from app import app` disparava `create_all()` + as 104 migrations
+> (`app.py:551-721`), incluindo a 217 e a 218 que `docs/plano-deploy-seguro.md` marca como
+> as que **mexem em dados** — apontar isso para produção era escrever em produção com um
+> script de leitura; (2) a invocação documentada morria com `ModuleNotFoundError`, faltava
+> o `sys.path.insert`. **Quem rodar a medição de produção precisa da versão a partir de
+> `d53ec3fc`.**
+>
+> O comando: `DATABASE_URL='<url de producao>' python scripts/medir_tenant_fantasma.py`
 
 
 > 🔴 **A raiz:** 📖 `multitenant_helper.py:25`. `get_admin_id()` só mapeia
