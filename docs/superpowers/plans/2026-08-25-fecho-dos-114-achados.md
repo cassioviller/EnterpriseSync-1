@@ -78,7 +78,28 @@ esperado.** Corrigir exige **mudar um teste verde**, e isso não se faz em silê
 - **(c) Fica como está** e o `saldo_final_projetado` ganha, na tela, o aviso de que
   ignora 24% do valor aberto. Barato e honesto, mas não conserta.
 
-⚠️ **A Task 3.6 está bloqueada até você escolher.** Todo o resto anda sem isso.
+✅ **D2 DECIDIDA em 26/08.** O dono do repositório delegou a escolha e a recomendação
+foi seguida: **saída (a) — a exclusão vira consciente de estado.** O gêmeo sai de
+`saidas_previstas` somente quando a outra perna do par realmente entra; enquanto ela não
+entrar, a obrigação continua projetada.
+
+**Por que (a) e não as outras:** a (c) é honesta mas não conserta — o número continua
+errado, só com um aviso ao lado, e um aviso que aparece toda vez vira ruído que ninguém
+lê. A (b) é a mais correta em teoria, mas mexe no fluxo de caixa inteiro para resolver um
+defeito localizado, e trocaria um erro conhecido e medido por uma superfície de regressão
+grande num módulo de dinheiro. A (a) é a única que faz o número fechar mexendo só onde o
+defeito está.
+
+**O que ela custa se estiver errada:** `saldo_final_projetado` passa a incluir obrigações
+que hoje ele ignora, então o número projetado **piora** para o usuário — que é o ponto,
+mas é uma mudança visível de KPI. Reversível num commit, e coberta pelo teste que a task
+terá de reescrever.
+
+⚠️ **A alteração de `tests/test_b5_fluxo_gemeos_e_orfaos.py:100` fica autorizada** — é um
+teste verde que afirma o defeito como esperado, e esta é a decisão humana registrada que a
+constraint global exige. A task que a implementar deve citar esta decisão no commit.
+
+⚠️ A Task 3.6 sai do bloqueio e vira um plano próprio de uma task, como a Onda 3 já previa.
 
 ### D3 — `views/vehicles.py` é seis rotas mortas ou seis rotas a consertar?
 
