@@ -41,6 +41,8 @@ def main():
 
         print(f'{len(suspeitos)} usuário(s) com papel afetado:\n')
         total_geral = 0
+        falhas_por_tabela = {}
+        tabelas_medidas = set()
         for u in suspeitos:
             print(f'  id={u.id} {u.tipo_usuario.value} admin_id={u.admin_id} '
                   f'({u.email})')
@@ -54,8 +56,11 @@ def main():
                         db.text(f'SELECT count(*) FROM {tabela} '
                                 f'WHERE admin_id = :aid'),
                         {'aid': u.id}).scalar()
+                    tabelas_medidas.add(tabela)
                 except Exception as erro:
                     print(f'    {tabela}: não consultável ({erro})')
+                    if tabela not in falhas_por_tabela:
+                        falhas_por_tabela[tabela] = str(erro)
                     continue
                 if n:
                     total_geral += n
@@ -63,15 +68,36 @@ def main():
                           f'(deveria ser {u.admin_id}) — escrito por {modulo}')
 
         print()
-        if total_geral:
-            print(f'VEREDITO: {total_geral} linha(s) no tenant fantasma.')
-            print('A Task 2 PRECISA de migration de saneamento, e ela é '
-                  'DECISÃO HUMANA: mover o dado para o admin_id certo pode '
-                  'colidir com registro que já existe lá.')
+        tabelas_falhadas = set(TABELAS.keys()) - tabelas_medidas
+        if tabelas_falhadas == set(TABELAS.keys()):
+            print('FALHA: medição incompleta')
+            print(f'{len(tabelas_falhadas)} tabela(s) não puderam ser consultadas:')
+            for tabela in sorted(tabelas_falhadas):
+                print(f'  - {tabela}: {falhas_por_tabela.get(tabela, "erro desconhecido")}')
+            return 1
+        elif tabelas_falhadas:
+            print(f'AVISO: medição parcial ({len(tabelas_medidas)}/{len(TABELAS)} tabelas)')
+            print(f'Tabelas que falharam: {", ".join(sorted(tabelas_falhadas))}')
+            print()
+            if total_geral:
+                print(f'VEREDITO (PARCIAL): {total_geral} linha(s) no tenant fantasma.')
+                print('A Task 2 PRECISA de migration de saneamento, e ela é '
+                      'DECISÃO HUMANA: mover o dado para o admin_id certo pode '
+                      'colidir com registro que já existe lá.')
+            else:
+                print('VEREDITO (PARCIAL): nenhuma linha encontrada nas tabelas consultáveis.')
+                print('A Task 2 entra SEM migration de saneamento.')
+            return 1
         else:
-            print('VEREDITO: nenhuma linha no tenant fantasma.')
-            print('A Task 2 entra SEM migration de saneamento.')
-        return 0
+            if total_geral:
+                print(f'VEREDITO: {total_geral} linha(s) no tenant fantasma.')
+                print('A Task 2 PRECISA de migration de saneamento, e ela é '
+                      'DECISÃO HUMANA: mover o dado para o admin_id certo pode '
+                      'colidir com registro que já existe lá.')
+            else:
+                print('VEREDITO: nenhuma linha no tenant fantasma.')
+                print('A Task 2 entra SEM migration de saneamento.')
+            return 0
 
 
 if __name__ == '__main__':
