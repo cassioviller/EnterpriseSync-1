@@ -260,9 +260,12 @@ class PontoService:
     def _calcular_horas(registro):
         """Calcula horas trabalhadas, extras e atrasos"""
         try:
-            # Buscar configuração de horário da obra
+            # Buscar configuração de horário da obra (escopada ao tenant do
+            # próprio registro — sem isso, a configuração de outro admin_id
+            # para a mesma obra_id numérica podia vazar para cá)
             config = ConfiguracaoHorario.query.filter_by(
                 obra_id=registro.obra_id,
+                admin_id=registro.admin_id,
                 ativo=True
             ).first()
             

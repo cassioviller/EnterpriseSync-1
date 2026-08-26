@@ -18,7 +18,7 @@
 > | Onda | Plano de execução | Tasks | Estado |
 > |---|---|---|---|
 > | 1 — o dinheiro entra errado (5 achados) | `2026-08-25-onda-1-parser-de-dinheiro.md` | 6 | ✅ escrito. 🔬 O código do plano foi **extraído e executado**: 32 passed |
-> | 2 — o tenant vaza (14) | `2026-08-25-onda-2-o-tenant-para-de-vazar.md` | 8 | ✅ escrito |
+> | 2 — o tenant vaza (14) | `2026-08-25-onda-2-o-tenant-para-de-vazar.md` | 8 | ✅ **FECHADA 26/08** — 8/8 tasks, 7 fix rounds, gate verde. 15 achados marcados |
 > | 3 — o valor duplica ou some (16) | `2026-08-25-onda-3-o-valor-para-de-duplicar.md` | 10 | ✅ escrito. A 16ª (`financeiro_service.py:619`) **não está lá** — espera a D2 |
 > | 4 — o relatório que nunca funcionou (11) | `2026-08-25-onda-4-o-relatorio-passa-a-funcionar.md` | 7 | ✅ escrito. Duas tasks bloqueadas por D3/D4 |
 > | 5 — grava o que foi recusado (10) | `2026-08-25-onda-5-o-recusado-para-de-ser-gravado.md` | 8 | ✅ escrito |
@@ -78,7 +78,28 @@ esperado.** Corrigir exige **mudar um teste verde**, e isso não se faz em silê
 - **(c) Fica como está** e o `saldo_final_projetado` ganha, na tela, o aviso de que
   ignora 24% do valor aberto. Barato e honesto, mas não conserta.
 
-⚠️ **A Task 3.6 está bloqueada até você escolher.** Todo o resto anda sem isso.
+✅ **D2 DECIDIDA em 26/08.** O dono do repositório delegou a escolha e a recomendação
+foi seguida: **saída (a) — a exclusão vira consciente de estado.** O gêmeo sai de
+`saidas_previstas` somente quando a outra perna do par realmente entra; enquanto ela não
+entrar, a obrigação continua projetada.
+
+**Por que (a) e não as outras:** a (c) é honesta mas não conserta — o número continua
+errado, só com um aviso ao lado, e um aviso que aparece toda vez vira ruído que ninguém
+lê. A (b) é a mais correta em teoria, mas mexe no fluxo de caixa inteiro para resolver um
+defeito localizado, e trocaria um erro conhecido e medido por uma superfície de regressão
+grande num módulo de dinheiro. A (a) é a única que faz o número fechar mexendo só onde o
+defeito está.
+
+**O que ela custa se estiver errada:** `saldo_final_projetado` passa a incluir obrigações
+que hoje ele ignora, então o número projetado **piora** para o usuário — que é o ponto,
+mas é uma mudança visível de KPI. Reversível num commit, e coberta pelo teste que a task
+terá de reescrever.
+
+⚠️ **A alteração de `tests/test_b5_fluxo_gemeos_e_orfaos.py:100` fica autorizada** — é um
+teste verde que afirma o defeito como esperado, e esta é a decisão humana registrada que a
+constraint global exige. A task que a implementar deve citar esta decisão no commit.
+
+⚠️ A Task 3.6 sai do bloqueio e vira um plano próprio de uma task, como a Onda 3 já previa.
 
 ### D3 — `views/vehicles.py` é seis rotas mortas ou seis rotas a consertar?
 
@@ -147,6 +168,37 @@ manutenção. A Task 4.5 assume apagar; diga se prefere o contrário.
 ---
 
 ## Onda 2 — o tenant vaza (14 achados, 1 raiz + 13 pontos)
+
+> **✅ FECHADA em 26/08.** Branch `sdd/onda-2-o-tenant-para-de-vazar`, 8/8 tasks, 7 fix
+> rounds, gate completo verde. Os 15 achados estão marcados inline em
+> `docs/auditoria/achados-code-review-2026-08-25.md` com o commit que fechou cada um.
+> Ledger completo da execução (21 rulings registradas) em
+> `docs/auditoria/execucao-onda-2-tenant-2026-08-26.md`.
+>
+> 🔴 **Três achados FORA do escopo, medidos, que esta onda NÃO fecha e que a próxima
+> deveria pegar primeiro:**
+> 1. Restam **~11 resolvedores de tenant com lógica própria** (`clientes_views`,
+>    `crm_views`, `equipe_views`, `views/metricas_views`, `subempreiteiros_views`,
+>    `views/almoxarifado/__init__.py` e outros). O padrão é
+>    `admin_id if set else current_user.id` — para usuário sem `admin_id` devolve um
+>    **tenant fantasma** onde o canônico devolve `None` e falha fechado. É o mesmo
+>    defeito que a Task 2 fechou, vivo noutros módulos. 🔬 O de
+>    `views/almoxarifado/__init__.py` é o mais urgente: ele alimenta `fk_do_tenant`.
+> 2. Os 8 módulos que importam `multitenant_helper` somam **225 usos de `admin_id` em
+>    query e ZERO guardas de `None`**.
+> 3. **Padrão sistêmico, confirmado em 5 pontos independentes:** o `try/except Exception`
+>    dos handlers engole a `HTTPException` de `abort()`, então o 400/403 das guardas
+>    nunca chega ao cliente (vira flash+redirect, ou **500** em `ponto_views`). Seguro —
+>    a escrita é bloqueada — mas o contrato documentado é ficção nesses pontos. 📖 O
+>    idioma da correção já existe: `views/rdo.py` usa `except HTTPException: raise` em
+>    8 lugares, e a Task 3 acrescentou o nono. Faltam 6 handlers.
+>
+> ⚠️ **Item humano em aberto:** `scripts/medir_tenant_fantasma.py` foi rodado em DEV
+> ("nenhuma linha"), mas dev não tem nenhum GESTOR_EQUIPES nem ALMOXARIFE — provou a
+> forma, não a ausência. **A medição que decide é a de produção**, e ela precisa rodar
+> ANTES do deploy: corrigir o resolvedor torna invisível, de uma vez, todo dado que foi
+> carimbado no tenant fantasma.
+
 
 > 🔴 **A raiz:** 📖 `multitenant_helper.py:25`. `get_admin_id()` só mapeia
 > `tipo == 'funcionario'` para `current_user.admin_id`; **todo outro papel não-admin

@@ -168,7 +168,7 @@ def salvar_edicao_rdo(rdo_id):
     Salvar alterações no RDO editado
     """
     try:
-        from models import RDO, RDOServicoSubatividade, SubatividadeMestre, TipoUsuario, Funcionario
+        from models import RDO, Obra, RDOServicoSubatividade, SubatividadeMestre, TipoUsuario, Funcionario
         try:
             from utils.auth_utils import get_admin_id_from_user
         except ImportError:
@@ -215,7 +215,10 @@ def salvar_edicao_rdo(rdo_id):
             return redirect(url_for('rdo_editar.editar_rdo_form', rdo_id=rdo_id))
         
         # Atualizar dados básicos do RDO
-        rdo.obra_id = obra_id
+        # O RDO não pode mudar de dono pelo formulário: `obra_id` vinha cru.
+        from utils.fk_do_tenant import fk_do_tenant
+        rdo.obra_id = fk_do_tenant(Obra, obra_id, rdo.admin_id,
+                                   campo='Obra', obrigatorio=True)
         rdo.data_relatorio = data_relatorio
         # Task #12: RDO sempre Finalizado (sem rascunho)
         rdo.status = 'Finalizado'

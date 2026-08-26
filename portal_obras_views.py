@@ -303,7 +303,12 @@ def portal_obra(token: str):
 
     compras_resolvidas = (
         PedidoCompra.query
-        .filter_by(obra_id=obra.id, admin_id=admin_id)
+        .filter_by(obra_id=obra.id, admin_id=admin_id,
+                   # A restrição que o docstring de `_get_compra_do_portal`
+                   # (`:511`) já dizia existir aqui, e que faltava: o portal
+                   # só mostra o que ele próprio ofereceu ao cliente. Sem
+                   # ela, compra interna carimbada APROVADO virava vitrine.
+                   tipo_compra='aprovacao_cliente')
         .filter(PedidoCompra.status_aprovacao_cliente.in_(['APROVADO', 'RECUSADO']))
         .order_by(PedidoCompra.created_at.desc())
         .all()
@@ -642,7 +647,7 @@ def recusar_compra(token: str, compra_id: int):
 @portal_obras_bp.route('/obra/<token>/compra/<int:compra_id>/comprovante', methods=['POST'])
 def upload_comprovante(token: str, compra_id: int):
     obra = _get_obra_by_token(token)
-    compra = PedidoCompra.query.filter_by(id=compra_id, obra_id=obra.id).first_or_404()
+    compra = _get_compra_do_portal(obra, compra_id)
 
     _registrar_acesso(obra, 'compra_comprovante', 'pedido_compra', compra_id)
 
@@ -717,7 +722,7 @@ def ver_comprovante(token: str, compra_id: int):
     """
     from flask import send_file
     obra = _get_obra_by_token(token)
-    compra = PedidoCompra.query.filter_by(id=compra_id, obra_id=obra.id).first_or_404()
+    compra = _get_compra_do_portal(obra, compra_id)
     _registrar_acesso(obra, 'compra_comprovante_ver', 'pedido_compra', compra_id)
     return send_file(_arquivo_comprovante(compra))
 

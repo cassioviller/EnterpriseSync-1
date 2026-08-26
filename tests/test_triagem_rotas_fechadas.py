@@ -121,7 +121,7 @@ def cenario_comprovante(tmp_path, monkeypatch):
         pedido = PedidoCompra(
             fornecedor_id=fornecedor.id, obra_id=obra.id,
             data_compra=date(2026, 7, 1), valor_total=Decimal('100.00'),
-            admin_id=admin.id,
+            admin_id=admin.id, tipo_compra='aprovacao_cliente',
             comprovante_pagamento_url='/persistent-uploads/comprovantes/comp_teste.pdf',
         )
         db.session.add(pedido)

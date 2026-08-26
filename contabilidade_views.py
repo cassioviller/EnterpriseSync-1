@@ -1297,7 +1297,9 @@ def centro_custo_custos(id):
     # Query de partidas vinculadas ao centro de custo
     query = db.session.query(PartidaContabil, LancamentoContabil, PlanoContas)\
         .join(LancamentoContabil, PartidaContabil.lancamento_id == LancamentoContabil.id)\
-        .join(PlanoContas, PartidaContabil.conta_codigo == PlanoContas.codigo)\
+        .join(PlanoContas,
+              db.and_(PartidaContabil.conta_codigo == PlanoContas.codigo,
+                      PartidaContabil.admin_id == PlanoContas.admin_id))\
         .filter(
             PartidaContabil.centro_custo_id == centro.id,
             PartidaContabil.admin_id == admin_id
@@ -1360,22 +1362,32 @@ def sped():
 @admin_required
 def processar_integracao():
     """API para processar integrações automáticas"""
-    from contabilidade_utils import (contabilizar_proposta_aprovada, 
-                                   contabilizar_entrada_material, 
+    from contabilidade_utils import (contabilizar_proposta_aprovada,
+                                   contabilizar_entrada_material,
                                    contabilizar_folha_pagamento)
-    
+    from models import NotaFiscal, Proposta
+
     admin_id = get_admin_id()
     if not admin_id:
         return jsonify({'success': False, 'message': 'Erro de autenticação'}), 401
-    
+
     try:
         data = request.json or {}
         tipo = data.get('tipo')
         origem_id = data.get('origem_id')
-        
+
         if tipo == 'proposta_aprovada':
+            # 🔒 `origem_id` vem do JSON do request e `contabilizar_proposta_aprovada`
+            # carrega por PK pelada, lançando sob o admin_id do documento — sem
+            # esta checagem, qualquer tenant contabiliza a proposta de outro.
+            documento = Proposta.query.filter_by(id=origem_id, admin_id=admin_id).first()
+            if not documento:
+                return jsonify({'success': False, 'message': 'Documento inválido.'}), 400
             contabilizar_proposta_aprovada(origem_id)
         elif tipo == 'entrada_material':
+            documento = NotaFiscal.query.filter_by(id=origem_id, admin_id=admin_id).first()
+            if not documento:
+                return jsonify({'success': False, 'message': 'Documento inválido.'}), 400
             contabilizar_entrada_material(origem_id)
         elif tipo == 'folha_pagamento':
             mes_ref = datetime.strptime(data.get('mes_referencia'), '%Y-%m-%d').date()

@@ -27,6 +27,7 @@ from models import Obra, Funcionario, RegistroPonto, ConfiguracaoHorario, Funcio
 from ponto_service import PontoService
 from multitenant_helper import get_admin_id as get_tenant_admin_id
 from decorators import admin_required
+from utils.fk_do_tenant import fk_do_tenant
 from utils_facial import (
     comparar_faces_deepface, 
     validar_qualidade_foto,
@@ -770,10 +771,18 @@ def api_bater_ponto():
         obra_id = data.get('obra_id')
         latitude = data.get('latitude')
         longitude = data.get('longitude')
-        
+
         if not all([funcionario_id, tipo_ponto, obra_id]):
             return jsonify({'success': False, 'error': 'Dados obrigatórios não informados'}), 400
-        
+
+        # O serviço criava o RegistroPonto (e devolvia o NOME do funcionário
+        # na resposta) para qualquer funcionário/obra, de qualquer tenant.
+        admin_id = get_tenant_admin_id()
+        funcionario_id = fk_do_tenant(Funcionario, funcionario_id, admin_id,
+                                      campo='funcionário', obrigatorio=True)
+        obra_id = fk_do_tenant(Obra, obra_id, admin_id,
+                               campo='obra', obrigatorio=True)
+
         resultado = PontoService.bater_ponto_obra(
             funcionario_id=funcionario_id,
             tipo_ponto=tipo_ponto,
@@ -997,11 +1006,17 @@ def api_registrar_falta():
         funcionario_id = data.get('funcionario_id')
         data_falta_str = data.get('data')
         data_falta = datetime.strptime(data_falta_str, '%Y-%m-%d').date()
-        
+
         # ✅ FIX: Aceitar 'motivo' OU 'tipo_registro' para compatibilidade
         motivo = data.get('motivo') or data.get('tipo_registro', 'falta')  # 'falta' ou 'falta_justificada'
         observacoes = data.get('observacoes')
-        
+
+        # Mesmo achado de `api_bater_ponto`: sem isto, o serviço registra a
+        # falta de um funcionário de outro tenant.
+        funcionario_id = fk_do_tenant(Funcionario, funcionario_id,
+                                      get_tenant_admin_id(),
+                                      campo='funcionário', obrigatorio=True)
+
         logger.info(f"📝 Registrando falta: funcionario={funcionario_id}, data={data_falta}, tipo={motivo}")
         
         resultado = PontoService.registrar_falta(
@@ -1131,8 +1146,12 @@ def api_salvar_configuracao():
     try:
         data = request.get_json()
         admin_id = get_tenant_admin_id()
-        
-        obra_id = data.get('obra_id')
+
+        # `obra_id` vinha cru do JSON: sem validar contra o tenant, dava para
+        # criar/atualizar configuração de horário apontando para a obra de
+        # outro admin_id.
+        obra_id = fk_do_tenant(Obra, data.get('obra_id'), admin_id,
+                               campo='obra', obrigatorio=True)
         entrada_padrao = datetime.strptime(data.get('entrada_padrao'), '%H:%M').time()
         saida_padrao = datetime.strptime(data.get('saida_padrao'), '%H:%M').time()
         almoco_inicio = datetime.strptime(data.get('almoco_inicio'), '%H:%M').time()
