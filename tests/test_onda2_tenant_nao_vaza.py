@@ -260,3 +260,39 @@ def test_rdo_nao_muda_de_obra_sem_checagem_de_tenant():
     fonte = inspect.getsource(rdo_editar_sistema)
     assert 'rdo.obra_id = obra_id' not in fonte, (
         'obra_id do formulário ainda entra sem validação de tenant')
+
+
+# ---------------------------------------------------------------------------
+# Task 7 — consultas sem admin_id
+# ---------------------------------------------------------------------------
+
+def test_dedup_de_nf_e_por_tenant_nao_global():
+    """🔴 `almoxarifado_utils.py:257` — `filter_by(xml_hash=...)` sem admin_id.
+
+    Se outro tenant já importou aquele XML, este ouve "já foi importada" e
+    NUNCA consegue importar. É o mesmo defeito que `entrada_ja_lancada`
+    (`views/almoxarifado/movimentos.py:16`) documenta e evita uma camada
+    abaixo.
+    """
+    import inspect
+
+    import almoxarifado_utils
+    fonte = inspect.getsource(almoxarifado_utils)
+    assert 'NotaFiscal.query.filter_by(xml_hash=xml_hash)' not in fonte, (
+        'dedup de NF ainda é global entre tenants')
+
+
+def test_join_do_plano_de_contas_leva_admin_id():
+    """🔴 `contabilidade_views.py:1300` — join só por `codigo`.
+
+    A PK de `PlanoContas` é composta `(admin_id, codigo)` (`models.py:3266`).
+    Cada tenant que possui aquele código soma uma linha duplicada: uma partida
+    de R$ 840 em ~300 tenants semeados vira R$ 252.000, com `conta.nome` de um
+    plano alheio.
+    """
+    import inspect
+
+    import contabilidade_views
+    fonte = inspect.getsource(contabilidade_views)
+    assert 'PartidaContabil.conta_codigo == PlanoContas.codigo)' not in fonte, (
+        'o join de PlanoContas ainda ignora admin_id')

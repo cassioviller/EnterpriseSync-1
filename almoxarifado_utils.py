@@ -253,8 +253,10 @@ def processar_xml_nfe(xml_content, admin_id):
         # Validar XML
         xml_hash = hashlib.sha256(xml_content.encode()).hexdigest()
         
-        # Verificar se já existe
-        nf_existente = NotaFiscal.query.filter_by(xml_hash=xml_hash).first()
+        # Verificar se já existe (dedup é por tenant — o mesmo XML pode ter
+        # sido importado por outro admin_id sem que isso bloqueie este)
+        nf_existente = NotaFiscal.query.filter_by(
+            xml_hash=xml_hash, admin_id=admin_id).first()
         if nf_existente:
             return {'erro': 'Nota fiscal já foi importada anteriormente'}
         

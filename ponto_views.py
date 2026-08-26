@@ -1146,8 +1146,12 @@ def api_salvar_configuracao():
     try:
         data = request.get_json()
         admin_id = get_tenant_admin_id()
-        
-        obra_id = data.get('obra_id')
+
+        # `obra_id` vinha cru do JSON: sem validar contra o tenant, dava para
+        # criar/atualizar configuração de horário apontando para a obra de
+        # outro admin_id.
+        obra_id = fk_do_tenant(Obra, data.get('obra_id'), admin_id,
+                               campo='obra', obrigatorio=True)
         entrada_padrao = datetime.strptime(data.get('entrada_padrao'), '%H:%M').time()
         saida_padrao = datetime.strptime(data.get('saida_padrao'), '%H:%M').time()
         almoco_inicio = datetime.strptime(data.get('almoco_inicio'), '%H:%M').time()
