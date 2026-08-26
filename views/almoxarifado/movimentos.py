@@ -8,6 +8,7 @@ from sqlalchemy import func
 from event_manager import EventManager
 import logging
 
+from services.estoque_saldo import criar_lote
 from views.almoxarifado import almoxarifado_bp, get_admin_id
 
 logger = logging.getLogger(__name__)
@@ -1063,13 +1064,12 @@ def processar_devolucao():
                 flash('Item não permite devolução', 'danger')
                 return redirect(url_for('almoxarifado.devolucao'))
 
-            estoque = AlmoxarifadoEstoque(
-                item_id=item_id,
-                quantidade=quantidade,
-                status='DISPONIVEL',
-                admin_id=admin_id
-            )
-            db.session.add(estoque)
+            # `criar_lote` mantém `quantidade_inicial` e
+            # `quantidade_disponivel` junto com `quantidade`. Sem as três, o
+            # material devolvido é invisível para a guarda de saída
+            # (`func.sum(quantidade_disponivel)`, `:597`) e nunca mais pode ser
+            # emitido.
+            estoque = criar_lote(item_id, quantidade, admin_id)
             db.session.flush()
 
             movimento = AlmoxarifadoMovimento(
@@ -1327,13 +1327,8 @@ def processar_devolucao_multipla():
             else:  # CONSUMIVEL
                 quantidade = item_validado['quantidade']
 
-                estoque = AlmoxarifadoEstoque(
-                    item_id=item.id,
-                    quantidade=quantidade,
-                    status='DISPONIVEL',
-                    admin_id=admin_id
-                )
-                db.session.add(estoque)
+                # Ver `processar_devolucao`: a omissão era idêntica aqui.
+                estoque = criar_lote(item.id, quantidade, admin_id)
                 db.session.flush()
 
                 movimento = AlmoxarifadoMovimento(

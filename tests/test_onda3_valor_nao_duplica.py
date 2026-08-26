@@ -302,3 +302,77 @@ def test_lote_legado_com_disponivel_nulo_ainda_pode_sair():
         assert _disponivel_de(item.id) == Decimal('60'), (
             'o lote legado devia curar-se para 100 e baixar para 60, e ficou '
             f'{_disponivel_de(item.id)}')
+
+
+# ---------------------------------------------------------------------------
+# Task 2 — o material devolvido volta a existir
+# ---------------------------------------------------------------------------
+
+def test_devolucao_de_consumivel_volta_a_ser_emitivel():
+    """🔴 `movimentos.py:1066` criava o lote de retorno só com `quantidade`.
+
+    O devolvido ficava invisível para `sum(quantidade_disponivel)` — a guarda
+    de saída (`:597`) via 0 e o material nunca mais podia ser emitido.
+    """
+    with app.app_context():
+        t = um_tenant('onda3_dev', com_fatos=False)
+        item = _item_consumivel(t.admin_id)
+        db.session.commit()
+        item_id, admin_id, funcionario_id = item.id, t.admin_id, t.funcionario_id
+
+    resposta = cliente_de(admin_id).post('/almoxarifado/processar-devolucao', data={
+        'funcionario_id': str(funcionario_id),
+        'tipo_controle': 'CONSUMIVEL',
+        'item_id': str(item_id),
+        'quantidade': '7',
+        'condicao_devolucao': 'BOM',
+    }, follow_redirects=True)
+    assert resposta.status_code == 200
+
+    with app.app_context():
+        assert _disponivel_de(item_id) == Decimal('7'), (
+            f'devolveu 7 e o disponível ficou {_disponivel_de(item_id)} — '
+            'material devolvido some da guarda de saída')
+
+
+def test_devolucao_multipla_de_consumivel_volta_a_ser_emitivel():
+    """🔴 `movimentos.py:1330` tem a omissão idêntica."""
+    import json
+
+    with app.app_context():
+        t = um_tenant('onda3_dev_mult', com_fatos=False)
+        item = _item_consumivel(t.admin_id)
+        db.session.commit()
+        item_id, admin_id, funcionario_id = item.id, t.admin_id, t.funcionario_id
+
+    resposta = cliente_de(admin_id).post(
+        '/almoxarifado/processar-devolucao-multipla',
+        data=json.dumps({
+            # ⚠️ `funcionario_id` e `condicao_item` vão DENTRO de cada item
+            # (`movimentos.py:1202`), não na raiz do payload.
+            'itens': [{'item_id': item_id, 'quantidade': 5,
+                       'tipo_controle': 'CONSUMIVEL',
+                       'funcionario_id': funcionario_id,
+                       'condicao_item': 'Bom'}],
+        }),
+        content_type='application/json')
+    assert resposta.status_code in (200, 302), resposta.data[:300]
+
+    with app.app_context():
+        assert _disponivel_de(item_id) == Decimal('5'), (
+            f'devolveu 5 e o disponível ficou {_disponivel_de(item_id)}')
+
+
+def test_movimentos_nao_cria_lote_sem_quantidade_disponivel():
+    """A guarda da Task 1, estendida ao segundo módulo que cria lote."""
+    import inspect
+
+    import views.almoxarifado.movimentos as mov
+
+    fonte = inspect.getsource(mov)
+    for bloco in fonte.split('AlmoxarifadoEstoque(')[1:]:
+        corpo = bloco.split(')')[0]
+        if 'quantidade=' in corpo:
+            assert 'quantidade_disponivel' in corpo, (
+                'movimentos: lote criado sem quantidade_disponivel'
+                f' → {corpo[:200]}')
