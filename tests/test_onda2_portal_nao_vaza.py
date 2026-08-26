@@ -42,7 +42,7 @@ def _obra_com_token(admin_id):
     obra = Obra.query.filter_by(admin_id=admin_id).first()
     obra.token_cliente = uuid.uuid4().hex
     obra.token_cliente_expira_em = date.today() + timedelta(days=30)
-    obra.portal_cliente_ativo = True
+    obra.portal_ativo = True
     db.session.flush()
     return obra
 

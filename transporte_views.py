@@ -160,7 +160,8 @@ def novo_post():
     try:
         categoria_id = fk_do_tenant(CategoriaTransporte,
                                     request.form.get('categoria_id'),
-                                    admin_id, campo='Categoria')
+                                    admin_id, campo='Categoria',
+                                    obrigatorio=True)
         centro_custo_id = fk_do_tenant(CentroCusto,
                                        request.form.get('centro_custo_id'),
                                        admin_id, campo='Centro de custo')
@@ -382,7 +383,8 @@ def novo_massa_post():
     try:
         categoria_id = fk_do_tenant(CategoriaTransporte,
                                     request.form.get('categoria_id'),
-                                    admin_id, campo='Categoria')
+                                    admin_id, campo='Categoria',
+                                    obrigatorio=True)
         data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
         data_fim = datetime.strptime(request.form.get('data_fim'), '%Y-%m-%d').date()
         valor = float(request.form.get('valor', '0').replace(',', '.'))

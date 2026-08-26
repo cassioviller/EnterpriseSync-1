@@ -254,15 +254,23 @@ def nova_obra():
             #      de quem ainda não tem o cliente cadastrado, mas grava sempre
             #      um Cliente real (FK respeitada).
             from services.cliente_resolver import obter_ou_criar_cliente
-            cliente_obj = obter_ou_criar_cliente(
-                admin_id=admin_id,
-                nome=cliente_busca_form or None,
-                email=cliente_email_form or None,
-                telefone=cliente_telefone_form or None,
-                cliente_id=cliente_id_form,
-            )
-            # Se cliente_id veio mas é de outro tenant, o resolver retorna None
-            # nesse path — então caímos no fallback por nome/email se houver.
+            try:
+                cliente_obj = obter_ou_criar_cliente(
+                    admin_id=admin_id,
+                    nome=cliente_busca_form or None,
+                    email=cliente_email_form or None,
+                    telefone=cliente_telefone_form or None,
+                    cliente_id=cliente_id_form,
+                )
+            except ValueError:
+                # Onda 2 / Task 8: cliente_id de outro tenant agora LEVANTA em
+                # vez de devolver None. Aqui isso não é erro fatal — é o caso
+                # que o fallback por nome/e-mail sempre atendeu (o Cliente foi
+                # apagado, ou o hidden do form ficou obsoleto). Quem precisa
+                # que levante é `event_manager`, onde o cliente_id é FK de
+                # sistema e cair no casamento difuso criava Cliente duplicado
+                # sem log.
+                cliente_obj = None
             if not cliente_obj and (cliente_busca_form or cliente_email_form):
                 cliente_obj = obter_ou_criar_cliente(
                     admin_id=admin_id,
@@ -957,13 +965,23 @@ def editar_obra(id):
             cliente_email_form = (request.form.get('cliente_email') or '').strip()
             cliente_telefone_form = (request.form.get('cliente_telefone') or '').strip()
             from services.cliente_resolver import obter_ou_criar_cliente
-            cliente_obj = obter_ou_criar_cliente(
-                admin_id=obra.admin_id,
-                nome=cliente_busca_form or None,
-                email=cliente_email_form or None,
-                telefone=cliente_telefone_form or None,
-                cliente_id=cliente_id_form,
-            )
+            try:
+                cliente_obj = obter_ou_criar_cliente(
+                    admin_id=obra.admin_id,
+                    nome=cliente_busca_form or None,
+                    email=cliente_email_form or None,
+                    telefone=cliente_telefone_form or None,
+                    cliente_id=cliente_id_form,
+                )
+            except ValueError:
+                # Onda 2 / Task 8: cliente_id de outro tenant agora LEVANTA em
+                # vez de devolver None. Aqui isso não é erro fatal — é o caso
+                # que o fallback por nome/e-mail sempre atendeu (o Cliente foi
+                # apagado, ou o hidden do form ficou obsoleto). Quem precisa
+                # que levante é `event_manager`, onde o cliente_id é FK de
+                # sistema e cair no casamento difuso criava Cliente duplicado
+                # sem log.
+                cliente_obj = None
             if not cliente_obj and (cliente_busca_form or cliente_email_form):
                 cliente_obj = obter_ou_criar_cliente(
                     admin_id=obra.admin_id,
