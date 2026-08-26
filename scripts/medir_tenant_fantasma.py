@@ -73,7 +73,7 @@ def main():
 
         print()
         pares_nao_medidos = pares_esperados - pares_medidos
-        if pares_nao_medidos == pares_esperados:
+        if pares_esperados and pares_nao_medidos == pares_esperados:
             print('FALHA: medição incompleta')
             print(f'{len(pares_nao_medidos)} par(es) usuário-tabela não puderam ser consultados:')
             for uid, tabela in sorted(pares_nao_medidos):
@@ -81,6 +81,10 @@ def main():
                 err = pares_falhados.get(chave, 'erro desconhecido')
                 print(f'  - usuário {uid}, {tabela}: {err}')
             return 1
+        elif not pares_esperados:
+            print('Nenhum usuário de papel afetado distingue os dois resolvedores.')
+            print('VEREDITO: a Task 2 entra SEM migration de saneamento.')
+            return 0
         elif pares_nao_medidos:
             usuarios_falhados = sorted(set(uid for uid, _ in pares_nao_medidos))
             tabelas_falhadas = sorted(set(tab for _, tab in pares_nao_medidos))
