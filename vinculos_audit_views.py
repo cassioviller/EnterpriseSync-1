@@ -36,8 +36,17 @@ vinculos_audit_bp = Blueprint(
 
 
 def _admin_id() -> int:
-    from utils.tenant import get_tenant_admin_id
-    return get_tenant_admin_id()
+    """O tenant do usuário, ou 403.
+
+    Devolvia `get_tenant_admin_id()` direto, e `Usuario.admin_id` é nullable
+    (`models.py:122`): funcionário sem admin_id fazia todo filtro do módulo
+    degradar para `admin_id IS NULL`. A página FALHAVA ABERTA sobre linhas
+    órfãs, e `marcar_subatividade_revisada` (`:116`) mutava
+    `SubatividadeMestre` de tenant NULL. O docstring do módulo promete
+    "filtra TUDO por admin_id do usuário corrente".
+    """
+    from utils.tenant import require_tenant
+    return require_tenant()
 
 
 @vinculos_audit_bp.route('/auditoria')
