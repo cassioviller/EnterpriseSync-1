@@ -3484,9 +3484,15 @@ def rdo_salvar_unificado():
             flash(f'RDO {rdo.numero_rdo} atualizado com sucesso!', 'success')
         else:
             flash(f'RDO {rdo.numero_rdo} criado com sucesso!', 'success')
-            
+
         return redirect(url_for('main.visualizar_rdo', id=rdo.id))
-        
+
+    except HTTPException:
+        # Task 3: abort(403) quando tenant não resolve (admin_id=None). Sem isto,
+        # HTTPException seria capturada pelo bloco abaixo e convertida em flash +
+        # redirect, mascarando o erro de segurança.
+        raise
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"ERRO RDO SALVAR UNIFICADO: {str(e)}")

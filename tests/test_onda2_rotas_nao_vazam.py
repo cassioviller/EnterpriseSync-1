@@ -145,11 +145,9 @@ def test_usuario_orfao_sem_tenant_nao_consegue_salvar_rdo_e_recebe_403():
         follow_redirects=False
     )
 
-    # Verificar que recebeu redireção (o try/except da rota captura abort(403) e redireciona)
-    # A rota tem try/except que captura HTTPException e redireciona para novo_rdo (302)
-    # Isso é um sinal de que o abort(403) foi chamado
-    assert resposta.status_code == 302, (
-        f'Usuário órfão deveria ser redirecionado (302), recebeu {resposta.status_code}')
+    # Verificar que recebeu 403 (o guard `if admin_id_correto is None: abort(403)` agora sai)
+    assert resposta.status_code == 403, (
+        f'Usuário órfão deveria receber 403, recebeu {resposta.status_code}')
 
     # Verificar que nenhum RDO foi gravado (dentro de um novo context)
     with app.app_context():
