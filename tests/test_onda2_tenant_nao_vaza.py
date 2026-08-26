@@ -361,3 +361,103 @@ def test_join_do_plano_de_contas_leva_admin_id():
     fonte = inspect.getsource(contabilidade_views)
     assert 'PartidaContabil.conta_codigo == PlanoContas.codigo)' not in fonte, (
         'o join de PlanoContas ainda ignora admin_id')
+
+
+def test_processar_integracao_recusa_documento_de_outro_tenant():
+    """🔴 `contabilidade_views.py:1377` (`processar_integracao`) — `origem_id`
+    vem do JSON do request e `contabilizar_proposta_aprovada`/
+    `contabilizar_entrada_material` carregam por PK pelada, lançando sob o
+    `admin_id` do documento, não o do usuário.
+
+    Cobre os dois ramos (`proposta_aprovada` e `entrada_material`) com um
+    documento pertencente a OUTRO tenant. A afirmação forte é sobre a função
+    de contabilização NUNCA ter sido chamada — via mock/spy — porque uma
+    asserção sobre a escrita em si é hoje pouco confiável: o achado de
+    `contabilidade_utils.py:221` (Onda 4, atributos inexistentes) já barra a
+    escrita por outro motivo, e um teste que olhasse só para a ausência de
+    lançamento passaria pela razão errada mesmo sem esta guarda.
+    """
+    from datetime import date
+    from unittest.mock import patch
+
+    from models import Fornecedor, NotaFiscal, Proposta
+
+    with app.app_context():
+        a, b = dois_tenants('onda2_integr', com_fatos=False)
+        admin_a, admin_b = a.admin_id, b.admin_id
+
+        proposta_b = Proposta(numero=f'P-{uuid.uuid4().hex[:8]}',
+                              cliente_nome='Cliente alheio',
+                              admin_id=admin_b, status='aprovada')
+        db.session.add(proposta_b)
+
+        fornecedor_b = Fornecedor(nome='Fornecedor alheio',
+                                  cnpj=f'{uuid.uuid4().int % 10**14:014d}',
+                                  admin_id=admin_b)
+        db.session.add(fornecedor_b)
+        db.session.flush()
+
+        nf_b = NotaFiscal(numero='999', serie='1',
+                          chave_acesso=uuid.uuid4().hex[:44].ljust(44, '0'),
+                          fornecedor_id=fornecedor_b.id,
+                          data_emissao=date(2026, 1, 1),
+                          valor_produtos=100, valor_total=100,
+                          admin_id=admin_b)
+        db.session.add(nf_b)
+        db.session.commit()
+        proposta_id, nf_id = proposta_b.id, nf_b.id
+
+    with patch('contabilidade_utils.contabilizar_proposta_aprovada') as espia:
+        resposta = cliente_de(admin_a).post(
+            '/contabilidade/api/processar-integracao',
+            json={'tipo': 'proposta_aprovada', 'origem_id': proposta_id})
+        assert resposta.status_code == 400
+        assert 'Documento inválido' in resposta.get_json()['message']
+        assert not espia.called, (
+            'contabilizar_proposta_aprovada foi chamada para documento de outro tenant')
+
+    with patch('contabilidade_utils.contabilizar_entrada_material') as espia:
+        resposta = cliente_de(admin_a).post(
+            '/contabilidade/api/processar-integracao',
+            json={'tipo': 'entrada_material', 'origem_id': nf_id})
+        assert resposta.status_code == 400
+        assert 'Documento inválido' in resposta.get_json()['message']
+        assert not espia.called, (
+            'contabilizar_entrada_material foi chamada para documento de outro tenant')
+
+
+def test_salvar_configuracao_de_horario_recusa_obra_de_outro_tenant():
+    """🔴 `ponto_service.py:264` / `ponto_views.py` (`api_salvar_configuracao`)
+    — `obra_id` vinha cru do JSON. `Obra.id` é PK global auto-increment: sem
+    validação, qualquer admin autenticado apontava a escrita de configuração
+    de horário para a obra de outro tenant. Diferente do 3b (que só vira
+    explorável quando a Onda 4 destravar a escrita), este é um buraco ATIVO
+    hoje.
+
+    Nota de status: o `abort(400)` de `fk_do_tenant` é engolido pelo
+    `except Exception` largo de `api_salvar_configuracao` e vira 500 — achado
+    sistêmico separado (mesmo padrão do `api_bater_ponto`, acima), registrado
+    para o fecho da onda, não para consertar aqui. O que esta task garante é
+    que nada é gravado para a obra alheia, qualquer que seja o código HTTP.
+    """
+    from models import ConfiguracaoHorario
+
+    with app.app_context():
+        a, b = dois_tenants('onda2_cfghor', com_fatos=False)
+        admin_a, obra_b_id = a.admin_id, b.obra_id
+
+    resposta = cliente_de(admin_a).post('/ponto/api/salvar-configuracao', json={
+        'obra_id': obra_b_id,
+        'entrada_padrao': '08:00',
+        'saida_padrao': '17:00',
+        'almoco_inicio': '12:00',
+        'almoco_fim': '13:00',
+    })
+
+    assert resposta.status_code in (400, 403, 500), (
+        f'status inesperado: {resposta.status_code}')
+
+    with app.app_context():
+        vazou = ConfiguracaoHorario.query.filter_by(obra_id=obra_b_id).count()
+        assert vazou == 0, (
+            'ConfiguracaoHorario criada/alterada para obra de outro tenant')
