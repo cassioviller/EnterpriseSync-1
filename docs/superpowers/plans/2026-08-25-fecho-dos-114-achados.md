@@ -173,7 +173,7 @@ manutenção. A Task 4.5 assume apagar; diga se prefere o contrário.
 > rounds, gate completo verde. Os 15 achados estão marcados inline em
 > `docs/auditoria/achados-code-review-2026-08-25.md` com o commit que fechou cada um.
 > Ledger completo da execução (21 rulings registradas) em
-> `.superpowers/sdd/2026-08-25-onda-2-o-tenant-para-de-vazar/progress.md`.
+> `docs/auditoria/execucao-onda-2-tenant-2026-08-26.md`.
 >
 > 🔴 **Três achados FORA do escopo, medidos, que esta onda NÃO fecha e que a próxima
 > deveria pegar primeiro:**
