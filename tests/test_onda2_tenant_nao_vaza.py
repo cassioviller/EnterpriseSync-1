@@ -201,3 +201,62 @@ def test_lancamento_de_transporte_nao_prende_custo_na_obra_alheia():
     with app.app_context():
         vazou = LancamentoTransporte.query.filter_by(obra_id=obra_b).count()
         assert vazou == 0, 'lançamento gravado na obra de outro tenant'
+
+
+# ---------------------------------------------------------------------------
+# Task 6 — setattr cego e mudança de dono por formulário
+# ---------------------------------------------------------------------------
+
+def test_veiculo_nao_tem_mais_setattr_cego():
+    """🔴 `veiculos_services.py:167` — `hasattr` diz sim para `admin_id`."""
+    import inspect
+
+    import veiculos_services
+    fonte = inspect.getsource(veiculos_services)
+    assert 'if hasattr(veiculo, campo):' not in fonte, (
+        'ainda há setattr cego: hasattr responde sim para admin_id')
+
+
+def test_lista_branca_de_veiculo_nao_deixa_passar_dono_nem_id():
+    from veiculos_services import CAMPOS_EDITAVEIS_VEICULO
+    assert 'admin_id' not in CAMPOS_EDITAVEIS_VEICULO
+    assert 'id' not in CAMPOS_EDITAVEIS_VEICULO
+
+
+def test_post_com_admin_id_alheio_nao_transfere_o_veiculo():
+    """O achado inteiro em uma asserção: o dicionário do formulário levava
+    `admin_id=<outro tenant>` e o `setattr` cego transferia o veículo — e, por
+    cascade, todo o histórico dele.
+    """
+    from models import Veiculo
+    from veiculos_services import VeiculoService
+
+    with app.app_context():
+        a, b = dois_tenants('onda2_veic', com_fatos=False)
+        veiculo = Veiculo(placa=f'AAA{uuid.uuid4().hex[:4].upper()}',
+                          marca='Marca', modelo='Modelo', ano=2020,
+                          admin_id=a.admin_id)
+        db.session.add(veiculo)
+        db.session.commit()
+        vid, dono_antes, admin_b = veiculo.id, veiculo.admin_id, b.admin_id
+
+    with app.app_context():
+        # o dicionário chega como `request.form.to_dict()` chegaria
+        _ok, _v, _msg = VeiculoService.atualizar_veiculo(
+            vid, {'modelo': 'Modelo Novo', 'admin_id': str(admin_b)},
+            admin_id=dono_antes)
+        depois = Veiculo.query.get(vid)
+        assert depois.admin_id == dono_antes, (
+            'o veículo mudou de tenant por um campo do formulário')
+        assert depois.modelo == 'Modelo Novo', (
+            'a lista branca bloqueou um campo que era editável de verdade')
+
+
+def test_rdo_nao_muda_de_obra_sem_checagem_de_tenant():
+    """🔴 `rdo_editar_sistema.py:218` — `rdo.obra_id = obra_id` cru."""
+    import inspect
+
+    import rdo_editar_sistema
+    fonte = inspect.getsource(rdo_editar_sistema)
+    assert 'rdo.obra_id = obra_id' not in fonte, (
+        'obra_id do formulário ainda entra sem validação de tenant')

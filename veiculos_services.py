@@ -13,6 +13,25 @@ from decimal import Decimal
 import logging
 logger = logging.getLogger(__name__)
 
+# Lista BRANCA, nunca negra: o laço antigo era
+# `for campo, valor in dados.items(): if hasattr(veiculo, campo)`, e
+# `hasattr` diz sim para `admin_id`. Um POST com admin_id=99 transferia o
+# veículo e, por cascade, todo o histórico dele para outro tenant.
+#
+# Conferida contra `class Veiculo` (models.py:5147) e contra os `name=` de
+# `templates/veiculos_editar.html`, único caller de `atualizar_veiculo` com
+# dict de formulário. `combustivel`, `data_ultima_manutencao` e
+# `data_proxima_manutencao` são campos reais do formulário que o brief
+# original deixava de fora — ficariam sem salvar. `status` e `observacoes`
+# ficam de fora de propósito: não são coluna de `Veiculo` (o template referencia
+# `veiculo.status`, mas o modelo não tem essa coluna); com `hasattr` também
+# nunca eram persistidos, então excluí-los preserva o comportamento de hoje.
+CAMPOS_EDITAVEIS_VEICULO = frozenset({
+    'placa', 'marca', 'modelo', 'ano', 'tipo', 'cor', 'combustivel',
+    'chassi', 'renavam', 'km_atual', 'km_proxima_manutencao',
+    'data_ultima_manutencao', 'data_proxima_manutencao',
+})
+
 
 class VeiculoService:
     """Serviço principal para gestão de veículos"""
@@ -163,17 +182,20 @@ class VeiculoService:
                 ).first():
                     return False, None, f"Placa {dados['placa']} já está cadastrada"
             
-            # Atualizar campos
+            # Atualizar campos — lista BRANCA: só o que está em
+            # CAMPOS_EDITAVEIS_VEICULO pode ser escrito. `admin_id` e `id`
+            # nunca entram aqui.
             for campo, valor in dados.items():
-                if hasattr(veiculo, campo):
-                    if campo == 'placa' and valor:
-                        setattr(veiculo, campo, valor.upper().strip())
-                    elif campo in ['marca', 'modelo'] and valor:
-                        setattr(veiculo, campo, valor.strip())
-                    elif campo in ['ano', 'km_atual', 'km_proxima_manutencao'] and valor:
-                        setattr(veiculo, campo, int(valor))
-                    else:
-                        setattr(veiculo, campo, valor)
+                if campo not in CAMPOS_EDITAVEIS_VEICULO:
+                    continue
+                if campo == 'placa' and valor:
+                    setattr(veiculo, campo, valor.upper().strip())
+                elif campo in ('marca', 'modelo') and valor:
+                    setattr(veiculo, campo, valor.strip())
+                elif campo in ('ano', 'km_atual', 'km_proxima_manutencao') and valor:
+                    setattr(veiculo, campo, int(valor))
+                else:
+                    setattr(veiculo, campo, valor)
             
             veiculo.updated_at = datetime.utcnow()
             db.session.commit()
