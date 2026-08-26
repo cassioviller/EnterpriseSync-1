@@ -20,6 +20,38 @@
 >
 > **Marcas:** 🔴 alto · 🟡 médio · ⚪ baixo
 
+
+> **26/08 — a Onda 2 fechou os 15 achados de isolamento de tenant.** Marcados inline
+> com o commit que fechou cada um. A raiz era uma só: `utils.tenant.get_tenant_admin_id`
+> é o resolvedor correto, e `multitenant_helper.get_admin_id` era uma cópia que divergia
+> nos papéis GESTOR_EQUIPES e ALMOXARIFE — mandando-os para um tenant que não existe —
+> importada por oito módulos, dois deles sob o nome do resolvedor certo.
+>
+> Gate ao fim da onda: **2752 passed** (régua era 2726). Uma falha apareceu e não era
+> ruído: `test_portal_serve_comprovante_com_token_valido` **afirmava o vazamento como
+> comportamento esperado** — a fixture criava compra interna (`tipo_compra` default
+> `'normal'`) e exigia que o portal servisse o comprovante dela a um anônimo com token.
+> Corrigida a fixture por decisão do dono do repositório (commit `97a63ea9`), não em
+> silêncio.
+>
+> ⚠️ **Dois achados FORA do escopo desta onda, medidos e em aberto:**
+> 1. Restam ~11 resolvedores de tenant com lógica própria (`clientes_views`, `crm_views`,
+>    `equipe_views`, `views/metricas_views`, `subempreiteiros_views` e outros). O padrão
+>    deles é `admin_id if set else current_user.id` — que para usuário sem `admin_id`
+>    devolve **um tenant fantasma** onde o canônico devolve `None` e falha fechado. É o
+>    mesmo defeito que a Task 2 fechou, vivo noutros módulos. Medido no banco de dev:
+>    263 usuários não-admin com `admin_id` NULL (dev é ~99% resíduo de suíte, então isso
+>    mede a forma, não o volume de produção).
+> 2. Os 8 módulos que importam `multitenant_helper` somam **225 usos de `admin_id` em
+>    query e ZERO guardas de `None`**. Com tenant não resolvido viram `admin_id IS NULL`.
+> 3. Padrão sistêmico confirmado em **cinco** pontos independentes: o `try/except Exception`
+>    dos handlers engole a `HTTPException` de `abort()`, então o 400/403 das guardas novas
+>    nunca chega ao cliente (vira flash+redirect, ou **500** em `ponto_views`). Seguro — a
+>    escrita é bloqueada e a mensagem continua genérica — mas o contrato documentado é
+>    ficção nesses pontos. `views/rdo.py` já usa `except HTTPException: raise` em 8 lugares;
+>    o idioma existe e não foi aplicado nos demais.
+
+
 ## Placar
 
 | Módulo | 🔴 | 🟡 | ⚪ | Passada |
@@ -118,7 +150,7 @@ CREDORA é positivo e cai na coluna de débito. Um lançamento D Caixa 1.000 /
 C Receita 1.000 dá `total_saldo_devedor = 2.000`, `total_saldo_credor = 0`. Mesmo
 defeito em `contabilidade_views.py:619`.
 
-🔴 **`contabilidade_views.py:1300` — o join vaza entre tenants.**
+🔴 **`contabilidade_views.py:1300` ✅ **CORRIGIDO** (Onda 2, Task 7 — commit `22343233`) — o join vaza entre tenants.**
 `.join(PlanoContas, PartidaContabil.conta_codigo == PlanoContas.codigo)` omite
 `admin_id`, mas a PK de `PlanoContas` é composta `(admin_id, codigo)`
 (`models.py:3266`). Cada tenant que possui aquele código soma uma linha
@@ -150,7 +182,7 @@ filho de 600. A primeira edição chama `_recalcular_total_pai`, que reescreve
 `valor_total` para 600 — o passivo some R$ 400 sem trilha. `sincronizar_obra_do_pai`
 também nunca é chamado aqui, então `gcp.obra_id` fica NULL.
 
-🔴 **`gestao_custos_views.py:234` — a correção de tenant não foi aplicada nos irmãos.**
+🔴 **`gestao_custos_views.py:234` ✅ **CORRIGIDO** (Onda 2, Task 5 — commit `42f48247`) — a correção de tenant não foi aplicada nos irmãos.**
 `obra_id = request.form.get('obra_id', type=int)` vai direto para
 `destino_de_filho_novo`, que devolve verbatim. O commit `6af4fe93` adicionou
 exatamente essa checagem em `editar_filho` (:550, com comentário explicando o
@@ -195,7 +227,7 @@ porque `pagar_conta` só olha `situacao_liberacao` (`financeiro_views.py:506`).
 'ABERTO' mas não reverte a `situacao_liberacao` que `fechar_lote` pôs em
 'liberada'. Fecha, reabre, tira a conta do lote: ela fica pagável para sempre sem
 lote nenhum a autorizando.
-🟡 `contabilidade_views.py:1377` — `origem_id` vem do JSON do request e
+🟡 `contabilidade_views.py:1377` ✅ **CORRIGIDO** (Onda 2, Task 7 — commits `22343233`+`8708982e`) — `origem_id` vem do JSON do request e
 `contabilizar_*` carrega por PK pelada, lançando sob o `admin_id` **do documento**.
 Tenant A cria centro de custo e lançamento no razão do tenant B. Só o achado 5
 impede a escrita de aterrissar hoje.
@@ -241,9 +273,9 @@ não é atributo de `RDO`; todo POST em `/rdo/<id>/atualizar` levanta
 🔴 **`views/rdo.py:3070` — `obra_id` não vinculada** no ramo de edição de
 `rdo_salvar_unificado`; o `NameError` escapa do `except (ValueError, IndexError)`
 local e aborta a edição inteira.
-🔴 **`rdo_editar_sistema.py:218` — RDO muda de tenant.** `rdo.obra_id` é atribuído
+🔴 **`rdo_editar_sistema.py:218` ✅ **CORRIGIDO** (Onda 2, Task 6 — commit `af913fce`) — RDO muda de tenant.** `rdo.obra_id` é atribuído
 do formulário sem checagem de tenant nem de existência.
-🔴 **`views/rdo.py:2838` — `get_admin_id_robusta` resolve o tenant** por
+🔴 **`views/rdo.py:2838` ✅ **CORRIGIDO** (Onda 2, Task 3 — commits `77e4ab00`+`2d94cae3`) — `get_admin_id_robusta` resolve o tenant** por
 `Funcionario.query.filter_by(email=...)` sem escopo e **cai num `return 10`
 hardcoded**.
 
@@ -400,7 +432,7 @@ validação e o processamento) emitem menos que o pedido, e a resposta ainda é
 `almoxarifado/itens_detalhes.html:246` testam `'MANUTENCAO'`, então item devolvido
 avariado não mostra selo nenhum nas duas telas — enquanto `dashboard.py:93` e
 `relatorios.py:296` casam `EM_MANUTENCAO`. **O vocabulário está partido no meio.**
-🟡 `almoxarifado_utils.py:257` — `NotaFiscal.query.filter_by(xml_hash=xml_hash)` sem
+🟡 `almoxarifado_utils.py:257` ✅ **CORRIGIDO** (Onda 2, Task 7 — commit `22343233`) — `NotaFiscal.query.filter_by(xml_hash=xml_hash)` sem
 `admin_id`. Se outro tenant já importou aquele XML, este tenant ouve "Nota fiscal já
 foi importada anteriormente" e nunca consegue importar. É o mesmo defeito que
 `entrada_ja_lancada` (`movimentos.py:16`) documenta e evita de propósito uma camada
@@ -454,7 +486,7 @@ equivalente.
 
 ## 7. Portal do cliente, auth e multitenant — 2 🔴
 
-🔴 **`multitenant_helper.py:25` — o tenant fantasma.**
+🔴 **`multitenant_helper ✅ **CORRIGIDO** (Onda 2, Task 2 — commit `44bea17f`).py:25` — o tenant fantasma.**
 `get_admin_id()` só mapeia `tipo == 'funcionario'` para `current_user.admin_id`;
 **todo outro papel não-admin cai no `return current_user.id`**.
 `TipoUsuario.GESTOR_EQUIPES` e `ALMOXARIFE` são papéis vivos (`crm_views.py:83`,
@@ -466,7 +498,7 @@ fantasma, fica invisível para o admin 7, e as leituras voltam vazias.
 `utils/tenant.get_tenant_admin_id` e `auth.get_tenant_filter` tratam esses papéis
 corretamente no ramo `else` — **esta é a única cópia que divergiu.**
 
-🔴 **`portal_obras_views.py:304` — compra interna ainda vaza no portal do cliente.**
+🔴 **`portal_obras_views.py:304` ✅ **CORRIGIDO** (Onda 2, Task 4 — commit `63857dfb`) — compra interna ainda vaza no portal do cliente.**
 `compras_resolvidas` continua sem o filtro `tipo_compra == 'aprovacao_cliente'`.
 É exatamente o vazamento que o docstring de `_get_compra_do_portal` (:511) descreve
 como **corrigido**: *"Uma compra `tipo_compra='normal'` carimbada como APROVADO
@@ -494,14 +526,14 @@ cria `MedicaoObra` cujo `valor_medido` é percentual de `obra.valor_contrato`. R
 administrativas comparáveis usam `admin_required`, e
 `templates/obras/detalhes_obra_profissional.html:1477,1657` renderizam os dois
 botões sem condição.
-🟡 `vinculos_audit_views.py:38` — `_admin_id()` devolve `get_tenant_admin_id()`
+🟡 `vinculos_audit_views.py:38` ✅ **CORRIGIDO** (Onda 2, Task 8 — commit `1a880748`) — `_admin_id()` devolve `get_tenant_admin_id()`
 direto, e `Usuario.admin_id` é nullable (`models.py:122`). Para funcionário sem
 `admin_id` devolve `None` e todo filtro degrada para `admin_id IS NULL` — a página
 **falha aberta** sobre linhas órfãs em vez de 403, e
 `marcar_subatividade_revisada` (:116) muta `SubatividadeMestre` de tenant NULL. O
 docstring promete "filtra TUDO por admin_id"; `utils.tenant.require_tenant()` é o
 helper fail-closed que existe para isso.
-🟡 `services/cliente_resolver.py:61` — com `cliente_id` explícito que não pertence
+🟡 `services/cliente_resolver.py:61` ✅ **CORRIGIDO** (Onda 2, Task 8 — commit `1a880748`) — com `cliente_id` explícito que não pertence
 ao `admin_id`, a busca devolve vazio em silêncio e a execução **cai** para casamento
 difuso por nome/e-mail e depois cria um `Cliente` novo, sem log. O chamador
 (`event_manager.py:1244`) acredita que a regra 1 "vence sempre": uma FK velha produz
@@ -520,7 +552,7 @@ checar que o resultado fica sob `static/`. Latente hoje
 absoluto ou com `../` naquela coluna de 500 chars transforma rota anônima em
 leitor de arquivo arbitrário — o mesmo defeito que fez remover
 `/persistent-uploads` (`app.py:176`).
-⚪ **Armadilha para o próximo:** `auth.py:47` `get_tenant_filter()` e `auth.py:58`
+⚪ **Armadilha para o próximo:** `auth.py:47 ✅ **CORRIGIDO** (Onda 2, Task 8 — commit `1a880748`)` `get_tenant_filter()` e `auth.py:58`
 `can_access_data()` têm **zero** consumidores no repo — a mesma condição que
 justificou apagar `almoxarife_required` e irmãos na Fase 1, comentado no pé do
 próprio arquivo. `get_tenant_filter` devolve `None` tanto para "super admin vê
@@ -546,7 +578,7 @@ internamente únicos).
 `/equipe/alocacao-principal` renderizam `traceback.format_exc()` no HTML em caso de
 erro, expondo caminhos, frames e **SQL com parâmetros vinculados** a qualquer
 usuário autenticado.
-🔴 **`ponto_views.py:777` — ponto batido no funcionário de outro tenant.**
+🔴 **`ponto_views.py:777` ✅ **CORRIGIDO** (Onda 2, Task 6 — commits `af913fce`+`4b55a2d3`) — ponto batido no funcionário de outro tenant.**
 `api_bater_ponto` repassa `funcionario_id`/`obra_id` do corpo do request sem
 checagem; o serviço cria `RegistroPonto` para o funcionário alheio **e devolve o
 nome dele**. `api_registrar_falta` tem o mesmo furo.
@@ -577,7 +609,7 @@ os outros.
 🟡 `ponto_views.py:2625` — `recarregar_cache_facial()` só relê o pickle, nunca o
 regenera: foto facial apagada/desativada **continua autenticando** e foto nova nunca
 passa a valer.
-🟡 `ponto_service.py:264` — `ConfiguracaoHorario` é lida sem `admin_id`, e
+🟡 `ponto_service.py:264` ✅ **CORRIGIDO** (Onda 2, Task 7 — commits `22343233`+`8708982e`) — `ConfiguracaoHorario` é lida sem `admin_id`, e
 `api_salvar_configuracao` aceita qualquer `obra_id`: um tenant planta regras de
 horário que alteram a matemática de atraso/hora extra de outro.
 
@@ -606,12 +638,12 @@ reembolsos do mesmo funcionário**. É a armadilha que
 🔴 **`reembolso_views.py:293` — editar faz os irmãos evaporarem.** Sobrescreve
 `pai.valor_total` com o valor de um único reembolso (o pai é compartilhado) e nunca
 atualiza o `GestaoCustoFilho`: pai e filhos divergem.
-🔴 **`veiculos_services.py:167` — o veículo muda de tenant por POST.** `setattr`
+🔴 **`veiculos_services.py:16 ✅ **CORRIGIDO** (Onda 2, Task 6 — commit `af913fce`)7` — o veículo muda de tenant por POST.** `setattr`
 cego sobre `request.form.to_dict()`: um POST com `admin_id=99` em
 `/veiculos/<id>/editar` transfere o veículo **e o histórico em cascata** para outro
 tenant.
 
-🟡 `transporte_views.py:204` — `obra_id`, `categoria_id`, `funcionario_id`,
+🟡 `transporte_views.py:204` ✅ **CORRIGIDO** (Onda 2, Task 5 — commit `42f48247`) — `obra_id`, `categoria_id`, `funcionario_id`,
 `veiculo_id` e `centro_custo_id` entram sem checagem de tenant (só `osc_id` é
 validado): POST forjado prende o lançamento e o `CustoObra` à obra de outro tenant.
 🟡 `transporte_views.py:442` — o lote grava o custo sem `origem_id`, e
