@@ -62,6 +62,13 @@ def obter_ou_criar_cliente(
         cli = Cliente.query.filter_by(id=cliente_id, admin_id=admin_id).first()
         if cli:
             return cli
+        # A regra 1 "vence sempre": o chamador (`event_manager.py:1244`)
+        # passa `proposta.cliente_id` acreditando nisso. Cair para o
+        # casamento difuso aqui criava um Cliente DUPLICADO, sem log, com
+        # a obra presa a ele — o que `propostas_consolidated.py:595`
+        # documenta querer evitar.
+        raise ValueError(
+            f'cliente_id={cliente_id} não pertence ao tenant {admin_id}')
 
     nome_n = _norm(nome)
     email_n = _norm(email)

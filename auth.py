@@ -44,28 +44,13 @@ def funcionario_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def get_tenant_filter():
-    """Retorna filtro para isolar dados do tenant atual"""
-    if current_user.is_authenticated:
-        if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-            return None  # Super admin vê tudo
-        elif current_user.tipo_usuario == TipoUsuario.ADMIN:
-            return current_user.id  # Admin vê seus dados
-        else:  # FUNCIONARIO
-            return current_user.admin_id  # Funcionário vê dados do seu admin
-    return None
-
-def can_access_data(admin_id):
-    """Verifica se o usuário atual pode acessar dados de um determinado admin"""
-    if not current_user.is_authenticated:
-        return False
-    
-    if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-        return True
-    elif current_user.tipo_usuario == TipoUsuario.ADMIN:
-        return current_user.id == admin_id
-    else:  # FUNCIONARIO
-        return current_user.admin_id == admin_id
+# Onda 2 (25/08) — `get_tenant_filter` e `can_access_data` foram removidos.
+# Tinham ZERO consumidores (censo de 25/08), a mesma condição que justificou
+# remover `almoxarife_required` e irmãos na Fase 1. E eram armadilha:
+# `get_tenant_filter` devolvia None tanto para "super admin vê tudo" quanto
+# para "não autenticado", então o idiomático
+# `if f: query.filter_by(admin_id=f)` serviria as linhas de TODO tenant a um
+# chamador anônimo. Quem precisa de tenant usa `utils.tenant.require_tenant`.
 
 # Fase 1 — `almoxarife_required`, `pode_gerenciar_almoxarifado` e
 # `pode_lancar_materiais` foram removidos. Tinham ZERO consumidores no
