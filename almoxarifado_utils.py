@@ -10,6 +10,11 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import logging
 
+# O ponto único que mantém `quantidade`, `quantidade_inicial` e
+# `quantidade_disponivel` coerentes. Nenhum caminho deste módulo escreve nessas
+# colunas direto — ver o docstring de `services/estoque_saldo.py`.
+from services.estoque_saldo import creditar, criar_lote, debitar, disponivel_de
+
 logger = logging.getLogger(__name__)
 
 # ===== FUNÇÕES DE CÓDIGO DE BARRAS =====
@@ -601,16 +606,14 @@ def apply_movimento_manual(movimento):
                 if estoque_existente:
                     return {'sucesso': False, 'mensagem': f'Número de série {movimento.numero_serie} já cadastrado'}
                 
-                novo_estoque = AlmoxarifadoEstoque(
-                    item_id=item.id,
+                # O caminho de entrada por nota sempre criou o serializado com
+                # as três colunas (`movimentos.py:400-406`). Este nascia só com
+                # `quantidade=1`, invisível para a guarda de saída.
+                novo_estoque = criar_lote(
+                    item.id, 1, movimento.admin_id,
                     numero_serie=movimento.numero_serie,
-                    quantidade=1,
-                    status='DISPONIVEL',
                     valor_unitario=movimento.valor_unitario,
-                    lote=movimento.lote,
-                    admin_id=movimento.admin_id
-                )
-                db.session.add(novo_estoque)
+                    lote=movimento.lote)
                 
             elif movimento.tipo_movimento == 'SAIDA':
                 # Buscar item DISPONIVEL (não EM_USO)
@@ -660,18 +663,17 @@ def apply_movimento_manual(movimento):
                     
                     if estoque:
                         # Incrementa no mesmo lote/valor
-                        estoque.quantidade += movimento.quantidade
+                        creditar(estoque, movimento.quantidade)
                     else:
                         # Cria novo registro para novo lote/valor
-                        novo_estoque = AlmoxarifadoEstoque(
-                            item_id=item.id,
-                            quantidade=movimento.quantidade,
-                            status='DISPONIVEL',
+                        # `criar_lote` mantém as três colunas coerentes. Nascia
+                        # só com `quantidade`, e a guarda de saída
+                        # (`func.sum(quantidade_disponivel)`, `movimentos.py:597`)
+                        # via NULL como 0: recusava material que existia.
+                        novo_estoque = criar_lote(
+                            item.id, movimento.quantidade, movimento.admin_id,
                             valor_unitario=movimento.valor_unitario,
-                            lote=movimento.lote,
-                            admin_id=movimento.admin_id
-                        )
-                        db.session.add(novo_estoque)
+                            lote=movimento.lote)
                 else:
                     # Sem lote/valor: usa primeiro disponível
                     estoque = AlmoxarifadoEstoque.query.filter_by(
@@ -681,17 +683,16 @@ def apply_movimento_manual(movimento):
                     ).first()
                     
                     if estoque:
-                        estoque.quantidade += movimento.quantidade
+                        creditar(estoque, movimento.quantidade)
                     else:
-                        novo_estoque = AlmoxarifadoEstoque(
-                            item_id=item.id,
-                            quantidade=movimento.quantidade,
-                            status='DISPONIVEL',
+                        # `criar_lote` mantém as três colunas coerentes. Nascia
+                        # só com `quantidade`, e a guarda de saída
+                        # (`func.sum(quantidade_disponivel)`, `movimentos.py:597`)
+                        # via NULL como 0: recusava material que existia.
+                        novo_estoque = criar_lote(
+                            item.id, movimento.quantidade, movimento.admin_id,
                             valor_unitario=movimento.valor_unitario,
-                            lote=movimento.lote,
-                            admin_id=movimento.admin_id
-                        )
-                        db.session.add(novo_estoque)
+                            lote=movimento.lote)
                     
             elif movimento.tipo_movimento == 'SAIDA':
                 # VALIDAR estoque total ANTES de aplicar
@@ -727,18 +728,20 @@ def apply_movimento_manual(movimento):
                     ).order_by(AlmoxarifadoEstoque.created_at.asc()).all()
                 
                 # Consumir de múltiplos lotes se necessário
+                # `debitar` baixa `quantidade` E `quantidade_disponivel`
+                # juntas. Baixava só a primeira, e a guarda da PRÓXIMA saída
+                # soma `quantidade_disponivel` (`movimentos.py:597`): as mesmas
+                # unidades saíam de novo.
                 for estoque in estoques:
                     if quantidade_restante <= 0:
                         break
-                    
-                    if estoque.quantidade >= quantidade_restante:
-                        # Este lote tem suficiente
-                        estoque.quantidade -= quantidade_restante
-                        quantidade_restante = 0
-                    else:
-                        # Consumir tudo deste lote e continuar
-                        quantidade_restante -= estoque.quantidade
-                        estoque.quantidade = 0
+
+                    disponivel = disponivel_de(estoque)
+                    consumir = min(disponivel, quantidade_restante)
+                    if consumir <= 0:
+                        continue
+                    debitar(estoque, consumir)
+                    quantidade_restante -= consumir
                 
                 if quantidade_restante > 0:
                     return {
@@ -757,17 +760,16 @@ def apply_movimento_manual(movimento):
                     ).first()
                     
                     if estoque:
-                        estoque.quantidade += movimento.quantidade
+                        creditar(estoque, movimento.quantidade)
                     else:
-                        novo_estoque = AlmoxarifadoEstoque(
-                            item_id=item.id,
-                            quantidade=movimento.quantidade,
-                            status='DISPONIVEL',
+                        # `criar_lote` mantém as três colunas coerentes. Nascia
+                        # só com `quantidade`, e a guarda de saída
+                        # (`func.sum(quantidade_disponivel)`, `movimentos.py:597`)
+                        # via NULL como 0: recusava material que existia.
+                        novo_estoque = criar_lote(
+                            item.id, movimento.quantidade, movimento.admin_id,
                             valor_unitario=movimento.valor_unitario,
-                            lote=movimento.lote,
-                            admin_id=movimento.admin_id
-                        )
-                        db.session.add(novo_estoque)
+                            lote=movimento.lote)
                 else:
                     # Sem lote: usar primeiro disponível ou criar
                     estoque = AlmoxarifadoEstoque.query.filter_by(
@@ -777,16 +779,11 @@ def apply_movimento_manual(movimento):
                     ).first()
                     
                     if estoque:
-                        estoque.quantidade += movimento.quantidade
+                        creditar(estoque, movimento.quantidade)
                     else:
-                        novo_estoque = AlmoxarifadoEstoque(
-                            item_id=item.id,
-                            quantidade=movimento.quantidade,
-                            status='DISPONIVEL',
-                            valor_unitario=movimento.valor_unitario,
-                            admin_id=movimento.admin_id
-                        )
-                        db.session.add(novo_estoque)
+                        novo_estoque = criar_lote(
+                            item.id, movimento.quantidade, movimento.admin_id,
+                            valor_unitario=movimento.valor_unitario)
         
         db.session.flush()
         return {'sucesso': True, 'mensagem': 'Estoque atualizado com sucesso'}
@@ -903,8 +900,12 @@ def rollback_movimento_manual(movimento):
                     ).first()
                 
                 if estoque:
-                    if estoque.quantidade >= movimento.quantidade:
-                        estoque.quantidade -= movimento.quantidade
+                    # `debitar` desfaz nas DUAS colunas. Desfazia só
+                    # `quantidade`, e `quantidade_disponivel` ficava com a
+                    # entrada que acabou de ser revertida — a volta recriava o
+                    # defeito que a ida corrige.
+                    if disponivel_de(estoque) >= movimento.quantidade:
+                        debitar(estoque, movimento.quantidade)
                         # Remover registro se quantidade zerar
                         if estoque.quantidade == 0:
                             db.session.delete(estoque)
@@ -927,18 +928,17 @@ def rollback_movimento_manual(movimento):
                     ).first()
                     
                     if estoque:
-                        estoque.quantidade += movimento.quantidade
+                        creditar(estoque, movimento.quantidade)
                     else:
                         # Criar novo registro com o lote original
-                        novo_estoque = AlmoxarifadoEstoque(
-                            item_id=item.id,
-                            quantidade=movimento.quantidade,
-                            status='DISPONIVEL',
+                        # `criar_lote` mantém as três colunas coerentes. Nascia
+                        # só com `quantidade`, e a guarda de saída
+                        # (`func.sum(quantidade_disponivel)`, `movimentos.py:597`)
+                        # via NULL como 0: recusava material que existia.
+                        novo_estoque = criar_lote(
+                            item.id, movimento.quantidade, movimento.admin_id,
                             valor_unitario=movimento.valor_unitario,
-                            lote=movimento.lote,
-                            admin_id=movimento.admin_id
-                        )
-                        db.session.add(novo_estoque)
+                            lote=movimento.lote)
                 else:
                     # Sem lote: adicionar em registro existente ou criar novo
                     estoque = AlmoxarifadoEstoque.query.filter_by(
@@ -948,16 +948,11 @@ def rollback_movimento_manual(movimento):
                     ).first()
                     
                     if estoque:
-                        estoque.quantidade += movimento.quantidade
+                        creditar(estoque, movimento.quantidade)
                     else:
-                        novo_estoque = AlmoxarifadoEstoque(
-                            item_id=item.id,
-                            quantidade=movimento.quantidade,
-                            status='DISPONIVEL',
-                            valor_unitario=movimento.valor_unitario,
-                            admin_id=movimento.admin_id
-                        )
-                        db.session.add(novo_estoque)
+                        novo_estoque = criar_lote(
+                            item.id, movimento.quantidade, movimento.admin_id,
+                            valor_unitario=movimento.valor_unitario)
                     
             elif movimento.tipo_movimento == 'DEVOLUCAO':
                 # Rollback DEVOLUCAO: Subtrair quantidade (reverter adição)
@@ -976,8 +971,8 @@ def rollback_movimento_manual(movimento):
                     ).first()
                 
                 if estoque:
-                    if estoque.quantidade >= movimento.quantidade:
-                        estoque.quantidade -= movimento.quantidade
+                    if disponivel_de(estoque) >= movimento.quantidade:
+                        debitar(estoque, movimento.quantidade)
                         # Remover se zerar
                         if estoque.quantidade == 0:
                             db.session.delete(estoque)
