@@ -175,8 +175,38 @@ SELECT pid, state, wait_event_type, left(query,80)
   commit** ele buildou (a tela de build mostra o hash) — produção já rodou
   35 commits atrás do repositório sem ninguém notar.
 
+### 8. 🔴 A medição do tenant fantasma tem de rodar ANTES deste deploy — é irreversível
+
+A Onda 2 (merge `fed8f19b`, na `main` desde 26/08) conserta
+`multitenant_helper.get_admin_id()`, que devolvia `current_user.id` em vez de
+`current_user.admin_id` para **GESTOR_EQUIPES e ALMOXARIFE**. Todo registro que
+esses dois papéis escreveram pelos 8 módulos que importam o helper foi carimbado
+num `admin_id` que não é de nenhum ADMIN — o "tenant fantasma".
+
+⚠️ **Por que é agora ou nunca:** depois que a correção subir, a consulta passa a
+procurar no `admin_id` certo e **a linha errada simplesmente não aparece mais**.
+Ela não some do banco; some da vista. Não existe medição pós-deploy.
+
+```
+DATABASE_URL='<url de producao>' python scripts/medir_tenant_fantasma.py
+```
+
+- ✅ **Exige o script a partir de `d53ec3fc`.** Antes desse commit ele prometia
+  "SÓ LÊ" e disparava `create_all()` + as 104 migrations no import — inclusive a
+  217 e a 218, as duas que mexem em DADOS (ver `docs/plano-deploy-seguro.md`).
+  Rodar a versão antiga contra produção **escrevia** em produção.
+- O script só lê. Saída 0 = medição completa; saída 1 = parcial ou falha, e o
+  relatório nomeia os pares usuário-tabela que não deu para consultar.
+- **Se acusar linhas:** pare. A migration de saneamento é **decisão humana** —
+  mover o dado para o `admin_id` certo pode colidir com registro que já existe lá.
+- **Se acusar zero:** siga o deploy, e registre o número no plano-mãe.
+- ⚠️ A medição de DEV **não substitui** esta: dev não tem as tabelas `reembolso`
+  nem `custo_escritorio`, e o veredito de lá é "parcial, 288/384 pares".
+
 ## A ordem sugerida do próximo deploy
 
+0. 🔴 **`scripts/medir_tenant_fantasma.py` contra produção** (item 8). É a única
+   etapa que o deploy torna impossível de refazer — antes de tudo.
 1. Conferir que o EasyPanel aponta para `main` e o hash é o atual.
 2. Deploy. O entrypoint faz backup → migrações → health → sobe.
 3. Grep no log do build/boot: `❌`, `Migração .* falhou`, `FATAL`.

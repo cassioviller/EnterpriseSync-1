@@ -193,7 +193,12 @@ manutenção. A Task 4.5 assume apagar; diga se prefere o contrário.
 >    idioma da correção já existe: `views/rdo.py` usa `except HTTPException: raise` em
 >    8 lugares, e a Task 3 acrescentou o nono. Faltam 6 handlers.
 >
-> ⚠️ **Item humano em aberto:** `scripts/medir_tenant_fantasma.py` precisa rodar em
+> ✅ **26/08 — este item saiu daqui e virou portão de deploy.** Ele não podia ficar como
+> pendência de um plano fechado: quem o executa não é quem lê planos de onda, é quem
+> aperta Deploy. Está em `docs/deploy-checklist-easypanel.md`, seção 8, e como **passo 0**
+> da ordem do próximo deploy. O que segue é o registro do porquê.
+>
+> ⚠️ **Item humano:** `scripts/medir_tenant_fantasma.py` precisa rodar em
 > **PRODUÇÃO, ANTES do deploy** — corrigir o resolvedor torna invisível, de uma vez, todo
 > dado que foi carimbado no tenant fantasma. A `main` já carrega a correção (merge
 > `fed8f19b`), então a janela fecha no próximo deploy do EasyPanel, que é manual.
