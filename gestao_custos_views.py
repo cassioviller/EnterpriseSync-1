@@ -18,6 +18,7 @@ from models import (GestaoCustoPai, GestaoCustoFilho,
                     FluxoCaixa, Obra, TipoUsuario, ContaPagar, Fornecedor, BancoEmpresa,
                     ObraServicoCusto)
 from utils.tenant import is_v2_active
+from utils.fk_do_tenant import fk_do_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -231,14 +232,19 @@ def novo():
             valor = Decimal(request.form.get('valor', '0').replace(',', '.'))
             data_ref_str = request.form.get('data_referencia')
             data_ref = datetime.strptime(data_ref_str, '%Y-%m-%d').date() if data_ref_str else date.today()
-            obra_id = request.form.get('obra_id', type=int)
+            obra_id = fk_do_tenant(Obra, request.form.get('obra_id'),
+                                   admin_id, campo='Obra')
 
             # Campos opcionais para todos os tipos
             data_venc_str = request.form.get('data_vencimento', '').strip()
             data_venc = datetime.strptime(data_venc_str, '%Y-%m-%d').date() if data_venc_str else None
             numero_doc = request.form.get('numero_documento', '').strip() or None
-            fornecedor_id = request.form.get('fornecedor_id', type=int)
-            subempreiteiro_id = request.form.get('subempreiteiro_id', type=int)
+            fornecedor_id = fk_do_tenant(Fornecedor,
+                                         request.form.get('fornecedor_id'),
+                                         admin_id, campo='Fornecedor')
+            subempreiteiro_id = fk_do_tenant(
+                Subempreiteiro, request.form.get('subempreiteiro_id'),
+                admin_id, campo='Subempreiteiro')
             forma_pagamento = request.form.get('forma_pagamento', '').strip() or None
             data_emissao_str = request.form.get('data_emissao', '').strip()
             data_emissao = datetime.strptime(data_emissao_str, '%Y-%m-%d').date() if data_emissao_str else None
@@ -259,7 +265,7 @@ def novo():
 
             # Sincronizar entidade_nome com fornecedor se selecionado
             if fornecedor_id:
-                forn = Fornecedor.query.get(fornecedor_id)
+                forn = Fornecedor.query.filter_by(id=fornecedor_id, admin_id=admin_id).first()
                 if forn and not entidade_nome:
                     entidade_nome = forn.nome
 
@@ -757,10 +763,11 @@ def autorizar(pai_id):
         data_pgto = (datetime.strptime(data_pgto_str, '%Y-%m-%d').date()
                      if data_pgto_str else date.today())
 
-        banco_id_str = request.form.get('banco_id', '').strip()
+        banco_id = fk_do_tenant(BancoEmpresa, request.form.get('banco_id'),
+                                admin_id, campo='Banco')
         conta_bancaria_manual = request.form.get('conta_bancaria_manual', '').strip()
-        if banco_id_str:
-            banco = BancoEmpresa.query.filter_by(id=int(banco_id_str), admin_id=admin_id).first()
+        if banco_id:
+            banco = BancoEmpresa.query.filter_by(id=banco_id, admin_id=admin_id).first()
             conta = f'{banco.nome_banco} — Ag {banco.agencia} / C {banco.conta}' if banco else conta_bancaria_manual
         else:
             conta = conta_bancaria_manual
@@ -803,7 +810,7 @@ def autorizar(pai_id):
         criar_fc = 'criar_fluxo_caixa' in request.form
 
         # Fase 2 Fix #1: banco obrigatório quando FC marcado
-        if criar_fc and not banco_id_str:
+        if criar_fc and not banco_id:
             flash('Selecione o banco para criar o lançamento no Fluxo de Caixa.', 'danger')
             return redirect(url_for('gestao_custos.index'))
 
@@ -819,7 +826,7 @@ def autorizar(pai_id):
                 referencia_id=pai.id,
                 referencia_tabela='gestao_custo_pai',
                 observacoes=conta or None,
-                banco_id=int(banco_id_str),
+                banco_id=banco_id,
             )
             db.session.add(fc)
             db.session.flush()
@@ -892,10 +899,12 @@ def pagar(pai_id):
         data_pgto = (datetime.strptime(data_pgto_str, '%Y-%m-%d').date()
                      if data_pgto_str else date.today())
 
-        banco_id_str_pagar = request.form.get('banco_id', '').strip()
+        banco_id_pagar = fk_do_tenant(BancoEmpresa,
+                                      request.form.get('banco_id'),
+                                      admin_id, campo='Banco')
         conta_bancaria_manual_pagar = request.form.get('conta_bancaria', '').strip()
-        if banco_id_str_pagar:
-            banco_obj = BancoEmpresa.query.filter_by(id=int(banco_id_str_pagar), admin_id=admin_id).first()
+        if banco_id_pagar:
+            banco_obj = BancoEmpresa.query.filter_by(id=banco_id_pagar, admin_id=admin_id).first()
             conta = f'{banco_obj.nome_banco} — Ag {banco_obj.agencia} / C {banco_obj.conta}' if banco_obj else conta_bancaria_manual_pagar
         else:
             conta = conta_bancaria_manual_pagar
@@ -942,7 +951,7 @@ def pagar(pai_id):
         label = CATEGORIA_LABELS.get(pai.tipo_categoria, ('Custo',))[0]
 
         # Fase 2 Fix #1: banco obrigatório para criar FluxoCaixa (pagar sempre cria FC)
-        if not banco_id_str_pagar:
+        if not banco_id_pagar:
             flash('Selecione o banco para registrar o pagamento no Fluxo de Caixa.', 'danger')
             return redirect(url_for('gestao_custos.index'))
 
@@ -971,7 +980,7 @@ def pagar(pai_id):
             referencia_id=pai.id,
             referencia_tabela='gestao_custo_pai',
             observacoes=conta or None,
-            banco_id=int(banco_id_str_pagar),
+            banco_id=banco_id_pagar,
         )
         db.session.add(fc)
         db.session.flush()
@@ -1060,8 +1069,12 @@ def editar(pai_id):
             data_venc_str   = request.form.get('data_vencimento', '').strip()
             data_venc       = datetime.strptime(data_venc_str, '%Y-%m-%d').date() if data_venc_str else None
             numero_doc      = request.form.get('numero_documento', '').strip() or None
-            fornecedor_id   = request.form.get('fornecedor_id', type=int)
-            subempreiteiro_id = request.form.get('subempreiteiro_id', type=int)
+            fornecedor_id   = fk_do_tenant(Fornecedor,
+                                           request.form.get('fornecedor_id'),
+                                           admin_id, campo='Fornecedor')
+            subempreiteiro_id = fk_do_tenant(
+                Subempreiteiro, request.form.get('subempreiteiro_id'),
+                admin_id, campo='Subempreiteiro')
             forma_pagamento = request.form.get('forma_pagamento', '').strip() or None
             data_emissao_str= request.form.get('data_emissao', '').strip()
             data_emissao    = datetime.strptime(data_emissao_str, '%Y-%m-%d').date() if data_emissao_str else None
@@ -1071,7 +1084,8 @@ def editar(pai_id):
 
             # Campos do filho principal
             descricao_filho = request.form.get('descricao', '').strip() or entidade_nome
-            obra_id_filho   = request.form.get('obra_id', type=int)
+            obra_id_filho   = fk_do_tenant(Obra, request.form.get('obra_id'),
+                                           admin_id, campo='Obra')
             data_ref_str    = request.form.get('data_referencia', '').strip()
             data_ref        = datetime.strptime(data_ref_str, '%Y-%m-%d').date() if data_ref_str else date.today()
 

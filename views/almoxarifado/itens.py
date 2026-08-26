@@ -7,6 +7,7 @@ from sqlalchemy import func, or_
 import logging
 
 from views.almoxarifado import almoxarifado_bp, get_admin_id
+from utils.fk_do_tenant import fk_do_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,9 @@ def itens_criar():
         try:
             codigo = request.form.get('codigo')
             nome = request.form.get('nome')
-            categoria_id = request.form.get('categoria_id', type=int)
+            categoria_id = fk_do_tenant(AlmoxarifadoCategoria,
+                                        request.form.get('categoria_id'),
+                                        admin_id, campo='Categoria')
             tipo_controle = request.form.get('tipo_controle')
             permite_devolucao = request.form.get('permite_devolucao') == 'on'
             estoque_minimo = request.form.get('estoque_minimo', type=int) or 0
@@ -162,7 +165,9 @@ def itens_editar(id):
 
             item.codigo = codigo
             item.nome = request.form.get('nome')
-            item.categoria_id = request.form.get('categoria_id', type=int)
+            item.categoria_id = fk_do_tenant(AlmoxarifadoCategoria,
+                                             request.form.get('categoria_id'),
+                                             admin_id, campo='Categoria')
             item.tipo_controle = tipo_controle
             item.permite_devolucao = permite_devolucao
             item.estoque_minimo = request.form.get('estoque_minimo', type=int) or 0

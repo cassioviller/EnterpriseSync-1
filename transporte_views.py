@@ -10,6 +10,7 @@ from app import db
 from models import (CategoriaTransporte, CentroCusto, CustoObra,
                     Funcionario, LancamentoTransporte, Obra, Vehicle)
 from utils.tenant import get_tenant_admin_id, is_v2_active
+from utils.fk_do_tenant import fk_do_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -157,25 +158,29 @@ def novo_post():
     admin_id = _get_admin_id()
 
     try:
-        categoria_id = int(request.form.get('categoria_id'))
-        _cc_raw = request.form.get('centro_custo_id') or None
-        centro_custo_id = int(_cc_raw) if _cc_raw else None
+        categoria_id = fk_do_tenant(CategoriaTransporte,
+                                    request.form.get('categoria_id'),
+                                    admin_id, campo='Categoria')
+        centro_custo_id = fk_do_tenant(CentroCusto,
+                                       request.form.get('centro_custo_id'),
+                                       admin_id, campo='Centro de custo')
         data_lancamento = datetime.strptime(request.form.get('data_lancamento'), '%Y-%m-%d').date()
         valor = float(request.form.get('valor', '0').replace(',', '.'))
         descricao = request.form.get('descricao', '').strip()
-        funcionario_id = request.form.get('funcionario_id') or None
-        veiculo_id = request.form.get('veiculo_id') or None
-        obra_id = request.form.get('obra_id') or None
+        # `veiculo_id` referencia `frota_veiculo` (models.py `class Vehicle`),
+        # não `veiculo` (`class Veiculo`) — são tabelas diferentes, e é
+        # `Vehicle` quem esta função já usa abaixo (`Vehicle.query.get`).
+        funcionario_id = fk_do_tenant(Funcionario,
+                                      request.form.get('funcionario_id'),
+                                      admin_id, campo='Funcionário')
+        veiculo_id = fk_do_tenant(Vehicle, request.form.get('veiculo_id'),
+                                  admin_id, campo='Veículo')
+        obra_id = fk_do_tenant(Obra, request.form.get('obra_id'),
+                               admin_id, campo='Obra')
 
         if not obra_id:
             flash('Selecione a obra para vincular o custo.', 'warning')
             return redirect(url_for('transporte.novo'))
-        if funcionario_id:
-            funcionario_id = int(funcionario_id)
-        if veiculo_id:
-            veiculo_id = int(veiculo_id)
-        if obra_id:
-            obra_id = int(obra_id)
 
         osc_id = request.form.get('obra_servico_custo_id') or None
         if osc_id and obra_id:
@@ -375,18 +380,24 @@ def novo_massa_post():
     admin_id = _get_admin_id()
 
     try:
-        categoria_id = int(request.form.get('categoria_id'))
+        categoria_id = fk_do_tenant(CategoriaTransporte,
+                                    request.form.get('categoria_id'),
+                                    admin_id, campo='Categoria')
         data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
         data_fim = datetime.strptime(request.form.get('data_fim'), '%Y-%m-%d').date()
         valor = float(request.form.get('valor', '0').replace(',', '.'))
         descricao = request.form.get('descricao', '').strip()
-        obra_id = request.form.get('obra_id') or None
+        obra_id = fk_do_tenant(Obra, request.form.get('obra_id'),
+                               admin_id, campo='Obra')
         if not obra_id:
             flash('Selecione a obra para vincular os custos.', 'warning')
             return redirect(url_for('transporte.novo_massa'))
-        obra_id = int(obra_id)
         dias_semana = [int(d) for d in request.form.getlist('dias_semana')]
-        funcionario_ids = [int(f) for f in request.form.getlist('funcionario_ids')]
+        funcionario_ids = [
+            fk_do_tenant(Funcionario, f, admin_id, campo='Funcionário',
+                        obrigatorio=True)
+            for f in request.form.getlist('funcionario_ids')
+        ]
 
         if not funcionario_ids:
             flash('Selecione pelo menos um funcionário.', 'warning')

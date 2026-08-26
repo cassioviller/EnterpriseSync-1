@@ -108,3 +108,96 @@ def test_sem_request_context_devolve_none_em_vez_de_levantar():
     """
     from multitenant_helper import get_admin_id
     assert get_admin_id() is None
+
+
+# ---------------------------------------------------------------------------
+# Task 5 — FK vinda de formulário
+# ---------------------------------------------------------------------------
+
+def test_fk_do_tenant_aceita_o_que_e_do_tenant():
+    from models import Obra
+    from utils.fk_do_tenant import fk_do_tenant
+
+    with app.app_context():
+        a, _b = dois_tenants('onda2_fk_ok', com_fatos=False)
+        with app.test_request_context():
+            assert fk_do_tenant(Obra, a.obra_id, a.admin_id,
+                                campo='obra') == a.obra_id
+            assert fk_do_tenant(Obra, '', a.admin_id, campo='obra') is None
+            assert fk_do_tenant(Obra, None, a.admin_id, campo='obra') is None
+
+
+def test_fk_do_tenant_recusa_id_de_outro_tenant():
+    from werkzeug.exceptions import BadRequest
+
+    from models import Obra
+    from utils.fk_do_tenant import fk_do_tenant
+
+    with app.app_context():
+        a, b = dois_tenants('onda2_fk_no', com_fatos=False)
+        with app.test_request_context():
+            with pytest.raises(BadRequest) as exc:
+                fk_do_tenant(Obra, b.obra_id, a.admin_id, campo='obra')
+            # a mensagem NÃO pode confirmar que a obra existe
+            texto = str(exc.value).lower()
+            assert 'outro tenant' not in texto
+            assert 'não existe' not in texto
+
+
+def test_fk_do_tenant_exige_quando_obrigatorio():
+    from werkzeug.exceptions import BadRequest
+
+    from models import Obra
+    from utils.fk_do_tenant import fk_do_tenant
+
+    with app.app_context():
+        a, _b = dois_tenants('onda2_fk_ob', com_fatos=False)
+        with app.test_request_context():
+            with pytest.raises(BadRequest):
+                fk_do_tenant(Obra, '', a.admin_id, campo='obra',
+                             obrigatorio=True)
+
+
+def test_lancamento_de_transporte_nao_prende_custo_na_obra_alheia():
+    """🔴 `transporte_views.py` (`novo_post`) — cinco FKs entravam sem checagem.
+
+    Só `osc_id` era validado. Um POST forjado prendia o lançamento e o
+    `CustoObra` à obra de outro tenant, cujo nome passava a aparecer na
+    listagem deste.
+
+    Todos os campos são válidos e do tenant A, EXCETO `obra_id`, que é
+    forjado com a obra do tenant B. `categoria_id` e `centro_custo_id` são
+    `nullable=False` em `LancamentoTransporte` — sem eles a rota levanta
+    `TypeError` em `int(request.form.get('categoria_id'))` antes mesmo de
+    chegar em `obra_id`, e o teste "passa" por crash, não por validação.
+    Isso já aconteceu uma vez nesta task (ver task-5-report.md) — daí o
+    cuidado de semear os dois.
+    """
+    from models import CategoriaTransporte, CentroCusto, LancamentoTransporte
+
+    with app.app_context():
+        a, b = dois_tenants('onda2_transp', com_fatos=False)
+        admin_a, obra_b, marca_b = a.admin_id, b.obra_id, b.marca
+
+        categoria = CategoriaTransporte(nome=f'Categoria {a.marca}',
+                                        admin_id=admin_a)
+        centro_custo = CentroCusto(admin_id=admin_a, codigo=a.marca[:10],
+                                   nome=f'Centro {a.marca}',
+                                   tipo='departamento')
+        db.session.add_all([categoria, centro_custo])
+        db.session.commit()
+        categoria_id, centro_custo_id = categoria.id, centro_custo.id
+
+    resposta = cliente_de(admin_a).post('/transporte/novo', data={
+        'obra_id': str(obra_b),
+        'categoria_id': str(categoria_id),
+        'centro_custo_id': str(centro_custo_id),
+        'data_lancamento': '2026-08-25',
+        'valor': '100,00',
+        'descricao': f'forjado contra {marca_b}',
+    }, follow_redirects=False)
+    assert resposta.status_code in (400, 403, 302)
+
+    with app.app_context():
+        vazou = LancamentoTransporte.query.filter_by(obra_id=obra_b).count()
+        assert vazou == 0, 'lançamento gravado na obra de outro tenant'
