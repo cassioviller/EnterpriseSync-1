@@ -376,3 +376,172 @@ def test_movimentos_nao_cria_lote_sem_quantidade_disponivel():
             assert 'quantidade_disponivel' in corpo, (
                 'movimentos: lote criado sem quantidade_disponivel'
                 f' → {corpo[:200]}')
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — a obra 1 e a atomicidade
+# ---------------------------------------------------------------------------
+
+def _item_serializado(admin_id):
+    from models import AlmoxarifadoCategoria, AlmoxarifadoItem
+    suf = uuid.uuid4().hex[:8]
+    categoria = AlmoxarifadoCategoria(
+        admin_id=admin_id, nome=f'Ferramentas {suf}',
+        tipo_controle_padrao='SERIALIZADO')
+    db.session.add(categoria)
+    db.session.flush()
+    item = AlmoxarifadoItem(
+        admin_id=admin_id, nome=f'Furadeira {suf}', codigo=f'FUR{suf}',
+        categoria_id=categoria.id, tipo_controle='SERIALIZADO',
+        unidade='un', permite_devolucao=True)
+    db.session.add(item)
+    db.session.flush()
+    return item
+
+
+def test_devolucao_serializada_preserva_a_obra_real():
+    """🔴 `movimentos.py:1046` — `estoque.obra_id or 1`, com `obra_id` posto a
+    None três linhas antes (`:1031`). A expressão era SEMPRE 1: toda devolução
+    serializada era carimbada com a obra de id 1, arbitrária e possivelmente
+    de outro tenant. `relatorios.py:214` (consumo por obra) lê essa coluna.
+    """
+    from models import AlmoxarifadoEstoque, AlmoxarifadoMovimento
+
+    with app.app_context():
+        t = um_tenant('onda3_obra1', com_fatos=False)
+        item = _item_serializado(t.admin_id)
+        lote = AlmoxarifadoEstoque(
+            item_id=item.id, admin_id=t.admin_id, status='EM_USO',
+            numero_serie=f'SN{uuid.uuid4().hex[:8]}',
+            quantidade=Decimal('1'), quantidade_inicial=Decimal('1'),
+            quantidade_disponivel=Decimal('0'),
+            funcionario_atual_id=t.funcionario_id, obra_id=t.obra_id)
+        db.session.add(lote)
+        db.session.commit()
+        admin_id, func_id = t.admin_id, t.funcionario_id
+        obra_real, estoque_id = t.obra_id, lote.id
+
+    resposta = cliente_de(admin_id).post(
+        '/almoxarifado/processar-devolucao', data={
+            'funcionario_id': str(func_id),
+            'tipo_controle': 'SERIALIZADO',
+            'estoque_ids[]': str(estoque_id),
+            'condicao_devolucao': 'Bom',
+        }, follow_redirects=True)
+    assert resposta.status_code == 200
+
+    with app.app_context():
+        movimento = AlmoxarifadoMovimento.query.filter_by(
+            estoque_id=estoque_id, tipo_movimento='DEVOLUCAO').first()
+        assert movimento is not None, 'a devolução não gerou movimento'
+        assert movimento.obra_id == obra_real, (
+            f'a devolução foi carimbada com a obra {movimento.obra_id} em vez '
+            f'da obra real {obra_real} — o consumo por obra se perde')
+
+
+def test_entrada_em_lote_emite_depois_do_commit():
+    """🔴 O emit dentro do laço tornava o rollback um no-op.
+
+    O handler `criar_conta_pagar_entrada_material` commita
+    (`event_manager.py:216`): emitido dentro do laço, o item 1 já estava
+    commitado quando o item 3 falhava, e o `rollback()` do erro não desfazia
+    nada — meia carga ficava no estoque com o chamador informado de que a
+    operação falhou. A rota de item único (`:185`, `:236`) sempre emitiu
+    depois do commit; esta divergiu, e o docstring dela promete
+    'TRANSAÇÃO ATÔMICA'.
+    """
+    import inspect
+
+    import views.almoxarifado.movimentos as mov
+
+    fonte = inspect.getsource(mov.processar_entrada_multipla)
+    pos_emit = fonte.find("EventManager.emit('material_entrada'")
+    pos_commit = fonte.find('db.session.commit()')
+    assert pos_emit > pos_commit > 0, (
+        'o emit de material_entrada ainda acontece antes do commit da rota')
+
+
+def test_saida_multipla_falha_quando_o_lote_sumiu():
+    """O lote que não existe é recusado, e o estoque fica intacto.
+
+    ⚠️ Este teste NÃO alcança o `continue` silencioso de `:872`: a rota valida
+    os lotes adiantado (`:783-791`) e devolve 400 nomeando o lote. O `continue`
+    só dispara na janela entre validação e aplicação, que exige outra conexão
+    commitando no meio — não é montável daqui. O que este teste garante é que
+    a recusa não mexe no estoque.
+    """
+    import json
+
+    from models import AlmoxarifadoMovimento
+
+    with app.app_context():
+        t = um_tenant('onda3_saida_mult', com_fatos=False)
+        item = _item_consumivel(t.admin_id)
+        lote = _lote_bom(item.id, t.admin_id, Decimal('50'))
+        db.session.commit()
+        admin_id, func_id, obra_id = t.admin_id, t.funcionario_id, t.obra_id
+        item_id, lote_id = item.id, lote.id
+        # O lote some entre a montagem do carrinho e o POST.
+        inexistente = lote_id + 10_000_000
+
+    resposta = cliente_de(admin_id).post(
+        '/almoxarifado/processar-saida-multipla',
+        data=json.dumps({
+            'itens': [{'item_id': item_id, 'quantidade': 10,
+                       'funcionario_id': func_id, 'obra_id': obra_id,
+                       'tipo_controle': 'CONSUMIVEL',
+                       'lote_allocations': [
+                           {'estoque_id': inexistente, 'quantidade': 10}]}],
+        }),
+        content_type='application/json')
+
+    corpo = json.loads(resposta.data)
+    assert corpo.get('success') is False, (
+        f'o lote pedido não existe e a rota respondeu {corpo} — '
+        'o usuário é informado de sucesso tendo saído zero')
+
+    with app.app_context():
+        movimentos = AlmoxarifadoMovimento.query.filter_by(
+            item_id=item_id, tipo_movimento='SAIDA').count()
+        assert movimentos == 0, 'não devia sobrar movimento de uma saída falha'
+        assert _disponivel_de(item_id) == Decimal('50'), (
+            'o estoque foi mexido numa saída que falhou')
+
+
+def test_saida_multipla_baixa_as_duas_colunas():
+    """A saída em lote passa pelo ponto único: `quantidade` e
+    `quantidade_disponivel` andam juntas.
+
+    Escrevia nas duas à mão, com `quantidade = quantidade_disponivel` — o que
+    apaga a divergência em vez de subtrair.
+    """
+    import json
+
+    from models import AlmoxarifadoEstoque
+
+    with app.app_context():
+        t = um_tenant('onda3_saida_ok', com_fatos=False)
+        item = _item_consumivel(t.admin_id)
+        lote = _lote_bom(item.id, t.admin_id, Decimal('50'))
+        db.session.commit()
+        admin_id, func_id, obra_id = t.admin_id, t.funcionario_id, t.obra_id
+        item_id, lote_id = item.id, lote.id
+
+    resposta = cliente_de(admin_id).post(
+        '/almoxarifado/processar-saida-multipla',
+        data=json.dumps({
+            'itens': [{'item_id': item_id, 'quantidade': 20,
+                       'funcionario_id': func_id, 'obra_id': obra_id,
+                       'tipo_controle': 'CONSUMIVEL',
+                       'lote_allocations': [
+                           {'estoque_id': lote_id, 'quantidade': 20}]}],
+        }),
+        content_type='application/json')
+    corpo = json.loads(resposta.data)
+    assert corpo.get('success') is True, corpo
+
+    with app.app_context():
+        lote = db.session.get(AlmoxarifadoEstoque, lote_id)
+        assert Decimal(str(lote.quantidade)) == Decimal('30')
+        assert Decimal(str(lote.quantidade_disponivel)) == Decimal('30'), (
+            'as duas colunas têm de andar juntas')

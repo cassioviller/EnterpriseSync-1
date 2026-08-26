@@ -8,7 +8,7 @@ from sqlalchemy import func
 from event_manager import EventManager
 import logging
 
-from services.estoque_saldo import criar_lote
+from services.estoque_saldo import criar_lote, debitar
 from views.almoxarifado import almoxarifado_bp, get_admin_id
 
 logger = logging.getLogger(__name__)
@@ -369,6 +369,15 @@ def processar_entrada_multipla():
         total_processados = 0
         total_itens_esperados = len(itens_validados)
 
+        # Os emits saem do laço. O handler `criar_conta_pagar_entrada_material`
+        # commita (`event_manager.py:216`), então emitir dentro do laço já tinha
+        # commitado o item 1 quando o item 3 falhava — e o `db.session.rollback()`
+        # do erro não desfazia nada. Meia carga ficava no estoque com o chamador
+        # informado de que a operação falhou, numa função cujo docstring promete
+        # 'TRANSAÇÃO ATÔMICA'. A rota de item único (`:185`, `:236`) sempre
+        # emitiu depois do commit; esta divergiu.
+        entradas_para_notificar = []
+
         for item_validado in itens_validados:
             item = item_validado['item']
             tipo_controle = item_validado['tipo_controle']
@@ -409,11 +418,11 @@ def processar_entrada_multipla():
                     db.session.add(estoque)
 
                     if fornecedor_id:
-                        EventManager.emit('material_entrada', {
+                        entradas_para_notificar.append({
                             'movimento_id': movimento.id,
                             'item_id': item.id,
                             'fornecedor_id': fornecedor_id,
-                        }, admin_id=admin_id)
+                        })
 
                 total_processados += 1
 
@@ -453,11 +462,11 @@ def processar_entrada_multipla():
                 movimento.estoque_id = estoque.id
 
                 if fornecedor_id:
-                    EventManager.emit('material_entrada', {
+                    entradas_para_notificar.append({
                         'movimento_id': movimento.id,
                         'item_id': item.id,
                         'fornecedor_id': fornecedor_id,
-                    }, admin_id=admin_id)
+                    })
 
                 total_processados += 1
 
@@ -469,6 +478,11 @@ def processar_entrada_multipla():
             }), 500
 
         db.session.commit()
+
+        # Só agora, com a carga inteira no banco: o handler commita por conta
+        # própria, e antes do commit da rota isso quebrava a atomicidade.
+        for carga in entradas_para_notificar:
+            EventManager.emit('material_entrada', carga, admin_id=admin_id)
 
         return jsonify({
             'success': True,
@@ -855,12 +869,26 @@ def processar_saida_multipla():
                         ).first()
 
                         if not lote:
-                            continue
+                            # O lote existia na validação (`:783-791`) e sumiu
+                            # antes da aplicação — janela estreita, mas real se
+                            # outra conexão commitar no meio. Pular em silêncio
+                            # gerava saída sem movimento: o `total_processados`
+                            # conta por ITEM, não por alocação, então a rota
+                            # respondia sucesso com a contagem cheia tendo
+                            # baixado menos do que disse.
+                            db.session.rollback()
+                            return jsonify({
+                                'success': False,
+                                'message': (f'Lote {alloc_estoque_id} deixou de '
+                                            'estar disponível durante a operação. '
+                                            'Nada foi baixado — refaça a saída.')
+                            }), 409
 
-                        qtd_disponivel_lote = lote.quantidade_disponivel if lote.quantidade_disponivel else lote.quantidade
-
-                        lote.quantidade_disponivel = qtd_disponivel_lote - qtd_consumida
-                        lote.quantidade = lote.quantidade_disponivel
+                        # `debitar` mantém as duas colunas juntas e é o ponto
+                        # único da invariante. Aqui se escrevia nas duas à mão,
+                        # e `quantidade = quantidade_disponivel` apagava
+                        # qualquer divergência em vez de subtrair.
+                        debitar(lote, qtd_consumida)
 
                         if lote.quantidade_disponivel == 0:
                             lote.status = 'CONSUMIDO'
@@ -1027,6 +1055,15 @@ def processar_devolucao():
                     flash(f'Item de estoque ID {estoque_id} não está em uso por este funcionário', 'danger')
                     return redirect(url_for('almoxarifado.devolucao'))
 
+                # A obra real, ANTES de o lote ser liberado. `obra_id` é
+                # zerado logo abaixo porque o item volta ao estoque livre —
+                # mas o MOVIMENTO precisa dizer de onde ele voltou.
+                # `estoque.obra_id or 1` era sempre 1: a atribuição a None
+                # acontecia três linhas antes. Toda devolução serializada ia
+                # para a obra de id 1, arbitrária e possivelmente de outro
+                # tenant, e `relatorios.py:214` (consumo por obra) lê daí.
+                obra_de_origem = estoque.obra_id
+
                 estoque.status = 'DISPONIVEL'
                 estoque.funcionario_atual_id = None
                 estoque.obra_id = None
@@ -1043,7 +1080,7 @@ def processar_devolucao():
                     estoque_id=estoque.id,
                     admin_id=admin_id,
                     usuario_id=current_user.id,
-                    obra_id=estoque.obra_id or 1
+                    obra_id=obra_de_origem
                 )
                 db.session.add(movimento)
                 itens_processados += 1
