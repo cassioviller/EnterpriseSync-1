@@ -41,8 +41,9 @@ def main():
 
         print(f'{len(suspeitos)} usuário(s) com papel afetado:\n')
         total_geral = 0
-        falhas_por_tabela = {}
-        tabelas_medidas = set()
+        pares_medidos = set()
+        pares_falhados = {}
+        pares_esperados = set()
         for u in suspeitos:
             print(f'  id={u.id} {u.tipo_usuario.value} admin_id={u.admin_id} '
                   f'({u.email})')
@@ -50,17 +51,20 @@ def main():
                 print('    ↳ admin_id == id: este não distingue os dois '
                       'resolvedores, nada a corrigir')
                 continue
+            for tabela in TABELAS.keys():
+                pares_esperados.add((u.id, tabela))
             for tabela, modulo in sorted(TABELAS.items()):
                 try:
                     n = db.session.execute(
                         db.text(f'SELECT count(*) FROM {tabela} '
                                 f'WHERE admin_id = :aid'),
                         {'aid': u.id}).scalar()
-                    tabelas_medidas.add(tabela)
+                    pares_medidos.add((u.id, tabela))
                 except Exception as erro:
                     print(f'    {tabela}: não consultável ({erro})')
-                    if tabela not in falhas_por_tabela:
-                        falhas_por_tabela[tabela] = str(erro)
+                    chave = (u.id, tabela)
+                    pares_falhados[chave] = str(erro)
+                    db.session.rollback()
                     continue
                 if n:
                     total_geral += n
@@ -68,16 +72,21 @@ def main():
                           f'(deveria ser {u.admin_id}) — escrito por {modulo}')
 
         print()
-        tabelas_falhadas = set(TABELAS.keys()) - tabelas_medidas
-        if tabelas_falhadas == set(TABELAS.keys()):
+        pares_nao_medidos = pares_esperados - pares_medidos
+        if pares_nao_medidos == pares_esperados:
             print('FALHA: medição incompleta')
-            print(f'{len(tabelas_falhadas)} tabela(s) não puderam ser consultadas:')
-            for tabela in sorted(tabelas_falhadas):
-                print(f'  - {tabela}: {falhas_por_tabela.get(tabela, "erro desconhecido")}')
+            print(f'{len(pares_nao_medidos)} par(es) usuário-tabela não puderam ser consultados:')
+            for uid, tabela in sorted(pares_nao_medidos):
+                chave = (uid, tabela)
+                err = pares_falhados.get(chave, 'erro desconhecido')
+                print(f'  - usuário {uid}, {tabela}: {err}')
             return 1
-        elif tabelas_falhadas:
-            print(f'AVISO: medição parcial ({len(tabelas_medidas)}/{len(TABELAS)} tabelas)')
-            print(f'Tabelas que falharam: {", ".join(sorted(tabelas_falhadas))}')
+        elif pares_nao_medidos:
+            usuarios_falhados = sorted(set(uid for uid, _ in pares_nao_medidos))
+            tabelas_falhadas = sorted(set(tab for _, tab in pares_nao_medidos))
+            print(f'AVISO: medição parcial ({len(pares_medidos)}/{len(pares_esperados)} pares usuário-tabela)')
+            print(f'Usuários afetados: {usuarios_falhados}')
+            print(f'Tabelas afetadas: {tabelas_falhadas}')
             print()
             if total_geral:
                 print(f'VEREDITO (PARCIAL): {total_geral} linha(s) no tenant fantasma.')
