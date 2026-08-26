@@ -6,14 +6,36 @@ GESTOR_EQUIPES e ALMOXARIFE, quando o certo é `current_user.admin_id`. Todo
 registro escrito por esses papéis pelos 8 módulos que importam o helper foi
 para um `admin_id` que não é de nenhum ADMIN.
 
-Este script SÓ LÊ. Rode antes da Task 2 da Onda 2.
+Este script SÓ LÊ — nenhum INSERT, UPDATE, DELETE nem DDL. Ver o bloco de
+`os.environ` abaixo: sem ele a promessa era falsa.
 
-    python scripts/medir_tenant_fantasma.py
+⚠️ **Rode em PRODUÇÃO, e ANTES do deploy que corrige o resolvedor.** Depois da
+correção o dado carimbado no tenant fantasma fica invisível — a consulta passa a
+procurar no `admin_id` certo, e a linha errada não aparece mais. A medição de DEV
+não serve de prova: dev não tem nenhum GESTOR_EQUIPES nem ALMOXARIFE, então lá o
+script prova a forma, não a ausência.
+
+    DATABASE_URL='<url de producao>' python scripts/medir_tenant_fantasma.py
 """
+import os
 import sys
 
-from app import app, db
-from models import TipoUsuario, Usuario
+# Rodado como `python scripts/medir_tenant_fantasma.py`, o sys.path[0] é
+# `scripts/` e a raiz do repo não entra — sem isto o `import app` abaixo morre
+# com ModuleNotFoundError. Mesmo idioma de `scripts/limpar_tenants_teste_dev.py`.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# 🔬 `import app` roda `db.create_all()` E as 104 migrations (app.py:551-721),
+# entre elas a 217 (`UPDATE obra.status`) e a 218 (troca a PK de `plano_contas`,
+# derruba e recria 6 FKs, copia contas entre tenants) — as duas que
+# `docs/plano-deploy-seguro.md` marca como as que mexem em DADOS. Um script de
+# leitura apontado para produção NÃO pode disparar isso. Mesmo idioma de
+# `scripts/limpar_tenants_teste_dev.py`.
+os.environ.setdefault('SIGE_BOOT_DDL', '0')
+os.environ.setdefault('SIGE_ENABLE_DEMO_SEED', 'false')
+
+from app import app, db  # noqa: E402
+from models import TipoUsuario, Usuario  # noqa: E402
 
 # As tabelas escritas pelos 8 módulos que importam `multitenant_helper`.
 # Nome da tabela → o módulo que a escreve, para o relatório dizer onde olhar.
