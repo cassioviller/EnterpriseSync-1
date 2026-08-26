@@ -2824,33 +2824,30 @@ def rdo_salvar_unificado():
         
         # CORREÇÃO CRÍTICA: Definir admin_id de forma robusta PRIMEIRO
         def get_admin_id_robusta():
-            """Função robusta para obter admin_id em qualquer contexto"""
+            """O tenant do usuário logado, ou None.
+
+            Tinha quatro "estratégias" em cascata; as duas últimas eram o
+            defeito. A 3 buscava `Funcionario` por e-mail SEM escopo de
+            tenant — e-mail repetido entre empresas devolvia o funcionário da
+            outra. E o `except` final devolvia `10` fixo: um tenant real, de
+            alguém, escolhido em tempo de desenvolvimento.
+
+            Agora delega para o resolvedor único e falha em None. Quem chama
+            decide o que fazer sem tenant — e a resposta certa é 403.
+            """
+            from utils.tenant import get_tenant_admin_id
             try:
-                # Estratégia 1: Verificar se é admin direto
-                if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
-                    return current_user.id
-                
-                # Estratégia 2: Verificar se tem admin_id (funcionário)
-                if hasattr(current_user, 'admin_id') and current_user.admin_id:
-                    return current_user.admin_id
-                
-                # Estratégia 3: Buscar funcionário para obter admin_id
-                funcionario = Funcionario.query.filter_by(email=current_user.email).first()
-                if funcionario and funcionario.admin_id:
-                    return funcionario.admin_id
-                
-                # Estratégia 4: Usar função dinâmica
-                return get_admin_id_dinamico()
-                
-            except Exception as e:
-                logger.error(f"[ERROR] ERRO CRÍTICO get_admin_id_robusta: {e}")
-                # Fallback para desenvolvimento
-                return 10
+                return get_tenant_admin_id()
+            except Exception as erro:
+                logger.warning('tenant não resolvível no RDO: %s', erro)
+                return None
         
         # Aplicar admin_id robusto em TODO o contexto
         admin_id_correto = get_admin_id_robusta()
+        if admin_id_correto is None:
+            abort(403)
         logger.info(f"[OK] admin_id determinado de forma robusta: {admin_id_correto}")
-        
+
         if rdo_id:
             # EDIÇÃO - Buscar RDO existente usando admin_id robusto
             rdo = RDO.query.join(Obra).filter(
