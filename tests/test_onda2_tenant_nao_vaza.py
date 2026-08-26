@@ -262,6 +262,71 @@ def test_rdo_nao_muda_de_obra_sem_checagem_de_tenant():
         'obra_id do formulário ainda entra sem validação de tenant')
 
 
+def test_bater_ponto_rejeita_funcionario_e_obra_de_outro_tenant_sem_vazar_nome():
+    """🔴 `ponto_views.py:777` (`api_bater_ponto`) — `funcionario_id`/`obra_id`
+    entravam sem checagem de tenant, e `PontoService.bater_ponto_obra`
+    (`ponto_service.py:166`) devolvia `funcionario_nome` na resposta: o
+    vazamento aqui é de DADO PESSOAL, não só de escrita — por isso ganha
+    teste de comportamento, diferente dos irmãos 3a/3b.
+
+    Nota de status: o `abort(400)` de `fk_do_tenant` é engolido pelo
+    `except Exception` largo de `api_bater_ponto` (`ponto_views.py:796-798`)
+    e vira 500. Isso é achado sistêmico separado, para o fecho da onda — não
+    desta task, e não é para ser consertado aqui. O que esta task garante é
+    que nada é gravado e o nome não vaza, qualquer que seja o código HTTP.
+    """
+    from models import RegistroPonto
+
+    with app.app_context():
+        a, b = dois_tenants('onda2_bponto', com_fatos=False)
+        admin_a = a.admin_id
+        func_b_id, obra_b_id = b.funcionario_id, b.obra_id
+        nome_b = f'Funcionario {b.marca}'
+
+    resposta = cliente_de(admin_a).post('/ponto/api/bater-ponto', json={
+        'funcionario_id': func_b_id,
+        'tipo_ponto': 'entrada',
+        'obra_id': obra_b_id,
+    })
+
+    assert resposta.status_code in (400, 403, 500), (
+        f'status inesperado: {resposta.status_code}')
+    corpo = resposta.get_data(as_text=True)
+    assert nome_b not in corpo, (
+        'o nome do funcionário de outro tenant vazou na resposta')
+
+    with app.app_context():
+        gravado = RegistroPonto.query.filter_by(funcionario_id=func_b_id).count()
+        assert gravado == 0, (
+            'RegistroPonto criado para funcionário de outro tenant')
+
+
+def test_registrar_falta_rejeita_funcionario_de_outro_tenant():
+    """🔴 mesmo achado de `api_bater_ponto`, na irmã `api_registrar_falta`
+    (`ponto_views.py:998`) — ela não recebe `obra_id`, só `funcionario_id`.
+    """
+    from models import RegistroPonto
+
+    with app.app_context():
+        a, b = dois_tenants('onda2_falta', com_fatos=False)
+        admin_a = a.admin_id
+        func_b_id = b.funcionario_id
+
+    resposta = cliente_de(admin_a).post('/ponto/api/registrar-falta', json={
+        'funcionario_id': func_b_id,
+        'data': '2026-06-15',
+        'motivo': 'falta',
+    })
+
+    assert resposta.status_code in (400, 403, 500), (
+        f'status inesperado: {resposta.status_code}')
+
+    with app.app_context():
+        gravado = RegistroPonto.query.filter_by(funcionario_id=func_b_id).count()
+        assert gravado == 0, (
+            'RegistroPonto (falta) criado para funcionário de outro tenant')
+
+
 # ---------------------------------------------------------------------------
 # Task 7 — consultas sem admin_id
 # ---------------------------------------------------------------------------
