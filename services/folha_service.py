@@ -372,7 +372,8 @@ def _resultado_vazio_horas() -> Dict:
         'faltas': 0,
         'horas_falta': 0.0,
         'horas_contratuais_mes': 0.0,
-        'total_minutos_atraso': 0
+        'total_minutos_atraso': 0,
+        'atrasos_ja_em_horas_falta': False
     }
 
 
@@ -507,7 +508,14 @@ def _calcular_horas_mes_novo(
         'horas_falta': float(horas_falta),
         'horas_contratuais_mes': float(horas_contratuais_mes),
         'total_minutos_atraso': total_minutos_atraso,
-        'tolerancia_minutos': tolerancia_minutos
+        'tolerancia_minutos': tolerancia_minutos,
+        # Onda 3 / Task 9 — dobra 1. Aqui a falta é medida pelo DELTA do dia
+        # contra o horário contratual: quem chega 1h atrasado bate 7h de 8h e
+        # essa 1h já entra em `horas_falta`. `total_minutos_atraso` continua
+        # sendo devolvido (relatório de ponto o exibe), mas descontá-lo de novo
+        # cobrava a MESMA hora duas vezes. Esta chave diz a
+        # `calcular_salario_bruto` que o desconto já está contabilizado.
+        'atrasos_ja_em_horas_falta': True
     }
 
 
@@ -582,7 +590,11 @@ def _calcular_horas_mes_legado(
         'faltas': faltas,
         'horas_falta': float(horas_falta),
         'horas_contratuais_mes': float(horas_contratuais_mes),
-        'total_minutos_atraso': total_minutos_atraso
+        'total_minutos_atraso': total_minutos_atraso,
+        # Aqui `horas_falta` conta só dia útil INTEIRO sem ponto — o atraso do
+        # dia trabalhado não está nela, e continua sendo o único desconto que
+        # alcança a jornada parcial deste caminho.
+        'atrasos_ja_em_horas_falta': False
     }
 
 
@@ -756,7 +768,18 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
         else:
             valor_desconto_faltas = valor_hora_normal * 8 * Decimal(str(horas_info.get('faltas', 0)))
         
-        if horas_info.get('total_minutos_atraso', 0) > 0:
+        # Onda 3 / Task 9 — dobra 1: o atraso é cobrado UMA vez.
+        #
+        # `_calcular_horas_mes_novo` mede a falta pelo delta do dia contra o
+        # horário contratual, então a hora perdida por atraso JÁ está dentro de
+        # `horas_falta` e já foi cobrada acima. Descontá-la de novo aqui tirava
+        # 2h de salário por 1h de atraso — e furava a própria tolerância
+        # (5 min dentro da tolerância não viram falta, mas viravam atraso).
+        # O caminho legado não compara com contratual algum: lá `horas_falta`
+        # só conta dia inteiro sem ponto, e o desconto de atraso continua sendo
+        # o único que alcança a jornada parcial.
+        if (horas_info.get('total_minutos_atraso', 0) > 0
+                and not horas_info.get('atrasos_ja_em_horas_falta', False)):
             horas_atraso = Decimal(str(horas_info['total_minutos_atraso'])) / Decimal('60')
             valor_desconto_atrasos = valor_hora_normal * horas_atraso
         else:

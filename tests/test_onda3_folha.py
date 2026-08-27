@@ -8,7 +8,8 @@ folha dobrava no contas a pagar e no razão.
 import calendar
 import os
 import sys
-from datetime import date
+from datetime import date, time
+from decimal import Decimal
 
 import pytest
 
@@ -54,6 +55,31 @@ def _seed_ponto_mes_completo(admin_id, funcionario_id, obra_id):
             funcionario_id=funcionario_id, obra_id=obra_id, admin_id=admin_id,
             data=data, horas_trabalhadas=8.0, horas_extras=0.0))
     db.session.commit()
+
+
+def _seed_horario_trabalho(admin_id, funcionario_id, marca):
+    """Segunda a sexta, 08:00–17:00 com 1h de pausa = 8h contratuais/dia.
+
+    Sem `HorarioTrabalho` cadastrado, `calcular_horas_mes` cai na lógica
+    legada (`_calcular_horas_mes_legado`), que NÃO compara ponto com horário
+    contratual e por isso nunca põe as horas do atraso dentro de
+    `horas_falta`. O caminho que dobra o desconto é o novo
+    (`_calcular_horas_mes_novo`) — e ele só existe com horário configurado.
+    """
+    from models import Funcionario, HorarioDia, HorarioTrabalho
+    horario = HorarioTrabalho(nome=f'Comercial {marca}', admin_id=admin_id,
+                              ativo=True, horas_diarias=8.0)
+    db.session.add(horario)
+    db.session.flush()
+    for dia_semana in range(0, 5):  # segunda a sexta
+        db.session.add(HorarioDia(
+            horario_id=horario.id, dia_semana=dia_semana,
+            entrada=time(8, 0), saida=time(17, 0),
+            pausa_horas=1.0, trabalha=True, admin_id=admin_id))
+    funcionario = Funcionario.query.get(funcionario_id)
+    funcionario.horario_trabalho_id = horario.id
+    db.session.commit()
+    return horario.id
 
 
 def _seed_parametros_legais(admin_id):
@@ -188,3 +214,85 @@ def test_estorno_preserva_pai_compartilhado_com_outra_origem():
         assert pai_depois.valor_total == valor_outra_origem, (
             f'GestaoCustoPai.valor_total não foi recalculado: '
             f'{pai_depois.valor_total} != {valor_outra_origem}')
+
+
+# ---------------------------------------------------------------------------
+# Task 9 / dobra 1 — o atraso deixa de ser descontado duas vezes
+# ---------------------------------------------------------------------------
+
+def _seed_ponto_com_atraso(admin_id, funcionario_id, obra_id,
+                            dia_do_atraso, horas_no_dia, minutos_atraso):
+    """Mês inteiro batido em 8h, menos um dia útil com atraso.
+
+    O dia do atraso é o que expõe a dobra: `_calcular_horas_mes_novo` mede a
+    falta pelo delta contra as 8h contratuais (e portanto JÁ cobra a hora que
+    faltou) e ainda assim devolve `total_minutos_atraso`, que
+    `calcular_salario_bruto` cobra de novo.
+    """
+    from models import RegistroPonto
+    ultimo_dia = calendar.monthrange(ANO_REF, MES_REF)[1]
+    for dia in range(1, ultimo_dia + 1):
+        data = date(ANO_REF, MES_REF, dia)
+        if data.weekday() >= 5:
+            continue
+        eh_dia_do_atraso = dia == dia_do_atraso
+        db.session.add(RegistroPonto(
+            funcionario_id=funcionario_id, obra_id=obra_id, admin_id=admin_id,
+            data=data,
+            horas_trabalhadas=horas_no_dia if eh_dia_do_atraso else 8.0,
+            horas_extras=0.0,
+            minutos_atraso_entrada=minutos_atraso if eh_dia_do_atraso else 0,
+            total_atraso_minutos=minutos_atraso if eh_dia_do_atraso else 0,
+            total_atraso_horas=(minutos_atraso / 60.0) if eh_dia_do_atraso else 0.0,
+        ))
+    db.session.commit()
+
+
+def test_atraso_nao_e_descontado_duas_vezes():
+    """🔴 dobra 1 — `services/folha_service.py:calcular_salario_bruto`.
+
+    Quem chega 1h atrasado num dia de 8h contratuais trabalha 7h. O cálculo
+    novo de horas põe essa 1h em `horas_falta` (delta contra o contratual) e
+    o desconto de faltas já a cobra. `desconto_atrasos` cobrava a MESMA hora
+    outra vez: o funcionário perdia 2h de salário por 1h de atraso.
+    """
+    from models import Funcionario
+    from services.folha_service import calcular_horas_mes, calcular_salario_bruto
+
+    with app.app_context():
+        t = um_tenant('onda3_atraso', com_fatos=False)
+        admin_id = t.admin_id
+        _seed_parametros_legais(admin_id)
+        _seed_horario_trabalho(admin_id, t.funcionario_id, t.marca)
+        # 2026-06-02 é uma terça-feira: 7h batidas, 60min de atraso.
+        _seed_ponto_com_atraso(admin_id, t.funcionario_id, t.obra_id,
+                                dia_do_atraso=2, horas_no_dia=7.0,
+                                minutos_atraso=60)
+
+        horas_info = calcular_horas_mes(t.funcionario_id, ANO_REF, MES_REF)
+
+        # Pré-condições: o teste só prova algo se as duas grandezas existirem
+        # e apontarem para a MESMA hora perdida.
+        assert horas_info['total_minutos_atraso'] == 60, (
+            'pré-condição: o ponto do dia precisa registrar o atraso')
+        assert horas_info['horas_falta'] == pytest.approx(1.0), (
+            'pré-condição: a hora do atraso já entra em horas_falta')
+        assert horas_info['faltas'] == 0, (
+            'pré-condição: nenhum dia útil pode estar sem ponto')
+
+        funcionario = Funcionario.query.filter_by(
+            id=t.funcionario_id, admin_id=admin_id).first()
+        ultimo_dia = calendar.monthrange(ANO_REF, MES_REF)[1]
+        resultado = calcular_salario_bruto(
+            funcionario, horas_info,
+            date(ANO_REF, MES_REF, 1), date(ANO_REF, MES_REF, ultimo_dia))
+
+    valor_hora = resultado['valor_hora']
+    esperado = valor_hora * Decimal('1')  # 1 hora perdida, cobrada UMA vez
+    cobrado = resultado['desconto_faltas'] + resultado['desconto_atrasos']
+
+    assert cobrado == esperado, (
+        f'1h de atraso cobrada {cobrado / valor_hora}x '
+        f'(faltas={resultado["desconto_faltas"]}, '
+        f'atrasos={resultado["desconto_atrasos"]})')
+    assert resultado['total_proventos'] == resultado['salario_bruto'] - esperado
