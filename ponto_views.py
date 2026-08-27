@@ -1442,6 +1442,62 @@ def download_modelo():
         return redirect(url_for('ponto.pagina_importar'))
 
 
+# ── O vocabulário do Excel → o do banco ──────────────────────────────────────
+#
+# O importador declara os códigos em CAIXA ALTA e abreviados
+# (`services/ponto_importacao.PontoExcelService.TIPOS_REGISTRO`) e a rota os
+# gravava VERBATIM. Os consumidores de `tipo_registro` não leem esse
+# vocabulário:
+#
+#   * `models.registro_ponto_tem_fato_humano` normaliza (strip+lower) e casa
+#     contra a lista branca — sobrevive por ter os códigos crus lá dentro;
+#   * `views/dashboard.py:804` filtra em SQL por `== 'falta_justificada'`, e
+#     SQL não perdoa caixa: a falta justificada importada como 'FALTA_J' fica
+#     invisível para a contagem e para o custo do painel;
+#   * `pdf_generator.py:269,306-313,322` classifica falta, sábado, domingo e
+#     feriado pelos mesmos nomes minúsculos, sem `else`.
+#
+# Calcular as horas do dia importado (o defeito irmão) não bastava: elas
+# chegavam a esses leitores e caíam fora. Por isso a normalização acontece na
+# ENTRADA, uma vez, e não em cada leitor. O alvo de cada código é o nome que os
+# consumidores já sabem tratar — os "_TRAB" de fim de semana viram os tipos de
+# hora extra, que é o que a própria legenda da planilha promete (50% no sábado,
+# 100% no domingo e no feriado), e os "_FOLGA" viram os nomes que
+# `views/api.py:355-358` já grava.
+#
+# ⚠️ `utils.calcular_custos_salariais_completos` (`utils.py:341-363`) tem a
+# mesma comparação case-sensitive e é a citação óbvia aqui, mas hoje ela não
+# roda para ninguém: o corpo usa `Funcionario`, que `utils.py` não importa, e a
+# função levanta `NameError` em `utils.py:315` antes da comparação — zero
+# chamadores em produção. Não é argumento para esta normalização; os dois
+# acima são.
+#
+# Código desconhecido cai em `.lower()` e mais nada: fica fora da lista branca
+# de `models.py` e, por isso, PROTEGIDO do plano — a mesma direção fail-closed
+# que aquele módulo escolheu.
+TIPO_REGISTRO_CANONICO_DO_EXCEL = {
+    'TRAB': 'trabalhado',
+    'FALTA': 'falta',
+    'FALTA_J': 'falta_justificada',
+    'SAB_TRAB': 'sabado_horas_extras',
+    'DOM_TRAB': 'domingo_horas_extras',
+    'FER_TRAB': 'feriado_trabalhado',
+    'SAB_FOLGA': 'sabado_folga',
+    'DOM_FOLGA': 'domingo_folga',
+    'FER_FOLGA': 'feriado',
+    'ATESTADO': 'atestado',
+    'FERIAS': 'ferias',
+}
+
+
+def tipo_registro_canonico(valor):
+    """O `tipo_registro` da planilha no vocabulário que o banco lê."""
+    if not valor:
+        return valor
+    bruto = str(valor).strip()
+    return TIPO_REGISTRO_CANONICO_DO_EXCEL.get(bruto.upper(), bruto.lower())
+
+
 @ponto_bp.route('/importar/processar', methods=['POST'])
 @login_required
 @admin_required
@@ -1494,6 +1550,12 @@ def processar_importacao():
         
         novos_registros_import = []  # [(RegistroPonto_obj, funcionario_id)] para evento pós-commit
         for registro in registros_validos:
+            # O vocabulário do Excel entra no do banco AQUI, antes de qualquer
+            # ramo — ver TIPO_REGISTRO_CANONICO_DO_EXCEL acima.
+            if registro.get('tipo_registro'):
+                registro['tipo_registro'] = tipo_registro_canonico(
+                    registro['tipo_registro'])
+
             # Verificar se já existe registro para este funcionário nesta data
             registro_existente = RegistroPonto.query.filter_by(
                 funcionario_id=registro['funcionario_id'],

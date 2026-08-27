@@ -1,7 +1,10 @@
 """Onda 3 — o ponto que não vira hora, e o RDO que cobra quem saiu.
 
-Quatro defeitos de UM tema só: **um lançamento que entra e não sai, ou uma
-hora que entra e não vira número.** O arreio de tenant é
+Um tema só: **um lançamento que entra e não sai, ou uma hora que entra e não
+vira número.** Quatro defeitos do plano e os três achados que a revisão
+acrescentou — o `CustoObra` que nenhum estorno alcançava, a hora que
+sobrevivia à reimportação como ausência, e o vocabulário de tipo que os
+consumidores não reconheciam. O arreio de tenant é
 `tests/helpers_tenant.py` e o de dinheiro é `tests/helpers_dinheiro.py` — o
 banco de desenvolvimento é compartilhado, então TODA contagem aqui é escopada
 pelo `admin_id` do tenant do próprio teste. Contagem global mediria o mundo.
@@ -139,9 +142,64 @@ def test_importacao_excel_calcula_horas_e_preserva_obra_no_update():
         assert atualizado.obra_id == t.obra_id, (
             'o ramo de atualização descartou a obra da planilha — sem obra '
             'não há custo de obra')
-        assert atualizado.tipo_registro == 'TRAB', (
+        assert atualizado.tipo_registro == 'trabalhado', (
             f'o ramo de atualização descartou o tipo; veio '
             f'{atualizado.tipo_registro!r}')
+
+
+def test_dia_importado_entra_no_vocabulario_que_os_consumidores_leem():
+    """🔴 O tipo entrava em CAIXA ALTA e os consumidores não o reconheciam.
+
+    O importador declara os códigos abreviados e em maiúsculas
+    (`services/ponto_importacao.py:22-33`) e a rota os gravava VERBATIM. Os
+    consumidores vivos de `tipo_registro` comparam CASE-SENSITIVE contra os
+    nomes canônicos minúsculos, e não têm `else`:
+
+    * `views/dashboard.py:804` — o filtro SQL `tipo_registro ==
+      'falta_justificada'` do painel: um dia importado como `'FALTA_J'` é
+      invisível para a contagem e para o custo de faltas justificadas;
+    * `pdf_generator.py:269,306-313,322` — o relatório de ponto, que classifica
+      falta, sábado, domingo e feriado pelos mesmos nomes minúsculos.
+
+    ⚠️ `utils.calcular_custos_salariais_completos` (`utils.py:341-363`) tem a
+    mesma comparação case-sensitive, mas **não é aferível**: o corpo referencia
+    `Funcionario`, que `utils.py` não importa, e a função levanta
+    `NameError` em `utils.py:315` antes de chegar à comparação. Zero chamadores
+    em produção. Por isso a prova aqui é o predicado do painel, que roda.
+    """
+    from models import RegistroPonto
+    from models import TIPOS_PONTO_NEUTROS_PARA_O_PLANO
+
+    with app.app_context():
+        t = um_tenant('onda3_vocab', data_ref=DIA, com_fatos=False)
+        codigo = _codigo_do_funcionario(t)
+
+        cliente_de(t.admin_id).post(
+            '/ponto/importar/processar',
+            data={'arquivo': (_planilha_de_ponto(codigo, [
+                (DIA, 'TRAB', t.obra_id, '08:00', '17:00', '12:00', '13:00'),
+                (OUTRO_DIA, 'FALTA_J', t.obra_id, None, None, None, None)]),
+                'ponto.xlsx')},
+            content_type='multipart/form-data')
+
+        trabalhado = _registro(t, DIA)
+        assert trabalhado.horas_trabalhadas == pytest.approx(8.0)
+
+        # O predicado do painel, escrito como ele escreve — case-sensitive, em
+        # SQL, escopado pelo tenant.
+        justificadas = RegistroPonto.query.filter(
+            RegistroPonto.admin_id == t.admin_id,
+            RegistroPonto.tipo_registro == 'falta_justificada').all()
+        assert [r.data for r in justificadas] == [OUTRO_DIA], (
+            f'a falta justificada importada é invisível para o painel: ela '
+            f'foi gravada como {_registro(t, OUTRO_DIA).tipo_registro!r}')
+
+        assert trabalhado.tipo_registro == 'trabalhado', (
+            f'o dia trabalhado precisa entrar no vocabulário do banco; veio '
+            f'{trabalhado.tipo_registro!r}')
+        assert trabalhado.tipo_registro in TIPOS_PONTO_NEUTROS_PARA_O_PLANO, (
+            'e continuar neutro para o plano — a lista branca de models.py é '
+            'sobre os valores JÁ normalizados')
 
 
 def test_reimportar_como_atestado_apaga_as_horas_do_dia_trabalhado():
