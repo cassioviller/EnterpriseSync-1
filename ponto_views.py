@@ -1442,6 +1442,62 @@ def download_modelo():
         return redirect(url_for('ponto.pagina_importar'))
 
 
+# ── O vocabulário do Excel → o do banco ──────────────────────────────────────
+#
+# O importador declara os códigos em CAIXA ALTA e abreviados
+# (`services/ponto_importacao.PontoExcelService.TIPOS_REGISTRO`) e a rota os
+# gravava VERBATIM. Os consumidores de `tipo_registro` não leem esse
+# vocabulário:
+#
+#   * `models.registro_ponto_tem_fato_humano` normaliza (strip+lower) e casa
+#     contra a lista branca — sobrevive por ter os códigos crus lá dentro;
+#   * `views/dashboard.py:804` filtra em SQL por `== 'falta_justificada'`, e
+#     SQL não perdoa caixa: a falta justificada importada como 'FALTA_J' fica
+#     invisível para a contagem e para o custo do painel;
+#   * `pdf_generator.py:269,306-313,322` classifica falta, sábado, domingo e
+#     feriado pelos mesmos nomes minúsculos, sem `else`.
+#
+# Calcular as horas do dia importado (o defeito irmão) não bastava: elas
+# chegavam a esses leitores e caíam fora. Por isso a normalização acontece na
+# ENTRADA, uma vez, e não em cada leitor. O alvo de cada código é o nome que os
+# consumidores já sabem tratar — os "_TRAB" de fim de semana viram os tipos de
+# hora extra, que é o que a própria legenda da planilha promete (50% no sábado,
+# 100% no domingo e no feriado), e os "_FOLGA" viram os nomes que
+# `views/api.py:355-358` já grava.
+#
+# ⚠️ `utils.calcular_custos_salariais_completos` (`utils.py:341-363`) tem a
+# mesma comparação case-sensitive e é a citação óbvia aqui, mas hoje ela não
+# roda para ninguém: o corpo usa `Funcionario`, que `utils.py` não importa, e a
+# função levanta `NameError` em `utils.py:315` antes da comparação — zero
+# chamadores em produção. Não é argumento para esta normalização; os dois
+# acima são.
+#
+# Código desconhecido cai em `.lower()` e mais nada: fica fora da lista branca
+# de `models.py` e, por isso, PROTEGIDO do plano — a mesma direção fail-closed
+# que aquele módulo escolheu.
+TIPO_REGISTRO_CANONICO_DO_EXCEL = {
+    'TRAB': 'trabalhado',
+    'FALTA': 'falta',
+    'FALTA_J': 'falta_justificada',
+    'SAB_TRAB': 'sabado_horas_extras',
+    'DOM_TRAB': 'domingo_horas_extras',
+    'FER_TRAB': 'feriado_trabalhado',
+    'SAB_FOLGA': 'sabado_folga',
+    'DOM_FOLGA': 'domingo_folga',
+    'FER_FOLGA': 'feriado',
+    'ATESTADO': 'atestado',
+    'FERIAS': 'ferias',
+}
+
+
+def tipo_registro_canonico(valor):
+    """O `tipo_registro` da planilha no vocabulário que o banco lê."""
+    if not valor:
+        return valor
+    bruto = str(valor).strip()
+    return TIPO_REGISTRO_CANONICO_DO_EXCEL.get(bruto.upper(), bruto.lower())
+
+
 @ponto_bp.route('/importar/processar', methods=['POST'])
 @login_required
 @admin_required
@@ -1494,6 +1550,12 @@ def processar_importacao():
         
         novos_registros_import = []  # [(RegistroPonto_obj, funcionario_id)] para evento pós-commit
         for registro in registros_validos:
+            # O vocabulário do Excel entra no do banco AQUI, antes de qualquer
+            # ramo — ver TIPO_REGISTRO_CANONICO_DO_EXCEL acima.
+            if registro.get('tipo_registro'):
+                registro['tipo_registro'] = tipo_registro_canonico(
+                    registro['tipo_registro'])
+
             # Verificar se já existe registro para este funcionário nesta data
             registro_existente = RegistroPonto.query.filter_by(
                 funcionario_id=registro['funcionario_id'],
@@ -1502,15 +1564,50 @@ def processar_importacao():
             ).first()
             
             if registro_existente:
-                # Atualizar registro existente
-                registro_existente.hora_entrada = registro['hora_entrada']
-                registro_existente.hora_saida = registro['hora_saida']
-                registro_existente.hora_almoco_saida = registro['hora_almoco_saida']
-                registro_existente.hora_almoco_retorno = registro['hora_almoco_retorno']
+                # Atualizar registro existente.
+                #
+                # `.get()` e não `[...]`: as linhas de falta/folga chegam SEM
+                # nenhuma chave de horário (`services/ponto_importacao.py:604`),
+                # e o acesso direto derrubava a importação inteira no
+                # `except` da rota — planilha com um único dia de atestado
+                # perdia o mês todo.
+                registro_existente.hora_entrada = registro.get('hora_entrada')
+                registro_existente.hora_saida = registro.get('hora_saida')
+                registro_existente.hora_almoco_saida = registro.get('hora_almoco_saida')
+                registro_existente.hora_almoco_retorno = registro.get('hora_almoco_retorno')
+                # O tipo declarado na planilha é o que a reimportação quer
+                # dizer — sem ele o dia corrigido para 'ATESTADO' continuava
+                # 'trabalhado'. A obra só entra quando a planilha informou:
+                # célula vazia é "não mexe", e apagar a obra do registro
+                # deixaria o dia sem custo de obra.
+                if registro.get('tipo_registro'):
+                    registro_existente.tipo_registro = registro['tipo_registro']
+                if registro.get('obra_id'):
+                    registro_existente.obra_id = registro['obra_id']
+                # Reimportar é ESTORNAR e refazer, também aqui.
+                # `_calcular_horas` só ESCREVE `horas_trabalhadas` quando há
+                # entrada E saída (`ponto_service.py:298`) e nunca zera
+                # atraso: sem esta limpeza, o dia que era 'TRAB' de 8h e
+                # voltou como 'ATESTADO' guardava as 8h e o atraso do dia
+                # trabalhado — a folha seguia pagando o que não houve. Zerar
+                # antes e recalcular deixa o resultado ser função só da linha
+                # que acabou de chegar, inclusive nos casos parciais (só
+                # entrada, sem saída).
+                registro_existente.horas_trabalhadas = 0.0
+                registro_existente.horas_extras = 0.0
+                registro_existente.minutos_atraso_entrada = 0
+                registro_existente.minutos_atraso_saida = 0
+                registro_existente.total_atraso_minutos = 0
+                registro_existente.total_atraso_horas = 0.0
+                # A hora não se calculava em ramo nenhum: o mês importado
+                # marcava 0h, a folha cobrava todo dia como falta cheia e
+                # nenhum custo de obra saía.
+                PontoService._calcular_horas(registro_existente)
                 total_atualizados += 1
             else:
                 # Criar novo registro
                 novo_registro = RegistroPonto(**registro)
+                PontoService._calcular_horas(novo_registro)
                 db.session.add(novo_registro)
                 novos_registros_import.append((novo_registro, registro['funcionario_id']))
                 total_importados += 1
@@ -1740,7 +1837,12 @@ def registrar_ponto_facial_api():
         registro.reconhecimento_facial_sucesso = True
         registro.confianca_reconhecimento = float(distancia) if distancia is not None else None
         registro.modelo_utilizado = 'SFace'
-        
+
+        # A mesma jornada valia 8h batida pelo PontoService
+        # (`ponto_service.py:138`) e 0h batida pela câmera: a rota commitava
+        # sem calcular. Sem isto a folha lê o dia como falta cheia.
+        PontoService._calcular_horas(registro)
+
         db.session.commit()
 
         # Emitir evento após commit — integração com diaristas V2 e outros módulos
@@ -2401,73 +2503,107 @@ def identificar_e_registrar():
                 registro.distancia_obra_metros = distancia_obra
         
         tipo_registrado = None
-        
+
+        # tipo_ponto_canonico: valor canônico para eventos
+        # (entrada/saida_almoco/volta_almoco/saida), igual ao da rota irmã
+        # `/api/registrar-facial`. O `tipo_registrado` ao lado é rótulo de
+        # tela e não serve de chave de evento.
+        tipo_ponto_canonico = None
+
         # Se tipo foi selecionado manualmente, usar esse
         if tipo_ponto:
             if tipo_ponto == 'entrada':
                 if registro.hora_entrada:
                     return jsonify({
-                        'success': False, 
+                        'success': False,
                         'message': f'{funcionario.nome}: Entrada já foi registrada hoje.',
                         'funcionario_nome': funcionario.nome
                     }), 400
                 registro.hora_entrada = agora
                 tipo_registrado = 'entrada'
+                tipo_ponto_canonico = 'entrada'
             elif tipo_ponto == 'almoco_saida':
                 if registro.hora_almoco_saida:
                     return jsonify({
-                        'success': False, 
+                        'success': False,
                         'message': f'{funcionario.nome}: Saída para almoço já foi registrada hoje.',
                         'funcionario_nome': funcionario.nome
                     }), 400
                 registro.hora_almoco_saida = agora
                 tipo_registrado = 'saída para almoço'
+                tipo_ponto_canonico = 'saida_almoco'
             elif tipo_ponto == 'almoco_retorno':
                 if registro.hora_almoco_retorno:
                     return jsonify({
-                        'success': False, 
+                        'success': False,
                         'message': f'{funcionario.nome}: Retorno do almoço já foi registrado hoje.',
                         'funcionario_nome': funcionario.nome
                     }), 400
                 registro.hora_almoco_retorno = agora
                 tipo_registrado = 'retorno do almoço'
+                tipo_ponto_canonico = 'volta_almoco'
             elif tipo_ponto == 'saida':
                 if registro.hora_saida:
                     return jsonify({
-                        'success': False, 
+                        'success': False,
                         'message': f'{funcionario.nome}: Saída já foi registrada hoje.',
                         'funcionario_nome': funcionario.nome
                     }), 400
                 registro.hora_saida = agora
                 tipo_registrado = 'saída'
+                tipo_ponto_canonico = 'saida'
         else:
             # Modo automático sequencial
             if not registro.hora_entrada:
                 registro.hora_entrada = agora
                 tipo_registrado = 'entrada'
+                tipo_ponto_canonico = 'entrada'
             elif registro.hora_entrada and not registro.hora_almoco_saida:
                 registro.hora_almoco_saida = agora
                 tipo_registrado = 'saída para almoço'
+                tipo_ponto_canonico = 'saida_almoco'
             elif registro.hora_almoco_saida and not registro.hora_almoco_retorno:
                 registro.hora_almoco_retorno = agora
                 tipo_registrado = 'retorno do almoço'
+                tipo_ponto_canonico = 'volta_almoco'
             elif not registro.hora_saida:
                 registro.hora_saida = agora
                 tipo_registrado = 'saída'
+                tipo_ponto_canonico = 'saida'
             else:
                 return jsonify({
-                    'success': False, 
+                    'success': False,
                     'message': f'{funcionario.nome}: Jornada completa já registrada hoje.',
                     'funcionario_nome': funcionario.nome
                 }), 400
-        
+
         # Salvar metadados do reconhecimento
         registro.reconhecimento_facial_sucesso = True
         registro.confianca_reconhecimento = float(menor_distancia) if menor_distancia is not None else None
         registro.modelo_utilizado = 'SFace'
-        
+
+        # A mesma jornada valia 8h batida pelo PontoService
+        # (`ponto_service.py:138`) e 0h batida pela câmera: a rota commitava
+        # sem calcular. Sem isto a folha lê o dia como falta cheia.
+        PontoService._calcular_horas(registro)
+
         db.session.commit()
-        
+
+        # Emitir evento após commit — esta era a única rota de ponto que
+        # nunca emitia: ponto batido no totem da obra não virava custo de
+        # diarista nenhum (`event_manager`, handler de `ponto_registrado`).
+        if tipo_ponto_canonico:
+            try:
+                from event_manager import EventManager
+                EventManager.emit('ponto_registrado', {
+                    'registro_id': registro.id,
+                    'tipo_ponto': tipo_ponto_canonico,
+                }, admin_id=admin_id)
+            except Exception as ev_err:
+                logger.warning(
+                    f"[WARN] Evento ponto_registrado não emitido "
+                    f"(identificar-e-registrar): {ev_err}")
+
         tempo_total = time.time() - start_total
         
         # Log de performance com indicador visual

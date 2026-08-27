@@ -1909,8 +1909,43 @@ def reabrir_rdo(id):
         return redirect(url_for('main.visualizar_rdo', id=id))
 
     try:
+        admin_id = rdo.admin_id or rdo.obra.admin_id
+
         transicionar(rdo, RASCUNHO, usuario=current_user, motivo=motivo,
                      ip=request.remote_addr)
+
+        # A OUTRA metade da simetria do plano de 24/08: o Submeter lança o
+        # custo de mão de obra (via `rdo_finalizado`), e a reabertura tinha
+        # desfeito só o percentual do cronograma. O custo ficava de pé com o
+        # RDO de volta em `rascunho` — o estado que, por
+        # `services.rdo_ciclo_vida.publica_custos`, não pode ter custo nenhum.
+        # Reprocessar é estornar e refazer: o Submeter seguinte relança.
+        #
+        # DENTRO da transação da transição (o percentual, abaixo, fica fora
+        # porque comita por tarefa): estado e razão mudam juntos, ou nenhum
+        # dos dois. E nesta ordem, porque `remover_custos_rdo` casa o
+        # lançamento pelo id do `RDOCustoDiario` que a linha seguinte apaga.
+        try:
+            from services.rdo_custos import remover_custos_rdo
+            remover_custos_rdo(rdo, admin_id)
+        except Exception as _e:
+            logger.warning(f"[rdo-custo] remover_custos_rdo falhou: {_e}")
+        try:
+            from services.custo_funcionario_dia import remover_custo_diario_rdo
+            remover_custo_diario_rdo(rdo.id)
+        except Exception as _e:
+            logger.warning(f"[custo-dia] remover_custo_diario_rdo falhou: {_e}")
+
+        # E o `CustoObra`, que nenhum dos dois removedores alcança: o
+        # `rdo_finalizado` grava um por trabalhador
+        # (`event_manager.py:932-961`). Sem esta linha o RDO reaberto seguia
+        # cobrando a obra — o custo saía do razão e ficava no custo da obra,
+        # que é justamente onde ele aparece para quem toca o orçamento.
+        # O Submeter seguinte regrava, pelo upsert da mesma chave.
+        from models import CustoObra
+        db.session.query(CustoObra).filter(
+            CustoObra.rdo_id == rdo.id).delete(synchronize_session=False)
+
         db.session.commit()
 
         # Simétrico do Submeter: o RDO volta a rascunho, e o avanço dele sai
@@ -1920,8 +1955,7 @@ def reabrir_rdo(id):
         try:
             from services.cronograma_apontamento_service import (
                 recalcular_percentuais_do_rdo)
-            recalcular_percentuais_do_rdo(
-                rdo.id, rdo.admin_id or rdo.obra.admin_id)
+            recalcular_percentuais_do_rdo(rdo.id, admin_id)
         except Exception as _e_pct:
             logger.warning(
                 f"[WARN] RDO {rdo.id} reaberto, mas o percentual do "
@@ -2859,7 +2893,38 @@ def rdo_salvar_unificado():
                 flash('RDO não encontrado ou sem permissão de acesso.', 'error')
                 return redirect('/rdo')
             
-            # Limpar dados antigos para substituir pelos novos
+            # Limpar dados antigos para substituir pelos novos.
+            #
+            # O estorno vem ANTES do delete: os dois removedores casam o
+            # lançamento pelo id da linha de origem (`origem_id` em
+            # `services/rdo_custos.remover_custos_rdo`), e com a linha já
+            # apagada o custo de quem saiu do RDO virava órfão insuprimível
+            # — o trabalhador removido seguia sendo cobrado na obra. Mesma
+            # ordem de `rdo_editar_sistema.py:357-368` e
+            # `crud_rdo_completo.py:293-297`. O que fica é relançado adiante,
+            # por `gravar_custo_funcionario_rdo` + `rdo_finalizado`.
+            try:
+                from services.rdo_custos import remover_custos_rdo
+                remover_custos_rdo(rdo, admin_id_correto)
+            except Exception as _e:
+                logger.warning(f"[rdo-custo] remover_custos_rdo falhou: {_e}")
+            try:
+                from services.custo_funcionario_dia import remover_custo_diario_rdo
+                remover_custo_diario_rdo(rdo.id)
+            except Exception as _e:
+                logger.warning(f"[custo-dia] remover_custo_diario_rdo falhou: {_e}")
+
+            # A TERCEIRA tabela, que nenhum dos dois removedores alcança:
+            # `rdo_finalizado` grava um `CustoObra` por trabalhador
+            # (`event_manager.py:932-961`, chave rdo_id+funcionario_id+data+
+            # admin_id). Estornar só o razão deixava o removido cobrando a
+            # obra para sempre. Sai tudo do RDO, e o `rdo_finalizado` que
+            # esta rota emite adiante regrava quem ficou — mesmo delete por
+            # `rdo_id` que a exclusão de RDO já usa (`views/rdo.py:534`).
+            from models import CustoObra
+            db.session.query(CustoObra).filter(
+                CustoObra.rdo_id == rdo.id).delete(synchronize_session=False)
+
             RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).delete()
             RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
             RDOEquipamento.query.filter_by(rdo_id=rdo.id).delete()
