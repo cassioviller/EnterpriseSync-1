@@ -4,10 +4,10 @@ Centraliza todos os cálculos de folha, INSS, IR, FGTS e horas extras
 """
 
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Optional
 from sqlalchemy import extract
-from models import db, Funcionario, RegistroPonto, ParametrosLegais, ConfiguracaoSalarial, BeneficioFuncionario, CalendarioUtil, HorarioDia, HorarioTrabalho
+from models import db, Funcionario, RegistroPonto, ParametrosLegais, ConfiguracaoSalarial, BeneficioFuncionario, CalendarioUtil, HorarioDia, HorarioTrabalho, FolhaPagamento, GestaoCustoPai, GestaoCustoFilho, LancamentoContabil
 from utils import calcular_valor_hora_periodo
 import logging
 
@@ -372,7 +372,8 @@ def _resultado_vazio_horas() -> Dict:
         'faltas': 0,
         'horas_falta': 0.0,
         'horas_contratuais_mes': 0.0,
-        'total_minutos_atraso': 0
+        'total_minutos_atraso': 0,
+        'atrasos_ja_em_horas_falta': False
     }
 
 
@@ -507,7 +508,14 @@ def _calcular_horas_mes_novo(
         'horas_falta': float(horas_falta),
         'horas_contratuais_mes': float(horas_contratuais_mes),
         'total_minutos_atraso': total_minutos_atraso,
-        'tolerancia_minutos': tolerancia_minutos
+        'tolerancia_minutos': tolerancia_minutos,
+        # Onda 3 / Task 9 — dobra 1. Aqui a falta é medida pelo DELTA do dia
+        # contra o horário contratual: quem chega 1h atrasado bate 7h de 8h e
+        # essa 1h já entra em `horas_falta`. `total_minutos_atraso` continua
+        # sendo devolvido (relatório de ponto o exibe), mas descontá-lo de novo
+        # cobrava a MESMA hora duas vezes. Esta chave diz a
+        # `calcular_salario_bruto` que o desconto já está contabilizado.
+        'atrasos_ja_em_horas_falta': True
     }
 
 
@@ -582,7 +590,11 @@ def _calcular_horas_mes_legado(
         'faltas': faltas,
         'horas_falta': float(horas_falta),
         'horas_contratuais_mes': float(horas_contratuais_mes),
-        'total_minutos_atraso': total_minutos_atraso
+        'total_minutos_atraso': total_minutos_atraso,
+        # Aqui `horas_falta` conta só dia útil INTEIRO sem ponto — o atraso do
+        # dia trabalhado não está nela, e continua sendo o único desconto que
+        # alcança a jornada parcial deste caminho.
+        'atrasos_ja_em_horas_falta': False
     }
 
 
@@ -756,7 +768,18 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
         else:
             valor_desconto_faltas = valor_hora_normal * 8 * Decimal(str(horas_info.get('faltas', 0)))
         
-        if horas_info.get('total_minutos_atraso', 0) > 0:
+        # Onda 3 / Task 9 — dobra 1: o atraso é cobrado UMA vez.
+        #
+        # `_calcular_horas_mes_novo` mede a falta pelo delta do dia contra o
+        # horário contratual, então a hora perdida por atraso JÁ está dentro de
+        # `horas_falta` e já foi cobrada acima. Descontá-la de novo aqui tirava
+        # 2h de salário por 1h de atraso — e furava a própria tolerância
+        # (5 min dentro da tolerância não viram falta, mas viravam atraso).
+        # O caminho legado não compara com contratual algum: lá `horas_falta`
+        # só conta dia inteiro sem ponto, e o desconto de atraso continua sendo
+        # o único que alcança a jornada parcial.
+        if (horas_info.get('total_minutos_atraso', 0) > 0
+                and not horas_info.get('atrasos_ja_em_horas_falta', False)):
             horas_atraso = Decimal(str(horas_info['total_minutos_atraso'])) / Decimal('60')
             valor_desconto_atrasos = valor_hora_normal * horas_atraso
         else:
@@ -1106,10 +1129,145 @@ def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int, pa
 
 
 # ========================================
+# REPROCESSAMENTO — ESTORNO DA RODADA ANTERIOR (Onda 3 / Task 8 / A12)
+# ========================================
+
+def estornar_folha_do_mes(admin_id: int, mes_referencia: date) -> None:
+    """Estorna a rodada anterior de folha do mês — ANTES de recriar.
+
+    `folha_pagamento_views.py` (view `processar_folha_mes`, reprocessar=true)
+    apagava só `FolhaPagamento`; o `GestaoCustoPai`/`Filho` e o
+    `LancamentoContabil` da rodada anterior sobreviviam e eram recriados: a
+    folha dobrava no contas a pagar e no razão. Esta função apaga as três
+    coisas, nesta ordem (filho → pai/lançamento → folha, para não violar FK):
+
+    1. `GestaoCustoFilho` com `origem_tabela='folha_pagamento'` e
+       `origem_id` em uma das `FolhaPagamento` do mês — apagado **um a um**
+       (nunca `Query.delete()` em lote, que pula o evento `after_delete`
+       de `models.py:8214-8216` que resincroniza o dashboard da obra). O
+       `GestaoCustoPai` que os agrupa NÃO é apagado por tabela: ele é
+       rotineiramente compartilhado entre origens diferentes na mesma chave
+       (admin_id, categoria, entidade_id) —
+       `utils/financeiro_integration.py:118-140` reaproveita o pai em aberto
+       sem olhar `origem_tabela`, e outra origem (ex.: RDO) pode ter um
+       filho no mesmo pai. Por isso: recalcula `valor_total` pela SOMA dos
+       filhos que sobraram, e só apaga o pai se não sobrar filho nenhum
+       (conta, nunca soma — soma zero não é ausência de filho) E o pai
+       estiver `PENDENTE`. Mesmo conserto de
+       `transporte_views.py:_limpar_gestao_custo_filho`.
+    2. `LancamentoContabil` com `origem='FOLHA_PAGAMENTO'` — dois formatos
+       coexistem no código: um por funcionário
+       (`event_manager.py:criar_lancamento_folha_pagamento`,
+       `origem_id=folha.id`) e um agregado por rodada
+       (`folha_pagamento_views.py`, `origem_id=None`, mesmo
+       `data_lancamento` do mês). Os dois são apagados.
+    3. `FolhaPagamento` do mês.
+
+    Loga contagem ANTES e DEPOIS de cada uma das três coisas.
+    """
+    from decimal import Decimal
+    from sqlalchemy import func
+
+    folhas = FolhaPagamento.query.filter_by(
+        admin_id=admin_id, mes_referencia=mes_referencia).all()
+    folha_ids = [f.id for f in folhas]
+
+    filhos = []
+    if folha_ids:
+        filhos = GestaoCustoFilho.query.filter(
+            GestaoCustoFilho.admin_id == admin_id,
+            GestaoCustoFilho.origem_tabela == 'folha_pagamento',
+            GestaoCustoFilho.origem_id.in_(folha_ids),
+        ).all()
+    pai_ids_afetados = {f.pai_id for f in filhos}
+
+    lcs_por_folha = []
+    if folha_ids:
+        lcs_por_folha = LancamentoContabil.query.filter(
+            LancamentoContabil.admin_id == admin_id,
+            LancamentoContabil.origem == 'FOLHA_PAGAMENTO',
+            LancamentoContabil.origem_id.in_(folha_ids),
+        ).all()
+    lc_agregado = LancamentoContabil.query.filter_by(
+        admin_id=admin_id, origem='FOLHA_PAGAMENTO', origem_id=None,
+        data_lancamento=mes_referencia,
+    ).all()
+    lcs = list({lc.id: lc for lc in (lcs_por_folha + lc_agregado)}.values())
+
+    logger.info(
+        "[estornar_folha_do_mes] ANTES admin=%s mes=%s | FolhaPagamento=%s "
+        "GestaoCustoFilho=%s GestaoCustoPai(afetados)=%s LancamentoContabil=%s",
+        admin_id, mes_referencia, len(folha_ids), len(filhos),
+        len(pai_ids_afetados), len(lcs))
+
+    # 1a) Filhos de origem folha — um a um, nunca bulk.
+    for filho in filhos:
+        db.session.delete(filho)
+        db.session.flush()
+
+    # 1b) Pai: recalcula pela soma dos filhos restantes; só apaga se não
+    # sobrar filho E o pai estiver PENDENTE — nunca só por ter tido um filho
+    # de folha, porque o pai pode ser de outras origens também.
+    pais_removidos = 0
+    pais_recalculados = 0
+    for pai_id in pai_ids_afetados:
+        pai = GestaoCustoPai.query.get(pai_id)
+        if not pai:
+            continue
+        novo_total = (
+            db.session.query(func.coalesce(func.sum(GestaoCustoFilho.valor), 0))
+            .filter_by(pai_id=pai.id)
+            .scalar()
+        ) or Decimal('0.00')
+        pai.valor_total = Decimal(str(novo_total))
+
+        restantes = (
+            db.session.query(func.count(GestaoCustoFilho.id))
+            .filter(GestaoCustoFilho.pai_id == pai.id)
+            .scalar()
+        ) or 0
+        if restantes == 0 and pai.status == 'PENDENTE':
+            db.session.delete(pai)
+            pais_removidos += 1
+        else:
+            pais_recalculados += 1
+    db.session.flush()
+
+    for lc in lcs:
+        db.session.delete(lc)
+    for folha in folhas:
+        db.session.delete(folha)
+    db.session.flush()
+
+    logger.info(
+        "[estornar_folha_do_mes] DEPOIS admin=%s mes=%s | FolhaPagamento=%s "
+        "GestaoCustoFilho(folha)=%s GestaoCustoPai(removidos=%s "
+        "recalculados=%s) LancamentoContabil=%s",
+        admin_id, mes_referencia,
+        FolhaPagamento.query.filter_by(
+            admin_id=admin_id, mes_referencia=mes_referencia).count(),
+        (GestaoCustoFilho.query.filter(
+            GestaoCustoFilho.admin_id == admin_id,
+            GestaoCustoFilho.origem_tabela == 'folha_pagamento',
+            GestaoCustoFilho.origem_id.in_(folha_ids)).count()
+         if folha_ids else 0),
+        pais_removidos, pais_recalculados,
+        (LancamentoContabil.query.filter(
+            LancamentoContabil.admin_id == admin_id,
+            LancamentoContabil.origem == 'FOLHA_PAGAMENTO',
+            LancamentoContabil.origem_id.in_(folha_ids)).count()
+         if folha_ids else 0)
+        + LancamentoContabil.query.filter_by(
+            admin_id=admin_id, origem='FOLHA_PAGAMENTO', origem_id=None,
+            data_lancamento=mes_referencia).count(),
+    )
+
+
+# ========================================
 # FUNÇÕES PARA DASHBOARD DE CUSTOS POR OBRA
 # ========================================
 
-def salvar_folha_processada(funcionario_id: int, obra_id: Optional[int], ano: int, mes: int, 
+def salvar_folha_processada(funcionario_id: int, obra_id: Optional[int], ano: int, mes: int,
                             dados_folha: Dict, admin_id: int) -> bool:
     """
     Salva os resultados do processamento de folha na tabela FolhaProcessada.
@@ -1333,12 +1491,22 @@ def obter_dados_folha_obra(obra_id: int, data_inicio: date, data_fim: date, admi
         custo_por_hora = total_custo / total_horas if total_horas > 0 else Decimal('0')
         percentual_he = (total_he / total_horas * 100) if total_horas > 0 else Decimal('0')
         
-        total_salario_base = sum(d['total_salario_bruto'] for d in dados_por_funcionario.values())
+        total_bruto = sum(d['total_salario_bruto'] for d in dados_por_funcionario.values())
         total_encargos = sum(d['total_encargos'] for d in dados_por_funcionario.values())
         total_he_50_valor = sum(dados_por_mes[m]['he_50'] for m in dados_por_mes)
         total_he_100_valor = sum(dados_por_mes[m]['he_100'] for m in dados_por_mes)
         total_dsr_valor = sum(dados_por_mes[m]['dsr'] for m in dados_por_mes)
-        
+
+        # Onda 3 / Task 9 — dobra 2: HE e DSR entram na composição UMA vez.
+        #
+        # `salario_bruto` já É `salario_normal + HE 50% + HE 100% + DSR`
+        # (`calcular_salario_bruto`). Exibi-lo inteiro como "Salário Base" e
+        # ainda somar as extras e o DSR como fatias próprias fazia a
+        # composição estourar o custo total exatamente pelo valor das extras.
+        # Subtraindo, a fatia vira o salário normal e as cinco fatias fecham
+        # em `custo_total` — que é `salario_bruto + encargos`.
+        total_salario_base = total_bruto - total_he_50_valor - total_he_100_valor - total_dsr_valor
+
         composicao = [
             {'categoria': 'Salário Base', 'valor': float(total_salario_base), 'cor': '#4CAF50'},
             {'categoria': 'HE 50%', 'valor': float(total_he_50_valor), 'cor': '#FF9800'},
@@ -1407,43 +1575,173 @@ def obter_dados_folha_obra(obra_id: int, data_inicio: date, data_fim: date, admi
         }
 
 
+_CENTAVO = Decimal('0.01')
+
+# Onda 3 / Task 9 — dobra 3. Campos de `processar_folha_funcionario` que são
+# grandeza do MÊS INTEIRO e por isso precisam ser rateados entre as obras
+# antes de virar uma linha `FolhaProcessada` por obra. São exatamente os que
+# `salvar_folha_processada` persiste (mais `encargos_patronais`, de onde ela
+# deduz o INSS patronal quando `inss_patronal` não vem).
+_CAMPOS_RATEAVEIS_POR_OBRA = (
+    'salario_base', 'salario_bruto', 'total_proventos', 'total_descontos',
+    'salario_liquido', 'valor_he_50', 'valor_he_100', 'valor_dsr',
+    'fgts', 'inss_patronal', 'encargos_patronais', 'custo_total_empresa',
+    'inss', 'irrf', 'desconto_faltas', 'desconto_atrasos',
+    'horas_trabalhadas', 'horas_extras_50', 'horas_extras_100', 'horas_falta',
+)
+
+
+def _horas_por_obra_no_mes(funcionario_id: int, ano: int, mes: int) -> Dict[int, Decimal]:
+    """Horas apontadas por obra no mês — a chave do rateio da folha.
+
+    Só entram registros COM obra: hora sem obra não é lançável em obra
+    nenhuma, e mantê-la no denominador faria a soma das partes ficar abaixo
+    do total do mês (o custo dela sumiria do roll-up). Fora do denominador,
+    ela é distribuída entre as obras junto com o resto.
+    """
+    from models import RegistroPonto
+    from sqlalchemy import func as sql_func
+
+    linhas = db.session.query(
+        RegistroPonto.obra_id,
+        sql_func.coalesce(sql_func.sum(RegistroPonto.horas_trabalhadas), 0)
+    ).filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.obra_id.isnot(None),
+        extract('year', RegistroPonto.data) == ano,
+        extract('month', RegistroPonto.data) == mes
+    ).group_by(RegistroPonto.obra_id).all()
+
+    return {obra_id: Decimal(str(horas or 0)) for obra_id, horas in linhas}
+
+
+def _ratear_valor_por_obra(valor: Decimal, horas_por_obra: Dict[int, Decimal]) -> Dict[int, Decimal]:
+    """Divide `valor` entre as obras na proporção das horas — somando EXATO.
+
+    Cada fatia é arredondada ao centavo e o resíduo (o que o arredondamento
+    tirou ou pôs) vai inteiro para a obra de maior peso — desempate pelo menor
+    `obra_id`. O destino não depende da ordem em que as obras são processadas,
+    então chamar esta função uma obra por vez produz o mesmo conjunto de
+    fatias, e `sum(fatias) == valor` sempre.
+
+    Sem horas apontadas em obra alguma (ponto zerado), divide em partes iguais
+    — é o único critério neutro disponível, e ainda fecha a soma.
+    """
+    obras = sorted(horas_por_obra)
+    if not obras:
+        return {}
+
+    valor = valor.quantize(_CENTAVO, rounding=ROUND_HALF_UP)
+
+    total_horas = sum(horas_por_obra.values())
+    if total_horas > 0:
+        pesos = horas_por_obra
+        total_peso = total_horas
+    else:
+        pesos = {obra: Decimal('1') for obra in obras}
+        total_peso = Decimal(len(obras))
+
+    fatias = {
+        obra: (valor * pesos[obra] / total_peso).quantize(_CENTAVO, rounding=ROUND_HALF_UP)
+        for obra in obras
+    }
+    destino_do_residuo = max(obras, key=lambda obra: (pesos[obra], -obra))
+    fatias[destino_do_residuo] += valor - sum(fatias.values())
+    return fatias
+
+
+def _folha_rateada_para_obra(dados_folha: Dict, obra_id: int,
+                             horas_por_obra: Dict[int, Decimal]) -> Dict:
+    """Cópia de `dados_folha` com os valores do mês reduzidos à fatia da obra."""
+    if obra_id not in horas_por_obra:
+        # Não deveria acontecer: o funcionário foi encontrado JUSTAMENTE por
+        # ter ponto nesta obra no mês. Se acontecer, gravar a folha cheia
+        # (comportamento antigo) erra menos que gravar zero.
+        logger.warning(
+            "[_folha_rateada_para_obra] obra %s fora do rateio de horas %s — "
+            "gravando a folha sem ratear", obra_id, sorted(horas_por_obra)
+        )
+        return dados_folha
+
+    rateada = dict(dados_folha)
+    for campo in _CAMPOS_RATEAVEIS_POR_OBRA:
+        valor = dados_folha.get(campo)
+        if valor is None:
+            continue
+        rateada[campo] = _ratear_valor_por_obra(Decimal(str(valor)), horas_por_obra)[obra_id]
+
+    # Encargo total e custo total da obra são DERIVADOS das fatias, não
+    # rateados por conta própria. Dois arredondamentos independentes ao
+    # centavo não fecham entre si, e a linha da obra passaria a violar o
+    # invariante que a A24a/B2.14 defendeu em `salvar_folha_processada`:
+    # `fgts + inss_patronal == custo_total_empresa - salario_bruto`. Somar as
+    # fatias fecha o invariante. (O rateio acima fica como fallback: se algum
+    # componente faltar no dict, é melhor uma fatia rateada que o valor cheio
+    # do mês.)
+    #
+    # O preço, consciente: derivando, a soma das fatias vale
+    # `Q(bruto) + Q(fgts) + Q(inss)`, enquanto o custo do mês em
+    # `processar_folha_funcionario` soma ANTES de arredondar — `Q(b + f + i)`.
+    # As duas diferem em um centavo quando os três arredondamentos se acumulam
+    # além de meio centavo (36% dos salários, medido). Escolhemos a exatidão
+    # POR LINHA, que é a que alguém lê; o centavo do total do mês é estrutural
+    # e está coberto por teto no teste do rateio.
+    fatia_fgts = rateada.get('fgts')
+    fatia_inss_patronal = rateada.get('inss_patronal')
+    fatia_bruto = rateada.get('salario_bruto')
+    if None not in (fatia_fgts, fatia_inss_patronal, fatia_bruto):
+        rateada['encargos_patronais'] = fatia_fgts + fatia_inss_patronal
+        rateada['custo_total_empresa'] = fatia_bruto + fatia_fgts + fatia_inss_patronal
+
+    return rateada
+
+
 def processar_e_salvar_folha_obra(obra_id: int, ano: int, mes: int, admin_id: int) -> Dict:
     """
     Processa e salva folhas de todos os funcionários que trabalharam em uma obra no período.
     Útil para recalcular dados de custo de uma obra.
-    
+
+    Onda 3 / Task 9 — dobra 3: a folha do mês é RATEADA pelas horas apontadas
+    em cada obra. Antes, a folha inteira era gravada contra CADA obra em que o
+    funcionário apontou: duas obras, duas folhas cheias, e o custo por obra —
+    com todo roll-up acima dele — saía multiplicado pelo número de obras.
+
     Args:
         obra_id: ID da obra
         ano: Ano de referência
         mes: Mês de referência
         admin_id: ID do administrador
-    
+
     Returns:
         dict com estatísticas do processamento
     """
     try:
         from models import RegistroPonto
-        
+
         funcionarios_ids = db.session.query(RegistroPonto.funcionario_id).filter(
             RegistroPonto.obra_id == obra_id,
             extract('year', RegistroPonto.data) == ano,
             extract('month', RegistroPonto.data) == mes
         ).distinct().all()
-        
+
         funcionarios_ids = [f[0] for f in funcionarios_ids]
-        
+
         processados = 0
         erros = 0
-        
+
         for func_id in funcionarios_ids:
             try:
                 funcionario = Funcionario.query.get(func_id)
                 if not funcionario:
                     continue
-                
+
                 dados_folha = processar_folha_funcionario(funcionario, ano, mes)
-                
+
                 if dados_folha:
+                    dados_folha = _folha_rateada_para_obra(
+                        dados_folha, obra_id,
+                        _horas_por_obra_no_mes(func_id, ano, mes)
+                    )
                     if salvar_folha_processada(func_id, obra_id, ano, mes, dados_folha, admin_id):
                         processados += 1
                     else:
