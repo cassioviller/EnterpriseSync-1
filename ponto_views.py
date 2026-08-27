@@ -1760,7 +1760,12 @@ def registrar_ponto_facial_api():
         registro.reconhecimento_facial_sucesso = True
         registro.confianca_reconhecimento = float(distancia) if distancia is not None else None
         registro.modelo_utilizado = 'SFace'
-        
+
+        # A mesma jornada valia 8h batida pelo PontoService
+        # (`ponto_service.py:138`) e 0h batida pela câmera: a rota commitava
+        # sem calcular. Sem isto a folha lê o dia como falta cheia.
+        PontoService._calcular_horas(registro)
+
         db.session.commit()
 
         # Emitir evento após commit — integração com diaristas V2 e outros módulos
@@ -2421,73 +2426,107 @@ def identificar_e_registrar():
                 registro.distancia_obra_metros = distancia_obra
         
         tipo_registrado = None
-        
+
+        # tipo_ponto_canonico: valor canônico para eventos
+        # (entrada/saida_almoco/volta_almoco/saida), igual ao da rota irmã
+        # `/api/registrar-facial`. O `tipo_registrado` ao lado é rótulo de
+        # tela e não serve de chave de evento.
+        tipo_ponto_canonico = None
+
         # Se tipo foi selecionado manualmente, usar esse
         if tipo_ponto:
             if tipo_ponto == 'entrada':
                 if registro.hora_entrada:
                     return jsonify({
-                        'success': False, 
+                        'success': False,
                         'message': f'{funcionario.nome}: Entrada já foi registrada hoje.',
                         'funcionario_nome': funcionario.nome
                     }), 400
                 registro.hora_entrada = agora
                 tipo_registrado = 'entrada'
+                tipo_ponto_canonico = 'entrada'
             elif tipo_ponto == 'almoco_saida':
                 if registro.hora_almoco_saida:
                     return jsonify({
-                        'success': False, 
+                        'success': False,
                         'message': f'{funcionario.nome}: Saída para almoço já foi registrada hoje.',
                         'funcionario_nome': funcionario.nome
                     }), 400
                 registro.hora_almoco_saida = agora
                 tipo_registrado = 'saída para almoço'
+                tipo_ponto_canonico = 'saida_almoco'
             elif tipo_ponto == 'almoco_retorno':
                 if registro.hora_almoco_retorno:
                     return jsonify({
-                        'success': False, 
+                        'success': False,
                         'message': f'{funcionario.nome}: Retorno do almoço já foi registrado hoje.',
                         'funcionario_nome': funcionario.nome
                     }), 400
                 registro.hora_almoco_retorno = agora
                 tipo_registrado = 'retorno do almoço'
+                tipo_ponto_canonico = 'volta_almoco'
             elif tipo_ponto == 'saida':
                 if registro.hora_saida:
                     return jsonify({
-                        'success': False, 
+                        'success': False,
                         'message': f'{funcionario.nome}: Saída já foi registrada hoje.',
                         'funcionario_nome': funcionario.nome
                     }), 400
                 registro.hora_saida = agora
                 tipo_registrado = 'saída'
+                tipo_ponto_canonico = 'saida'
         else:
             # Modo automático sequencial
             if not registro.hora_entrada:
                 registro.hora_entrada = agora
                 tipo_registrado = 'entrada'
+                tipo_ponto_canonico = 'entrada'
             elif registro.hora_entrada and not registro.hora_almoco_saida:
                 registro.hora_almoco_saida = agora
                 tipo_registrado = 'saída para almoço'
+                tipo_ponto_canonico = 'saida_almoco'
             elif registro.hora_almoco_saida and not registro.hora_almoco_retorno:
                 registro.hora_almoco_retorno = agora
                 tipo_registrado = 'retorno do almoço'
+                tipo_ponto_canonico = 'volta_almoco'
             elif not registro.hora_saida:
                 registro.hora_saida = agora
                 tipo_registrado = 'saída'
+                tipo_ponto_canonico = 'saida'
             else:
                 return jsonify({
-                    'success': False, 
+                    'success': False,
                     'message': f'{funcionario.nome}: Jornada completa já registrada hoje.',
                     'funcionario_nome': funcionario.nome
                 }), 400
-        
+
         # Salvar metadados do reconhecimento
         registro.reconhecimento_facial_sucesso = True
         registro.confianca_reconhecimento = float(menor_distancia) if menor_distancia is not None else None
         registro.modelo_utilizado = 'SFace'
-        
+
+        # A mesma jornada valia 8h batida pelo PontoService
+        # (`ponto_service.py:138`) e 0h batida pela câmera: a rota commitava
+        # sem calcular. Sem isto a folha lê o dia como falta cheia.
+        PontoService._calcular_horas(registro)
+
         db.session.commit()
-        
+
+        # Emitir evento após commit — esta era a única rota de ponto que
+        # nunca emitia: ponto batido no totem da obra não virava custo de
+        # diarista nenhum (`event_manager`, handler de `ponto_registrado`).
+        if tipo_ponto_canonico:
+            try:
+                from event_manager import EventManager
+                EventManager.emit('ponto_registrado', {
+                    'registro_id': registro.id,
+                    'tipo_ponto': tipo_ponto_canonico,
+                }, admin_id=admin_id)
+            except Exception as ev_err:
+                logger.warning(
+                    f"[WARN] Evento ponto_registrado não emitido "
+                    f"(identificar-e-registrar): {ev_err}")
+
         tempo_total = time.time() - start_total
         
         # Log de performance com indicador visual
