@@ -17,6 +17,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import main  # noqa: F401 — registra blueprints e handlers de evento
 from app import app, db
+from helpers_dinheiro import (custo_diario, filhos_mao_de_obra,  # noqa: F401
+                              linhas_mao_de_obra, mao_de_obra, rdo_da_obra,
+                              soma)
 from helpers_tenant import cliente_de, um_tenant  # noqa: F401
 
 pytestmark = pytest.mark.integration
@@ -259,3 +262,106 @@ def test_identificar_e_registrar_calcula_horas_e_emite_evento(monkeypatch):
         assert pontos[0][1]['registro_id'] == registro.id
         assert pontos[0][1]['tipo_ponto'] == 'saida'
         assert pontos[0][2] == t.admin_id
+
+
+# ---------------------------------------------------------------------------
+# Defeito 3 — a edição unificada que não estorna (views/rdo.py:2867)
+# ---------------------------------------------------------------------------
+
+def _servico_do_tenant(tenant):
+    """Um `Servico` ativo do tenant.
+
+    `POST /rdo/salvar` sem campo de subatividade cai num fallback que pega o
+    PRIMEIRO `Servico` do admin; sem nenhum, ela dá flash+redirect ANTES de
+    parsear a mão de obra, e o teste mediria o abandono da rota.
+    """
+    from models import Servico
+    servico = Servico(nome=f'Servico {tenant.marca}', categoria='geral',
+                      unidade_medida='un', custo_unitario=100.0, ativo=True,
+                      admin_id=tenant.admin_id)
+    db.session.add(servico)
+    db.session.commit()
+    return servico
+
+
+def _segundo_funcionario(tenant):
+    """O colega que vai SAIR do RDO na edição."""
+    import uuid
+    from models import Funcionario
+    funcionario = Funcionario(
+        codigo=f'B{uuid.uuid4().hex[:8].upper()}',
+        nome=f'Colega {tenant.marca}',
+        cpf=f'{uuid.uuid4().int % 10**11:011d}',
+        data_admissao=date(2026, 1, 2), admin_id=tenant.admin_id, ativo=True,
+        salario=3000.0, tipo_remuneracao='salario', valor_diaria=0.0)
+    db.session.add(funcionario)
+    db.session.commit()
+    return funcionario
+
+
+def _submeter(tenant, rdo_id):
+    """`POST /rdo/<id>/finalizar` — o Submeter, que é quem lança o custo."""
+    resposta = cliente_de(tenant.admin_id).post(f'/rdo/{rdo_id}/finalizar')
+    assert resposta.status_code in (200, 302), (
+        f'finalizar respondeu {resposta.status_code}')
+    db.session.expire_all()
+
+
+def test_edicao_unificada_estorna_o_custo_de_quem_saiu():
+    """🔴 A edição apagava `RDOMaoObra` em bloco e deixava o custo de pé.
+
+    `rdo_salvar_unificado` (`views/rdo.py:2864`) fazia
+    `RDOMaoObra.query.filter_by(rdo_id=...).delete()` **sem**
+    `remover_custos_rdo`/`remover_custo_diario_rdo` — e como os dois casam o
+    lançamento pelo id da linha que acabou de ser apagada, o custo do
+    trabalhador removido virava órfão insuprimível: ele seguia sendo cobrado
+    na obra para sempre.
+    """
+    from models import RDOMaoObra
+
+    with app.app_context():
+        t = um_tenant('onda3_edit', data_ref=DIA, com_fatos=False,
+                      tipo_remuneracao='salario', valor_diaria=0.0,
+                      salario=3000.0)
+        _servico_do_tenant(t)
+        colega = _segundo_funcionario(t)
+
+        rdo = rdo_da_obra(t, DIA)
+        mao_de_obra(rdo, t, horas=8.0)
+        db.session.add(RDOMaoObra(
+            rdo_id=rdo.id, admin_id=t.admin_id, funcionario_id=colega.id,
+            funcao_exercida='Servente', horas_trabalhadas=8.0))
+        db.session.commit()
+        rdo_id = rdo.id
+
+        _submeter(t, rdo_id)
+        antes = filhos_mao_de_obra(t)
+        assert len(antes) == 2, (
+            f'o cenário precisa dos DOIS custos lançados; veio {len(antes)}')
+        valor_de_um = soma(antes) / 2
+
+        # A edição que remove o colega: só o funcionário do tenant volta no
+        # formulário (campos achatados do path A, `views/rdo.py:3307`).
+        cli = cliente_de(t.admin_id)
+        resposta = cli.post('/rdo/salvar', data={
+            'rdo_id': str(rdo_id),
+            'obra_id': str(t.obra_id),
+            'data_relatorio': DIA.isoformat(),
+            f'funcionario_{t.funcionario_id}_nome': f'Funcionario {t.marca}',
+            f'funcionario_{t.funcionario_id}_horas': '8',
+        })
+        assert resposta.status_code in (200, 302), (
+            f'salvar respondeu {resposta.status_code}')
+
+        equipe = linhas_mao_de_obra(rdo_id)
+        assert [l.funcionario_id for l in equipe] == [t.funcionario_id], (
+            'o cenário depende de a edição ter mesmo removido o colega')
+
+        depois = filhos_mao_de_obra(t)
+        assert len(depois) == 1, (
+            f'o custo do trabalhador removido continua no razão: esperava 1 '
+            f'lançamento de mão de obra, encontrou {len(depois)}')
+        assert soma(depois) == pytest.approx(valor_de_um, abs=0.01)
+        assert len(custo_diario(rdo_id)) == 1, (
+            'o RDOCustoDiario do removido também precisa sair — é dele que o '
+            'lançamento nasce de novo')

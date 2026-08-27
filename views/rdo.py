@@ -2859,7 +2859,27 @@ def rdo_salvar_unificado():
                 flash('RDO não encontrado ou sem permissão de acesso.', 'error')
                 return redirect('/rdo')
             
-            # Limpar dados antigos para substituir pelos novos
+            # Limpar dados antigos para substituir pelos novos.
+            #
+            # O estorno vem ANTES do delete: os dois removedores casam o
+            # lançamento pelo id da linha de origem (`origem_id` em
+            # `services/rdo_custos.remover_custos_rdo`), e com a linha já
+            # apagada o custo de quem saiu do RDO virava órfão insuprimível
+            # — o trabalhador removido seguia sendo cobrado na obra. Mesma
+            # ordem de `rdo_editar_sistema.py:357-368` e
+            # `crud_rdo_completo.py:293-297`. O que fica é relançado adiante,
+            # por `gravar_custo_funcionario_rdo` + `rdo_finalizado`.
+            try:
+                from services.rdo_custos import remover_custos_rdo
+                remover_custos_rdo(rdo, admin_id_correto)
+            except Exception as _e:
+                logger.warning(f"[rdo-custo] remover_custos_rdo falhou: {_e}")
+            try:
+                from services.custo_funcionario_dia import remover_custo_diario_rdo
+                remover_custo_diario_rdo(rdo.id)
+            except Exception as _e:
+                logger.warning(f"[custo-dia] remover_custo_diario_rdo falhou: {_e}")
+
             RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).delete()
             RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
             RDOEquipamento.query.filter_by(rdo_id=rdo.id).delete()
