@@ -608,33 +608,65 @@ def test_salvar_rdo_legado_nao_passa_kwargs_que_rdo_nao_aceita():
         'NameError e TypeError garantidos no primeiro uso')
 
 
-def test_flexivel_nao_produz_rdo_duplicado_na_mesma_data():
-    """🔴 `salvar_rdo_flexivel` ignorava `rdo_id` e não tinha guarda de
-    obra+data: era O PRODUTOR dos RDOs duplicados que os serviços de
-    exportação e atualização contornam. E a colisão de `numero_rdo` era
-    checada por admin_id numa coluna UNIQUE GLOBAL."""
+def test_flexivel_honra_rdo_id_em_vez_de_banir_o_segundo_rdo_do_dia():
+    """🔴 `salvar_rdo_flexivel` ignora `rdo_id`: quem manda o id de um RDO
+    existente pedindo edição recebe um RDO NOVO. Essa é a metade do achado
+    `views/rdo.py:4002` que produz duplicata de verdade.
+
+    ⚠️ A outra metade — "não tem guarda de obra+data" — foi corrigida com uma
+    guarda cega e **revertida em 28/08**: dois RDOs na mesma obra e mesmo dia
+    são estado LEGAL do domínio, não duplicata. `custo_funcionario_dia.py`
+    rateia a diária entre os RDOs do dia e recalcula os vizinhos em cruz, e a
+    Onda 3 / Task 9 desta mesma auditoria aprofundou exatamente esse caso.
+    A guarda cega recusava com 302+flash — sucesso aos olhos de todo chamador
+    que confere status —, matava o toggle reverso de terceiros e derrubava 6
+    testes de caracterização que congelam a regra de propósito.
+
+    Este teste fixa as duas pontas: sem `rdo_id`, cria; com `rdo_id`, edita.
+    """
     with app.app_context():
         from test_cronograma_versao_service import _ambiente
 
-        from models import RDO
         admin, obra = _ambiente()
         admin_id, obra_id = admin.id, obra.id
 
     cliente = cliente_de(admin_id)
     form = {'obra_id': str(obra_id), 'data_relatorio': '2026-08-18'}
-    r1 = cliente.post('/salvar-rdo-flexivel', data=form)
-    r2 = cliente.post('/salvar-rdo-flexivel', data=form)
+
+    # Sem `rdo_id`: o segundo RDO do dia é legal e tem de nascer.
+    cliente.post('/salvar-rdo-flexivel', data=form)
+    cliente.post('/salvar-rdo-flexivel', data=form)
 
     with app.app_context():
         from datetime import date
 
         from models import RDO
-        quantos = RDO.query.filter_by(
+        rdos = RDO.query.filter_by(
             obra_id=obra_id, admin_id=admin_id,
-            data_relatorio=date(2026, 8, 18)).count()
-        assert quantos == 1, (
-            f'{quantos} RDOs para a mesma obra+data — o flexível segue '
-            'produzindo duplicatas')
+            data_relatorio=date(2026, 8, 18)).order_by(RDO.id).all()
+        assert len(rdos) == 2, (
+            f'{len(rdos)} RDO(s) para obra+data — dois RDOs no mesmo dia são '
+            'estado legal: a diária é rateada entre eles')
+        alvo_id = rdos[0].id
+
+    # Com `rdo_id`: é pedido de EDIÇÃO. Não pode nascer um terceiro.
+    cliente.post('/salvar-rdo-flexivel',
+                 data={**form, 'rdo_id': str(alvo_id),
+                       'observacoes_gerais': 'editado pelo flexivel'})
+
+    with app.app_context():
+        from datetime import date
+
+        from models import RDO
+        depois = RDO.query.filter_by(
+            obra_id=obra_id, admin_id=admin_id,
+            data_relatorio=date(2026, 8, 18)).all()
+        assert len(depois) == 2, (
+            f'POST com rdo_id criou RDO novo em vez de editar: {len(depois)} '
+            'no total — é este o produtor real das duplicatas')
+        alvo = RDO.query.get(alvo_id)
+        assert alvo.comentario_geral == 'editado pelo flexivel', (
+            'o rdo_id foi aceito mas a edição não chegou ao RDO apontado')
 
 
 def test_flexivel_checa_colisao_de_numero_globalmente():

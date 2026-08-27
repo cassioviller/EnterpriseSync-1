@@ -4031,31 +4031,41 @@ def salvar_rdo_flexivel():
         else:
             data_relatorio = datetime.now().date()
 
-        # Guarda de obra+data: esta rota criava SEMPRE — era o produtor
-        # dos RDOs duplicados na mesma data que os serviços de exportação
-        # e atualização contornam. Já existe RDO? A edição tem rota
-        # própria; aqui a resposta honesta é apontar o existente.
-        _ja_existe = RDO.query.filter_by(
-            obra_id=obra_id, admin_id=admin_id,
-            data_relatorio=data_relatorio).first()
-        if _ja_existe:
-            logger.warning(
-                '[GUARD] RDO duplicado recusado: obra=%s data=%s ja tem %s',
-                obra_id, data_relatorio, _ja_existe.numero_rdo)
-            flash(f'Já existe um RDO ({_ja_existe.numero_rdo}) para esta '
-                  f'obra em {data_relatorio.strftime("%d/%m/%Y")}. '
-                  'Edite o existente.', 'warning')
-            return redirect(url_for('main.funcionario_rdo_novo'))
-            
+        # `rdo_id` no form é pedido de EDIÇÃO, e esta rota o ignorava: quem
+        # mandava o id de um RDO existente recebia um RDO NOVO. É esta metade
+        # do achado que produz as duplicatas que exportação e atualização
+        # contornam — não a existência de dois RDOs no mesmo dia.
+        #
+        # ⚠️ 28/08 — NÃO pôr aqui guarda de obra+data. Dois RDOs na mesma obra
+        # e mesmo dia são estado LEGAL: `services/custo_funcionario_dia.py`
+        # rateia a diária entre os RDOs do dia e recalcula os vizinhos em cruz,
+        # e a Onda 3 / Task 9 aprofundou exatamente esse caso. A guarda cega
+        # tentada nesta onda recusava com 302 + flash — sucesso aos olhos de
+        # todo chamador que confere status —, matava o toggle reverso de
+        # terceiros e derrubava 6 testes de caracterização que congelam a
+        # regra de propósito.
+        _rdo_alvo = None
+        _rdo_id_form = (request.form.get('rdo_id') or '').strip()
+        if _rdo_id_form.isdigit():
+            _rdo_alvo = RDO.query.filter_by(
+                id=int(_rdo_id_form), obra_id=obra_id,
+                admin_id=admin_id).first()
+            if _rdo_alvo is None:
+                logger.warning(
+                    '[EDIT] rdo_id=%s nao pertence a obra=%s/admin=%s — '
+                    'ignorado, seguindo como criacao',
+                    _rdo_id_form, obra_id, admin_id)
+
         # [OK] CORREÇÃO CRÍTICA: Gerar número RDO Único (evita constraint violation)
             logger.info(f"[NUM] GERANDO NÚMERO RDO Único para admin_id={admin_id}, ano={data_relatorio.year}")
         
         # Gerar número único com verificação de duplicata
         contador = 1
-        numero_rdo = None
-        
-        # Loop para garantir número único
-        for tentativa in range(1, 1000):  # Máximo 999 tentativas
+        numero_rdo = _rdo_alvo.numero_rdo if _rdo_alvo is not None else None
+
+        # Loop para garantir número único. Editando (`rdo_id` no form), o
+        # número é o que o RDO já tem — gerar outro renomearia o documento.
+        for tentativa in range(1, 1000 if numero_rdo is None else 1):  # Máximo 999 tentativas
             numero_proposto = f"RDO-{admin_id}-{data_relatorio.year}-{tentativa:03d}"
             
             # Verificar se já existe — SEM filtro de admin_id: a coluna
@@ -4093,24 +4103,43 @@ def salvar_rdo_flexivel():
                 _criado_por_id = funcionario_id
             else:
                 logger.warning(f"[WARN] funcionario_id={funcionario_id} não existe em usuario - criado_por_id será None")
-        rdo = RDO(
-            numero_rdo=numero_rdo,
-            obra_id=obra_id,
-            criado_por_id=_criado_por_id,
-            data_relatorio=data_relatorio,
-            local=request.form.get('local', 'Campo'),
-            admin_id=admin_id,
-            # Task #61 — clima alinhado à visualização
-            clima_geral=(request.form.get('clima_geral') or '').strip() or None,
-            temperatura_media=(request.form.get('temperatura_media') or '').strip() or None,
-            condicoes_trabalho=(request.form.get('condicoes_trabalho') or '').strip() or None,
-            # Observação geral (campo único)
-            comentario_geral=(
-                request.form.get('observacoes_gerais', '').strip()
-                or request.form.get('comentario_geral', '').strip()
-                or request.form.get('observacoes_finais', '').strip()
-            ),
+        _comentario_geral = (
+            request.form.get('observacoes_gerais', '').strip()
+            or request.form.get('comentario_geral', '').strip()
+            or request.form.get('observacoes_finais', '').strip()
         )
+        if _rdo_alvo is not None:
+            # Edição: o form apontou um RDO desta obra/tenant. Criar outro aqui
+            # era o que produzia a duplicata. `criado_por_id` e `numero_rdo`
+            # ficam como estão — autoria e documento não mudam de dono numa
+            # edição.
+            rdo = _rdo_alvo
+            rdo.local = request.form.get('local', rdo.local or 'Campo')
+            rdo.clima_geral = (
+                request.form.get('clima_geral') or '').strip() or rdo.clima_geral
+            rdo.temperatura_media = (
+                request.form.get('temperatura_media') or '').strip() or rdo.temperatura_media
+            rdo.condicoes_trabalho = (
+                request.form.get('condicoes_trabalho') or '').strip() or rdo.condicoes_trabalho
+            if _comentario_geral:
+                rdo.comentario_geral = _comentario_geral
+            logger.info('[EDIT] RDO %s editado pelo flexivel (id=%s)',
+                        rdo.numero_rdo, rdo.id)
+        else:
+            rdo = RDO(
+                numero_rdo=numero_rdo,
+                obra_id=obra_id,
+                criado_por_id=_criado_por_id,
+                data_relatorio=data_relatorio,
+                local=request.form.get('local', 'Campo'),
+                admin_id=admin_id,
+                # Task #61 — clima alinhado à visualização
+                clima_geral=(request.form.get('clima_geral') or '').strip() or None,
+                temperatura_media=(request.form.get('temperatura_media') or '').strip() or None,
+                condicoes_trabalho=(request.form.get('condicoes_trabalho') or '').strip() or None,
+                # Observação geral (campo único)
+                comentario_geral=_comentario_geral,
+            )
         
         # FASE 4: PERSISTIR COM TRANSAÇÃO ROBUSTA (Arquitetura Joris Kuypers INLINE)
         logger.info(f"[START] INICIANDO TRANSAÇÃO - RDO {numero_rdo}")
