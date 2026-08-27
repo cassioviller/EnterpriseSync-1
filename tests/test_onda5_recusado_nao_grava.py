@@ -479,6 +479,29 @@ def test_regressao_real_depois_de_superexecucao_e_barrada():
         db.session.rollback()
 
 
+def test_reuso_por_chave_natural_restaura_a_tarefa_arquivada():
+    """🔴 `cronograma_proposta.py:602`/`:675` — os ramos de reúso por chave
+    natural reaproveitavam a tarefa casada SEM restaurar `ativa`:
+    item suprimido e re-adicionado como novo ficava sem tarefa viva, em
+    silêncio (`natural_key_index` não filtra `ativa` — casa a arquivada).
+    """
+    import inspect
+
+    from services import cronograma_proposta
+
+    fonte = inspect.getsource(cronograma_proposta)
+    reusos = []
+    for numero, linha in enumerate(fonte.splitlines(), start=1):
+        if '— reuso' in linha or '- reusar' in linha.lower() \
+                or 'reusar' in linha.lower():
+            reusos.append(numero)
+    assert len(reusos) >= 2, 'os dois ramos de reúso sumiram do fonte?'
+
+    assert fonte.count('.ativa = True') >= 2, (
+        'os ramos de reúso não restauram `ativa` — item suprimido e '
+        're-adicionado fica sem tarefa viva, em silêncio')
+
+
 def test_a_tela_de_comparar_e_alcancavel_pela_navegacao():
     """Entrega inalcançável não é entrega."""
     import subprocess

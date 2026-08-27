@@ -602,6 +602,12 @@ def materializar_cronograma(
         if existente_serv is not None:
             # Reusar tarefa existente (Task #144) — preenche PI se faltar
             tarefa_serv = existente_serv
+            # `natural_key_index` não filtra `ativa`: a casada pode ser uma
+            # tarefa ARQUIVADA (item suprimido numa revisão anterior). Sem
+            # restaurá-la, o item re-adicionado ficava sem tarefa viva, em
+            # silêncio.
+            if not tarefa_serv.ativa:
+                tarefa_serv.ativa = True
             if tarefa_serv.gerada_por_proposta_item_id is None and pi_id:
                 tarefa_serv.gerada_por_proposta_item_id = pi_id
             if tarefa_serv.servico_id is None and servico_id_no:
@@ -675,6 +681,9 @@ def materializar_cronograma(
                 if existente is not None:
                     # Task #144 — tarefa equivalente já existe; reusar
                     tarefa = existente
+                    # Mesmo caso do nó-raiz: a casada pode estar arquivada.
+                    if not tarefa.ativa:
+                        tarefa.ativa = True
                     if tarefa.gerada_por_proposta_item_id is None and pi_id:
                         tarefa.gerada_por_proposta_item_id = pi_id
                     # Task #4 — preencher servico_id quando faltar
