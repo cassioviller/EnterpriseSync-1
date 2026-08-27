@@ -375,3 +375,152 @@ def test_composicao_do_custo_da_obra_nao_soma_he_e_dsr_duas_vezes():
     esperado_base = (dados['salario_bruto'] - dados['valor_he_50']
                      - dados['valor_he_100'] - dados['valor_dsr'])
     assert fatias['Salário Base'] == pytest.approx(esperado_base, abs=0.02)
+
+
+# ---------------------------------------------------------------------------
+# Task 9 / dobra 3 — a folha do mês é rateada entre as obras, não repetida
+# ---------------------------------------------------------------------------
+
+def _segunda_obra(admin_id, cliente_id, marca):
+    """Uma segunda obra no MESMO tenant — o arreio só semeia uma."""
+    from models import Obra
+    obra = Obra(nome=f'Obra 2 {marca}', codigo=f'{marca[:8]}B2',
+                data_inicio=date(2026, 1, 1), admin_id=admin_id,
+                cliente_id=cliente_id, valor_contrato=100000,
+                orcamento=100000, status='Em andamento')
+    db.session.add(obra)
+    db.session.commit()
+    return obra.id
+
+
+def _seed_ponto_dividido_entre_obras(admin_id, funcionario_id,
+                                      obra_a, obra_b, dias_na_obra_a):
+    """Mês cheio em 8h/dia: os primeiros `dias_na_obra_a` dias úteis na obra A,
+    o resto na obra B. Devolve (horas_a, horas_b)."""
+    from models import RegistroPonto
+    ultimo_dia = calendar.monthrange(ANO_REF, MES_REF)[1]
+    horas_a = horas_b = 0.0
+    uteis = 0
+    for dia in range(1, ultimo_dia + 1):
+        data = date(ANO_REF, MES_REF, dia)
+        if data.weekday() >= 5:
+            continue
+        uteis += 1
+        obra_id = obra_a if uteis <= dias_na_obra_a else obra_b
+        if obra_id == obra_a:
+            horas_a += 8.0
+        else:
+            horas_b += 8.0
+        db.session.add(RegistroPonto(
+            funcionario_id=funcionario_id, obra_id=obra_id, admin_id=admin_id,
+            data=data, horas_trabalhadas=8.0, horas_extras=0.0))
+    db.session.commit()
+    return horas_a, horas_b
+
+
+def test_folha_do_mes_e_rateada_entre_as_obras_e_a_soma_fecha():
+    """🔴 dobra 3 — `services/folha_service.py:processar_e_salvar_folha_obra`.
+
+    Quem apontou em duas obras no mês tinha a folha INTEIRA gravada contra
+    CADA uma delas: duas obras, duas folhas cheias, custo por obra e todo
+    roll-up com o dobro do que a empresa pagou. O rateio é por horas
+    apontadas em cada obra — e as partes precisam somar EXATAMENTE o total
+    do mês, sem sobra nem falta de centavo.
+    """
+    from models import FolhaProcessada, Funcionario
+    from services.folha_service import (processar_e_salvar_folha_obra,
+                                        processar_folha_funcionario)
+
+    with app.app_context():
+        t = um_tenant('onda3_rateio', com_fatos=False)
+        admin_id = t.admin_id
+        obra_a, obra_b = t.obra_id, _segunda_obra(admin_id, t.cliente_id, t.marca)
+        _seed_parametros_legais(admin_id)
+        _seed_horario_trabalho(admin_id, t.funcionario_id, t.marca)
+        # 7 dias na obra A e 15 na obra B: 56h/176h não é fração redonda —
+        # é o caso em que o rateio precisa acertar o centavo do resíduo.
+        horas_a, horas_b = _seed_ponto_dividido_entre_obras(
+            admin_id, t.funcionario_id, obra_a, obra_b, dias_na_obra_a=7)
+
+        funcionario = Funcionario.query.filter_by(
+            id=t.funcionario_id, admin_id=admin_id).first()
+        do_mes = processar_folha_funcionario(funcionario, ANO_REF, MES_REF)
+        assert do_mes is not None, 'pré-condição: a folha precisa processar'
+
+        processar_e_salvar_folha_obra(obra_a, ANO_REF, MES_REF, admin_id)
+        processar_e_salvar_folha_obra(obra_b, ANO_REF, MES_REF, admin_id)
+
+        folhas = FolhaProcessada.query.filter_by(
+            admin_id=admin_id, ano=ANO_REF, mes=MES_REF).all()
+        por_obra = {f.obra_id: f for f in folhas}
+
+    assert set(por_obra) == {obra_a, obra_b}, (
+        f'esperado uma linha por obra trabalhada, veio {sorted(por_obra)}')
+
+    def _total(campo):
+        return sum(getattr(f, campo) for f in por_obra.values())
+
+    def _do_mes(campo):
+        return Decimal(str(do_mes[campo])).quantize(Decimal('0.01'))
+
+    # 1) Nenhuma obra carrega o mês inteiro.
+    for obra_id, folha in por_obra.items():
+        assert folha.custo_total_empresa < _do_mes('custo_total_empresa'), (
+            f'obra {obra_id} recebeu a folha INTEIRA do mês: '
+            f'{folha.custo_total_empresa} de {_do_mes("custo_total_empresa")}')
+
+    # 2) As partes somam EXATAMENTE o total do mês — sem resíduo perdido.
+    for campo_folha, campo_dados in (
+            ('custo_total_empresa', 'custo_total_empresa'),
+            ('salario_bruto', 'salario_bruto'),
+            ('salario_liquido', 'salario_liquido'),
+            ('encargos_fgts', 'fgts'),
+            ('horas_trabalhadas', 'horas_trabalhadas')):
+        assert _total(campo_folha) == _do_mes(campo_dados), (
+            f'{campo_folha}: rateio soma {_total(campo_folha)}, '
+            f'mês inteiro é {_do_mes(campo_dados)}')
+
+    # 3) Cada linha por obra respeita o invariante interno que a linha do mês
+    #    respeita (A24a/B2.14): fgts + inss patronal = custo total − bruto.
+    for obra_id, folha in por_obra.items():
+        assert (folha.encargos_fgts + folha.encargos_inss_patronal
+                == folha.custo_total_empresa - folha.salario_bruto), (
+            f'a linha da obra {obra_id} viola o invariante dos encargos: '
+            f'{folha.encargos_fgts} + {folha.encargos_inss_patronal} != '
+            f'{folha.custo_total_empresa} - {folha.salario_bruto}')
+
+    # 4) E cada parte é proporcional às horas apontadas naquela obra.
+    horas_totais = Decimal(str(horas_a + horas_b))
+    esperado_a = (_do_mes('custo_total_empresa')
+                  * Decimal(str(horas_a)) / horas_totais)
+    assert abs(por_obra[obra_a].custo_total_empresa - esperado_a) <= Decimal('0.01'), (
+        f'obra A ficou com {por_obra[obra_a].custo_total_empresa}, '
+        f'proporcional a {horas_a}h de {horas_totais}h seria {esperado_a:.2f}')
+
+
+def test_rateio_da_folha_nao_perde_o_centavo_do_arredondamento():
+    """O resíduo do arredondamento tem destino fixo — e a soma fecha.
+
+    Complementa o teste acima: com 56h/120h as fatias já caem redondas, e
+    fechar a soma ali não prova que o centavo perdido no arredondamento tem
+    para onde ir. Três obras com o mesmo peso é o caso em que ele sempre
+    sobra (R$ 100,00 ÷ 3 = 33,33 × 3 = 99,99).
+    """
+    from services.folha_service import _ratear_valor_por_obra
+
+    horas_iguais = {77: Decimal('8'), 12: Decimal('8'), 45: Decimal('8')}
+    fatias = _ratear_valor_por_obra(Decimal('100.00'), horas_iguais)
+
+    assert sum(fatias.values()) == Decimal('100.00'), (
+        f'o rateio perdeu o resíduo: {fatias}')
+    # Destino determinístico: maior peso, desempate pelo menor obra_id — não
+    # depende da ordem em que as obras são processadas.
+    assert fatias == {12: Decimal('33.34'), 45: Decimal('33.33'),
+                      77: Decimal('33.33')}
+
+    # E com peso desigual, o resíduo vai para a obra de maior peso.
+    fatias = _ratear_valor_por_obra(
+        Decimal('100.00'), {8: Decimal('1'), 3: Decimal('2')})
+    assert sum(fatias.values()) == Decimal('100.00')
+    assert fatias[3] == Decimal('66.67')
+

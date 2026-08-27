@@ -4,7 +4,7 @@ Centraliza todos os cálculos de folha, INSS, IR, FGTS e horas extras
 """
 
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Optional
 from sqlalchemy import extract
 from models import db, Funcionario, RegistroPonto, ParametrosLegais, ConfiguracaoSalarial, BeneficioFuncionario, CalendarioUtil, HorarioDia, HorarioTrabalho, FolhaPagamento, GestaoCustoPai, GestaoCustoFilho, LancamentoContabil
@@ -1575,43 +1575,165 @@ def obter_dados_folha_obra(obra_id: int, data_inicio: date, data_fim: date, admi
         }
 
 
+_CENTAVO = Decimal('0.01')
+
+# Onda 3 / Task 9 — dobra 3. Campos de `processar_folha_funcionario` que são
+# grandeza do MÊS INTEIRO e por isso precisam ser rateados entre as obras
+# antes de virar uma linha `FolhaProcessada` por obra. São exatamente os que
+# `salvar_folha_processada` persiste (mais `encargos_patronais`, de onde ela
+# deduz o INSS patronal quando `inss_patronal` não vem).
+_CAMPOS_RATEAVEIS_POR_OBRA = (
+    'salario_base', 'salario_bruto', 'total_proventos', 'total_descontos',
+    'salario_liquido', 'valor_he_50', 'valor_he_100', 'valor_dsr',
+    'fgts', 'inss_patronal', 'encargos_patronais', 'custo_total_empresa',
+    'inss', 'irrf', 'desconto_faltas', 'desconto_atrasos',
+    'horas_trabalhadas', 'horas_extras_50', 'horas_extras_100', 'horas_falta',
+)
+
+
+def _horas_por_obra_no_mes(funcionario_id: int, ano: int, mes: int) -> Dict[int, Decimal]:
+    """Horas apontadas por obra no mês — a chave do rateio da folha.
+
+    Só entram registros COM obra: hora sem obra não é lançável em obra
+    nenhuma, e mantê-la no denominador faria a soma das partes ficar abaixo
+    do total do mês (o custo dela sumiria do roll-up). Fora do denominador,
+    ela é distribuída entre as obras junto com o resto.
+    """
+    from models import RegistroPonto
+    from sqlalchemy import func as sql_func
+
+    linhas = db.session.query(
+        RegistroPonto.obra_id,
+        sql_func.coalesce(sql_func.sum(RegistroPonto.horas_trabalhadas), 0)
+    ).filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        RegistroPonto.obra_id.isnot(None),
+        extract('year', RegistroPonto.data) == ano,
+        extract('month', RegistroPonto.data) == mes
+    ).group_by(RegistroPonto.obra_id).all()
+
+    return {obra_id: Decimal(str(horas or 0)) for obra_id, horas in linhas}
+
+
+def _ratear_valor_por_obra(valor: Decimal, horas_por_obra: Dict[int, Decimal]) -> Dict[int, Decimal]:
+    """Divide `valor` entre as obras na proporção das horas — somando EXATO.
+
+    Cada fatia é arredondada ao centavo e o resíduo (o que o arredondamento
+    tirou ou pôs) vai inteiro para a obra de maior peso — desempate pelo menor
+    `obra_id`. O destino não depende da ordem em que as obras são processadas,
+    então chamar esta função uma obra por vez produz o mesmo conjunto de
+    fatias, e `sum(fatias) == valor` sempre.
+
+    Sem horas apontadas em obra alguma (ponto zerado), divide em partes iguais
+    — é o único critério neutro disponível, e ainda fecha a soma.
+    """
+    obras = sorted(horas_por_obra)
+    if not obras:
+        return {}
+
+    valor = valor.quantize(_CENTAVO, rounding=ROUND_HALF_UP)
+
+    total_horas = sum(horas_por_obra.values())
+    if total_horas > 0:
+        pesos = horas_por_obra
+        total_peso = total_horas
+    else:
+        pesos = {obra: Decimal('1') for obra in obras}
+        total_peso = Decimal(len(obras))
+
+    fatias = {
+        obra: (valor * pesos[obra] / total_peso).quantize(_CENTAVO, rounding=ROUND_HALF_UP)
+        for obra in obras
+    }
+    destino_do_residuo = max(obras, key=lambda obra: (pesos[obra], -obra))
+    fatias[destino_do_residuo] += valor - sum(fatias.values())
+    return fatias
+
+
+def _folha_rateada_para_obra(dados_folha: Dict, obra_id: int,
+                             horas_por_obra: Dict[int, Decimal]) -> Dict:
+    """Cópia de `dados_folha` com os valores do mês reduzidos à fatia da obra."""
+    if obra_id not in horas_por_obra:
+        # Não deveria acontecer: o funcionário foi encontrado JUSTAMENTE por
+        # ter ponto nesta obra no mês. Se acontecer, gravar a folha cheia
+        # (comportamento antigo) erra menos que gravar zero.
+        logger.warning(
+            "[_folha_rateada_para_obra] obra %s fora do rateio de horas %s — "
+            "gravando a folha sem ratear", obra_id, sorted(horas_por_obra)
+        )
+        return dados_folha
+
+    rateada = dict(dados_folha)
+    for campo in _CAMPOS_RATEAVEIS_POR_OBRA:
+        valor = dados_folha.get(campo)
+        if valor is None:
+            continue
+        rateada[campo] = _ratear_valor_por_obra(Decimal(str(valor)), horas_por_obra)[obra_id]
+
+    # Encargo total e custo total da obra são DERIVADOS das fatias, não
+    # rateados por conta própria. Dois arredondamentos independentes ao
+    # centavo não fecham entre si, e a linha da obra passaria a violar o
+    # invariante que a A24a/B2.14 defendeu em `salvar_folha_processada`:
+    # `fgts + inss_patronal == custo_total_empresa - salario_bruto`. Somar as
+    # fatias fecha o invariante e a soma das partes continua batendo com o
+    # mês. (O rateio acima fica como fallback: se algum componente faltar no
+    # dict, é melhor uma fatia rateada que o valor cheio do mês.)
+    fatia_fgts = rateada.get('fgts')
+    fatia_inss_patronal = rateada.get('inss_patronal')
+    fatia_bruto = rateada.get('salario_bruto')
+    if None not in (fatia_fgts, fatia_inss_patronal, fatia_bruto):
+        rateada['encargos_patronais'] = fatia_fgts + fatia_inss_patronal
+        rateada['custo_total_empresa'] = fatia_bruto + fatia_fgts + fatia_inss_patronal
+
+    return rateada
+
+
 def processar_e_salvar_folha_obra(obra_id: int, ano: int, mes: int, admin_id: int) -> Dict:
     """
     Processa e salva folhas de todos os funcionários que trabalharam em uma obra no período.
     Útil para recalcular dados de custo de uma obra.
-    
+
+    Onda 3 / Task 9 — dobra 3: a folha do mês é RATEADA pelas horas apontadas
+    em cada obra. Antes, a folha inteira era gravada contra CADA obra em que o
+    funcionário apontou: duas obras, duas folhas cheias, e o custo por obra —
+    com todo roll-up acima dele — saía multiplicado pelo número de obras.
+
     Args:
         obra_id: ID da obra
         ano: Ano de referência
         mes: Mês de referência
         admin_id: ID do administrador
-    
+
     Returns:
         dict com estatísticas do processamento
     """
     try:
         from models import RegistroPonto
-        
+
         funcionarios_ids = db.session.query(RegistroPonto.funcionario_id).filter(
             RegistroPonto.obra_id == obra_id,
             extract('year', RegistroPonto.data) == ano,
             extract('month', RegistroPonto.data) == mes
         ).distinct().all()
-        
+
         funcionarios_ids = [f[0] for f in funcionarios_ids]
-        
+
         processados = 0
         erros = 0
-        
+
         for func_id in funcionarios_ids:
             try:
                 funcionario = Funcionario.query.get(func_id)
                 if not funcionario:
                     continue
-                
+
                 dados_folha = processar_folha_funcionario(funcionario, ano, mes)
-                
+
                 if dados_folha:
+                    dados_folha = _folha_rateada_para_obra(
+                        dados_folha, obra_id,
+                        _horas_por_obra_no_mes(func_id, ano, mes)
+                    )
                     if salvar_folha_processada(func_id, obra_id, ano, mes, dados_folha, admin_id):
                         processados += 1
                     else:
