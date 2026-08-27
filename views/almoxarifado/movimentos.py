@@ -8,7 +8,7 @@ from sqlalchemy import func
 from event_manager import EventManager
 import logging
 
-from services.estoque_saldo import criar_lote, debitar
+from services.estoque_saldo import criar_lote, debitar, disponivel_de
 from views.almoxarifado import almoxarifado_bp, get_admin_id
 
 logger = logging.getLogger(__name__)
@@ -636,7 +636,7 @@ def processar_saida():
                 if quantidade_restante <= 0:
                     break
 
-                qtd_disponivel_lote = lote.quantidade_disponivel if lote.quantidade_disponivel else lote.quantidade
+                qtd_disponivel_lote = disponivel_de(lote)
 
                 if qtd_disponivel_lote <= 0:
                     continue
@@ -648,8 +648,11 @@ def processar_saida():
                     qtd_consumida = qtd_disponivel_lote
                     quantidade_restante -= qtd_disponivel_lote
 
-                lote.quantidade_disponivel = qtd_disponivel_lote - qtd_consumida
-                lote.quantidade = lote.quantidade_disponivel
+                # `debitar` mantém as duas colunas juntas e é o ponto único
+                # da invariante (services/estoque_saldo.py). Aqui se
+                # escrevia nas duas à mão, e `quantidade = quantidade_disponivel`
+                # apagava qualquer divergência em vez de subtrair.
+                debitar(lote, qtd_consumida)
 
                 if lote.quantidade_disponivel == 0:
                     lote.status = 'CONSUMIDO'
@@ -924,7 +927,7 @@ def processar_saida_multipla():
                         if qtd_restante <= 0:
                             break
 
-                        qtd_disponivel_lote = lote.quantidade_disponivel if lote.quantidade_disponivel else lote.quantidade
+                        qtd_disponivel_lote = disponivel_de(lote)
 
                         if qtd_disponivel_lote <= 0:
                             continue
@@ -936,8 +939,12 @@ def processar_saida_multipla():
                             qtd_consumida = qtd_disponivel_lote
                             qtd_restante -= qtd_disponivel_lote
 
-                        lote.quantidade_disponivel = qtd_disponivel_lote - qtd_consumida
-                        lote.quantidade = lote.quantidade_disponivel
+                        # `debitar` mantém as duas colunas juntas e é o ponto
+                        # único da invariante (services/estoque_saldo.py).
+                        # Aqui se escrevia nas duas à mão, e
+                        # `quantidade = quantidade_disponivel` apagava
+                        # qualquer divergência em vez de subtrair.
+                        debitar(lote, qtd_consumida)
 
                         if lote.quantidade_disponivel == 0:
                             lote.status = 'CONSUMIDO'

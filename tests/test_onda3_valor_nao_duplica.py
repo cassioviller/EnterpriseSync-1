@@ -545,3 +545,132 @@ def test_saida_multipla_baixa_as_duas_colunas():
         assert Decimal(str(lote.quantidade)) == Decimal('30')
         assert Decimal(str(lote.quantidade_disponivel)) == Decimal('30'), (
             'as duas colunas têm de andar juntas')
+
+
+# ---------------------------------------------------------------------------
+# Fecho — os dois ramos legados que sobraram fora do ponto único
+# ---------------------------------------------------------------------------
+#
+# `test_saida_multipla_baixa_as_duas_colunas` (acima) e o ramo de alocação de
+# `processar_saida_multipla` (`:891`) já foram corrigidos. Dois ramos
+# continuavam escrevendo `quantidade`/`quantidade_disponivel` à mão:
+# `processar_saida` (item único, CONSUMIVEL, `:651-652`) e o FIFO legado de
+# `processar_saida_multipla` sem `lote_allocations` (`:939-940`).
+#
+# Um lote ALINHADO (`_lote_bom`) não distingue "subtrair" de "colar
+# `quantidade` no valor pós-baixa de `quantidade_disponivel`" — os dois dão o
+# mesmo número quando as colunas partem iguais. Por isso os dois testes de
+# comportamento abaixo partem de um lote DESALINHADO (`quantidade` mais baixo
+# que `quantidade_disponivel`, como um resíduo do defeito legado que esta
+# onda já corrigiu noutros caminhos): só assim a assinatura do bug — apagar a
+# divergência em vez de subtrair — aparece no resultado.
+
+def _lote_desalinhado(item_id, admin_id, quantidade, quantidade_disponivel):
+    from models import AlmoxarifadoEstoque
+    lote = AlmoxarifadoEstoque(
+        item_id=item_id, admin_id=admin_id, status='DISPONIVEL',
+        quantidade=quantidade, quantidade_inicial=quantidade_disponivel,
+        quantidade_disponivel=quantidade_disponivel)
+    db.session.add(lote)
+    db.session.flush()
+    return lote
+
+
+def test_saida_unica_subtrai_em_vez_de_apagar_a_divergencia():
+    """🔴 `processar_saida` (item único, ramo CONSUMIVEL, `:651-652`) escrevia
+    `lote.quantidade_disponivel = disponivel - consumida` e depois
+    `lote.quantidade = lote.quantidade_disponivel` — a segunda linha ignora o
+    valor anterior de `quantidade` e cola nela o resultado da OUTRA coluna.
+    Com um lote desalinhado (90/100), subtrair 40 de cada coluna dá 50/60;
+    colar dá 60/60.
+    """
+    from models import AlmoxarifadoEstoque
+
+    with app.app_context():
+        t = um_tenant('onda3_saida_unica_diverge', com_fatos=False)
+        item = _item_consumivel(t.admin_id)
+        lote = _lote_desalinhado(item.id, t.admin_id, Decimal('90'), Decimal('100'))
+        db.session.commit()
+        admin_id, func_id, obra_id = t.admin_id, t.funcionario_id, t.obra_id
+        item_id, lote_id = item.id, lote.id
+
+    resposta = cliente_de(admin_id).post('/almoxarifado/processar-saida', data={
+        'item_id': str(item_id),
+        'tipo_controle': 'CONSUMIVEL',
+        'funcionario_id': str(func_id),
+        'obra_id': str(obra_id),
+        'quantidade': '40',
+    }, follow_redirects=True)
+    assert resposta.status_code == 200
+
+    with app.app_context():
+        lote = db.session.get(AlmoxarifadoEstoque, lote_id)
+        assert Decimal(str(lote.quantidade_disponivel)) == Decimal('60'), (
+            f'quantidade_disponivel devia baixar para 60 e ficou {lote.quantidade_disponivel}')
+        assert Decimal(str(lote.quantidade)) == Decimal('50'), (
+            f'quantidade devia subtrair 40 de 90 (ficar 50) e ficou {lote.quantidade} — '
+            'o código antigo colava quantidade no valor pós-baixa de quantidade_disponivel, '
+            'apagando a divergência em vez de subtrair')
+
+
+def test_saida_multipla_fifo_legado_subtrai_em_vez_de_apagar_a_divergencia():
+    """🔴 A mesma assinatura, no FIFO legado de `processar_saida_multipla`
+    (sem `lote_allocations`, `:939-940`).
+    """
+    import json
+
+    from models import AlmoxarifadoEstoque
+
+    with app.app_context():
+        t = um_tenant('onda3_saida_mult_fifo_diverge', com_fatos=False)
+        item = _item_consumivel(t.admin_id)
+        lote = _lote_desalinhado(item.id, t.admin_id, Decimal('90'), Decimal('100'))
+        db.session.commit()
+        admin_id, func_id, obra_id = t.admin_id, t.funcionario_id, t.obra_id
+        item_id, lote_id = item.id, lote.id
+
+    resposta = cliente_de(admin_id).post(
+        '/almoxarifado/processar-saida-multipla',
+        data=json.dumps({
+            'itens': [{'item_id': item_id, 'quantidade': 40,
+                       'funcionario_id': func_id, 'obra_id': obra_id,
+                       'tipo_controle': 'CONSUMIVEL'}],
+        }),
+        content_type='application/json')
+    corpo = json.loads(resposta.data)
+    assert corpo.get('success') is True, corpo
+
+    with app.app_context():
+        lote = db.session.get(AlmoxarifadoEstoque, lote_id)
+        assert Decimal(str(lote.quantidade_disponivel)) == Decimal('60'), (
+            f'quantidade_disponivel devia baixar para 60 e ficou {lote.quantidade_disponivel}')
+        assert Decimal(str(lote.quantidade)) == Decimal('50'), (
+            f'quantidade devia subtrair 40 de 90 (ficar 50) e ficou {lote.quantidade} — '
+            'o FIFO legado cola quantidade no valor pós-baixa de quantidade_disponivel, '
+            'apagando a divergência em vez de subtrair')
+
+
+def test_movimentos_nao_escreve_direto_nas_colunas_de_saida():
+    """A guarda de "um ponto de escrita por invariante".
+
+    `quantidade`/`quantidade_disponivel` só podem mudar via
+    `services.estoque_saldo` (`debitar`/`creditar`/`criar_lote`). Uma
+    atribuição direta a `lote.quantidade` ou `lote.quantidade_disponivel`
+    em `movimentos.py` reabre a divergência entre as colunas.
+
+    `movimento.quantidade` (o campo de `AlmoxarifadoMovimento`, não de
+    `AlmoxarifadoEstoque`) está fora do escopo desta invariante e é
+    explicitamente ignorado pelo filtro abaixo.
+    """
+    import inspect
+    import re
+
+    import views.almoxarifado.movimentos as mov
+
+    fonte = inspect.getsource(mov)
+    atribuicoes = re.findall(
+        r'^\s*(\w+)\.(quantidade|quantidade_disponivel)\s*=(?!=)',
+        fonte, re.MULTILINE)
+    ofensoras = [(nome, campo) for nome, campo in atribuicoes if nome != 'movimento']
+    assert not ofensoras, (
+        f'atribuição direta fora do ponto único (services/estoque_saldo.py): {ofensoras}')
