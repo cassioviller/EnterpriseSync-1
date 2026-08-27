@@ -1491,12 +1491,22 @@ def obter_dados_folha_obra(obra_id: int, data_inicio: date, data_fim: date, admi
         custo_por_hora = total_custo / total_horas if total_horas > 0 else Decimal('0')
         percentual_he = (total_he / total_horas * 100) if total_horas > 0 else Decimal('0')
         
-        total_salario_base = sum(d['total_salario_bruto'] for d in dados_por_funcionario.values())
+        total_bruto = sum(d['total_salario_bruto'] for d in dados_por_funcionario.values())
         total_encargos = sum(d['total_encargos'] for d in dados_por_funcionario.values())
         total_he_50_valor = sum(dados_por_mes[m]['he_50'] for m in dados_por_mes)
         total_he_100_valor = sum(dados_por_mes[m]['he_100'] for m in dados_por_mes)
         total_dsr_valor = sum(dados_por_mes[m]['dsr'] for m in dados_por_mes)
-        
+
+        # Onda 3 / Task 9 — dobra 2: HE e DSR entram na composição UMA vez.
+        #
+        # `salario_bruto` já É `salario_normal + HE 50% + HE 100% + DSR`
+        # (`calcular_salario_bruto`). Exibi-lo inteiro como "Salário Base" e
+        # ainda somar as extras e o DSR como fatias próprias fazia a
+        # composição estourar o custo total exatamente pelo valor das extras.
+        # Subtraindo, a fatia vira o salário normal e as cinco fatias fecham
+        # em `custo_total` — que é `salario_bruto + encargos`.
+        total_salario_base = total_bruto - total_he_50_valor - total_he_100_valor - total_dsr_valor
+
         composicao = [
             {'categoria': 'Salário Base', 'valor': float(total_salario_base), 'cor': '#4CAF50'},
             {'categoria': 'HE 50%', 'valor': float(total_he_50_valor), 'cor': '#FF9800'},

@@ -296,3 +296,82 @@ def test_atraso_nao_e_descontado_duas_vezes():
         f'(faltas={resultado["desconto_faltas"]}, '
         f'atrasos={resultado["desconto_atrasos"]})')
     assert resultado['total_proventos'] == resultado['salario_bruto'] - esperado
+
+
+# ---------------------------------------------------------------------------
+# Task 9 / dobra 2 — a composição do custo para de somar HE e DSR duas vezes
+# ---------------------------------------------------------------------------
+
+def _seed_ponto_com_extras(admin_id, funcionario_id, obra_id):
+    """Mês cheio em 8h, dois dias úteis de 10h (HE 50%) e um domingo de 4h
+    (HE 100%). O domingo é o que faz o DSR sobre extras existir."""
+    from models import RegistroPonto
+    ultimo_dia = calendar.monthrange(ANO_REF, MES_REF)[1]
+    dias_com_he_50 = (3, 4)   # quarta e quinta
+    domingo_trabalhado = 7    # 2026-06-07 é domingo
+    for dia in range(1, ultimo_dia + 1):
+        data = date(ANO_REF, MES_REF, dia)
+        if data.weekday() >= 5 and dia != domingo_trabalhado:
+            continue
+        if dia == domingo_trabalhado:
+            horas = 4.0
+        elif dia in dias_com_he_50:
+            horas = 10.0
+        else:
+            horas = 8.0
+        db.session.add(RegistroPonto(
+            funcionario_id=funcionario_id, obra_id=obra_id, admin_id=admin_id,
+            data=data, horas_trabalhadas=horas, horas_extras=0.0))
+    db.session.commit()
+
+
+def test_composicao_do_custo_da_obra_nao_soma_he_e_dsr_duas_vezes():
+    """🔴 dobra 2 — `services/folha_service.py:obter_dados_folha_obra`.
+
+    `salario_bruto` JÁ É `salario_normal + horas extras + DSR`. A composição
+    exibia esse bruto inteiro sob o rótulo "Salário Base" e ainda somava
+    "HE 50%", "HE 100%" e "DSR s/ Extras" como fatias separadas: as fatias
+    não fechavam com o custo total — passavam dele pelo valor das extras.
+    """
+    from models import Funcionario
+    from services.folha_service import (obter_dados_folha_obra,
+                                        processar_folha_funcionario,
+                                        salvar_folha_processada)
+
+    with app.app_context():
+        t = um_tenant('onda3_composicao', com_fatos=False)
+        admin_id = t.admin_id
+        _seed_parametros_legais(admin_id)
+        _seed_horario_trabalho(admin_id, t.funcionario_id, t.marca)
+        _seed_ponto_com_extras(admin_id, t.funcionario_id, t.obra_id)
+
+        funcionario = Funcionario.query.filter_by(
+            id=t.funcionario_id, admin_id=admin_id).first()
+        dados = processar_folha_funcionario(funcionario, ANO_REF, MES_REF)
+        assert dados is not None, 'pré-condição: a folha precisa processar'
+        assert dados['valor_he_50'] > 0, 'pré-condição: HE 50% precisa existir'
+        assert dados['valor_he_100'] > 0, 'pré-condição: HE 100% precisa existir'
+        assert dados['valor_dsr'] > 0, 'pré-condição: DSR sobre extras precisa existir'
+        assert salvar_folha_processada(
+            t.funcionario_id, t.obra_id, ANO_REF, MES_REF, dados, admin_id)
+
+        ultimo_dia = calendar.monthrange(ANO_REF, MES_REF)[1]
+        painel = obter_dados_folha_obra(
+            obra_id=t.obra_id,
+            data_inicio=date(ANO_REF, MES_REF, 1),
+            data_fim=date(ANO_REF, MES_REF, ultimo_dia),
+            admin_id=admin_id)
+
+    fatias = {c['categoria']: c['valor'] for c in painel['composicao']}
+    custo_total = painel['totais']['custo_total']
+
+    assert custo_total > 0, 'pré-condição: a obra precisa ter custo de folha'
+    assert sum(fatias.values()) == pytest.approx(custo_total, abs=0.02), (
+        f'a composição não fecha com o custo total: '
+        f'{sum(fatias.values()):.2f} != {custo_total:.2f} — fatias={fatias}')
+
+    # E a fatia "Salário Base" é o salário normal: o bruto SEM as extras e o
+    # DSR que já aparecem em fatia própria.
+    esperado_base = (dados['salario_bruto'] - dados['valor_he_50']
+                     - dados['valor_he_100'] - dados['valor_dsr'])
+    assert fatias['Salário Base'] == pytest.approx(esperado_base, abs=0.02)
