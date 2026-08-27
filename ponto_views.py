@@ -1522,6 +1522,21 @@ def processar_importacao():
                     registro_existente.tipo_registro = registro['tipo_registro']
                 if registro.get('obra_id'):
                     registro_existente.obra_id = registro['obra_id']
+                # Reimportar é ESTORNAR e refazer, também aqui.
+                # `_calcular_horas` só ESCREVE `horas_trabalhadas` quando há
+                # entrada E saída (`ponto_service.py:298`) e nunca zera
+                # atraso: sem esta limpeza, o dia que era 'TRAB' de 8h e
+                # voltou como 'ATESTADO' guardava as 8h e o atraso do dia
+                # trabalhado — a folha seguia pagando o que não houve. Zerar
+                # antes e recalcular deixa o resultado ser função só da linha
+                # que acabou de chegar, inclusive nos casos parciais (só
+                # entrada, sem saída).
+                registro_existente.horas_trabalhadas = 0.0
+                registro_existente.horas_extras = 0.0
+                registro_existente.minutos_atraso_entrada = 0
+                registro_existente.minutos_atraso_saida = 0
+                registro_existente.total_atraso_minutos = 0
+                registro_existente.total_atraso_horas = 0.0
                 # A hora não se calculava em ramo nenhum: o mês importado
                 # marcava 0h, a folha cobrava todo dia como falta cheia e
                 # nenhum custo de obra saía.

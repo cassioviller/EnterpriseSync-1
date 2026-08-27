@@ -51,6 +51,13 @@ def _registro(tenant, data):
 # Defeito 1 — a importação Excel que nunca calculava hora (ponto_views.py:1487)
 # ---------------------------------------------------------------------------
 
+def _codigo_do_funcionario(tenant):
+    """O código do funcionário do tenant — é por ele que o importador acha a
+    aba (`services/ponto_importacao.py:532`)."""
+    from models import Funcionario
+    return db.session.get(Funcionario, tenant.funcionario_id).codigo
+
+
 def _planilha_de_ponto(codigo, linhas):
     """Uma planilha no formato que `PontoExcelService.validar_e_importar` lê.
 
@@ -92,11 +99,11 @@ def test_importacao_excel_calcula_horas_e_preserva_obra_no_update():
     `tipo_registro` — reimportar a planilha corrigida apagava a obra do
     registro que já existia.
     """
-    from models import Funcionario, RegistroPonto
+    from models import RegistroPonto
 
     with app.app_context():
         t = um_tenant('onda3_imp', data_ref=DIA, com_fatos=False)
-        codigo = db.session.get(Funcionario, t.funcionario_id).codigo
+        codigo = _codigo_do_funcionario(t)
 
         # O dia que já tem registro (sem obra e sem horário): o ramo de update.
         db.session.add(RegistroPonto(
@@ -135,6 +142,54 @@ def test_importacao_excel_calcula_horas_e_preserva_obra_no_update():
         assert atualizado.tipo_registro == 'TRAB', (
             f'o ramo de atualização descartou o tipo; veio '
             f'{atualizado.tipo_registro!r}')
+
+
+def test_reimportar_como_atestado_apaga_as_horas_do_dia_trabalhado():
+    """🔴 O dia reimportado como ausência guardava as horas do dia trabalhado.
+
+    `PontoService._calcular_horas` só ESCREVE `horas_trabalhadas` quando há
+    entrada E saída (`ponto_service.py:298`), e nunca zera os campos de
+    atraso. O ramo de atualização anula as quatro colunas de horário da linha
+    de ausência e chamava o cálculo em seguida — que não tinha o que calcular
+    e deixava 8h e o atraso do dia anterior de pé. A folha seguia pagando um
+    dia que virou atestado.
+    """
+    with app.app_context():
+        t = um_tenant('onda3_reimp', data_ref=DIA, com_fatos=False)
+        codigo = _codigo_do_funcionario(t)
+        cli = cliente_de(t.admin_id)
+
+        # 1ª importação: dia trabalhado, com entrada atrasada (09:00 contra
+        # o padrão 08:00, tolerância de 15min ⇒ 45min de atraso).
+        cli.post('/ponto/importar/processar',
+                 data={'arquivo': (_planilha_de_ponto(codigo, [
+                     (DIA, 'TRAB', t.obra_id, '09:00', '18:00',
+                      '12:00', '13:00')]), 'ponto.xlsx')},
+                 content_type='multipart/form-data')
+
+        trabalhado = _registro(t, DIA)
+        assert trabalhado.horas_trabalhadas == pytest.approx(8.0)
+        assert trabalhado.total_atraso_minutos == 45, (
+            'o cenário precisa do atraso gravado para provar que ele sai')
+
+        # 2ª importação: o mesmo dia vira atestado, sem horário nenhum.
+        cli.post('/ponto/importar/processar',
+                 data={'arquivo': (_planilha_de_ponto(codigo, [
+                     (DIA, 'ATESTADO', t.obra_id, None, None, None, None)]),
+                     'ponto.xlsx')},
+                 content_type='multipart/form-data')
+
+        ausente = _registro(t, DIA)
+        assert ausente.hora_entrada is None
+        assert ausente.horas_trabalhadas == pytest.approx(0.0), (
+            f'o dia virou ausência e continua valendo '
+            f'{ausente.horas_trabalhadas}h — a folha paga o que não houve')
+        assert ausente.horas_extras == pytest.approx(0.0)
+        assert ausente.total_atraso_minutos == 0, (
+            f'o atraso do dia trabalhado sobreviveu à reimportação: '
+            f'{ausente.total_atraso_minutos} min')
+        assert ausente.total_atraso_horas == pytest.approx(0.0)
+        assert ausente.minutos_atraso_entrada == 0
 
 
 # ---------------------------------------------------------------------------
