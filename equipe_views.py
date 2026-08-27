@@ -77,23 +77,14 @@ def alocacao_principal():
                              debug_info=user_info,
                              obras_count=obras_count)
         
-    except Exception as e:
-        logging.error(f"Erro na alocação teste fase 1: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Retorna erro detalhado
-        return f"""
-        <div class="container mt-5">
-            <div class="alert alert-danger">
-                <h3>❌ ERRO NA FASE 2</h3>
-                <p><strong>Erro:</strong> {e}</p>
-                <pre>{traceback.format_exc()}</pre>
-                <hr>
-                <a href="/equipe" class="btn btn-primary">← Voltar ao dashboard</a>
-            </div>
-        </div>
-        """
+    except Exception:
+        # O traceback ia para o HTML: caminhos, frames e SQL com os
+        # parâmetros vinculados, visíveis a qualquer usuário autenticado.
+        # Erro vai para o log; o usuário vê mensagem.
+        logging.exception('falha ao montar a alocação principal')
+        flash('Não foi possível carregar a alocação de equipe. '
+              'A equipe técnica foi notificada.', 'danger')
+        return redirect(url_for('main.dashboard'))
 
 @equipe_bp.route('/funcionarios/<int:allocation_id>')
 @login_required

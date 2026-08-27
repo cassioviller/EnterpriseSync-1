@@ -607,24 +607,14 @@ def index():
                              funcionarios=funcionarios_com_status,
                              hoje=hoje)
         
-    except Exception as e:
-        import traceback
-        erro_completo = traceback.format_exc()
-        logger.error(f"Erro ao listar funcionários: {e}\n{erro_completo}")
-        # Mostrar erro na tela para debug em produção
-        return f"""
-        <html>
-        <head><title>Erro Ponto</title></head>
-        <body style="font-family: monospace; padding: 20px; background: #f8f9fa;">
-            <h1 style="color: red;">Erro ao carregar página de Ponto</h1>
-            <h3>Mensagem: {str(e)}</h3>
-            <pre style="background: #fff; padding: 15px; border: 1px solid #ccc; overflow-x: auto;">
-{erro_completo}
-            </pre>
-            <p><a href="/dashboard">Voltar ao Dashboard</a></p>
-        </body>
-        </html>
-        """, 500
+    except Exception:
+        # O traceback ia para o HTML: caminhos, frames e SQL com os
+        # parâmetros vinculados, visíveis a qualquer usuário autenticado.
+        # Erro vai para o log; o usuário vê mensagem.
+        logger.exception('falha ao montar a tela de ponto')
+        flash('Não foi possível carregar a tela de ponto. '
+              'A equipe técnica foi notificada.', 'danger')
+        return redirect(url_for('main.dashboard'))
 
 
 @ponto_bp.route('/funcionario/<int:funcionario_id>')
@@ -2454,16 +2444,21 @@ def identificar_e_registrar():
         funcionario = melhor_match
         logger.info(f"Funcionário identificado: {funcionario.nome} (distância: {menor_distancia:.4f})")
         
-        # GEOFENCING: Validar localização se obra tiver coordenadas
+        # GEOFENCING: o validador decide, inclusive quando o cliente OMITE as
+        # coordenadas. Antes a chamada era pulada nesse caso, tornando o
+        # controle consultivo — bastava não mandar latitude/longitude.
+        # `validar_localizacao_na_obra` já tem a semântica certa: obra com
+        # geofence configurado e sem coordenada RECUSA; obra sem geofence
+        # segue aceitando.
         distancia_obra = None
-        if obra_id and latitude_func is not None and longitude_func is not None:
+        if obra_id:
             obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
             if obra:
                 valido_geo, distancia_obra, msg_geo = validar_localizacao_na_obra(
                     latitude_func, longitude_func, obra
                 )
                 logger.info(f"Geofencing para {funcionario.nome}: {msg_geo}")
-                
+
                 if not valido_geo:
                     return jsonify({
                         'success': False,
