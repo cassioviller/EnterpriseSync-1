@@ -352,10 +352,17 @@ def divergencia_nota_atestado(pedido):
     return diferenca, pct, pct <= limite
 
 
-def liberar(pedido, *, usuario=None, justificativa=None):
+def liberar(pedido, *, usuario=None, justificativa=None, fechamento_id=None):
     """Libera as contas do pedido para pagamento.
 
     Levanta `TriadeIncompleta` e `RessalvaInvalida`.
+
+    `fechamento_id` é como `fechar_lote()` restringe o efeito ao PRÓPRIO lote:
+    sem ele, uma compra parcelada com a parcela 1 de 3 num lote fechado
+    liberaria as parcelas 2 e 3 também — elas nunca estiveram em lote nenhum,
+    e sairiam pagáveis por tabela. Chamado direto (📖 `compras_views.py:1581`,
+    a rota do Fluxo A) não tem lote nenhum e passa `None`: aí o efeito
+    continua sendo todas as parcelas em aberto do pedido, como sempre foi.
 
     **Aqui o valor da conta é reajustado para o que CHEGOU** — é o momento em
     que `valor_atestado` (Fase 1) finalmente é lido por alguém. Entrega parcial
@@ -417,9 +424,11 @@ def liberar(pedido, *, usuario=None, justificativa=None):
                 f'perguntar.')
         ressalva = texto
 
-    contas = ContaPagar.query.filter_by(
-        pedido_compra_id=pedido.id, admin_id=pedido.admin_id).order_by(
-            ContaPagar.parcela_numero).all()
+    filtros = dict(pedido_compra_id=pedido.id, admin_id=pedido.admin_id)
+    if fechamento_id is not None:
+        filtros['fechamento_id'] = fechamento_id
+    contas = ContaPagar.query.filter_by(**filtros).order_by(
+        ContaPagar.parcela_numero).all()
     abertas = [c for c in contas if (c.status or '').upper() not in ('PAGO',)]
     if not abertas:
         return []
@@ -430,7 +439,13 @@ def liberar(pedido, *, usuario=None, justificativa=None):
 
     agora = datetime.utcnow()
     for idx, cp in enumerate(abertas, start=1):
-        if total_aberto > 0 and atestado != total_aberto:
+        # `atestado > 0` é a guarda que faltava. O rateio existe para pagar o
+        # que foi atestado em vez do que foi pedido — mas a ressalva D6 libera
+        # JUSTAMENTE sem atesto, e aí `atestado` é 0: sem esta guarda, toda
+        # parcela virava R$ 0,00 com `saldo = 0 - valor_pago`. É a "conta de
+        # R$ 0,00 que desaparece de toda projeção de caixa" que o docstring de
+        # `criar_obrigacao` diz evitar.
+        if atestado > 0 and total_aberto > 0 and atestado != total_aberto:
             proporcao = _d(cp.valor_original) / total_aberto
             novo = (atestado * proporcao).quantize(_d('0.01'))
             if idx == len(abertas):   # a última absorve o arredondamento
@@ -547,7 +562,8 @@ def fechar_lote(fechamento, *, usuario=None, justificativa=None):
         if pedido is None:
             continue
         try:
-            liberadas.extend(liberar(pedido, usuario=usuario))
+            liberadas.extend(liberar(pedido, usuario=usuario,
+                                     fechamento_id=fechamento.id))
         except TriadeIncompleta:
             continue   # fica bloqueada, e o sensor da F7 a nomeia
 
@@ -568,17 +584,26 @@ def reabrir_lote(fechamento, *, usuario=None):
 
     Lote fechado com pagamento é documento: reabri-lo seria reescrever o
     registro de uma autorização que já produziu saída de dinheiro.
+
+    `fechar_lote` põe `situacao_liberacao = 'liberada'` nas contas que
+    destrava; reabrir sem desfazer isso deixaria a conta pagável mesmo com o
+    lote de volta a rascunho — o "reabrir" seria só cosmético, e `pagar_conta`
+    (que só olha `situacao_liberacao`, ver o ⚠️ acima) continuaria autorizando.
     """
     from app import db
     from models import ContaPagar
 
-    pagas = ContaPagar.query.filter_by(fechamento_id=fechamento.id).filter(
-        ContaPagar.status == 'PAGO').count()
+    contas = ContaPagar.query.filter_by(fechamento_id=fechamento.id).all()
+    pagas = [c for c in contas if c.status == 'PAGO']
     if pagas:
         raise LoteImutavel(
-            f'este lote já tem {pagas} conta(s) paga(s) e não pode ser '
+            f'este lote já tem {len(pagas)} conta(s) paga(s) e não pode ser '
             f'reaberto — a autorização dele já virou saída de dinheiro. '
             f'Para corrigir um pagamento, estorne-o.')
+
+    for cp in contas:
+        if cp.situacao_liberacao == 'liberada':
+            cp.situacao_liberacao = 'bloqueada'
 
     fechamento.status = 'ABERTO'
     fechamento.reaberto_por_id = getattr(usuario, 'id', None)
