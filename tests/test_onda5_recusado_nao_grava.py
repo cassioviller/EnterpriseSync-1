@@ -200,3 +200,122 @@ def test_o_decorador_garante_a_invariante_que_documenta():
     assert '>= 400' in fonte and 'rollback' in fonte, (
         '_com_undo documenta depender do rollback da rota mas não o garante '
         '(a guarda de status >= 400 antes do registrar_acao sumiu)')
+# ---------------------------------------------------------------------------
+# Task 3 — o portal para de ser administrável por qualquer um
+# ---------------------------------------------------------------------------
+
+def _usuario_funcionario(admin_id):
+    from werkzeug.security import generate_password_hash
+
+    from models import TipoUsuario, Usuario
+    marca = f'func_{uuid.uuid4().hex[:8]}'
+    usuario = Usuario(
+        username=marca, email=f'{marca}@test.local', nome='Func Portal',
+        password_hash=generate_password_hash('Senha@2026'),
+        tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+        admin_id=admin_id, versao_sistema='v2')
+    db.session.add(usuario)
+    db.session.commit()
+    return usuario.id
+
+
+def test_funcionario_nao_administra_o_portal():
+    """🔴 `portal_obras_views.py` — `toggle_portal` e `gerar_medicao` só com
+    `@login_required`: qualquer FUNCIONARIO ligava o portal (recarimbando o
+    token +180 dias) ou criava MedicaoObra. A prova é no banco."""
+    from models import MedicaoObra, Obra
+
+    with app.app_context():
+        t = um_tenant('onda5_portal', com_fatos=False)
+        admin_id, obra_id = t.admin_id, t.obra_id
+        func_user_id = _usuario_funcionario(admin_id)
+        obra = db.session.get(Obra, obra_id)
+        portal_antes = bool(obra.portal_ativo)
+        expira_antes = obra.token_cliente_expira_em
+        medicoes_antes = MedicaoObra.query.filter_by(admin_id=admin_id).count()
+
+    cliente = cliente_de(func_user_id)
+    r1 = cliente.post(f'/portal/obra/{obra_id}/portal-toggle')
+    r2 = cliente.post(f'/portal/obra/{obra_id}/medicao/gerar')
+    assert r1.status_code in (302, 403) and r2.status_code in (302, 403)
+
+    with app.app_context():
+        obra = db.session.get(Obra, obra_id)
+        assert bool(obra.portal_ativo) == portal_antes, (
+            'FUNCIONARIO ligou/desligou o portal do cliente')
+        assert obra.token_cliente_expira_em == expira_antes, (
+            'FUNCIONARIO recarimbou a validade do token')
+        medicoes_depois = MedicaoObra.query.filter_by(
+            admin_id=admin_id).count()
+        assert medicoes_depois == medicoes_antes, (
+            'FUNCIONARIO criou MedicaoObra pelo portal')
+
+
+def test_upload_do_portal_tem_teto_proprio():
+    """🔴 `portal_obras_views.py:668` — o teto vinha de MAX_CONTENT_LENGTH
+    (64 MB desde app.py:159): o fallback de 5 MB era código morto, e a rota
+    anônima gravava blobs de 64 MB no volume a cada requisição."""
+    import portal_obras_views
+    teto = getattr(portal_obras_views, 'PORTAL_COMPROVANTE_MAX_BYTES', None)
+    assert teto == 5 * 1024 * 1024, (
+        'o teto do comprovante do portal não é mais os 5 MB declarados')
+
+    import inspect
+    fonte = inspect.getsource(portal_obras_views.upload_comprovante)
+    assert 'PORTAL_COMPROVANTE_MAX_BYTES' in fonte, (
+        'a rota de comprovante não usa o teto próprio do portal')
+    assert 'MAX_CONTENT_LENGTH' not in fonte, (
+        'a rota ainda herda o teto global de 64 MB')
+
+
+def test_caminho_de_relatorio_nao_sai_de_static():
+    """🔴 `portal_obras_views.py:958` — `os.path.join` sem checar que o
+    resultado fica sob `static/`: um `../` na coluna de 500 chars viraria
+    leitor de arquivo arbitrário."""
+    import portal_obras_views
+
+    with app.app_context():
+        with app.test_request_context():
+            sob = portal_obras_views._caminho_sob_static
+            assert sob('../../etc/passwd') is None, (
+                'um ../ escapou de static/')
+            assert sob('/etc/passwd') is None, (
+                'caminho absoluto escapou de static/')
+            valido = sob('relatorios/qualquer.pdf')
+            assert valido is not None and 'static' in valido
+
+
+def test_tentativa_no_portal_deixa_exatamente_um_evento():
+    """🔴 A trilha era registrada na entrada e 'persistida no commit adiante':
+    retorno antecipado descartava o evento, e o ramo de governança registrava
+    DE NOVO — dobrado. A regra: um evento por tentativa, olhado no banco."""
+    from test_fase3_portal_seguranca import _admin, _compra, _obra_com_token
+
+    from models import PortalAcessoEvento
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra_com_token(admin.id)
+        compra = _compra(admin.id, obra.id)
+        token, oid, cid = obra.token_cliente, obra.id, compra.id
+
+    anon = app.test_client()
+    anon.post(f'/portal/obra/{token}/compra/{cid}/aprovar')
+
+    with app.app_context():
+        eventos = PortalAcessoEvento.query.filter_by(
+            obra_id=oid, acao='compra_aprovar').count()
+        assert eventos == 1, f'{eventos} eventos para 1 tentativa'
+
+    # Segunda tentativa: idempotente — retorno antecipado que antes
+    # DESCARTAVA a trilha.
+    anon.post(f'/portal/obra/{token}/compra/{cid}/aprovar')
+
+    with app.app_context():
+        eventos = PortalAcessoEvento.query.filter_by(
+            obra_id=oid, acao='compra_aprovar').all()
+        assert len(eventos) == 2, (
+            f'{len(eventos)} eventos para 2 tentativas — o retorno '
+            'antecipado seguiu descartando (ou dobrando) a trilha')
+        assert any((e.detalhes or {}).get('resultado') == 'ja_aprovada'
+                   for e in eventos), 'a tentativa idempotente ficou sem trilha'

@@ -18,6 +18,8 @@ from flask import (
     render_template, request, url_for,
 )
 from flask_login import login_required
+
+from auth import admin_required
 from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
 
@@ -40,6 +42,25 @@ portal_obras_bp = Blueprint(
 )
 
 _UPLOADS_PATH_ENV = os.environ.get('UPLOADS_PATH', '')
+
+# Teto do comprovante enviado pelo portal (rota anônima): independente do
+# MAX_CONTENT_LENGTH global de 64 MB.
+PORTAL_COMPROVANTE_MAX_BYTES = 5 * 1024 * 1024
+
+
+def _caminho_sob_static(rel_path):
+    """Caminho absoluto sob `static/`, ou None se `rel_path` escapar dela.
+
+    `arquivo_path` é coluna de 500 chars vinda do banco: um `../` ali viraria
+    leitor de arquivo arbitrário — o mesmo defeito que fez remover
+    `/persistent-uploads` (app.py:176).
+    """
+    static_root = os.path.realpath(
+        os.path.join(current_app.root_path, 'static'))
+    alvo = os.path.realpath(os.path.join(static_root, rel_path))
+    if alvo != static_root and not alvo.startswith(static_root + os.sep):
+        return None
+    return alvo
 if _UPLOADS_PATH_ENV:
     _base = _UPLOADS_PATH_ENV if os.path.isabs(_UPLOADS_PATH_ENV) else os.path.join(os.getcwd(), _UPLOADS_PATH_ENV)
     UPLOAD_FOLDER = os.path.join(_base, 'comprovantes')
@@ -535,12 +556,18 @@ def aprovar_compra(token: str, compra_id: int):
     obra = _get_obra_by_token(token)
     compra = _get_compra_do_portal(obra, compra_id)
 
-    # Fase 3 — trilha do POST anônimo (IP/UA). Persistida no commit adiante.
-    _registrar_acesso(obra, 'compra_aprovar', 'pedido_compra', compra_id,
-                      {'valor_total': str(compra.valor_total)})
+    # Fase 3 — trilha do POST anônimo (IP/UA): UM evento por tentativa, com o
+    # desfecho no detalhe, registrado no ramo terminal e commitado ali. O
+    # desenho anterior registrava na entrada e "persistia no commit adiante" —
+    # os retornos antecipados não commitavam (trilha descartada) e o ramo de
+    # governança registrava de novo (trilha dobrada).
 
-    # Já aprovada? idempotente
+    # Já aprovada? idempotente.
     if compra.status_aprovacao_cliente == 'APROVADO':
+        _registrar_acesso(obra, 'compra_aprovar', 'pedido_compra', compra_id,
+                          {'resultado': 'ja_aprovada',
+                           'valor_total': str(compra.valor_total)})
+        db.session.commit()
         flash('Esta compra já foi aprovada.', 'info')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
@@ -554,6 +581,10 @@ def aprovar_compra(token: str, compra_id: int):
             f"[PORTAL] Tentativa de aprovar compra {compra_id} em estado "
             f"{compra.status_aprovacao_cliente!r} — obra {obra.id}. Recusado."
         )
+        _registrar_acesso(obra, 'compra_aprovar', 'pedido_compra', compra_id,
+                          {'resultado': 'estado_nao_decidivel',
+                           'estado': str(compra.status_aprovacao_cliente)})
+        db.session.commit()
         flash(
             'Esta compra já foi recusada. Fale com a empresa para reabri-la.',
             'warning')
@@ -599,6 +630,8 @@ def aprovar_compra(token: str, compra_id: int):
             # Fase 9a (identidade do portal) resolve isso de verdade.
             processar_compra_aprovada_cliente(compra, usuario_id=compra.admin_id)
 
+        _registrar_acesso(obra, 'compra_aprovar', 'pedido_compra', compra_id,
+                          {'valor_total': str(compra.valor_total)})
         db.session.commit()
         logger.info(
             f"[PORTAL] Compra {compra_id} APROVADA pelo cliente — obra {obra.id} "
@@ -608,6 +641,10 @@ def aprovar_compra(token: str, compra_id: int):
     except Exception as e:
         db.session.rollback()
         logger.error(f"[PORTAL] Erro ao aprovar compra {compra_id}: {e}", exc_info=True)
+        # A trilha da tentativa sobrevive ao rollback: registra e commita só ela.
+        _registrar_acesso(obra, 'compra_aprovar', 'pedido_compra', compra_id,
+                          {'resultado': 'erro'})
+        db.session.commit()
         flash(f'Erro ao aprovar compra: {e}', 'danger')
 
     return redirect(url_for('portal_obras.portal_obra', token=token))
@@ -618,9 +655,11 @@ def recusar_compra(token: str, compra_id: int):
     obra = _get_obra_by_token(token)
     compra = _get_compra_do_portal(obra, compra_id)
 
-    _registrar_acesso(obra, 'compra_recusar', 'pedido_compra', compra_id)
-
+    # Mesmo desenho da aprovação: UM evento por tentativa, no ramo terminal.
     if compra.status_aprovacao_cliente == 'RECUSADO':
+        _registrar_acesso(obra, 'compra_recusar', 'pedido_compra', compra_id,
+                          {'resultado': 'ja_recusada'})
+        db.session.commit()
         flash('Esta compra já foi recusada.', 'info')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
@@ -632,12 +671,17 @@ def recusar_compra(token: str, compra_id: int):
             f"[PORTAL] Tentativa de recusar compra {compra_id} em estado "
             f"{compra.status_aprovacao_cliente!r} — obra {obra.id}. Recusado."
         )
+        _registrar_acesso(obra, 'compra_recusar', 'pedido_compra', compra_id,
+                          {'resultado': 'estado_nao_decidivel',
+                           'estado': str(compra.status_aprovacao_cliente)})
+        db.session.commit()
         flash(
             'Esta compra já foi aprovada. Fale com a empresa para estorná-la.',
             'warning')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
     compra.status_aprovacao_cliente = 'RECUSADO'
+    _registrar_acesso(obra, 'compra_recusar', 'pedido_compra', compra_id)
     db.session.commit()
     logger.info(f"[PORTAL] Compra {compra_id} RECUSADA pelo cliente — obra {obra.id}")
     flash('Compra recusada.', 'warning')
@@ -665,7 +709,11 @@ def upload_comprovante(token: str, compra_id: int):
         flash('Tipo de arquivo não permitido. Envie imagem ou PDF.', 'danger')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
-    max_bytes = current_app.config.get('MAX_CONTENT_LENGTH', 5 * 1024 * 1024)
+    # Teto PRÓPRIO do portal. O antigo lia o teto global da aplicação com
+    # fallback de 5 MB — fallback morto: app.py fixa o global em 64 MB, então
+    # a rota — anônima, sem rate limit — aceitava blobs de 64 MB no volume
+    # persistente a cada requisição.
+    max_bytes = PORTAL_COMPROVANTE_MAX_BYTES
     arquivo.seek(0, 2)
     file_size = arquivo.tell()
     arquivo.seek(0)
@@ -770,7 +818,11 @@ def aprovar_mapa_concorrencia(token: str, mapa_id: int):
 
 @portal_obras_bp.route('/obra/<int:obra_id>/portal-toggle', methods=['POST'])
 @login_required
+@admin_required
 def toggle_portal(obra_id: int):
+    # `admin_required`: ligar o portal recarimba `token_cliente_expira_em`
+    # +180 dias SEM rotacionar o token — só `@login_required` deixava
+    # qualquer FUNCIONARIO do tenant fazer isso.
     from utils.tenant import get_tenant_admin_id
     admin_id = get_tenant_admin_id()
     obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
@@ -800,7 +852,10 @@ def toggle_portal(obra_id: int):
 
 @portal_obras_bp.route('/obra/<int:obra_id>/medicao/gerar', methods=['POST'])
 @login_required
+@admin_required
 def gerar_medicao(obra_id: int):
+    # `admin_required`: cria MedicaoObra cujo valor_medido é percentual de
+    # obra.valor_contrato — configuração da empresa, não ação de FUNCIONARIO.
     from utils.tenant import get_tenant_admin_id
     admin_id = get_tenant_admin_id()
 
@@ -959,10 +1014,15 @@ def baixar_relatorio_mapa_v2_portal(token: str, mapa_id: int, rel_id: int):
     )
     if not rel:
         abort(404)
-    static_root = os.path.join(current_app.root_path, 'static')
-    abs_dir = os.path.dirname(os.path.join(static_root, rel.arquivo_path))
+    # 404 (não 403) pela mesma regra do módulo: para o portal, o que ele não
+    # oferece não existe.
+    alvo = _caminho_sob_static(rel.arquivo_path)
+    if alvo is None:
+        logger.warning('[PORTAL] arquivo_path fora de static/ no relatório '
+                       '%s da obra %s — recusado', rel_id, obra.id)
+        abort(404)
     return send_from_directory(
-        abs_dir, os.path.basename(rel.arquivo_path),
+        os.path.dirname(alvo), os.path.basename(alvo),
         as_attachment=False, download_name=rel.arquivo_nome,
     )
 
