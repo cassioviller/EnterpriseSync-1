@@ -502,6 +502,135 @@ def test_reuso_por_chave_natural_restaura_a_tarefa_arquivada():
         're-adicionado fica sem tarefa viva, em silêncio')
 
 
+# ---------------------------------------------------------------------------
+# Task 6 — os RDOs que quebram, duplicam ou perdem dado
+# ---------------------------------------------------------------------------
+
+def _rdo_de_ambiente():
+    """Admin V2 + obra + RDO reais, pelo arreio existente."""
+    from datetime import date
+
+    from test_cronograma_apontamento_service import _rdo
+    from test_cronograma_versao_service import _ambiente
+
+    admin, obra = _ambiente()
+    ctx = {'admin_id': admin.id, 'obra_id': obra.id}
+    rdo = _rdo(ctx, date(2026, 8, 15))
+    return admin, obra, rdo
+
+
+def test_atualizar_rdo_volta_a_funcionar():
+    """🔴 `views/rdo.py:2161` — a rota lia `rdo.tempo_manha` (default do
+    form.get), atributo que `RDO` NÃO tem: todo POST levantava
+    AttributeError e caía no except — a rota estava morta em runtime."""
+    with app.app_context():
+        admin, obra, rdo = _rdo_de_ambiente()
+        admin_id, rdo_id = admin.id, rdo.id
+        data_str = rdo.data_relatorio.strftime('%Y-%m-%d')
+
+    resposta = cliente_de(admin_id).post(
+        f'/rdo/{rdo_id}/atualizar',
+        data={'data_relatorio': data_str, 'clima_geral': 'Ensolarado'},
+        follow_redirects=False)
+    assert resposta.status_code in (302, 200)
+
+    with app.app_context():
+        from models import RDO
+        depois = db.session.get(RDO, rdo_id)
+        assert depois.clima_geral == 'Ensolarado', (
+            'o POST em /rdo/<id>/atualizar não persistiu nada — '
+            'a rota continua morta (AttributeError engolido)')
+
+
+def test_nenhum_rdo_escreve_atributo_que_o_modelo_nao_tem():
+    """🔴 Escritas em atributos não mapeados são perdidas em silêncio —
+    inclusive `finalizado_em`/`finalizado_por_id` (a autoria da finalização,
+    que a trilha `RDOTransicaoEstado` já captura de verdade)."""
+    import inspect
+
+    import crud_rdo_completo
+    import views.rdo as vrdo
+
+    orfaos = ('rdo.tempo_manha =', 'rdo.tempo_tarde =', 'rdo.tempo_noite =',
+              'rdo.temperatura =', 'rdo.condicoes_climaticas =',
+              'rdo.finalizado_em =', 'rdo.finalizado_por_id =')
+    for modulo in (vrdo, crud_rdo_completo):
+        fonte = inspect.getsource(modulo)
+        for padrao in orfaos:
+            assert padrao not in fonte, (
+                f'{modulo.__name__}: escrita em atributo não mapeado '
+                f'({padrao.strip()}) — o valor é perdido em silêncio')
+
+
+def test_edicao_unificada_tem_obra_id_vinculada():
+    """🔴 `rdo_salvar_unificado` — no ramo de edição `obra_id` nunca era
+    atribuída, e o uso em `:3132` levantava NameError que ESCAPAVA do
+    `except (ValueError, IndexError)` local: a edição inteira abortava."""
+    import inspect
+
+    import views.rdo as vrdo
+    fonte = inspect.getsource(vrdo.rdo_salvar_unificado)
+    assert 'obra_id = rdo.obra_id' in fonte, (
+        'o ramo de edição não vincula obra_id — NameError no fallback de '
+        'último serviço aborta a edição')
+
+
+def test_salvar_rdo_legado_nao_passa_kwargs_que_rdo_nao_aceita():
+    """🔴 `crud_rdo_completo.py:324` — `func` não importado e kwargs
+    (`sequencial_ano`, `ano`) que `RDO` não aceita. Sem rota hoje, mas
+    reservada para o Módulo 07: quebrada é pior que ausente."""
+    import inspect
+
+    import crud_rdo_completo
+    fonte = inspect.getsource(crud_rdo_completo.salvar_rdo)
+    assert 'sequencial_ano' not in fonte and 'func.max' not in fonte, (
+        'salvar_rdo ainda usa func nao importado / kwargs inexistentes — '
+        'NameError e TypeError garantidos no primeiro uso')
+
+
+def test_flexivel_nao_produz_rdo_duplicado_na_mesma_data():
+    """🔴 `salvar_rdo_flexivel` ignorava `rdo_id` e não tinha guarda de
+    obra+data: era O PRODUTOR dos RDOs duplicados que os serviços de
+    exportação e atualização contornam. E a colisão de `numero_rdo` era
+    checada por admin_id numa coluna UNIQUE GLOBAL."""
+    with app.app_context():
+        from test_cronograma_versao_service import _ambiente
+
+        from models import RDO
+        admin, obra = _ambiente()
+        admin_id, obra_id = admin.id, obra.id
+
+    cliente = cliente_de(admin_id)
+    form = {'obra_id': str(obra_id), 'data_relatorio': '2026-08-18'}
+    r1 = cliente.post('/salvar-rdo-flexivel', data=form)
+    r2 = cliente.post('/salvar-rdo-flexivel', data=form)
+
+    with app.app_context():
+        from datetime import date
+
+        from models import RDO
+        quantos = RDO.query.filter_by(
+            obra_id=obra_id, admin_id=admin_id,
+            data_relatorio=date(2026, 8, 18)).count()
+        assert quantos == 1, (
+            f'{quantos} RDOs para a mesma obra+data — o flexível segue '
+            'produzindo duplicatas')
+
+
+def test_flexivel_checa_colisao_de_numero_globalmente():
+    """A coluna `numero_rdo` é UNIQUE global; checar colisão filtrando por
+    admin_id deixa a linha de outro tenant invisível e o INSERT explode em
+    laço permanente."""
+    import inspect
+
+    import views.rdo as vrdo
+    fonte = inspect.getsource(vrdo.salvar_rdo_flexivel)
+    assert 'numero_rdo=numero_proposto,\n                admin_id' \
+        not in fonte and "numero_rdo=numero_proposto, admin_id" not in fonte, (
+        'a checagem de colisão ainda filtra por admin_id numa coluna '
+        'UNIQUE global')
+
+
 def test_a_tela_de_comparar_e_alcancavel_pela_navegacao():
     """Entrega inalcançável não é entrega."""
     import subprocess

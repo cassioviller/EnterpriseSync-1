@@ -758,10 +758,14 @@ def criar_rdo():
         # admins que não têm Funcionario com o mesmo email.
         rdo.criado_por_id = current_user.id
         rdo.admin_id = admin_id
-        rdo.tempo_manha = request.form.get('tempo_manha', 'Bom')
-        rdo.tempo_tarde = request.form.get('tempo_tarde', 'Bom')
-        rdo.tempo_noite = request.form.get('tempo_noite', 'Bom')
-        rdo.observacoes_meteorologicas = request.form.get('observacoes_meteorologicas', '')
+        # tempo_manha/tarde/noite e observacoes_meteorologicas NÃO são
+        # colunas de RDO — escrever nelas perdia o dado em silêncio. O que o
+        # form legado manda vai para as colunas reais de clima.
+        rdo.clima_geral = (request.form.get('clima_geral')
+                           or request.form.get('tempo_manha') or '').strip() or None
+        rdo.observacoes_climaticas = (
+            request.form.get('observacoes_climaticas')
+            or request.form.get('observacoes_meteorologicas') or '').strip() or None
         # RDO V2: campo único de observações; aceita observacoes_gerais (novo), com fallbacks legados
         rdo.comentario_geral = (
             request.form.get('observacoes_gerais', '').strip()
@@ -2157,10 +2161,10 @@ def atualizar_rdo(id):
             rdo.temperatura_media = _tm or None
         if _ct or 'condicoes_trabalho' in request.form:
             rdo.condicoes_trabalho = _ct or None
-        # Compatibilidade legacy: tempo_manha/tarde/noite continuam sendo aceitos
-        rdo.tempo_manha = request.form.get('tempo_manha', rdo.tempo_manha)
-        rdo.tempo_tarde = request.form.get('tempo_tarde', rdo.tempo_tarde)
-        rdo.tempo_noite = request.form.get('tempo_noite', rdo.tempo_noite)
+        # Os campos legacy tempo_manha/tarde/noite NÃO existem no modelo RDO:
+        # ler `rdo.tempo_manha` (default do form.get) levantava AttributeError
+        # em TODO POST — a rota estava morta em runtime — e escrever neles
+        # perdia o valor em silêncio. O clima vive nos 3 campos acima.
         rdo.comentario_geral = (
             request.form.get('observacoes_gerais', '').strip()
             or request.form.get('comentario_geral', '').strip()
@@ -2892,6 +2896,12 @@ def rdo_salvar_unificado():
             if not rdo:
                 flash('RDO não encontrado ou sem permissão de acesso.', 'error')
                 return redirect('/rdo')
+
+            # O fallback de "último serviço" (:3132) e o de subatividade
+            # (:3170) filtram por `obra_id` — que só o ramo de CRIAÇÃO
+            # atribuía. Na edição, o NameError escapava do
+            # `except (ValueError, IndexError)` local e abortava tudo.
+            obra_id = rdo.obra_id
             
             # Limpar dados antigos para substituir pelos novos.
             #
@@ -3027,10 +3037,9 @@ def rdo_salvar_unificado():
         rdo.condicoes_trabalho = request.form.get('condicoes_trabalho', '').strip()
         rdo.observacoes_climaticas = request.form.get('observacoes_climaticas', '').strip()
         
-        # Campos legados (manter compatibilidade)
-        rdo.tempo_manha = request.form.get('clima', '').strip()  # Backup
-        rdo.temperatura = request.form.get('temperatura', '').strip()  # Backup
-        rdo.condicoes_climaticas = request.form.get('condicoes_climaticas', '').strip()  # Backup
+        # Os "campos legados" (tempo_manha/temperatura/condicoes_climaticas)
+        # não existem no modelo RDO — escrever neles perdia o valor em
+        # silêncio. Removidos; o clima vive nos campos padronizados acima.
         
         # RDO V2: campo único de observações; aceita observacoes_gerais (novo), com fallbacks legados
         rdo.comentario_geral = (
@@ -4021,6 +4030,22 @@ def salvar_rdo_flexivel():
             data_relatorio = datetime.strptime(data_relatorio, '%Y-%m-%d').date()
         else:
             data_relatorio = datetime.now().date()
+
+        # Guarda de obra+data: esta rota criava SEMPRE — era o produtor
+        # dos RDOs duplicados na mesma data que os serviços de exportação
+        # e atualização contornam. Já existe RDO? A edição tem rota
+        # própria; aqui a resposta honesta é apontar o existente.
+        _ja_existe = RDO.query.filter_by(
+            obra_id=obra_id, admin_id=admin_id,
+            data_relatorio=data_relatorio).first()
+        if _ja_existe:
+            logger.warning(
+                '[GUARD] RDO duplicado recusado: obra=%s data=%s ja tem %s',
+                obra_id, data_relatorio, _ja_existe.numero_rdo)
+            flash(f'Já existe um RDO ({_ja_existe.numero_rdo}) para esta '
+                  f'obra em {data_relatorio.strftime("%d/%m/%Y")}. '
+                  'Edite o existente.', 'warning')
+            return redirect(url_for('main.funcionario_rdo_novo'))
             
         # [OK] CORREÇÃO CRÍTICA: Gerar número RDO Único (evita constraint violation)
             logger.info(f"[NUM] GERANDO NÚMERO RDO Único para admin_id={admin_id}, ano={data_relatorio.year}")
@@ -4033,12 +4058,13 @@ def salvar_rdo_flexivel():
         for tentativa in range(1, 1000):  # Máximo 999 tentativas
             numero_proposto = f"RDO-{admin_id}-{data_relatorio.year}-{tentativa:03d}"
             
-            # Verificar se já existe
+            # Verificar se já existe — SEM filtro de admin_id: a coluna
+            # numero_rdo é UNIQUE GLOBAL, e filtrar por tenant deixava a
+            # linha de outro tenant invisível → IntegrityError em laço.
             rdo_existente = RDO.query.filter_by(
-                numero_rdo=numero_proposto,
-                admin_id=admin_id
+                numero_rdo=numero_proposto
             ).first()
-            
+
             if not rdo_existente:
                 numero_rdo = numero_proposto
                 logger.info(f"[OK] NÚMERO RDO Único GERADO: {numero_rdo}")

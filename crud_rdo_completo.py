@@ -319,16 +319,16 @@ def salvar_rdo():
                 flash(f'Já existe um RDO para a obra "{obra.nome}" na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
                 return redirect(url_for('rdo_crud.editar_rdo', rdo_id=rdo_existente.id))
             
-            # Gerar número do RDO
-            ano_atual = data_relatorio.year
-            ultimo_numero = db.session.query(func.max(RDO.sequencial_ano)).filter(
-                RDO.ano == ano_atual
-            ).scalar() or 0
-            
+            # Gerar número do RDO pelo helper único (globalmente único, com
+            # retry). O bloco anterior usava um `func` que nunca foi importado
+            # (NameError) e passava ao construtor kwargs de colunas que RDO
+            # não tem (TypeError): quebrado desde sempre, garantido no
+            # primeiro uso quando o Módulo 07 religar a rota.
+            from views.rdo import _gerar_numero_rdo_unico
+
             rdo = RDO(
-                numero_rdo=f'RDO-{ano_atual}-{ultimo_numero + 1:03d}',
-                sequencial_ano=ultimo_numero + 1,
-                ano=ano_atual,
+                numero_rdo=_gerar_numero_rdo_unico(
+                    obra_id, data_relatorio, admin_id),
                 obra_id=obra_id,
                 data_relatorio=data_relatorio,
                 admin_id=admin_id,
@@ -599,8 +599,10 @@ def finalizar_rdo(rdo_id):
             return redirect(url_for('rdo_crud.editar_rdo', rdo_id=rdo_id))
         
         rdo.status = 'Finalizado'
-        rdo.finalizado_em = datetime.utcnow()
-        rdo.finalizado_por_id = current_user.id
+        # `finalizado_em`/`finalizado_por_id` NÃO são colunas de RDO: as
+        # escritas eram perdidas em silêncio. A autoria e o instante da
+        # finalização são capturados pela trilha `RDOTransicaoEstado`
+        # (usuario_id + criado_em) na transição logo abaixo.
         # 21/08 — esta rota marcava `status` e emitia custo sem mexer em `estado`:
         # o RDO seguia rascunho para o ciclo de vida e, com o guarda
         # `publica_custos`, deixaria de lançar. Finalizar É submeter — a mesma
