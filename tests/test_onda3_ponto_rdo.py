@@ -365,3 +365,59 @@ def test_edicao_unificada_estorna_o_custo_de_quem_saiu():
         assert len(custo_diario(rdo_id)) == 1, (
             'o RDOCustoDiario do removido também precisa sair — é dele que o '
             'lançamento nasce de novo')
+
+
+# ---------------------------------------------------------------------------
+# Defeito 4 — reabrir desfazia o cronograma e deixava o custo (views/rdo.py:1888)
+# ---------------------------------------------------------------------------
+
+def test_reabrir_rdo_estorna_o_custo_de_mao_de_obra():
+    """🔴 O Reabrir desfazia o percentual e deixava o custo no razão.
+
+    A simetria Submeter/Reabrir foi desenhada em
+    `docs/superpowers/plans/2026-08-24-rascunho-nao-move-cronograma.md`
+    (`95eb585f`) e implementada só na metade do AVANÇO: `reabrir_rdo` chamava
+    `recalcular_percentuais_do_rdo` e nada mais. O custo de mão de obra que o
+    Submeter lançou ficava de pé com o RDO de volta em `rascunho` — o estado
+    que, por `services.rdo_ciclo_vida.publica_custos`, não pode ter custo
+    nenhum. Reprocessar é estornar e refazer.
+    """
+    from models import RDO
+    from services.rdo_ciclo_vida import PREENCHIDO, RASCUNHO, estado_de
+
+    with app.app_context():
+        t = um_tenant('onda3_reab', data_ref=DIA, com_fatos=False,
+                      tipo_remuneracao='salario', valor_diaria=0.0,
+                      salario=3000.0)
+        rdo = rdo_da_obra(t, DIA)
+        mao_de_obra(rdo, t, horas=8.0)
+        rdo_id = rdo.id
+
+        _submeter(t, rdo_id)
+        assert estado_de(db.session.get(RDO, rdo_id)) == PREENCHIDO
+        assert len(filhos_mao_de_obra(t)) == 1, (
+            'o cenário precisa do custo lançado pelo Submeter')
+        assert len(custo_diario(rdo_id)) == 1
+
+        resposta = cliente_de(t.admin_id).post(
+            f'/rdo/{rdo_id}/reabrir', data={'motivo': 'horas erradas'})
+        assert resposta.status_code in (200, 302), (
+            f'reabrir respondeu {resposta.status_code}')
+
+        db.session.expire_all()
+        assert estado_de(db.session.get(RDO, rdo_id)) == RASCUNHO, (
+            'o cenário depende de a reabertura ter acontecido')
+        assert filhos_mao_de_obra(t) == [], (
+            'o RDO voltou para rascunho e o custo de mão de obra continua no '
+            'razão — rascunho não lança custo')
+        assert custo_diario(rdo_id) == [], (
+            'o RDOCustoDiario é a fonte do lançamento: sem estorná-lo, o '
+            'próximo Submeter reaproveita o valor velho')
+
+        # A outra metade de "reprocessar é estornar e REFAZER": o estorno não
+        # pode deixar o custo irrecuperável. Submetendo de novo, ele volta —
+        # uma vez só.
+        _submeter(t, rdo_id)
+        assert len(filhos_mao_de_obra(t)) == 1, (
+            'depois de estornar, o Submeter seguinte precisa relançar o '
+            'custo — e uma vez só')

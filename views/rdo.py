@@ -1909,8 +1909,33 @@ def reabrir_rdo(id):
         return redirect(url_for('main.visualizar_rdo', id=id))
 
     try:
+        admin_id = rdo.admin_id or rdo.obra.admin_id
+
         transicionar(rdo, RASCUNHO, usuario=current_user, motivo=motivo,
                      ip=request.remote_addr)
+
+        # A OUTRA metade da simetria do plano de 24/08: o Submeter lança o
+        # custo de mão de obra (via `rdo_finalizado`), e a reabertura tinha
+        # desfeito só o percentual do cronograma. O custo ficava de pé com o
+        # RDO de volta em `rascunho` — o estado que, por
+        # `services.rdo_ciclo_vida.publica_custos`, não pode ter custo nenhum.
+        # Reprocessar é estornar e refazer: o Submeter seguinte relança.
+        #
+        # DENTRO da transação da transição (o percentual, abaixo, fica fora
+        # porque comita por tarefa): estado e razão mudam juntos, ou nenhum
+        # dos dois. E nesta ordem, porque `remover_custos_rdo` casa o
+        # lançamento pelo id do `RDOCustoDiario` que a linha seguinte apaga.
+        try:
+            from services.rdo_custos import remover_custos_rdo
+            remover_custos_rdo(rdo, admin_id)
+        except Exception as _e:
+            logger.warning(f"[rdo-custo] remover_custos_rdo falhou: {_e}")
+        try:
+            from services.custo_funcionario_dia import remover_custo_diario_rdo
+            remover_custo_diario_rdo(rdo.id)
+        except Exception as _e:
+            logger.warning(f"[custo-dia] remover_custo_diario_rdo falhou: {_e}")
+
         db.session.commit()
 
         # Simétrico do Submeter: o RDO volta a rascunho, e o avanço dele sai
@@ -1920,8 +1945,7 @@ def reabrir_rdo(id):
         try:
             from services.cronograma_apontamento_service import (
                 recalcular_percentuais_do_rdo)
-            recalcular_percentuais_do_rdo(
-                rdo.id, rdo.admin_id or rdo.obra.admin_id)
+            recalcular_percentuais_do_rdo(rdo.id, admin_id)
         except Exception as _e_pct:
             logger.warning(
                 f"[WARN] RDO {rdo.id} reaberto, mas o percentual do "
