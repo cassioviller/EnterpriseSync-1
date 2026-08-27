@@ -197,5 +197,6 @@ def test_o_decorador_garante_a_invariante_que_documenta():
 
     import cronograma_views
     fonte = inspect.getsource(cronograma_views._com_undo)
-    assert 'rollback' in fonte, (
-        '_com_undo documenta depender do rollback da rota mas não o garante')
+    assert '>= 400' in fonte and 'rollback' in fonte, (
+        '_com_undo documenta depender do rollback da rota mas não o garante '
+        '(a guarda de status >= 400 antes do registrar_acao sumiu)')
