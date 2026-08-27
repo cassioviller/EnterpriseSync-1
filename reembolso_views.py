@@ -7,8 +7,9 @@ from flask_login import login_required
 from datetime import datetime, date
 from decimal import Decimal
 import os, uuid
+from sqlalchemy import func as sa_func
 from app import db
-from models import ReembolsoFuncionario, Funcionario, Obra, GestaoCustoPai
+from models import ReembolsoFuncionario, Funcionario, Obra, GestaoCustoPai, GestaoCustoFilho
 from multitenant_helper import get_admin_id
 from utils.tenant import is_v2_active
 from utils.financeiro_integration import registrar_custo_automatico
@@ -286,12 +287,37 @@ def editar(reembolso_id):
             if novo_comp:
                 reembolso.comprovante_url = novo_comp
 
-            # Atualizar GestaoCustoPai associado se existir
+            # Atualizar GestaoCustoPai associado se existir.
+            #
+            # O `GestaoCustoPai` é COMPARTILHADO entre os reembolsos do
+            # mesmo funcionário (`models.py:7203`, cascade
+            # `all, delete-orphan` em `itens`): sobrescrever
+            # `gcp.valor_total = valor` com o valor de UM reembolso apagava
+            # os irmãos do total. Disciplina copiada de
+            # `transporte_views.py:565-579` — atualiza o FILHO deste
+            # reembolso e recalcula o total do pai pela SOMA dos filhos.
             if reembolso.origem_tabela == 'gestao_custo_pai' and reembolso.origem_id:
                 gcp = GestaoCustoPai.query.filter_by(id=reembolso.origem_id, admin_id=admin_id).first()
                 if gcp and gcp.status == 'PENDENTE':
-                    gcp.valor_total = valor
-                    gcp.valor_solicitado = valor
+                    filho = GestaoCustoFilho.query.filter_by(
+                        pai_id=gcp.id, origem_tabela='reembolso_funcionario',
+                        origem_id=reembolso.id, admin_id=admin_id).first()
+                    if filho:
+                        # Só o valor: `obra_id`/`centro_custo_id` tem check
+                        # constraint de destino obrigatório
+                        # (`models.py:7261`) e não é regravado aqui — mudar
+                        # a obra do filho é decisão de
+                        # `services/destino_custo.py`, fora do escopo desta
+                        # correção.
+                        filho.valor = valor
+                        filho.descricao = f'Reembolso ({reembolso.categoria}): {reembolso.descricao}'
+                        filho.data_referencia = reembolso.data_despesa
+
+                    novo_total = db.session.query(
+                        sa_func.coalesce(sa_func.sum(GestaoCustoFilho.valor), 0)
+                    ).filter(GestaoCustoFilho.pai_id == gcp.id).scalar()
+                    gcp.valor_total = Decimal(str(novo_total))
+                    gcp.valor_solicitado = gcp.valor_total
                     gcp.observacoes = f'Reembolso ({reembolso.categoria}): {reembolso.descricao}'
 
             db.session.commit()
@@ -322,13 +348,45 @@ def excluir(reembolso_id):
     reembolso = ReembolsoFuncionario.query.filter_by(id=reembolso_id, admin_id=admin_id).first_or_404()
 
     try:
-        # Se existir GestaoCustoPai associado, excluir também
+        # O `GestaoCustoPai` é COMPARTILHADO entre os reembolsos do mesmo
+        # funcionário, e `GestaoCustoPai.itens` é `cascade='all,
+        # delete-orphan'` (`models.py:7203`): apagá-lo levava junto os
+        # filhos de TODOS os outros reembolsos dele.
+        #
+        # Disciplina copiada de `transporte_views.py:565-579`: apaga o
+        # FILHO deste reembolso, recalcula o total do pai, e só mata o pai
+        # se não sobrar filho nenhum — contando filhos, nunca somando
+        # valor. Soma zero não é ausência de filho.
         if reembolso.origem_tabela == 'gestao_custo_pai' and reembolso.origem_id:
             gcp = GestaoCustoPai.query.filter_by(
                 id=reembolso.origem_id, admin_id=admin_id
             ).first()
-            if gcp and gcp.status == 'PENDENTE':
-                db.session.delete(gcp)
+            if gcp:
+                # Um a um, nunca `Query.delete()` em massa: o delete em
+                # massa não dispara eventos por instância, e é o
+                # `after_delete` de `_gestao_custo_filho_changed`
+                # (`models.py:8214-8216`) que agenda `recalcular_obra`
+                # (`services/resumo_custos_obra.py`) para ressincronizar o
+                # dashboard de custo da obra. `_limpar_gestao_custo_filho`
+                # (`transporte_views.py:565-579`) já apaga em loop por
+                # exatamente este motivo.
+                filhos = GestaoCustoFilho.query.filter_by(
+                    pai_id=gcp.id, origem_tabela='reembolso_funcionario',
+                    origem_id=reembolso.id, admin_id=admin_id).all()
+                for filho in filhos:
+                    db.session.delete(filho)
+                db.session.flush()
+
+                novo_total = db.session.query(
+                    sa_func.coalesce(sa_func.sum(GestaoCustoFilho.valor), 0)
+                ).filter(GestaoCustoFilho.pai_id == gcp.id).scalar()
+                gcp.valor_total = Decimal(str(novo_total))
+
+                restantes = db.session.query(
+                    sa_func.count(GestaoCustoFilho.id)
+                ).filter(GestaoCustoFilho.pai_id == gcp.id).scalar() or 0
+                if restantes == 0 and gcp.status == 'PENDENTE':
+                    db.session.delete(gcp)
 
         db.session.delete(reembolso)
         db.session.commit()
