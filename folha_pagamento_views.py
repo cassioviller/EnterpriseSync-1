@@ -4,8 +4,8 @@ Versão limpa e funcional
 """
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, make_response, send_file
-from models import (db, FolhaPagamento, ParametrosLegais, Funcionario, BeneficioFuncionario, 
-                    Adiantamento, GestaoCustoPai, GestaoCustoFilho)
+from models import (db, FolhaPagamento, ParametrosLegais, Funcionario, BeneficioFuncionario,
+                    Adiantamento, GestaoCustoPai, GestaoCustoFilho, TipoUsuario)
 from flask_login import current_user
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta  # [OK] OTIMIZAÇÃO: Movido do inline (linha 41)
@@ -20,6 +20,20 @@ folha_bp = Blueprint('folha', __name__)
 
 # Fase 1 — usa a definição canônica (ver contabilidade_views.py).
 from auth import admin_required
+
+
+def get_admin_id():
+    """Onda 2 — mesmo defeito de tenant que `contabilidade_views.py` já
+    corrigiu: `current_user.id` só é o admin_id certo para quem É admin.
+    Papel não-admin com `admin_id` próprio processava/estornava a folha do
+    admin errado. Task 8 traz a correção canônica para cá também."""
+    if not current_user.is_authenticated:
+        return None
+    if current_user.tipo_usuario == TipoUsuario.ADMIN:
+        return current_user.id
+    elif hasattr(current_user, 'admin_id'):
+        return current_user.admin_id
+    return None
 
 # ================================
 # DASHBOARD PRINCIPAL
@@ -128,13 +142,14 @@ def dashboard():
 @admin_required
 def processar_folha_mes(ano, mes):
     """Processar folha de pagamento do mês - VERSÃO COMPLETA"""
-    
+
     try:
+        admin_id = get_admin_id()
         mes_referencia = date(ano, mes, 1)
-        
+
         # Verificar se já foi processada
         folhas_existentes = FolhaPagamento.query.filter_by(
-            admin_id=current_user.id,
+            admin_id=admin_id,
             mes_referencia=mes_referencia
         ).count()
         
@@ -144,17 +159,19 @@ def processar_folha_mes(ano, mes):
             flash('Folha já processada para este mês. Use a opção "Reprocessar" se necessário.', 'warning')
             return redirect(url_for('folha.dashboard'))
         
-        # Se reprocessar, deletar folhas existentes
+        # Se reprocessar, ESTORNAR a rodada anterior ANTES de recriar.
+        # Apagava só `FolhaPagamento` — o `GestaoCustoPai`/`Filho` e o
+        # `LancamentoContabil` da rodada anterior sobreviviam e eram
+        # recriados: a folha dobrava no contas a pagar e no razão. É a
+        # automação A12 do backlog.
         if reprocessar:
-            FolhaPagamento.query.filter_by(
-                admin_id=current_user.id,
-                mes_referencia=mes_referencia
-            ).delete()
+            from services.folha_service import estornar_folha_do_mes
+            estornar_folha_do_mes(admin_id=admin_id, mes_referencia=mes_referencia)
             db.session.commit()
-        
+
         # Buscar funcionários ativos
         funcionarios = Funcionario.query.filter_by(
-            admin_id=current_user.id,
+            admin_id=admin_id,
             ativo=True
         ).all()
         
@@ -185,7 +202,7 @@ def processar_folha_mes(ano, mes):
                     total_descontos=dados_folha['total_descontos'],
                     salario_liquido=dados_folha['salario_liquido'],
                     fgts=dados_folha['fgts'],
-                    admin_id=current_user.id
+                    admin_id=admin_id
                 )
                 
                 db.session.add(folha)
@@ -197,7 +214,7 @@ def processar_folha_mes(ano, mes):
                 try:
                     EventManager.emit('folha_processada', {
                         'folha_id': folha.id
-                    }, admin_id=current_user.id)
+                    }, admin_id=admin_id)
                 except Exception as e:
                     logger.error(f"[ERROR] Erro ao emitir evento folha_processada: {e}")
 
@@ -224,7 +241,7 @@ def processar_folha_mes(ano, mes):
                             data_venc_folha = date(ano, mes, ultimo_dia)
 
                             gcp = GestaoCustoPai(
-                                admin_id=current_user.id,
+                                admin_id=admin_id,
                                 tipo_categoria=tipo_cat,
                                 entidade_nome=funcionario.nome,
                                 entidade_id=funcionario.id,
@@ -251,13 +268,13 @@ def processar_folha_mes(ano, mes):
 
                             gcf = GestaoCustoFilho(
                                 pai_id=gcp.id,
-                                admin_id=current_user.id,
+                                admin_id=admin_id,
                                 data_referencia=mes_referencia,
                                 descricao=f"Salário {mes_ref_str} - {funcionario.nome}",
                                 valor=salario_liq,
                                 obra_id=None,
                                 centro_custo_id=id_do_centro_administrativo(
-                                    current_user.id, criar=True),
+                                    admin_id, criar=True),
                                 origem_tabela='folha_pagamento',
                                 origem_id=folha.id,
                             )
@@ -278,12 +295,19 @@ def processar_folha_mes(ano, mes):
                 from contabilidade_utils import gerar_lancamento_contabil_automatico
                 from utils.tenant import is_v2_active
                 if is_v2_active():
+                    # B5.6 — carimbar a origem real (`FOLHA_PAGAMENTO`), não
+                    # deixar cair no default 'V2_AUTO'/origem_id=None: um LC
+                    # sem origem rastreável é INESTORNÁVEL, e
+                    # `estornar_folha_do_mes` (automação A12) depende deste
+                    # carimbo para achar e apagar este lançamento agregado no
+                    # reprocessamento.
                     gerar_lancamento_contabil_automatico(
-                        admin_id=current_user.id,
+                        admin_id=admin_id,
                         tipo_operacao='folha_pagamento',
                         valor=total_proventos_mes,
                         data=mes_referencia,
                         descricao=f"Folha de Pagamento {mes:02d}/{ano} - {folhas_criadas} funcionários",
+                        origem='FOLHA_PAGAMENTO',
                     )
             except Exception as _e:
                 logger.warning(f"[WARN] Lancamento contabil folha nao gerado: {_e}")

@@ -7,7 +7,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Dict, Optional
 from sqlalchemy import extract
-from models import db, Funcionario, RegistroPonto, ParametrosLegais, ConfiguracaoSalarial, BeneficioFuncionario, CalendarioUtil, HorarioDia, HorarioTrabalho
+from models import db, Funcionario, RegistroPonto, ParametrosLegais, ConfiguracaoSalarial, BeneficioFuncionario, CalendarioUtil, HorarioDia, HorarioTrabalho, FolhaPagamento, GestaoCustoPai, GestaoCustoFilho, LancamentoContabil
 from utils import calcular_valor_hora_periodo
 import logging
 
@@ -1106,10 +1106,108 @@ def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int, pa
 
 
 # ========================================
+# REPROCESSAMENTO — ESTORNO DA RODADA ANTERIOR (Onda 3 / Task 8 / A12)
+# ========================================
+
+def estornar_folha_do_mes(admin_id: int, mes_referencia: date) -> None:
+    """Estorna a rodada anterior de folha do mês — ANTES de recriar.
+
+    `folha_pagamento_views.py` (view `processar_folha_mes`, reprocessar=true)
+    apagava só `FolhaPagamento`; o `GestaoCustoPai`/`Filho` e o
+    `LancamentoContabil` da rodada anterior sobreviviam e eram recriados: a
+    folha dobrava no contas a pagar e no razão. Esta função apaga as três
+    coisas, nesta ordem (filho → pai/lançamento → folha, para não violar FK):
+
+    1. `GestaoCustoFilho` com `origem_tabela='folha_pagamento'` e
+       `origem_id` em uma das `FolhaPagamento` do mês, e o `GestaoCustoPai`
+       que os agrupa (`GestaoCustoPai` não tem FK direta para `FolhaPagamento`
+       — só é alcançável através do filho).
+    2. `LancamentoContabil` com `origem='FOLHA_PAGAMENTO'` — dois formatos
+       coexistem no código: um por funcionário
+       (`event_manager.py:criar_lancamento_folha_pagamento`,
+       `origem_id=folha.id`) e um agregado por rodada
+       (`folha_pagamento_views.py`, `origem_id=None`, mesmo
+       `data_lancamento` do mês). Os dois são apagados.
+    3. `FolhaPagamento` do mês.
+
+    Loga contagem ANTES e DEPOIS de cada uma das três coisas.
+    """
+    folhas = FolhaPagamento.query.filter_by(
+        admin_id=admin_id, mes_referencia=mes_referencia).all()
+    folha_ids = [f.id for f in folhas]
+
+    filhos = []
+    if folha_ids:
+        filhos = GestaoCustoFilho.query.filter(
+            GestaoCustoFilho.admin_id == admin_id,
+            GestaoCustoFilho.origem_tabela == 'folha_pagamento',
+            GestaoCustoFilho.origem_id.in_(folha_ids),
+        ).all()
+    pai_ids = {f.pai_id for f in filhos}
+    pais = GestaoCustoPai.query.filter(
+        GestaoCustoPai.admin_id == admin_id,
+        GestaoCustoPai.id.in_(pai_ids),
+    ).all() if pai_ids else []
+
+    lcs_por_folha = []
+    if folha_ids:
+        lcs_por_folha = LancamentoContabil.query.filter(
+            LancamentoContabil.admin_id == admin_id,
+            LancamentoContabil.origem == 'FOLHA_PAGAMENTO',
+            LancamentoContabil.origem_id.in_(folha_ids),
+        ).all()
+    lc_agregado = LancamentoContabil.query.filter_by(
+        admin_id=admin_id, origem='FOLHA_PAGAMENTO', origem_id=None,
+        data_lancamento=mes_referencia,
+    ).all()
+    lcs = list({lc.id: lc for lc in (lcs_por_folha + lc_agregado)}.values())
+
+    logger.info(
+        "[estornar_folha_do_mes] ANTES admin=%s mes=%s | FolhaPagamento=%s "
+        "GestaoCustoFilho=%s GestaoCustoPai=%s LancamentoContabil=%s",
+        admin_id, mes_referencia, len(folha_ids), len(filhos), len(pais), len(lcs))
+
+    for filho in filhos:
+        db.session.delete(filho)
+    for pai in pais:
+        db.session.delete(pai)
+    for lc in lcs:
+        db.session.delete(lc)
+    for folha in folhas:
+        db.session.delete(folha)
+    db.session.flush()
+
+    logger.info(
+        "[estornar_folha_do_mes] DEPOIS admin=%s mes=%s | FolhaPagamento=%s "
+        "GestaoCustoFilho=%s GestaoCustoPai=%s LancamentoContabil=%s",
+        admin_id, mes_referencia,
+        FolhaPagamento.query.filter_by(
+            admin_id=admin_id, mes_referencia=mes_referencia).count(),
+        (GestaoCustoFilho.query.filter(
+            GestaoCustoFilho.admin_id == admin_id,
+            GestaoCustoFilho.origem_tabela == 'folha_pagamento',
+            GestaoCustoFilho.origem_id.in_(folha_ids)).count()
+         if folha_ids else 0),
+        (GestaoCustoPai.query.filter(
+            GestaoCustoPai.admin_id == admin_id,
+            GestaoCustoPai.id.in_(pai_ids)).count()
+         if pai_ids else 0),
+        (LancamentoContabil.query.filter(
+            LancamentoContabil.admin_id == admin_id,
+            LancamentoContabil.origem == 'FOLHA_PAGAMENTO',
+            LancamentoContabil.origem_id.in_(folha_ids)).count()
+         if folha_ids else 0)
+        + LancamentoContabil.query.filter_by(
+            admin_id=admin_id, origem='FOLHA_PAGAMENTO', origem_id=None,
+            data_lancamento=mes_referencia).count(),
+    )
+
+
+# ========================================
 # FUNÇÕES PARA DASHBOARD DE CUSTOS POR OBRA
 # ========================================
 
-def salvar_folha_processada(funcionario_id: int, obra_id: Optional[int], ano: int, mes: int, 
+def salvar_folha_processada(funcionario_id: int, obra_id: Optional[int], ano: int, mes: int,
                             dados_folha: Dict, admin_id: int) -> bool:
     """
     Salva os resultados do processamento de folha na tabela FolhaProcessada.
