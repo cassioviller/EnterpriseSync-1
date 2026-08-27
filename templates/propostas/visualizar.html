@@ -20,6 +20,11 @@
             <a href="{{ url_for('propostas.editar_proposta', id=proposta.id) }}" class="btn btn-warning">
                 <i class="fas fa-edit me-2"></i>Editar
             </a>
+            {% if proposta.proposta_origem_id %}
+            <a href="{{ url_for('propostas.comparar', id=proposta.proposta_origem_id, outra_id=proposta.id) }}" class="btn btn-info">
+                <i class="fas fa-code-compare me-2"></i>Comparar com a versão anterior
+            </a>
+            {% endif %}
             <div class="btn-group">
                 <a href="{{ url_for('propostas.gerar_pdf', id=proposta.id) }}" class="btn btn-success" target="_blank">
                     <i class="fas fa-file-pdf me-2"></i>PDF Completo

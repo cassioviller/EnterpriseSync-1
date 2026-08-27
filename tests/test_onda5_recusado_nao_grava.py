@@ -319,3 +319,68 @@ def test_tentativa_no_portal_deixa_exatamente_um_evento():
             'antecipado seguiu descartando (ou dobrando) a trilha')
         assert any((e.detalhes or {}).get('resultado') == 'ja_aprovada'
                    for e in eventos), 'a tentativa idempotente ficou sem trilha'
+
+
+# ---------------------------------------------------------------------------
+# Task 4 — as duas entregas da Fase 6 chegam à tela
+# ---------------------------------------------------------------------------
+
+def test_revisao_que_muda_so_o_preco_aparece_no_diff():
+    """🔴 `services/proposta_diff.py:88` — lê `subtotal`, NULL fora da Task #89.
+
+    Revisão que muda só `preco_unitario` saía como "mantido", com impacto
+    R$ 0,00. `PropostaItem.subtotal_calculado` existe exatamente para isso.
+    """
+    import inspect
+
+    from services import proposta_diff
+    fonte = inspect.getsource(proposta_diff)
+    assert 'subtotal_calculado' in fonte, (
+        'o diff ainda lê `subtotal`, que é NULL para a maioria dos itens')
+    for numero, linha in enumerate(fonte.splitlines(), start=1):
+        if '.subtotal' in linha and 'subtotal_calculado' not in linha:
+            raise AssertionError(
+                f'proposta_diff:{numero} ainda lê .subtotal cru: '
+                f'{linha.strip()[:80]}')
+
+
+def test_o_diff_ve_o_item_sem_snapshot_de_subtotal():
+    """A prova pelo dado: dois itens iguais exceto o preço, ambos com
+    `subtotal` NULL (o caso da maioria) — o diff tem que acusar alteração."""
+    from types import SimpleNamespace
+
+    from services.proposta_diff import diff_versoes
+
+    def item(id_, preco):
+        return SimpleNamespace(
+            id=id_, descricao='Alvenaria', unidade='m2', item_numero=1,
+            quantidade=10, preco_unitario=preco, subtotal=None,
+            subtotal_calculado=10 * preco,
+            item_origem_id=None, servico_id=None, template_origem_id=None)
+
+    antes = item(1, 100)
+    depois = item(2, 150)
+    depois.item_origem_id = 1
+    linhas = diff_versoes(SimpleNamespace(itens=[antes]),
+                          SimpleNamespace(itens=[depois]))
+    alterados = [l for l in linhas if l['situacao'] == 'alterado']
+    assert alterados, (
+        'mudança só de preço saiu como "mantido" — impacto R$ 0,00')
+    assert alterados[0]['delta_valor'] == 500
+
+
+def test_a_tela_de_comparar_e_alcancavel_pela_navegacao():
+    """Entrega inalcançável não é entrega."""
+    import subprocess
+
+    # O grep literal do plano passava vazio: os únicos hits eram COMENTÁRIOS
+    # dentro dos próprios comparar.html. Link de verdade é url_for fora deles.
+    for endpoint in ('orcamentos.comparar', 'propostas.comparar'):
+        saida = subprocess.run(
+            ['grep', '-rl', f"url_for('{endpoint}'", 'templates/'],
+            capture_output=True, text=True).stdout
+        arquivos = [a for a in saida.splitlines()
+                    if not a.endswith('/comparar.html')]
+        assert arquivos, (
+            f'nenhum template linka {endpoint} — a Task 12 da Fase 6 '
+            'segue inalcançável')

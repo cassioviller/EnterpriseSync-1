@@ -85,7 +85,11 @@ def diff_versoes(origem, destino) -> list[dict]:
             continue
         usados.add(anterior.id)
         dq = _dec(it.quantidade) - _dec(anterior.quantidade)
-        dv = _dec(it.subtotal) - _dec(anterior.subtotal)
+        # `subtotal_calculado`, nunca `subtotal` cru: o snapshot é NULL para
+        # todo item fora do caminho de explosão da Task #89, e NULL − NULL = 0
+        # fazia revisão que muda só o preço sair como "mantido" com impacto
+        # R$ 0,00.
+        dv = _dec(it.subtotal_calculado) - _dec(anterior.subtotal_calculado)
         mudou = (dq != 0 or dv != 0
                  or (it.descricao or '') != (anterior.descricao or '')
                  or (it.unidade or '') != (anterior.unidade or ''))
@@ -114,7 +118,7 @@ def total_do_diff(linhas) -> Decimal:
         if l['delta_valor'] is not None:
             total += l['delta_valor']
         elif l['situacao'] == 'incluido':
-            total += _dec(l['destino'].subtotal)
+            total += _dec(l['destino'].subtotal_calculado)
         elif l['situacao'] == 'suprimido':
-            total -= _dec(l['origem'].subtotal)
+            total -= _dec(l['origem'].subtotal_calculado)
     return total
