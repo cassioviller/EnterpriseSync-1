@@ -1119,9 +1119,19 @@ def estornar_folha_do_mes(admin_id: int, mes_referencia: date) -> None:
     coisas, nesta ordem (filho → pai/lançamento → folha, para não violar FK):
 
     1. `GestaoCustoFilho` com `origem_tabela='folha_pagamento'` e
-       `origem_id` em uma das `FolhaPagamento` do mês, e o `GestaoCustoPai`
-       que os agrupa (`GestaoCustoPai` não tem FK direta para `FolhaPagamento`
-       — só é alcançável através do filho).
+       `origem_id` em uma das `FolhaPagamento` do mês — apagado **um a um**
+       (nunca `Query.delete()` em lote, que pula o evento `after_delete`
+       de `models.py:8214-8216` que resincroniza o dashboard da obra). O
+       `GestaoCustoPai` que os agrupa NÃO é apagado por tabela: ele é
+       rotineiramente compartilhado entre origens diferentes na mesma chave
+       (admin_id, categoria, entidade_id) —
+       `utils/financeiro_integration.py:118-140` reaproveita o pai em aberto
+       sem olhar `origem_tabela`, e outra origem (ex.: RDO) pode ter um
+       filho no mesmo pai. Por isso: recalcula `valor_total` pela SOMA dos
+       filhos que sobraram, e só apaga o pai se não sobrar filho nenhum
+       (conta, nunca soma — soma zero não é ausência de filho) E o pai
+       estiver `PENDENTE`. Mesmo conserto de
+       `transporte_views.py:_limpar_gestao_custo_filho`.
     2. `LancamentoContabil` com `origem='FOLHA_PAGAMENTO'` — dois formatos
        coexistem no código: um por funcionário
        (`event_manager.py:criar_lancamento_folha_pagamento`,
@@ -1132,6 +1142,9 @@ def estornar_folha_do_mes(admin_id: int, mes_referencia: date) -> None:
 
     Loga contagem ANTES e DEPOIS de cada uma das três coisas.
     """
+    from decimal import Decimal
+    from sqlalchemy import func
+
     folhas = FolhaPagamento.query.filter_by(
         admin_id=admin_id, mes_referencia=mes_referencia).all()
     folha_ids = [f.id for f in folhas]
@@ -1143,11 +1156,7 @@ def estornar_folha_do_mes(admin_id: int, mes_referencia: date) -> None:
             GestaoCustoFilho.origem_tabela == 'folha_pagamento',
             GestaoCustoFilho.origem_id.in_(folha_ids),
         ).all()
-    pai_ids = {f.pai_id for f in filhos}
-    pais = GestaoCustoPai.query.filter(
-        GestaoCustoPai.admin_id == admin_id,
-        GestaoCustoPai.id.in_(pai_ids),
-    ).all() if pai_ids else []
+    pai_ids_afetados = {f.pai_id for f in filhos}
 
     lcs_por_folha = []
     if folha_ids:
@@ -1164,13 +1173,43 @@ def estornar_folha_do_mes(admin_id: int, mes_referencia: date) -> None:
 
     logger.info(
         "[estornar_folha_do_mes] ANTES admin=%s mes=%s | FolhaPagamento=%s "
-        "GestaoCustoFilho=%s GestaoCustoPai=%s LancamentoContabil=%s",
-        admin_id, mes_referencia, len(folha_ids), len(filhos), len(pais), len(lcs))
+        "GestaoCustoFilho=%s GestaoCustoPai(afetados)=%s LancamentoContabil=%s",
+        admin_id, mes_referencia, len(folha_ids), len(filhos),
+        len(pai_ids_afetados), len(lcs))
 
+    # 1a) Filhos de origem folha — um a um, nunca bulk.
     for filho in filhos:
         db.session.delete(filho)
-    for pai in pais:
-        db.session.delete(pai)
+        db.session.flush()
+
+    # 1b) Pai: recalcula pela soma dos filhos restantes; só apaga se não
+    # sobrar filho E o pai estiver PENDENTE — nunca só por ter tido um filho
+    # de folha, porque o pai pode ser de outras origens também.
+    pais_removidos = 0
+    pais_recalculados = 0
+    for pai_id in pai_ids_afetados:
+        pai = GestaoCustoPai.query.get(pai_id)
+        if not pai:
+            continue
+        novo_total = (
+            db.session.query(func.coalesce(func.sum(GestaoCustoFilho.valor), 0))
+            .filter_by(pai_id=pai.id)
+            .scalar()
+        ) or Decimal('0.00')
+        pai.valor_total = Decimal(str(novo_total))
+
+        restantes = (
+            db.session.query(func.count(GestaoCustoFilho.id))
+            .filter(GestaoCustoFilho.pai_id == pai.id)
+            .scalar()
+        ) or 0
+        if restantes == 0 and pai.status == 'PENDENTE':
+            db.session.delete(pai)
+            pais_removidos += 1
+        else:
+            pais_recalculados += 1
+    db.session.flush()
+
     for lc in lcs:
         db.session.delete(lc)
     for folha in folhas:
@@ -1179,7 +1218,8 @@ def estornar_folha_do_mes(admin_id: int, mes_referencia: date) -> None:
 
     logger.info(
         "[estornar_folha_do_mes] DEPOIS admin=%s mes=%s | FolhaPagamento=%s "
-        "GestaoCustoFilho=%s GestaoCustoPai=%s LancamentoContabil=%s",
+        "GestaoCustoFilho(folha)=%s GestaoCustoPai(removidos=%s "
+        "recalculados=%s) LancamentoContabil=%s",
         admin_id, mes_referencia,
         FolhaPagamento.query.filter_by(
             admin_id=admin_id, mes_referencia=mes_referencia).count(),
@@ -1188,10 +1228,7 @@ def estornar_folha_do_mes(admin_id: int, mes_referencia: date) -> None:
             GestaoCustoFilho.origem_tabela == 'folha_pagamento',
             GestaoCustoFilho.origem_id.in_(folha_ids)).count()
          if folha_ids else 0),
-        (GestaoCustoPai.query.filter(
-            GestaoCustoPai.admin_id == admin_id,
-            GestaoCustoPai.id.in_(pai_ids)).count()
-         if pai_ids else 0),
+        pais_removidos, pais_recalculados,
         (LancamentoContabil.query.filter(
             LancamentoContabil.admin_id == admin_id,
             LancamentoContabil.origem == 'FOLHA_PAGAMENTO',

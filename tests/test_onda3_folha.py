@@ -116,3 +116,75 @@ def test_reprocessar_folha_nao_dobra_contas_a_pagar_nem_o_razao():
         f'GestaoCustoFilho (contas a pagar) dobrou ao reprocessar: {filhos_1} → {filhos_2}')
     assert lcs_2 == lcs_1, (
         f'LancamentoContabil (razão) dobrou ao reprocessar: {lcs_1} → {lcs_2}')
+
+
+def test_estorno_preserva_pai_compartilhado_com_outra_origem():
+    """🔴 `GestaoCustoPai` é rotineiramente compartilhado entre origens —
+    `utils/financeiro_integration.py:118-140` reaproveita o pai em aberto
+    pela chave (admin_id, categoria, entidade_id), sem olhar
+    `origem_tabela`. Se `estornar_folha_do_mes` apagar o pai só porque ele
+    tinha UM filho de folha, filhos de outras origens penduradas no MESMO
+    pai (`GestaoCustoPai.itens` é `cascade='all, delete-orphan'`) somem
+    junto — a mesma classe de bug que a Task 4 já matou em
+    `reembolso_views.py`.
+    """
+    from decimal import Decimal
+    from models import GestaoCustoFilho, GestaoCustoPai
+    from services.folha_service import estornar_folha_do_mes
+
+    with app.app_context():
+        t = um_tenant('onda3_folha_pai')
+        admin_id = t.admin_id
+        _seed_parametros_legais(admin_id)
+        _seed_ponto_mes_completo(admin_id, t.funcionario_id, t.obra_id)
+
+    cliente = cliente_de(admin_id)
+    resp = cliente.post(f'/folha/processar/{ANO_REF}/{MES_REF}',
+                         data={'reprocessar': 'false'}, follow_redirects=True)
+    assert resp.status_code == 200
+
+    with app.app_context():
+        filho_folha = GestaoCustoFilho.query.filter_by(
+            admin_id=admin_id, origem_tabela='folha_pagamento').first()
+        assert filho_folha is not None, (
+            'pré-condição: a folha precisa ter gerado o filho de origem folha')
+        pai_id = filho_folha.pai_id
+
+        # Um filho de OUTRA origem, no MESMO pai — é exatamente o que
+        # `financeiro_integration.reaproveita_pai_em_aberto` produz.
+        valor_outra_origem = Decimal('123.45')
+        filho_rdo = GestaoCustoFilho(
+            pai_id=pai_id, admin_id=admin_id,
+            data_referencia=date(ANO_REF, MES_REF, 1),
+            descricao='Diária RDO — não é folha',
+            valor=valor_outra_origem,
+            obra_id=t.obra_id,
+            origem_tabela='rdo_mao_obra',
+            origem_id=999999,
+        )
+        db.session.add(filho_rdo)
+        db.session.commit()
+        filho_rdo_id = filho_rdo.id
+
+        estornar_folha_do_mes(admin_id=admin_id,
+                               mes_referencia=date(ANO_REF, MES_REF, 1))
+        db.session.commit()
+
+    with app.app_context():
+        # O filho de folha foi embora.
+        assert GestaoCustoFilho.query.filter_by(
+            admin_id=admin_id, origem_tabela='folha_pagamento').count() == 0
+
+        # O filho de outra origem, e o pai que os agrupava, sobrevivem.
+        filho_rdo_depois = GestaoCustoFilho.query.get(filho_rdo_id)
+        assert filho_rdo_depois is not None, (
+            'estorno da folha apagou filho de OUTRA origem no mesmo pai')
+
+        pai_depois = GestaoCustoPai.query.get(pai_id)
+        assert pai_depois is not None, (
+            'estorno da folha apagou o pai compartilhado com outra origem')
+
+        # E o total do pai foi recalculado — sobrou só o filho do RDO.
+        assert pai_depois.valor_total == valor_outra_origem, (
+            f'GestaoCustoPai.valor_total não foi recalculado: '
+            f'{pai_depois.valor_total} != {valor_outra_origem}')
