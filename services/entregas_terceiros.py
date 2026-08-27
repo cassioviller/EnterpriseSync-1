@@ -360,4 +360,8 @@ def aplicar_entregas_no_rdo(rdo, form_data, admin_id=None):
         return (qtd, qtd_revertidas)
     except Exception as e:
         logger.error(f"Erro aplicar_entregas_no_rdo: {e}")
+        # Os laços acima já podem ter mutado TarefaCronograma na sessão, e o
+        # chamador commita ao voltar: sem o rollback, `(0, 0)` reportava
+        # "nada aplicado" com escrita parcial a caminho do banco.
+        db.session.rollback()
         return (0, 0)

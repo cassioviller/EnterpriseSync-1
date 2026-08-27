@@ -426,6 +426,22 @@ def test_toggle_reverso_nao_apaga_progresso_parcial():
         assert revertidas == 1
 
 
+def test_falha_no_meio_das_entregas_nao_deixa_escrita_parcial():
+    """🔴 `entregas_terceiros.py:357` — o `except` devolvia `(0, 0)` DEPOIS
+    de os laços já terem mutado `TarefaCronograma` na sessão, e o chamador
+    commitava: escrita parcial reportando que nada foi aplicado."""
+    import inspect
+
+    from services import entregas_terceiros
+    fonte = inspect.getsource(entregas_terceiros.aplicar_entregas_no_rdo)
+    posicao_except = fonte.rfind('except Exception')
+    assert posicao_except > 0
+    corpo_except = fonte[posicao_except:]
+    assert 'rollback' in corpo_except, (
+        'o except devolve (0, 0) sem desfazer o que os laços já mutaram — '
+        'o chamador commita escrita parcial reportada como nada')
+
+
 def test_a_tela_de_comparar_e_alcancavel_pela_navegacao():
     """Entrega inalcançável não é entrega."""
     import subprocess
