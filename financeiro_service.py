@@ -606,11 +606,68 @@ class FinanceiroService:
             # nas previstas e a CP gêmea que é invisível, então pagar a CP
             # debita `banco.saldo_atual` (= o saldo_inicial daqui) e deixa a
             # prevista ETERNA. `admin_id` na subquery não é opcional (misjoin
-            # do WF-2). Espelho literal de `financeiro_views.py:207-219`.
+            # do WF-2).
+            #
+            # ── D2 (26/08), saída (a): a exclusão é CONSCIENTE DE ESTADO ──
+            #
+            # A B6.2 excluía por EXISTÊNCIA da gêmea, e essa era a metade
+            # errada da história: `ContaPagar` nunca alimenta
+            # `saidas_previstas` (confirmado na varredura de 25/08 — só
+            # aparece nesta subquery). Enquanto a gêmea está em aberto a
+            # obrigação não muda de lado: EVAPORA. Um pedido de R$ 100k
+            # pendente projetava saída zero — ⚠️ dev 06/08: 580 gêmeos,
+            # R$ 490.950, 24% do valor aberto.
+            #
+            # A pergunta que a subquery responde agora é "a outra perna JÁ
+            # entra na projeção?", e o marcador que o sistema TEM para
+            # respondê-la é o `status`: `baixar_pagamento` acima (`:118-126`)
+            # escreve 'PAGO' quando o saldo zera. Quando a baixa passa por
+            # banco (`:130-140`), ela debita `banco.saldo_atual` — e
+            # `banco.saldo_atual` é o `saldo_inicial` deste fluxo (`:554`).
+            # Aí a obrigação está de fato contada de novo, e manter a prevista
+            # do Pai subtrairia a mesma despesa duas vezes: é a dupla
+            # subtração que a B6.2 fechou e que continua fechada.
+            #
+            # ⚠️ RESÍDUO DECLARADO — a baixa SEM banco. O `status` e o débito
+            # bancário não são equivalentes: 'PAGO' é escrito
+            # incondicionalmente, mas o débito só roda `if banco_id`, e a rota
+            # deixa o banco OPCIONAL (`financeiro_views.py:520`:
+            # `request.form.get('banco_id', type=int) or None`; `:328`
+            # documenta `banco_id` NULL = baixa sem banco OU conta
+            # pré-migração-280). Nessa fatia o gêmeo sai das previstas sem que
+            # nada tenha entrado no `saldo_inicial` — a evaporação sobrevive
+            # ali, e está escrito aqui em vez de escondido.
+            #
+            # Por que o predicado NÃO foi apertado com `banco_id.isnot(None)`:
+            # conta pré-migração-280 genuinamente paga tem `banco_id` NULL por
+            # nascimento (a coluna não existia; é a mesma forma do import,
+            # `importacao_excel.py:2414-2430`), e apertar re-projetaria
+            # obrigação que já foi quitada de verdade — trocaria este resíduo
+            # por um erro maior e no sentido oposto. Além disso a baixa sem
+            # banco é o operador registrando pagamento explicitamente: tratá-la
+            # como paga é o que corresponde à intenção dele. Fechar esta fatia
+            # exige um marcador de que o dinheiro saiu, e não existe um hoje.
+            #
+            # PARCIAL fica FORA da exclusão de propósito: só parte do dinheiro
+            # saiu do banco, e o resto da obrigação não está projetado em
+            # lugar nenhum. Projetar o Pai inteiro reconta a parte já paga;
+            # excluí-lo apaga a parte que falta. Entre errar para mais e fazer
+            # sumir, a D2 escolheu por escrito o primeiro — o
+            # `saldo_final_projetado` piorar é o ponto da decisão. Fechar o
+            # centavo do PARCIAL exigiria `ContaPagar` alimentando as
+            # previstas, que é a saída (b), REJEITADA na D2.
+            #
+            # ⚠️ Aqui ela DEIXA de ser o espelho literal de
+            # `financeiro_views.py:207-219`, e a divergência é deliberada: na
+            # TELA de contas a pagar a CP gêmea é exibida ao lado do Pai, então
+            # a mera existência dela já duplica a obrigação e a exclusão por
+            # existência está certa. No FLUXO a CP é invisível — é o estado
+            # dela, não a existência, que diz se a obrigação já está contada.
             _gemeos_reembolso = db.session.query(ContaPagar.origem_id).filter(
                 ContaPagar.admin_id == admin_id,
                 func.upper(ContaPagar.origem_tipo) == 'GESTAO_CUSTO_PAI',
                 ContaPagar.origem_id.isnot(None),
+                func.upper(ContaPagar.status) == 'PAGO',
             ).distinct().subquery()
             # joinedload da categoria: o rótulo do fluxo lê custo.categoria_fluxo_caixa;
             # eager-load resolve a categoria no MESMO SELECT do Pai (snapshot já visível),
@@ -689,7 +746,11 @@ class FinanceiroService:
                     # PAGO do import sempre tem FC, e o dedup `ids_gc_no_fluxo`
                     # abaixo já o pega). Fica para que as duas famílias tenham
                     # a mesma forma nas mesmas pontas — divergência entre elas
-                    # é o que faz a próxima leitura errar.
+                    # é o que faz a próxima leitura errar. Com a D2 a subquery
+                    # ficou consciente de estado e esta ponta herda o mesmo
+                    # sentido: quem sai daqui é o Pai cuja gêmea JÁ foi baixada
+                    # (o débito no banco já contou a despesa); com a gêmea em
+                    # aberto, o Pai PAGO é realizado de verdade e fica.
                     ~GestaoCustoPai.id.in_(_gemeos_reembolso),
                 )
             )
@@ -742,10 +803,31 @@ class FinanceiroService:
                 manuais = [f for f in custo.itens
                            if (f.origem_tabela or '') == 'lancamento_periodo_manual']
                 if manuais:
-                    soma_manual = 0.0
-                    for f in manuais:
+                    # Onda 3 — o rateio do que JÁ FOI PAGO entre os filhos.
+                    #
+                    # `valor_pai` é o SALDO do Pai (o que falta pagar); o filho
+                    # guarda o valor CHEIO, que ninguém abate ao pagar o Pai.
+                    # Listar cada filho pelo cheio e descartar o `resto`
+                    # negativo fazia o detalhe recontar o pagamento: dois filhos
+                    # de R$ 500 com R$ 600 pagos davam card = R$ 400 e detalhe =
+                    # R$ 1.000 — os R$ 600 duas vezes na MESMA tela.
+                    #
+                    # Quando o pago já comeu parte dos filhos, cada linha entra
+                    # pela sua fatia do saldo (proporcional ao próprio valor), e
+                    # o último filho leva o resíduo de arredondamento para que a
+                    # soma feche NO CENTAVO com o card. Quando o Pai ainda vale
+                    # mais que os filhos manuais, nada muda: a diferença
+                    # continua saindo na linha agregada do `resto` abaixo.
+                    soma_manual = sum(float(f.valor or 0) for f in manuais)
+                    ratear = soma_manual > valor_pai + 0.005 and soma_manual > 0
+                    ultimo = len(manuais) - 1
+                    distribuido = 0.0
+                    for i, f in enumerate(manuais):
                         v = float(f.valor or 0)
-                        soma_manual += v
+                        if ratear:
+                            v = round(valor_pai - distribuido, 2) if i == ultimo \
+                                else round(valor_pai * v / soma_manual, 2)
+                        distribuido += v
                         detalhes.append({
                             'data': f.data_referencia or custo_data,
                             'tipo': 'SAIDA',
@@ -756,7 +838,7 @@ class FinanceiroService:
                             'realizado': False,
                         })
                     # Resto não-manual do mesmo Pai (se houver) vai como linha agregada.
-                    resto = valor_pai - soma_manual
+                    resto = valor_pai - distribuido
                     if resto > 0.005:
                         detalhes.append({
                             'data': custo_data,
