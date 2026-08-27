@@ -211,18 +211,45 @@ def test_caso2_gcp_de_reembolso_sai_da_tela_e_o_kpi_conta_uma_vez(tenant):
         f'R$ 1.000 foi contada duas vezes no KPI (CP + GCP)')
 
 
-def test_caso3_gcp_de_reembolso_sai_das_previstas_e_dos_buckets(tenant):
+def test_caso3_gcp_de_reembolso_sai_das_previstas_quando_a_gemea_e_baixada(tenant):
     """No fluxo a assimetria morde ao contrário: a GCP entra nas previstas e a
     CP gêmea é invisível. Pagar a CP debita `banco.saldo_atual` (= o
     `saldo_inicial` deste fluxo) e deixa a prevista ETERNA — a dupla subtração
-    que a B5.7 fechou para a família 1."""
-    _, entidade, _ = _familia2(tenant.admin_id, tenant.obra_id, valor=700)
+    que a B5.7 fechou para a família 1.
+
+    ⚠️ **Este caso mudou pela decisão D2 de 26/08** (registrada em
+    `docs/superpowers/plans/2026-08-25-fecho-dos-114-achados.md`, saída **a**),
+    e a mudança de um teste verde é a decisão humana que a constraint global
+    exige. A forma original da B6.2 excluía por EXISTÊNCIA da gêmea e afirmava
+    `saidas_previstas == 0.0` com a CP **PENDENTE** — mas `ContaPagar` nunca
+    alimenta essa soma, então ali a obrigação não mudava de lado: **evaporava**
+    (⚠️ dev 06/08: 580 gêmeos, R$ 490.950, 24% do valor aberto). A exclusão
+    virou consciente de estado, e este caso passa a medir os DOIS estados —
+    é a mesma dupla subtração de antes, agora vigiada na perna certa."""
+    _, entidade, cp_id = _familia2(tenant.admin_id, tenant.obra_id, valor=700)
+
+    # Perna aberta: a CP PENDENTE não entra em projeção nenhuma — o Pai fica.
+    fluxo = _fluxo(tenant.admin_id)
+    assert fluxo['saidas_previstas'] == 700.0, (
+        f"saidas_previstas={fluxo['saidas_previstas']}: com a gêmea PENDENTE "
+        f'a obrigação de R$ 700 não está projetada em lugar nenhum — excluir '
+        f'o Pai a faz evaporar (D2, 26/08)')
+    assert _nas_previstas(fluxo, entidade)
+
+    # A baixa: é ela que põe a outra perna na projeção, debitando o banco (=
+    # o `saldo_inicial` daqui). Os campos são os que `pagar_conta` escreve.
+    with app.app_context():
+        cp = ContaPagar.query.filter_by(id=cp_id).first()
+        cp.valor_pago, cp.saldo = Decimal('700'), Decimal('0')
+        cp.data_pagamento, cp.status = HOJE, 'PAGO'
+        db.session.commit()
 
     fluxo = _fluxo(tenant.admin_id)
 
     assert fluxo['saidas_previstas'] == 0.0, (
-        f"saidas_previstas={fluxo['saidas_previstas']}: o GCP de reembolso "
-        f'com gêmea CP continua sendo previsto')
+        f"saidas_previstas={fluxo['saidas_previstas']}: a gêmea já foi baixada "
+        f'pelo banco e o GCP de reembolso continua previsto — a mesma despesa '
+        f'subtraída duas vezes do saldo projetado')
     assert not _nas_previstas(fluxo, entidade), (
         'o gêmeo continua nos detalhes → nos buckets de agregar_fluxo_mensal')
     mensal = FinanceiroService.agregar_fluxo_mensal(

@@ -606,11 +606,47 @@ class FinanceiroService:
             # nas previstas e a CP gêmea que é invisível, então pagar a CP
             # debita `banco.saldo_atual` (= o saldo_inicial daqui) e deixa a
             # prevista ETERNA. `admin_id` na subquery não é opcional (misjoin
-            # do WF-2). Espelho literal de `financeiro_views.py:207-219`.
+            # do WF-2).
+            #
+            # ── D2 (26/08), saída (a): a exclusão é CONSCIENTE DE ESTADO ──
+            #
+            # A B6.2 excluía por EXISTÊNCIA da gêmea, e essa era a metade
+            # errada da história: `ContaPagar` nunca alimenta
+            # `saidas_previstas` (confirmado na varredura de 25/08 — só
+            # aparece nesta subquery). Enquanto a gêmea está em aberto a
+            # obrigação não muda de lado: EVAPORA. Um pedido de R$ 100k
+            # pendente projetava saída zero — ⚠️ dev 06/08: 580 gêmeos,
+            # R$ 490.950, 24% do valor aberto.
+            #
+            # A pergunta que a subquery responde agora é "a outra perna JÁ
+            # entra na projeção?". Ela entra por UM caminho só: a baixa
+            # (`pagar_conta` acima, `:124` e `:134`) debita `banco.saldo_atual`, e
+            # `banco.saldo_atual` é o `saldo_inicial` deste fluxo. Logo só a
+            # gêmea BAIXADA (status 'PAGO', o que a baixa escreve quando o
+            # saldo zera) justifica tirar o Pai das previstas — aí sim manter
+            # a prevista subtrairia a mesma despesa duas vezes, que é a dupla
+            # subtração que a B6.2 fechou e que continua fechada.
+            #
+            # PARCIAL fica FORA da exclusão de propósito: só parte do dinheiro
+            # saiu do banco, e o resto da obrigação não está projetado em
+            # lugar nenhum. Projetar o Pai inteiro reconta a parte já paga;
+            # excluí-lo apaga a parte que falta. Entre errar para mais e fazer
+            # sumir, a D2 escolheu por escrito o primeiro — o
+            # `saldo_final_projetado` piorar é o ponto da decisão. Fechar o
+            # centavo do PARCIAL exigiria `ContaPagar` alimentando as
+            # previstas, que é a saída (b), REJEITADA na D2.
+            #
+            # ⚠️ Aqui ela DEIXA de ser o espelho literal de
+            # `financeiro_views.py:207-219`, e a divergência é deliberada: na
+            # TELA de contas a pagar a CP gêmea é exibida ao lado do Pai, então
+            # a mera existência dela já duplica a obrigação e a exclusão por
+            # existência está certa. No FLUXO a CP é invisível — é o estado
+            # dela, não a existência, que diz se a obrigação já está contada.
             _gemeos_reembolso = db.session.query(ContaPagar.origem_id).filter(
                 ContaPagar.admin_id == admin_id,
                 func.upper(ContaPagar.origem_tipo) == 'GESTAO_CUSTO_PAI',
                 ContaPagar.origem_id.isnot(None),
+                func.upper(ContaPagar.status) == 'PAGO',
             ).distinct().subquery()
             # joinedload da categoria: o rótulo do fluxo lê custo.categoria_fluxo_caixa;
             # eager-load resolve a categoria no MESMO SELECT do Pai (snapshot já visível),
@@ -689,7 +725,11 @@ class FinanceiroService:
                     # PAGO do import sempre tem FC, e o dedup `ids_gc_no_fluxo`
                     # abaixo já o pega). Fica para que as duas famílias tenham
                     # a mesma forma nas mesmas pontas — divergência entre elas
-                    # é o que faz a próxima leitura errar.
+                    # é o que faz a próxima leitura errar. Com a D2 a subquery
+                    # ficou consciente de estado e esta ponta herda o mesmo
+                    # sentido: quem sai daqui é o Pai cuja gêmea JÁ foi baixada
+                    # (o débito no banco já contou a despesa); com a gêmea em
+                    # aberto, o Pai PAGO é realizado de verdade e fica.
                     ~GestaoCustoPai.id.in_(_gemeos_reembolso),
                 )
             )

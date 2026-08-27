@@ -12,6 +12,14 @@ O oráculo aqui é a IGUALDADE entre as duas pontas, não um número escolhido a
 dedo: é a discordância que o usuário vê. Todo tenant é próprio (`um_tenant`), e
 `calcular_fluxo_caixa` recebe o `admin_id` dele — o banco de dev é compartilhado
 com trabalho concorrente e nenhuma asserção aqui pode enxergar linha alheia.
+
+**D2 (26/08) — os gêmeos de reembolso.** O segundo assunto do arquivo, na mesma
+função: a exclusão dos gêmeos tirava o `GestaoCustoPai` de `saidas_previstas`
+porque existe uma `ContaPagar` gêmea — só que `ContaPagar` **nunca** alimenta
+essa soma. Enquanto a gêmea está PENDENTE a obrigação não muda de lado:
+**evapora**. A exclusão passa a ser consciente de estado — o gêmeo sai da
+projeção só quando a outra perna de fato entra nela (a baixa da CP, que debita
+`banco.saldo_atual` = o `saldo_inicial` deste fluxo).
 """
 import os
 import sys
@@ -25,7 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import main  # noqa: F401 — registra blueprints e handlers de evento
 from app import app, db
-from models import GestaoCustoFilho, GestaoCustoPai
+from models import ContaPagar, GestaoCustoFilho, GestaoCustoPai
 
 from financeiro_service import FinanceiroService
 from helpers_tenant import um_tenant
@@ -141,3 +149,126 @@ def test_pai_com_saldo_maior_que_os_filhos_mantem_a_linha_de_resto():
         assert len(previstas) == 2, 'sumiu a linha do resto nao-manual'
         assert fluxo['saidas_previstas'] == pytest.approx(1000.0)
         assert _previstas_do_detalhe(fluxo) == pytest.approx(1000.0)
+
+
+# ── D2 (26/08) — a exclusão dos gêmeos vira consciente de estado ───────────
+#
+# `_gemeos_reembolso` (`financeiro_service.py`) tira das previstas todo
+# `GestaoCustoPai` que tenha `ContaPagar` gêmea (`origem_tipo`
+# 'gestao_custo_pai', `origem_id` = id do Pai — a forma que o import de fluxo
+# em modo reembolso grava). A pergunta que a exclusão passa a responder é
+# "a outra perna JÁ entra na projeção?": ela entra pela baixa da CP, que debita
+# `banco.saldo_atual` — o `saldo_inicial` deste mesmo fluxo. CP PENDENTE não
+# entra em lugar nenhum, e a obrigação tem de continuar projetada.
+
+
+def _par_gemeo_reembolso(admin_id, obra_id, valor, status_cp):
+    """GCP PENDENTE + a `ContaPagar` gêmea, no estado pedido.
+
+    Espelha a montagem de `tests/test_b6_familia2_reembolso_import.py`: o
+    `origem_tipo` vai MINÚSCULO como o import grava, e o filho nasce sem
+    `origem_tabela` (é o que o torna invisível à exclusão da família 1).
+    `valor_pago`/`saldo`/`data_pagamento` da CP acompanham o status porque é o
+    que `FinanceiroService.pagar_conta` escreve na baixa.
+    """
+    valor = Decimal(str(valor))
+    pago = valor if status_cp == 'PAGO' else Decimal('0')
+    pai = GestaoCustoPai(
+        tipo_categoria='MATERIAL',
+        entidade_nome=f'ONDA3-GEMEO-{uuid.uuid4().hex[:6]}',
+        valor_total=valor, saldo=valor, status='PENDENTE',
+        data_vencimento=HOJE + timedelta(days=5),
+        admin_id=admin_id, obra_id=obra_id)
+    db.session.add(pai)
+    db.session.flush()
+    db.session.add(GestaoCustoFilho(
+        pai_id=pai.id, admin_id=admin_id, obra_id=obra_id,
+        descricao='reembolso', valor=valor, data_referencia=HOJE,
+        origem_tabela=None, origem_id=None))
+    db.session.add(ContaPagar(
+        descricao=f'CP gemea {pai.entidade_nome}', valor_original=valor,
+        valor_pago=pago, saldo=valor - pago, data_emissao=HOJE,
+        data_vencimento=HOJE + timedelta(days=10),
+        data_pagamento=(HOJE if status_cp == 'PAGO' else None),
+        status=status_cp, origem_tipo='gestao_custo_pai', origem_id=pai.id,
+        obra_id=obra_id, admin_id=admin_id))
+    db.session.commit()
+    return pai
+
+
+def _linhas_previstas(fluxo, marca):
+    return [d for d in fluxo['detalhes']
+            if d['tipo'] == 'SAIDA' and not d.get('realizado')
+            and marca in (d['descricao'] or '')]
+
+
+def test_gemeo_com_conta_pagar_pendente_continua_previsto():
+    """🔴 D2 — a obrigação de R$ 1.000 evaporava da projeção.
+
+    A CP gêmea está PENDENTE: ninguém a debitou do banco e `ContaPagar` não
+    alimenta `saidas_previstas`. Excluir o Pai aqui não muda a obrigação de
+    lado — apaga ela. ⚠️ dev 06/08: 580 gêmeos, R$ 490.950, 24% do valor
+    aberto do parque.
+    """
+    with app.app_context():
+        t = um_tenant('onda3_gemeo_pend', com_fatos=False)
+        pai = _par_gemeo_reembolso(t.admin_id, t.obra_id, 1000, 'PENDENTE')
+
+        fluxo = FinanceiroService.calcular_fluxo_caixa(
+            t.admin_id, HOJE, JANELA_FIM)
+
+        assert fluxo['saidas_previstas'] == pytest.approx(1000.0), (
+            f"saidas_previstas={fluxo['saidas_previstas']}: a gemea esta "
+            f'PENDENTE — a obrigacao nao entrou em projecao nenhuma, entao '
+            f'excluir o Pai a faz evaporar')
+        assert _linhas_previstas(fluxo, pai.entidade_nome), (
+            'o gemeo sumiu dos detalhes → e dos buckets de agregar_fluxo_mensal')
+
+
+def test_gemeo_com_conta_pagar_paga_sai_das_previstas():
+    """Cão de guarda da B6.2 no outro estado: com a CP BAIXADA o dinheiro já
+    saiu do banco (`banco.saldo_atual` = o `saldo_inicial` deste fluxo). Manter
+    a prevista do Pai subtrairia a MESMA despesa duas vezes do
+    `saldo_final_projetado` — é a exclusão que a B6.2 criou, e ela fica."""
+    with app.app_context():
+        t = um_tenant('onda3_gemeo_pago', com_fatos=False)
+        pai = _par_gemeo_reembolso(t.admin_id, t.obra_id, 700, 'PAGO')
+
+        fluxo = FinanceiroService.calcular_fluxo_caixa(
+            t.admin_id, HOJE, JANELA_FIM)
+
+        assert fluxo['saidas_previstas'] == pytest.approx(0.0), (
+            f"saidas_previstas={fluxo['saidas_previstas']}: a gemea ja foi "
+            f'paga pelo banco e a prevista do Pai continua — dupla subtracao')
+        assert not _linhas_previstas(fluxo, pai.entidade_nome)
+
+
+def test_gemeo_com_conta_pagar_paga_de_outro_tenant_continua_previsto():
+    """Cão de guarda do `admin_id` no estado novo: a CP gêmea PAGA mora em
+    OUTRO tenant. Sem o guard na subquery, a baixa alheia apagaria a projeção
+    daqui — o misjoin que a medição do WF-2 cometeu duas vezes."""
+    with app.app_context():
+        t = um_tenant('onda3_gemeo_ml', com_fatos=False)
+        outro = um_tenant('onda3_gemeo_mlB', com_fatos=False)
+        pai = GestaoCustoPai(
+            tipo_categoria='MATERIAL',
+            entidade_nome=f'ONDA3-GEMEO-{uuid.uuid4().hex[:6]}',
+            valor_total=Decimal('500'), saldo=Decimal('500'), status='PENDENTE',
+            data_vencimento=HOJE + timedelta(days=5),
+            admin_id=t.admin_id, obra_id=t.obra_id)
+        db.session.add(pai)
+        db.session.flush()
+        db.session.add(ContaPagar(
+            descricao='CP gemea alheia', valor_original=Decimal('500'),
+            valor_pago=Decimal('500'), saldo=Decimal('0'), data_emissao=HOJE,
+            data_vencimento=HOJE + timedelta(days=10), data_pagamento=HOJE,
+            status='PAGO', origem_tipo='gestao_custo_pai', origem_id=pai.id,
+            obra_id=outro.obra_id, admin_id=outro.admin_id))
+        db.session.commit()
+
+        fluxo = FinanceiroService.calcular_fluxo_caixa(
+            t.admin_id, HOJE, JANELA_FIM)
+
+        assert fluxo['saidas_previstas'] == pytest.approx(500.0)
+        assert _linhas_previstas(fluxo, pai.entidade_nome), (
+            'GCP excluido por CP PAGA de OUTRO tenant — misjoin')
