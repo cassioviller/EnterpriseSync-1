@@ -471,7 +471,6 @@ def test_folha_do_mes_e_rateada_entre_as_obras_e_a_soma_fecha():
 
     # 2) As partes somam EXATAMENTE o total do mês — sem resíduo perdido.
     for campo_folha, campo_dados in (
-            ('custo_total_empresa', 'custo_total_empresa'),
             ('salario_bruto', 'salario_bruto'),
             ('salario_liquido', 'salario_liquido'),
             ('encargos_fgts', 'fgts'),
@@ -479,6 +478,33 @@ def test_folha_do_mes_e_rateada_entre_as_obras_e_a_soma_fecha():
         assert _total(campo_folha) == _do_mes(campo_dados), (
             f'{campo_folha}: rateio soma {_total(campo_folha)}, '
             f'mês inteiro é {_do_mes(campo_dados)}')
+
+    # 2b) `custo_total_empresa` tem DUAS exatidões concorrentes, e nenhum
+    #     arredondamento ao centavo satisfaz as duas ao mesmo tempo:
+    #
+    #       (a) POR LINHA (A24a/B2.14): `fgts + inss_patronal = custo − bruto`.
+    #           `_folha_rateada_para_obra` a garante DERIVANDO o custo da soma
+    #           das três fatias já arredondadas — a soma das partes é, então,
+    #           Q(bruto) + Q(fgts) + Q(inss).
+    #       (b) DO MÊS: `processar_folha_funcionario` soma antes de arredondar
+    #           — Q(bruto + fgts + inss).
+    #
+    #     As duas diferem em um centavo sempre que os três arredondamentos se
+    #     acumulam além de meio centavo (36% dos salários, medido com a
+    #     aritmética do próprio módulo). O centavo é ESTRUTURAL, não defeito.
+    #     Por isso a exatidão é cobrada comparando como com como — a soma das
+    #     fatias contra a base derivada do mesmo jeito — e a distância para o
+    #     total do mês do funcionário é cobrada como teto de um centavo.
+    base_por_componentes = (_do_mes('salario_bruto') + _do_mes('fgts')
+                            + _do_mes('inss_patronal'))
+    assert _total('custo_total_empresa') == base_por_componentes, (
+        f'custo_total_empresa: rateio soma {_total("custo_total_empresa")}, '
+        f'a base pelos componentes do mês é {base_por_componentes}')
+    assert abs(_total('custo_total_empresa')
+               - _do_mes('custo_total_empresa')) <= Decimal('0.01'), (
+        f'a soma das fatias ({_total("custo_total_empresa")}) se afastou mais '
+        f'de um centavo do custo do mês ({_do_mes("custo_total_empresa")}) — '
+        f'o centavo estrutural virou perda de rateio')
 
     # 3) Cada linha por obra respeita o invariante interno que a linha do mês
     #    respeita (A24a/B2.14): fgts + inss patronal = custo total − bruto.
@@ -489,11 +515,14 @@ def test_folha_do_mes_e_rateada_entre_as_obras_e_a_soma_fecha():
             f'{folha.encargos_fgts} + {folha.encargos_inss_patronal} != '
             f'{folha.custo_total_empresa} - {folha.salario_bruto}')
 
-    # 4) E cada parte é proporcional às horas apontadas naquela obra.
+    # 4) E cada parte é proporcional às horas apontadas naquela obra. A base é
+    #    a mesma de (2b) — comparar com `Q(b+f+i)` reintroduziria o centavo
+    #    estrutural na tolerância. A folga é de dois centavos porque a fatia da
+    #    obra é a soma de TRÊS parcelas arredondadas, cada uma podendo andar
+    #    meio centavo.
     horas_totais = Decimal(str(horas_a + horas_b))
-    esperado_a = (_do_mes('custo_total_empresa')
-                  * Decimal(str(horas_a)) / horas_totais)
-    assert abs(por_obra[obra_a].custo_total_empresa - esperado_a) <= Decimal('0.01'), (
+    esperado_a = base_por_componentes * Decimal(str(horas_a)) / horas_totais
+    assert abs(por_obra[obra_a].custo_total_empresa - esperado_a) <= Decimal('0.02'), (
         f'obra A ficou com {por_obra[obra_a].custo_total_empresa}, '
         f'proporcional a {horas_a}h de {horas_totais}h seria {esperado_a:.2f}')
 

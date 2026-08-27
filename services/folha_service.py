@@ -1675,9 +1675,17 @@ def _folha_rateada_para_obra(dados_folha: Dict, obra_id: int,
     # centavo não fecham entre si, e a linha da obra passaria a violar o
     # invariante que a A24a/B2.14 defendeu em `salvar_folha_processada`:
     # `fgts + inss_patronal == custo_total_empresa - salario_bruto`. Somar as
-    # fatias fecha o invariante e a soma das partes continua batendo com o
-    # mês. (O rateio acima fica como fallback: se algum componente faltar no
-    # dict, é melhor uma fatia rateada que o valor cheio do mês.)
+    # fatias fecha o invariante. (O rateio acima fica como fallback: se algum
+    # componente faltar no dict, é melhor uma fatia rateada que o valor cheio
+    # do mês.)
+    #
+    # O preço, consciente: derivando, a soma das fatias vale
+    # `Q(bruto) + Q(fgts) + Q(inss)`, enquanto o custo do mês em
+    # `processar_folha_funcionario` soma ANTES de arredondar — `Q(b + f + i)`.
+    # As duas diferem em um centavo quando os três arredondamentos se acumulam
+    # além de meio centavo (36% dos salários, medido). Escolhemos a exatidão
+    # POR LINHA, que é a que alguém lê; o centavo do total do mês é estrutural
+    # e está coberto por teto no teste do rateio.
     fatia_fgts = rateada.get('fgts')
     fatia_inss_patronal = rateada.get('inss_patronal')
     fatia_bruto = rateada.get('salario_bruto')
