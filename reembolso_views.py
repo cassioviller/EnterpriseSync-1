@@ -362,9 +362,19 @@ def excluir(reembolso_id):
                 id=reembolso.origem_id, admin_id=admin_id
             ).first()
             if gcp:
-                GestaoCustoFilho.query.filter_by(
+                # Um a um, nunca `Query.delete()` em massa: o delete em
+                # massa não dispara eventos por instância, e é o
+                # `after_delete` de `_gestao_custo_filho_changed`
+                # (`models.py:8214-8216`) que agenda `recalcular_obra`
+                # (`services/resumo_custos_obra.py`) para ressincronizar o
+                # dashboard de custo da obra. `_limpar_gestao_custo_filho`
+                # (`transporte_views.py:565-579`) já apaga em loop por
+                # exatamente este motivo.
+                filhos = GestaoCustoFilho.query.filter_by(
                     pai_id=gcp.id, origem_tabela='reembolso_funcionario',
-                    origem_id=reembolso.id, admin_id=admin_id).delete()
+                    origem_id=reembolso.id, admin_id=admin_id).all()
+                for filho in filhos:
+                    db.session.delete(filho)
                 db.session.flush()
 
                 novo_total = db.session.query(
