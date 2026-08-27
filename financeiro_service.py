@@ -742,10 +742,31 @@ class FinanceiroService:
                 manuais = [f for f in custo.itens
                            if (f.origem_tabela or '') == 'lancamento_periodo_manual']
                 if manuais:
-                    soma_manual = 0.0
-                    for f in manuais:
+                    # Onda 3 — o rateio do que JÁ FOI PAGO entre os filhos.
+                    #
+                    # `valor_pai` é o SALDO do Pai (o que falta pagar); o filho
+                    # guarda o valor CHEIO, que ninguém abate ao pagar o Pai.
+                    # Listar cada filho pelo cheio e descartar o `resto`
+                    # negativo fazia o detalhe recontar o pagamento: dois filhos
+                    # de R$ 500 com R$ 600 pagos davam card = R$ 400 e detalhe =
+                    # R$ 1.000 — os R$ 600 duas vezes na MESMA tela.
+                    #
+                    # Quando o pago já comeu parte dos filhos, cada linha entra
+                    # pela sua fatia do saldo (proporcional ao próprio valor), e
+                    # o último filho leva o resíduo de arredondamento para que a
+                    # soma feche NO CENTAVO com o card. Quando o Pai ainda vale
+                    # mais que os filhos manuais, nada muda: a diferença
+                    # continua saindo na linha agregada do `resto` abaixo.
+                    soma_manual = sum(float(f.valor or 0) for f in manuais)
+                    ratear = soma_manual > valor_pai + 0.005 and soma_manual > 0
+                    ultimo = len(manuais) - 1
+                    distribuido = 0.0
+                    for i, f in enumerate(manuais):
                         v = float(f.valor or 0)
-                        soma_manual += v
+                        if ratear:
+                            v = round(valor_pai - distribuido, 2) if i == ultimo \
+                                else round(valor_pai * v / soma_manual, 2)
+                        distribuido += v
                         detalhes.append({
                             'data': f.data_referencia or custo_data,
                             'tipo': 'SAIDA',
@@ -756,7 +777,7 @@ class FinanceiroService:
                             'realizado': False,
                         })
                     # Resto não-manual do mesmo Pai (se houver) vai como linha agregada.
-                    resto = valor_pai - soma_manual
+                    resto = valor_pai - distribuido
                     if resto > 0.005:
                         detalhes.append({
                             'data': custo_data,
