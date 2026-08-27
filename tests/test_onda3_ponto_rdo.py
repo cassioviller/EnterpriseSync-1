@@ -299,6 +299,22 @@ def _segundo_funcionario(tenant):
     return funcionario
 
 
+def _custos_obra_do_rdo(tenant, rdo_id):
+    """`CustoObra` do RDO — a TERCEIRA tabela que o Submeter escreve.
+
+    `event_manager.py:932-961` grava uma linha por trabalhador, chaveada em
+    (`rdo_id`, `funcionario_id`, `data`, `admin_id`). Ela não passa por
+    `remover_custos_rdo` nem por `remover_custo_diario_rdo` — quem estorna só
+    aquelas duas deixa esta de pé. Escopada pelo tenant, como todo coletor
+    deste arquivo.
+    """
+    from models import CustoObra
+    db.session.expire_all()
+    return (CustoObra.query
+            .filter_by(admin_id=tenant.admin_id, rdo_id=rdo_id)
+            .order_by(CustoObra.id).all())
+
+
 def _submeter(tenant, rdo_id):
     """`POST /rdo/<id>/finalizar` — o Submeter, que é quem lança o custo."""
     resposta = cliente_de(tenant.admin_id).post(f'/rdo/{rdo_id}/finalizar')
@@ -339,6 +355,8 @@ def test_edicao_unificada_estorna_o_custo_de_quem_saiu():
         assert len(antes) == 2, (
             f'o cenário precisa dos DOIS custos lançados; veio {len(antes)}')
         valor_de_um = soma(antes) / 2
+        assert len(_custos_obra_do_rdo(t, rdo_id)) == 2, (
+            'o cenário precisa das DUAS linhas de CustoObra lançadas')
 
         # A edição que remove o colega: só o funcionário do tenant volta no
         # formulário (campos achatados do path A, `views/rdo.py:3307`).
@@ -365,6 +383,11 @@ def test_edicao_unificada_estorna_o_custo_de_quem_saiu():
         assert len(custo_diario(rdo_id)) == 1, (
             'o RDOCustoDiario do removido também precisa sair — é dele que o '
             'lançamento nasce de novo')
+        assert [c.funcionario_id for c in _custos_obra_do_rdo(t, rdo_id)] == [
+            t.funcionario_id], (
+            'o CustoObra do trabalhador removido continua cobrando a obra — '
+            'ele não passa por remover_custos_rdo nem por '
+            'remover_custo_diario_rdo')
 
 
 # ---------------------------------------------------------------------------
@@ -398,6 +421,7 @@ def test_reabrir_rdo_estorna_o_custo_de_mao_de_obra():
         assert len(filhos_mao_de_obra(t)) == 1, (
             'o cenário precisa do custo lançado pelo Submeter')
         assert len(custo_diario(rdo_id)) == 1
+        assert len(_custos_obra_do_rdo(t, rdo_id)) == 1
 
         resposta = cliente_de(t.admin_id).post(
             f'/rdo/{rdo_id}/reabrir', data={'motivo': 'horas erradas'})
@@ -413,11 +437,18 @@ def test_reabrir_rdo_estorna_o_custo_de_mao_de_obra():
         assert custo_diario(rdo_id) == [], (
             'o RDOCustoDiario é a fonte do lançamento: sem estorná-lo, o '
             'próximo Submeter reaproveita o valor velho')
+        assert _custos_obra_do_rdo(t, rdo_id) == [], (
+            'o CustoObra do RDO reaberto continua cobrando a obra — rascunho '
+            'não lança custo em tabela nenhuma')
 
         # A outra metade de "reprocessar é estornar e REFAZER": o estorno não
         # pode deixar o custo irrecuperável. Submetendo de novo, ele volta —
-        # uma vez só.
+        # uma vez só, nas TRÊS tabelas.
         _submeter(t, rdo_id)
         assert len(filhos_mao_de_obra(t)) == 1, (
             'depois de estornar, o Submeter seguinte precisa relançar o '
             'custo — e uma vez só')
+        assert len(custo_diario(rdo_id)) == 1, (
+            'o RDOCustoDiario também precisa voltar')
+        assert len(_custos_obra_do_rdo(t, rdo_id)) == 1, (
+            'o CustoObra também precisa voltar')

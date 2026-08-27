@@ -1936,6 +1936,16 @@ def reabrir_rdo(id):
         except Exception as _e:
             logger.warning(f"[custo-dia] remover_custo_diario_rdo falhou: {_e}")
 
+        # E o `CustoObra`, que nenhum dos dois removedores alcança: o
+        # `rdo_finalizado` grava um por trabalhador
+        # (`event_manager.py:932-961`). Sem esta linha o RDO reaberto seguia
+        # cobrando a obra — o custo saía do razão e ficava no custo da obra,
+        # que é justamente onde ele aparece para quem toca o orçamento.
+        # O Submeter seguinte regrava, pelo upsert da mesma chave.
+        from models import CustoObra
+        db.session.query(CustoObra).filter(
+            CustoObra.rdo_id == rdo.id).delete(synchronize_session=False)
+
         db.session.commit()
 
         # Simétrico do Submeter: o RDO volta a rascunho, e o avanço dele sai
@@ -2903,6 +2913,17 @@ def rdo_salvar_unificado():
                 remover_custo_diario_rdo(rdo.id)
             except Exception as _e:
                 logger.warning(f"[custo-dia] remover_custo_diario_rdo falhou: {_e}")
+
+            # A TERCEIRA tabela, que nenhum dos dois removedores alcança:
+            # `rdo_finalizado` grava um `CustoObra` por trabalhador
+            # (`event_manager.py:932-961`, chave rdo_id+funcionario_id+data+
+            # admin_id). Estornar só o razão deixava o removido cobrando a
+            # obra para sempre. Sai tudo do RDO, e o `rdo_finalizado` que
+            # esta rota emite adiante regrava quem ficou — mesmo delete por
+            # `rdo_id` que a exclusão de RDO já usa (`views/rdo.py:534`).
+            from models import CustoObra
+            db.session.query(CustoObra).filter(
+                CustoObra.rdo_id == rdo.id).delete(synchronize_session=False)
 
             RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).delete()
             RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
