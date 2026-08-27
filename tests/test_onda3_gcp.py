@@ -6,6 +6,7 @@ trabalho concorrente — contar global daria falso positivo/negativo.
 """
 import os
 import sys
+from datetime import date
 
 import pytest
 
@@ -131,3 +132,97 @@ def test_editar_reembolso_nao_sobrescreve_o_total_do_pai_com_o_proprio_valor():
             f'gcp.valor_total ({gcp.valor_total}) diverge da soma dos filhos '
             f'({soma_filhos}) — o irmão evaporou do total')
         assert soma_filhos == Decimal('175.00') + Decimal('250.00')
+
+
+# ---------------------------------------------------------------------------
+# Task 5 — a migração de contas a pagar
+# ---------------------------------------------------------------------------
+
+def test_migracao_pula_o_registro_ruim_em_vez_de_perder_a_rodada():
+    """🔴 O IntegrityError estourava FORA do try por registro."""
+    import inspect
+
+    import gestao_custos_views
+    fonte = inspect.getsource(gestao_custos_views.migrar_contas_pagar)
+    assert 'centro_custo_id' in fonte, (
+        'o filho ainda nasce sem destino, violando '
+        'ck_gestao_custo_filho_destino')
+
+
+def test_pai_e_filho_nascem_com_o_mesmo_valor():
+    """🔴 Pai com `valor_original`, filho com `saldo`: a primeira edição
+    encolhia o passivo pelo valor já pago, sem trilha.
+    """
+    import inspect
+
+    import gestao_custos_views
+    fonte = inspect.getsource(gestao_custos_views.migrar_contas_pagar)
+    assert 'valor_total=cp.valor_original' not in fonte.replace(' ', ''), (
+        'o pai ainda nasce com valor_original enquanto o filho recebe saldo')
+
+
+def test_migracao_nao_perde_a_rodada_e_reporta_o_motivo_do_pulado():
+    """Uma rodada com uma conta PARCIAL (boa) e uma sem obra (ruim, estilo
+    despesa de escritório) tem de: (i) não perder a conta boa; (ii) nascer
+    pai e filho com o MESMO valor — o saldo; (iii) reportar a pulada com o
+    motivo, em vez de estourar o `IntegrityError` fora do try por registro e
+    derrubar a rodada inteira via rollback do handler externo.
+    """
+    from decimal import Decimal
+
+    from models import ContaPagar, GestaoCustoFilho, GestaoCustoPai
+
+    with app.app_context():
+        t = um_tenant('onda3_migr', com_fatos=False)
+        admin_id, obra_id = t.admin_id, t.obra_id
+
+        cp_parcial = ContaPagar(
+            admin_id=admin_id, obra_id=obra_id,
+            descricao='Cimento e areia', valor_original=Decimal('1000.00'),
+            valor_pago=Decimal('400.00'), saldo=Decimal('600.00'),
+            data_emissao=date(2026, 8, 1), data_vencimento=date(2026, 8, 20),
+            status='PARCIAL',
+        )
+        cp_sem_obra = ContaPagar(
+            admin_id=admin_id, obra_id=None,
+            descricao='Assinatura de software do escritório',
+            valor_original=Decimal('300.00'), valor_pago=Decimal('0'),
+            saldo=Decimal('300.00'),
+            data_emissao=date(2026, 8, 1), data_vencimento=date(2026, 8, 20),
+            status='PENDENTE',
+        )
+        db.session.add_all([cp_parcial, cp_sem_obra])
+        db.session.commit()
+        id_parcial, id_sem_obra = cp_parcial.id, cp_sem_obra.id
+
+    cliente = cliente_de(admin_id)
+    resposta = cliente.post('/gestao-custos/migrar-contas-pagar',
+                             follow_redirects=True)
+    assert resposta.status_code == 200
+
+    with app.app_context():
+        filho_bom = GestaoCustoFilho.query.filter_by(
+            admin_id=admin_id, origem_tabela='conta_pagar',
+            origem_id=id_parcial).first()
+        assert filho_bom is not None, (
+            'a conta PARCIAL boa se perdeu junto com a rodada')
+
+        pai_bom = GestaoCustoPai.query.filter_by(
+            id=filho_bom.pai_id, admin_id=admin_id).first()
+        assert pai_bom is not None
+        assert Decimal(str(pai_bom.valor_total)) == Decimal('600.00'), (
+            'o pai nasceu com valor_original em vez do saldo')
+        assert Decimal(str(filho_bom.valor)) == Decimal('600.00')
+        assert Decimal(str(pai_bom.valor_total)) == Decimal(str(filho_bom.valor)), (
+            'pai e filho nasceram com valores diferentes')
+
+        filho_ruim = GestaoCustoFilho.query.filter_by(
+            admin_id=admin_id, origem_tabela='conta_pagar',
+            origem_id=id_sem_obra).first()
+        assert filho_ruim is None, (
+            'a conta sem destino não devia virar filho — viola '
+            'ck_gestao_custo_filho_destino')
+
+    corpo = resposta.get_data(as_text=True)
+    assert 'pulad' in corpo.lower(), (
+        'o relatório final não menciona os registros pulados')

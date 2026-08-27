@@ -12,6 +12,7 @@ from flask import (Blueprint, render_template, request, flash,
                    redirect, url_for, jsonify)
 from flask_login import login_required, current_user
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 from models import (GestaoCustoPai, GestaoCustoFilho,
@@ -1346,6 +1347,7 @@ def migrar_contas_pagar():
     migrados = 0
     ignorados = 0
     erros = 0
+    pulados = []  # [(conta_id, motivo)] — relatório não esconde o que não sabe
 
     try:
         contas = ContaPagar.query.filter(
@@ -1420,13 +1422,30 @@ def migrar_contas_pagar():
                 valor_pago_cp = float(conta.valor_pago or 0)
                 saldo_cp = float(conta.saldo or (valor_original - valor_pago_cp))
 
+                # Pai e filho com o MESMO valor. Nasciam diferentes (pai com
+                # `valor_original`, filho com `saldo`) e a query inclui de
+                # propósito contas PARCIAL, onde os dois divergem: o passivo
+                # encolhia pelo valor já pago, sem trilha nenhuma.
+                valor_migrado = saldo_cp
+
+                # `ck_gestao_custo_filho_destino` (models.py:7261) exige obra
+                # OU centro de custo. `ContaPagar` não carrega centro de
+                # custo próprio, e despesa de escritório nasce sem obra por
+                # construção (`custos_escritorio_views._criar_conta_pagar`):
+                # sem este guard o IntegrityError é garantido. Pula com
+                # motivo em vez de deixar o banco estourar.
+                centro_custo_id = None
+                if not conta.obra_id and not centro_custo_id:
+                    pulados.append((conta.id, 'sem obra e sem centro de custo'))
+                    continue
+
                 gcp = GestaoCustoPai(
                     admin_id=admin_id,
                     tipo_categoria=tipo_cat,
                     entidade_nome=forn_nome,
                     entidade_id=forn_id,
                     fornecedor_id=forn_id,
-                    valor_total=valor_original,
+                    valor_total=valor_migrado,
                     valor_pago=valor_pago_cp,
                     saldo=saldo_cp,
                     status=status_gcp,
@@ -1443,22 +1462,50 @@ def migrar_contas_pagar():
                     admin_id=admin_id,
                     data_referencia=conta.data_vencimento or date.today(),
                     descricao=conta.descricao or f"Conta a pagar #{conta.id}",
-                    valor=saldo_cp,
+                    valor=valor_migrado,
                     obra_id=conta.obra_id if hasattr(conta, 'obra_id') else None,
+                    centro_custo_id=centro_custo_id,
                     origem_tabela='conta_pagar',
                     origem_id=conta.id,
                 )
                 db.session.add(gcf)
+
+                # O flush do FILHO mora dentro do try por registro — era só o
+                # do pai que morava aqui, e o filho só era gravado no commit
+                # final, fora de qualquer try por registro: um IntegrityError
+                # ali estourava lá em cima e o handler externo fazia rollback
+                # da RODADA INTEIRA, num botão anunciado como "ação segura e
+                # pode ser repetida".
+                db.session.flush()
+
+                from services.destino_custo import sincronizar_obra_do_pai
+                sincronizar_obra_do_pai(gcp)
+
+                # Commit por registro: cada migração bem-sucedida fica
+                # durável antes do próximo registro ser tentado, então um
+                # rollback por causa de UM registro ruim nunca leva junto os
+                # que já entraram nesta rodada.
+                db.session.commit()
                 migrados += 1
+            except IntegrityError as erro:
+                db.session.rollback()
+                pulados.append((conta.id, str(erro.orig)[:120]))
             except Exception as _e:
+                db.session.rollback()
                 logger.error(f"Erro ao migrar ContaPagar #{conta.id}: {_e}")
                 erros += 1
 
-        db.session.commit()
+        detalhe_pulados = ''
+        if pulados:
+            amostra = '; '.join(f'#{cid}: {motivo}' for cid, motivo in pulados[:10])
+            detalhe_pulados = f' Pulados: {amostra}'
+            if len(pulados) > 10:
+                detalhe_pulados += f' e mais {len(pulados) - 10}.'
         flash(
             f'Migração concluída: {migrados} registro(s) migrado(s), '
-            f'{ignorados} já existia(m), {erros} erro(s).',
-            'success' if erros == 0 else 'warning'
+            f'{ignorados} já existia(m), {len(pulados)} pulado(s), '
+            f'{erros} erro(s).{detalhe_pulados}',
+            'success' if not pulados and erros == 0 else 'warning'
         )
     except Exception as e:
         db.session.rollback()
