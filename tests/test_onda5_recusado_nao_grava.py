@@ -650,6 +650,127 @@ def test_a_tela_de_comparar_e_alcancavel_pela_navegacao():
 # Task 7 — frota, transporte e reembolso
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Task 8 — os índices que discordam das queries, e o resto da Fase 6
+# ---------------------------------------------------------------------------
+
+def test_indice_de_vigencia_casa_com_as_queries():
+    """🔴 `uq_contrato_versao_vigente` era UNIQUE (obra_id) enquanto todo
+    leitor filtra por (obra_id, admin_id): uma linha com admin_id divergente
+    (precedente real: migration 266) travava a obra PERMANENTEMENTE —
+    abrir_versao não a via, nunca a fechava, e o INSERT violava o índice.
+    Escolha registrada: o ÍNDICE ganha admin_id (mantém o escopo por tenant
+    em toda parte)."""
+    from models import ObraContratoVersao
+
+    indice = next(
+        (i for i in ObraContratoVersao.__table__.indexes
+         if i.name == 'uq_contrato_versao_vigente'), None)
+    assert indice is not None
+    colunas = {c.name for c in indice.columns}
+    assert colunas == {'obra_id', 'admin_id'}, (
+        f'o índice de vigência cobre {colunas} — as queries filtram por '
+        '(obra_id, admin_id)')
+
+
+def test_versao_de_orcamento_tem_server_default():
+    """🔴 `Orcamento.versao` sem server_default: schema criado por
+    create_all (tenant novo, CI) discordava de produção migrada — INSERT
+    fora do ORM funcionava lá e quebrava aqui, em silêncio."""
+    from models import Orcamento
+    assert Orcamento.__table__.c.versao.server_default is not None, (
+        'Orcamento.versao sem server_default — os dois schemas discordam')
+
+
+def test_aditivos_do_backref_tem_cascade():
+    """⚪ `AditivoContrato.obra` usava passive_deletes sem o cascade que o
+    irmão ObraContratoVersao.obra (mesmo hunk) tem."""
+    from sqlalchemy import inspect as sa_inspect
+
+    from models import Obra
+    rel = sa_inspect(Obra).relationships['aditivos_contrato']
+    assert rel.cascade.delete_orphan, (
+        'Obra.aditivos_contrato sem cascade all, delete-orphan')
+
+
+def test_versao_encerrada_em_memoria_nao_e_vigente():
+    """⚪ `_versao_vigente_da_obra` devolvia a versão que a PRÓPRIA transação
+    acabou de encerrar (vigente_ate posto em memória, ainda não flushado):
+    a query em no_autoflush lê o estado do banco, não o da sessão."""
+    from datetime import date
+
+    from test_cronograma_versao_service import _ambiente
+
+    from models import ObraContratoVersao
+    from services.contrato_obra import _versao_vigente_da_obra
+
+    with app.app_context():
+        admin, obra = _ambiente()
+        versao = ObraContratoVersao(
+            obra_id=obra.id, admin_id=admin.id, versao=1,
+            valor=100000, origem_tipo='contrato_original',
+            vigente_de=date(2026, 1, 1), vigente_ate=None)
+        db.session.add(versao)
+        db.session.commit()
+
+        # A transação encerra a vigência EM MEMÓRIA (sem flush) — é o que
+        # abrir_versao faz antes de abrir a seguinte.
+        versao.vigente_ate = date(2026, 8, 27)
+        vigente = _versao_vigente_da_obra(obra)
+        assert vigente is None or vigente.vigente_ate is None, (
+            'a versão recém-encerrada em memória voltou como vigente')
+        db.session.rollback()
+
+
+def test_aprovar_aditivo_none_nao_estoura_e_moeda_nao_come_o_ponto_final():
+    """⚪ `aprovar` fazia float(versao.valor) DEPOIS do commit com versao
+    possivelmente None; e o reformat de moeda era aplicado à FRASE inteira
+    (o ponto final virava vírgula)."""
+    import inspect
+
+    import views.aditivos_views as av
+    fonte = inspect.getsource(av.aprovar)
+    assert 'if versao is None' in fonte, (
+        'aprovar não guarda o None de aprovar_aditivo')
+    assert ".replace(',', 'X')" not in fonte.split('flash(')[1].split(
+        'success')[0] or '_moeda' in fonte or 'valor_fmt' in fonte, (
+        'o reformat de moeda ainda é aplicado à frase inteira')
+
+
+def test_leitor_nao_ve_botao_de_aprovar():
+    """⚪ `pode_editar=True` fixo: usuário só-leitura via 'Aprovar' e levava
+    404 opaco."""
+    import inspect
+
+    import views.aditivos_views as av
+    fonte = inspect.getsource(av)
+    assert 'pode_editar=True' not in fonte, (
+        'pode_editar segue fixo em True para qualquer papel')
+
+
+def test_rotulos_de_origem_casam_com_o_vocabulario():
+    """⚪ O mapa do template usava proposta/manual, mas ORIGEM_TIPO grava
+    proposta_aprovada, cadastro_manual, contrato_original... — só 'aditivo'
+    casava."""
+    corpo = open('templates/aditivos/listar.html').read()
+    from services.contrato_obra import ORIGENS
+    for origem in ORIGENS:
+        assert origem in corpo, (
+            f'o rótulo de {origem!r} não existe no template — cai no cru')
+
+
+def test_card_do_contrato_nao_depende_de_blueprint_engolido():
+    """⚪ `app.py` engole DE PROPÓSITO a falha de registro do aditivos_bp,
+    mas a página fazia url_for('aditivos.listar') sem guarda: no cenário que
+    o app.py foi escrito para sobreviver, toda obra com contrato dava
+    BuildError 500. `obra_form.html` usa href literal e está safe — mesmo
+    idioma."""
+    corpo = open('templates/obras/detalhes_obra_profissional.html').read()
+    assert "url_for('aditivos.listar'" not in corpo, (
+        'o card do contrato ainda quebra a página se o aditivos_bp não '
+        'registrar')
+
+
 def test_odometro_nao_anda_para_tras():
     """🔴 `frota_views.py:499` — `veiculo.km_atual = km_final` sem comparação:
     uso retroativo fazia o odômetro regredir e calava o alerta de manutenção.

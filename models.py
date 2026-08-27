@@ -7605,7 +7605,13 @@ class ObraContratoVersao(db.Model):
     __tablename__ = 'obra_contrato_versao'
     __table_args__ = (
         db.Index('idx_contrato_versao_lookup', 'obra_id', 'vigente_de', 'vigente_ate'),
-        db.Index('uq_contrato_versao_vigente', 'obra_id', unique=True,
+        # (obra_id, admin_id): todo leitor filtra pelo par. Com o índice só em
+        # obra_id, uma linha com admin_id divergente (precedente real:
+        # migration 266) travava a obra permanentemente — abrir_versao não a
+        # via, nunca a fechava, e o INSERT da próxima vigência violava o
+        # índice. Migration 315.
+        db.Index('uq_contrato_versao_vigente', 'obra_id', 'admin_id',
+                 unique=True,
                  postgresql_where=db.text('vigente_ate IS NULL')),
         db.UniqueConstraint('obra_id', 'versao', name='uq_contrato_versao_obra_versao'),
     )
@@ -7696,6 +7702,7 @@ class AditivoContrato(db.Model):
 
     obra = db.relationship('Obra', foreign_keys=[obra_id],
                            backref=db.backref('aditivos_contrato',
+                                              cascade='all, delete-orphan',
                                               passive_deletes=True,
                                               order_by='AditivoContrato.criado_em.desc()'))
 
@@ -8645,7 +8652,12 @@ class Orcamento(db.Model):
     revisao_de_id = db.Column(db.Integer,
                               db.ForeignKey('orcamento.id', ondelete='SET NULL'),
                               nullable=True, index=True)
-    versao = db.Column(db.Integer, nullable=False, default=1)
+    # server_default: a migration 274 criou a coluna com DEFAULT 1 no banco
+    # migrado; sem o espelho aqui, schema de create_all (tenant novo, CI)
+    # discordava de producao em silencio — INSERT fora do ORM quebrava so
+    # num dos dois.
+    versao = db.Column(db.Integer, nullable=False, default=1,
+                       server_default=db.text('1'))
     motivo_revisao = db.Column(db.Text, nullable=True)
     # Task 11 usa esta coluna (a trava do orçamento convertido); nasce aqui,
     # na mesma migration, para não gastar um número só por ela.

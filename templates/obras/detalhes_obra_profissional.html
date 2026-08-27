@@ -1313,7 +1313,11 @@
             {% if obra.valor_contrato and obra.valor_contrato > 0 %}
             {# Fase 6 / Task 13 — o card do contrato vira a porta do extrato:
                é dali que se responde "por que este valor é este hoje". #}
-            <a href="{{ url_for('aditivos.listar', obra_id=obra.id) }}"
+            {# href literal, não url_for: app.py engole DE PROPÓSITO a falha de
+               registro do aditivos_bp, e o url_for sem guarda dava BuildError
+               500 em toda obra com contrato exatamente no cenário que o app.py
+               foi escrito para sobreviver. Mesmo idioma de obra_form.html. #}
+            <a href="/obras/{{ obra.id }}/aditivos"
                class="kpi-card text-decoration-none text-reset"
                style="--kpi-color: #06b6d4; --kpi-color-light: #22d3ee;"
                title="Ver contrato, aditivos e o histórico de versões">

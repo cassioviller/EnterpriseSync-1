@@ -7378,6 +7378,40 @@ def _migration_314_baseline_revisao_e_motivo():
     logger.info("[Migration 314] Concluída com sucesso")
 
 
+def _migration_315_indice_vigencia_com_admin_id():
+    """Onda 5 / Task 8 — `uq_contrato_versao_vigente` ganha `admin_id`.
+
+    O índice era `UNIQUE (obra_id) WHERE vigente_ate IS NULL`, mas TODO
+    leitor (`_versao_vigente_da_obra`, `abrir_versao`, `abrir_aditivo`)
+    filtra por `(obra_id, admin_id)`. Uma linha com `admin_id` divergente —
+    e a migration 273 cita o precedente real da 266 — travava a obra
+    PERMANENTEMENTE: `abrir_versao` não a via, nunca a fechava, e o INSERT
+    da próxima vigência violava o índice, enquanto `abrir_aditivo`
+    reportava "obra não tem contrato vigente".
+
+    Escolha registrada no plano da onda: o índice ganha `admin_id` (mantém
+    o escopo por tenant em toda parte) — a alternativa, tirar `admin_id`
+    das queries, também resolveria; misturar as duas, não.
+
+    Seguro sobre dados existentes: tudo que satisfazia UNIQUE(obra_id)
+    satisfaz UNIQUE(obra_id, admin_id). Idempotente: DROP IF EXISTS +
+    CREATE — a dupla execução termina no mesmo estado.
+
+    Alocação: 315 (máximo real do repo em 27/08: 314; 300-307 é faixa
+    reservada da Fase 9, 290-295 da Fase 8).
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "DROP INDEX IF EXISTS uq_contrato_versao_vigente"))
+        conn.execute(sa_text(
+            "CREATE UNIQUE INDEX uq_contrato_versao_vigente "
+            "ON obra_contrato_versao (obra_id, admin_id) "
+            "WHERE vigente_ate IS NULL"))
+    logger.info("[Migration 315] uq_contrato_versao_vigente agora cobre "
+                "(obra_id, admin_id) — o par que as queries filtram.")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7693,6 +7727,7 @@ def executar_migracoes():
             (312, "Reuniao 2026-08-20 — funcao.operacional: separa o efetivo de campo do pessoal de escritorio no seletor do RDO. DEFAULT TRUE para ninguem sumir no deploy", _migration_312_funcao_operacional),
             (313, "Reuniao 2026-08-20 — funcionario.cpf DROP NOT NULL: cadastro rapido sem documento em maos. UNIQUE mantido (Postgres aceita N nulos)", _migration_313_funcionario_cpf_nullable),
             (314, "Reuniao 2026-08-20 — cronograma_baseline.revisao (sequencial por obra+modo, com backfill por criada_em) e .motivo: historico de V1/V2 deixa de depender do texto do nome", _migration_314_baseline_revisao_e_motivo),
+            (315, "Onda 5 / Task 8 — uq_contrato_versao_vigente ganha admin_id: o indice era UNIQUE(obra_id) e toda query filtra (obra_id, admin_id); linha com admin_id divergente travava a obra permanentemente", _migration_315_indice_vigencia_com_admin_id),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

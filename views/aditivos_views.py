@@ -71,9 +71,16 @@ def listar(obra_id: int):
                 .filter_by(obra_id=obra_id, admin_id=admin_id)
                 .order_by(AditivoContrato.criado_em.asc()).all())
     vigente = next((v for v in versoes if v.vigente_ate is None), None)
+    # pode_editar por papel: fixo em True, usuário só-leitura via "Aprovar"
+    # e levava 404 opaco. Botão que aparece e nega é pior que botão que não
+    # aparece.
+    from models import TipoUsuario
+    pode_editar = (current_user.is_authenticated
+                   and current_user.tipo_usuario in (TipoUsuario.ADMIN,
+                                                     TipoUsuario.SUPER_ADMIN))
     return render_template('aditivos/listar.html', obra=obra, versoes=versoes,
                            aditivos=aditivos, vigente=vigente,
-                           pode_editar=True)
+                           pode_editar=pode_editar)
 
 
 @aditivos_bp.route('/<int:obra_id>/aditivos/novo', methods=['GET', 'POST'])
@@ -149,10 +156,20 @@ def aprovar(obra_id: int, aid: int):
     try:
         versao = aprovar_aditivo(
             aditivo, aprovado_por_id=getattr(current_user, 'id', None))
+        if versao is None:
+            # O serviço pode devolver None — fazer float(versao.valor)
+            # DEPOIS do commit estourava AttributeError com o commit já feito.
+            db.session.rollback()
+            flash('A aprovação não abriu versão de contrato — nada foi '
+                  'gravado. Verifique o estado do aditivo.', 'error')
+            return redirect(url_for('aditivos.listar', obra_id=obra_id))
         db.session.commit()
+        # Só o NÚMERO passa pelo troca-troca de separadores: aplicado à frase
+        # inteira, o ponto final virava vírgula.
+        valor_fmt = (f'{float(versao.valor):,.2f}'
+                     .replace(',', 'X').replace('.', ',').replace('X', '.'))
         flash(f'Aditivo {aditivo.numero} aprovado. O contrato passou a valer '
-              f'R$ {float(versao.valor):,.2f} (versão {versao.versao}).'
-              .replace(',', 'X').replace('.', ',').replace('X', '.'),
+              f'R$ {valor_fmt} (versão {versao.versao}).',
               'success')
     except HTTPException:
         raise
