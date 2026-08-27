@@ -6,6 +6,15 @@ import logging
 import traceback
 from datetime import datetime
 
+
+def _detalhes_na_resposta(detalhes):
+    """Traceback na resposta só FORA de produção — em produção, o detalhe
+    vive no log (mesmo desenho do handler global de main.py). Antes, o
+    traceback completo — caminhos, frames, SQL — ia para o error.html de
+    qualquer usuário em todo 500."""
+    from app import IS_PRODUCTION
+    return None if IS_PRODUCTION else detalhes
+
 def register_error_handlers(app):
     """Registrar handlers de erro para produção"""
     
@@ -42,7 +51,7 @@ ARGUMENTOS DA REQUISIÇÃO:
         return render_template('error.html', 
                              error_code=500,
                              error_message="Erro interno do servidor",
-                             error_details=full_error_details,
+                             error_details=_detalhes_na_resposta(full_error_details),
                              error_url=request.url,
                              error_timestamp=error_timestamp), 500
     
@@ -92,6 +101,6 @@ CONTEXTO DA REQUISIÇÃO:
         return render_template('error.html', 
                              error_code=500,
                              error_message="Erro inesperado no sistema",
-                             error_details=full_error_details,
+                             error_details=_detalhes_na_resposta(full_error_details),
                              error_url=request.url,
                              error_timestamp=error_timestamp), 500

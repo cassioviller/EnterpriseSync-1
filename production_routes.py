@@ -10,6 +10,15 @@ import logging
 production_bp = Blueprint('production', __name__)
 
 
+def _detalhes_na_resposta(detalhes):
+    """Traceback na resposta só FORA de produção — em produção, o detalhe
+    vive no log (mesmo desenho do handler global de main.py). Antes, o
+    traceback completo — caminhos, frames, SQL — ia para o error.html de
+    qualquer usuário em todo 500."""
+    from app import IS_PRODUCTION
+    return None if IS_PRODUCTION else detalhes
+
+
 def get_safe_admin_id():
     """Tenant do usuário autenticado — falha segura.
 
@@ -113,7 +122,7 @@ DIAGNÓSTICO:
         return render_template('error.html', 
                              error_code=500,
                              error_message=f"Erro ao carregar funcionários: {str(e)}",
-                             error_details=full_error_details,
+                             error_details=_detalhes_na_resposta(full_error_details),
                              error_url="/prod/safe-funcionarios",
                              error_timestamp=error_timestamp), 500
 
@@ -190,7 +199,7 @@ DIAGNÓSTICO:
         return render_template('error.html', 
                              error_code=500,
                              error_message=f"Erro ao carregar dashboard: {str(e)}",
-                             error_details=full_error_details,
+                             error_details=_detalhes_na_resposta(full_error_details),
                              error_url="/prod/safe-dashboard",
                              error_timestamp=error_timestamp), 500
 
@@ -268,7 +277,7 @@ DIAGNÓSTICO:
         return render_template('error.html', 
                              error_code=500,
                              error_message=f"Erro ao carregar obras: {str(e)}",
-                             error_details=full_error_details,
+                             error_details=_detalhes_na_resposta(full_error_details),
                              error_url="/prod/safe-obras",
                              error_timestamp=error_timestamp), 500
 
@@ -325,7 +334,7 @@ DIAGNÓSTICO:
         return render_template('error.html', 
                              error_code=500,
                              error_message=f"Erro ao carregar veículos: {str(e)}",
-                             error_details=full_error_details,
+                             error_details=_detalhes_na_resposta(full_error_details),
                              error_url="/prod/safe-veiculos",
                              error_timestamp=error_timestamp), 500
 

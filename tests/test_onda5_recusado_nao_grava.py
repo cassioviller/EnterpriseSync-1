@@ -110,6 +110,26 @@ def test_obra_com_geofence_recusa_ponto_sem_coordenada():
     assert valido is True, 'obra sem geofence deveria seguir aceitando'
 
 
+def test_handler_500_nao_manda_traceback_em_producao():
+    """🔴 Achado do grep de fecho: `error_handlers.py` (handler 500 global,
+    SEM gate de ambiente) e 5 rotas de `production_routes.py` renderizavam o
+    traceback completo em `error.html` — a mesma classe da Task 1, viva em
+    TODO 500 do app. O desenho certo já existia em `main.py`: detalhe só
+    fora de produção; em produção, o detalhe vive no log."""
+    import inspect
+
+    import error_handlers
+    import production_routes
+
+    for modulo in (error_handlers, production_routes):
+        fonte = inspect.getsource(modulo)
+        assert 'error_details=full_error_details,' not in fonte, (
+            f'{modulo.__name__}: o traceback ainda vai cru para a resposta, '
+            'sem gate de ambiente')
+        assert '_detalhes_na_resposta' in fonte, (
+            f'{modulo.__name__}: falta o gate de produção nos detalhes')
+
+
 # ---------------------------------------------------------------------------
 # Task 2 — a edição recusada
 # ---------------------------------------------------------------------------
