@@ -495,8 +495,10 @@ def novo_uso(veiculo_id):
             
             db.session.add(novo_uso)
             
-            # [CAR] ATUALIZAR KM ATUAL DO VEÍCULO
-            if novo_uso.km_final:
+            # [CAR] ATUALIZAR KM ATUAL DO VEÍCULO — só se ANDOU PARA FRENTE.
+            # Uso retroativo (lançado depois) fazia o odômetro regredir e
+            # calava o alerta de manutenção. As três rotas irmãs têm a guarda.
+            if novo_uso.km_final and novo_uso.km_final > (veiculo.km_atual or 0):
                 veiculo.km_atual = novo_uso.km_final
                 logger.info(f"[OK] [FROTA_NOVO_USO] KM Atual do veículo atualizado: {veiculo.km_atual} km")
             
@@ -738,10 +740,19 @@ def editar_uso(uso_id):
             if uso.km_inicial and uso.km_final:
                 uso.km_percorrido = uso.km_final - uso.km_inicial
             
-            uso.passageiros_frente = dados.get('passageiros_frente')
-            uso.passageiros_tras = dados.get('passageiros_tras')
-            uso.responsavel_veiculo = dados.get('responsavel_veiculo')
-            uso.observacoes = dados.get('observacoes')
+            # Multi-select vem por getlist (to_dict() só entrega o PRIMEIRO
+            # valor) — mesmo idioma da criação. E campo ausente do form NÃO
+            # apaga o valor existente.
+            passageiros_frente_list = request.form.getlist('passageiros_frente')
+            if passageiros_frente_list:
+                uso.passageiros_frente = ','.join(passageiros_frente_list)
+            passageiros_tras_list = request.form.getlist('passageiros_tras')
+            if passageiros_tras_list:
+                uso.passageiros_tras = ','.join(passageiros_tras_list)
+            if 'responsavel_veiculo' in dados:
+                uso.responsavel_veiculo = dados['responsavel_veiculo']
+            if 'observacoes' in dados:
+                uso.observacoes = dados['observacoes']
             
             # [CAR] ATUALIZAR KM ATUAL DO VEÍCULO (se editou km_final)
             if dados.get('km_final'):
@@ -1041,15 +1052,17 @@ def dashboard():
         if data_fim:
             query_custos = query_custos.filter(FrotaDespesa.data_custo <= data_fim)
         
-        # Aplicar filtro de tipo de veículo (join com Vehicle)
+        # UM join só (tipo e status): no SA 2.0.41 o segundo
+        # `.join(FrotaVeiculo)` não é deduplicado e o produto cartesiano
+        # inflava os custos filtrados.
+        if filtro_tipo or filtro_status in ('ativo', 'inativo'):
+            query_custos = query_custos.join(FrotaVeiculo)
         if filtro_tipo:
-            query_custos = query_custos.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
-        
-        # Aplicar filtro de status (apenas veículos ativos/inativos)
+            query_custos = query_custos.filter(FrotaVeiculo.tipo == filtro_tipo)
         if filtro_status == 'ativo':
-            query_custos = query_custos.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+            query_custos = query_custos.filter(FrotaVeiculo.ativo == True)
         elif filtro_status == 'inativo':
-            query_custos = query_custos.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+            query_custos = query_custos.filter(FrotaVeiculo.ativo == False)
         
         # KPI 1: TCO Total (Total Cost of Ownership)
         tco_total = db.session.query(
@@ -1060,12 +1073,17 @@ def dashboard():
             tco_total = tco_total.filter(FrotaDespesa.data_custo >= data_inicio)
         if data_fim:
             tco_total = tco_total.filter(FrotaDespesa.data_custo <= data_fim)
+        # UM join só: no SA 2.0.41 o segundo `.join(FrotaVeiculo)` NÃO é
+        # deduplicado — com tipo E status filtrados o produto cartesiano
+        # inflava o TCO, e o filtro por tipo sempre errava.
+        if filtro_tipo or filtro_status in ('ativo', 'inativo'):
+            tco_total = tco_total.join(FrotaVeiculo)
         if filtro_tipo:
-            tco_total = tco_total.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
+            tco_total = tco_total.filter(FrotaVeiculo.tipo == filtro_tipo)
         if filtro_status == 'ativo':
-            tco_total = tco_total.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+            tco_total = tco_total.filter(FrotaVeiculo.ativo == True)
         elif filtro_status == 'inativo':
-            tco_total = tco_total.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+            tco_total = tco_total.filter(FrotaVeiculo.ativo == False)
         
         tco_total = float(tco_total.scalar() or 0)
         
@@ -1078,12 +1096,15 @@ def dashboard():
             query_km = query_km.filter(FrotaUtilizacao.data_uso >= data_inicio)
         if data_fim:
             query_km = query_km.filter(FrotaUtilizacao.data_uso <= data_fim)
+        # Mesmo conserto do join duplicado dos dois blocos acima.
+        if filtro_tipo or filtro_status in ('ativo', 'inativo'):
+            query_km = query_km.join(FrotaVeiculo)
         if filtro_tipo:
-            query_km = query_km.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
+            query_km = query_km.filter(FrotaVeiculo.tipo == filtro_tipo)
         if filtro_status == 'ativo':
-            query_km = query_km.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+            query_km = query_km.filter(FrotaVeiculo.ativo == True)
         elif filtro_status == 'inativo':
-            query_km = query_km.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+            query_km = query_km.filter(FrotaVeiculo.ativo == False)
         
         total_km = query_km.scalar() or 0
         custo_medio_km = round(tco_total / total_km, 2) if total_km > 0 else 0
@@ -1112,12 +1133,15 @@ def dashboard():
             FrotaDespesa.admin_id == tenant_admin_id,
             FrotaDespesa.data_custo >= inicio_mes_atual
         )
+        # Mesmo conserto do join duplicado dos blocos acima.
+        if filtro_tipo or filtro_status in ('ativo', 'inativo'):
+            query_mes_atual = query_mes_atual.join(FrotaVeiculo)
         if filtro_tipo:
-            query_mes_atual = query_mes_atual.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
+            query_mes_atual = query_mes_atual.filter(FrotaVeiculo.tipo == filtro_tipo)
         if filtro_status == 'ativo':
-            query_mes_atual = query_mes_atual.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+            query_mes_atual = query_mes_atual.filter(FrotaVeiculo.ativo == True)
         elif filtro_status == 'inativo':
-            query_mes_atual = query_mes_atual.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+            query_mes_atual = query_mes_atual.filter(FrotaVeiculo.ativo == False)
         
         custos_mes_atual = float(query_mes_atual.scalar() or 0)
         
@@ -1129,12 +1153,15 @@ def dashboard():
             FrotaDespesa.data_custo >= inicio_mes_anterior,
             FrotaDespesa.data_custo <= fim_mes_anterior
         )
+        # Mesmo conserto do join duplicado dos blocos acima.
+        if filtro_tipo or filtro_status in ('ativo', 'inativo'):
+            query_mes_anterior = query_mes_anterior.join(FrotaVeiculo)
         if filtro_tipo:
-            query_mes_anterior = query_mes_anterior.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
+            query_mes_anterior = query_mes_anterior.filter(FrotaVeiculo.tipo == filtro_tipo)
         if filtro_status == 'ativo':
-            query_mes_anterior = query_mes_anterior.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+            query_mes_anterior = query_mes_anterior.filter(FrotaVeiculo.ativo == True)
         elif filtro_status == 'inativo':
-            query_mes_anterior = query_mes_anterior.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+            query_mes_anterior = query_mes_anterior.filter(FrotaVeiculo.ativo == False)
         
         custos_mes_anterior = float(query_mes_anterior.scalar() or 0)
         
@@ -1177,12 +1204,15 @@ def dashboard():
             evolucao_mensal = evolucao_mensal.filter(FrotaDespesa.data_custo >= data_inicio)
         if data_fim:
             evolucao_mensal = evolucao_mensal.filter(FrotaDespesa.data_custo <= data_fim)
+        # Mesmo conserto do join duplicado dos blocos acima.
+        if filtro_tipo or filtro_status in ('ativo', 'inativo'):
+            evolucao_mensal = evolucao_mensal.join(FrotaVeiculo)
         if filtro_tipo:
-            evolucao_mensal = evolucao_mensal.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
+            evolucao_mensal = evolucao_mensal.filter(FrotaVeiculo.tipo == filtro_tipo)
         if filtro_status == 'ativo':
-            evolucao_mensal = evolucao_mensal.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+            evolucao_mensal = evolucao_mensal.filter(FrotaVeiculo.ativo == True)
         elif filtro_status == 'inativo':
-            evolucao_mensal = evolucao_mensal.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+            evolucao_mensal = evolucao_mensal.filter(FrotaVeiculo.ativo == False)
         
         evolucao_mensal = evolucao_mensal.group_by(
             func.to_char(FrotaDespesa.data_custo, 'YYYY-MM')

@@ -646,3 +646,87 @@ def test_a_tela_de_comparar_e_alcancavel_pela_navegacao():
         assert arquivos, (
             f'nenhum template linka {endpoint} — a Task 12 da Fase 6 '
             'segue inalcançável')
+# ---------------------------------------------------------------------------
+# Task 7 — frota, transporte e reembolso
+# ---------------------------------------------------------------------------
+
+def test_odometro_nao_anda_para_tras():
+    """🔴 `frota_views.py:499` — `veiculo.km_atual = km_final` sem comparação:
+    uso retroativo fazia o odômetro regredir e calava o alerta de manutenção.
+    As três rotas irmãs têm a guarda; só esta ficou de fora."""
+    import inspect
+
+    import frota_views
+    fonte = inspect.getsource(frota_views)
+    for numero, linha in enumerate(fonte.splitlines(), start=1):
+        if 'veiculo.km_atual = novo_uso.km_final' in linha:
+            contexto = fonte.splitlines()[max(0, numero - 6):numero]
+            assert any('km_atual' in l and ('>' in l or 'max(' in l)
+                       for l in contexto), (
+                f'frota_views:{numero}: km_atual atualizado sem comparar '
+                'com o valor atual — uso retroativo regride o odômetro')
+
+
+def test_edicao_de_uso_le_todos_os_passageiros():
+    """🔴 `frota_views.py:741` — a edição lia passageiros de `to_dict()` (só
+    o PRIMEIRO valor do multi-select) enquanto a criação usa getlist+CSV; e
+    apagava responsavel_veiculo/observacoes quando o campo não vinha."""
+    import inspect
+
+    import frota_views
+    fonte = inspect.getsource(frota_views)
+    assert "uso.passageiros_frente = ','.join(passageiros_frente_list)" \
+        in fonte, (
+        'a edição ainda lê passageiros de to_dict() — só o primeiro valor '
+        'do multi-select sobrevive')
+    assert "uso.responsavel_veiculo = dados.get('responsavel_veiculo')" \
+        not in fonte, (
+        'a edição ainda apaga responsavel_veiculo quando o campo não vem')
+
+
+def test_dashboard_tco_nao_duplica_o_join():
+    """🔴 `frota_views.py:1063` — `.join(FrotaVeiculo)` duplicado (tipo +
+    status): confirmado no SA 2.0.41 que o segundo join não é deduplicado —
+    o filtro por tipo do dashboard TCO sempre errava."""
+    import inspect
+
+    import frota_views
+    fonte = inspect.getsource(frota_views)
+    # O padrão duplicado existia em TRÊS builders do mesmo dashboard:
+    # query_custos, tco_total e query_km. Nenhuma linha pode ter join
+    # seguido de filter na mesma cadeia condicionada duas vezes.
+    for numero, linha in enumerate(fonte.splitlines(), start=1):
+        if '.join(FrotaVeiculo).filter(' in linha:
+            raise AssertionError(
+                f'frota_views:{numero}: join(FrotaVeiculo) encadeado com '
+                'filter dentro de condição — o segundo join da mesma query '
+                'duplica linhas e infla o TCO')
+
+
+def test_lote_de_transporte_grava_origem_id():
+    """🔴 `transporte_views.py:442` — o lote gravava GestaoCustoFilho SEM
+    `origem_id`, e `_limpar_gestao_custo_filho` filtra por ele: excluir
+    lançamento de lote deixava o valor vivo em Contas a Pagar dizendo
+    'Gestão de Custos atualizada'."""
+    import inspect
+
+    import transporte_views
+    fonte = inspect.getsource(transporte_views.novo_massa_post)
+    assert 'origem_id=' in fonte, (
+        'o lote ainda registra custo sem origem_id — a exclusão não acha o '
+        'filho e o valor fica vivo em Contas a Pagar')
+
+
+def test_reembolso_sem_v2_redireciona_em_vez_de_500():
+    """🔴 `reembolso_views.py:34` — `url_for('main_bp.dashboard')`, mas o
+    blueprint chama-se `main`: tenant sem V2 clicando em Reembolsos levava
+    BuildError 500 em vez do aviso."""
+    import inspect
+
+    import reembolso_views
+    fonte = inspect.getsource(reembolso_views)
+    assert 'main_bp.dashboard' not in fonte, (
+        "url_for('main_bp.dashboard') — o blueprint chama-se 'main'; "
+        'tenant sem V2 leva BuildError 500 em vez do aviso')
+
+
