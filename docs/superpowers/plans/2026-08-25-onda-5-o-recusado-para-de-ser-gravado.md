@@ -1,6 +1,24 @@
 # Onda 5 — O Recusado Para de Ser Gravado Implementation Plan
 
-> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — pronto para executar** — 8 tasks. A Task 1 (traceback no HTML) é **a de maior superfície exposta da varredura e a mais barata de fechar**.
+> **Estado em 2026-08-28:** ✅ **FECHADA 28/08** — 8/8 tasks + 1 fecho-fix + 1 correcao de gate, 13
+> commits, executada solo via superpowers:executing-plans, TDD com o RED citado
+> em todos. Teste: `tests/test_onda5_recusado_nao_grava.py` (38 testes).
+> Gate: **2839 passed, 6 skipped, 201 deselected, 2 xfailed** — na 2ª rodada.
+> A 1ª reprovou com 6 failed, todas de uma guarda que esta onda introduziu;
+> ver "A guarda da Task 6 que o gate derrubou", no fim.
+>
+> Duas decisões explícitas registradas nesta onda: **o geofencing consultivo
+> vira impositivo** — obra cercada e sem coordenada agora **recusa** o ponto,
+> obra sem geofence configurado segue aceitando (Task 1, commit `7ec18fe0`) — e
+> **o índice `uq_contrato_versao_vigente` ganha `admin_id`** em vez de as
+> queries o perderem (Task 8, commit `ae4e4191`, migration 315). Ambas
+> detalhadas na seção "Fecho da onda", abaixo.
+>
+> ⚠️ **Fecho-fix fora do plano original:** o grep de fecho (constraint de
+> `format_exc`) achou a mesma classe de vazamento da Task 1 viva em todo `500`
+> do app inteiro — `error_handlers.py` (handler global) e `production_routes.py`
+> mandavam traceback para `error.html`. Corrigido, env-gated como `main.py`, em
+> commit próprio: `356c2cf9`.
 >
 > Escrito na varredura de 25/08. Índice de estado de todos os planos e specs em
 > `docs/planos-em-aberto-2026-08-25.md`.
@@ -534,9 +552,78 @@ Expected: **2560 passed, 6 skipped, 201 deselected, 2 xfailed** — ou mais verd
 
 ## Fecho da onda
 
-- [ ] `bash run_tests.sh --gate` verde, com a contagem registrada.
-- [ ] A escolha da Task 8 (índice ganha `admin_id` **ou** queries o perdem)
-      registrada aqui, com o porquê.
-- [ ] `docs/auditoria/achados-code-review-2026-08-25.md` — marcar os 10 achados.
-- [ ] 🔬 `grep -rn "format_exc" --include=*.py . | grep -v __pycache__ | grep -v tests/`
-      — nenhum resultado fora de log.
+- [x] `bash run_tests.sh --gate` verde, com a contagem registrada.
+      ✅ **2839 passed, 6 skipped, 201 deselected, 2 xfailed** (44min, 28/08) —
+      acima da régua do plano (2560) e da Onda 3 (2798).
+      🔴 **A 1ª rodada NÃO passou: 6 failed, 2833 passed**. Causa-raiz única, e
+      era nossa: a guarda de obra+data que a Task 6 pôs em
+      `salvar_rdo_flexivel`, que disparou 12 vezes no gate. Corrigida em
+      `ed85d117` — ver "A guarda da Task 6 que o gate derrubou", abaixo.
+- [x] A escolha da Task 8 (índice ganha `admin_id` **ou** queries o perdem)
+      registrada aqui, com o porquê. ✅ **Decidido: o índice ganha `admin_id`**
+      (migration 315 — o máximo real do repo no dia do commit era 314, sem
+      faixa reservada). É a opção mais segura das duas: mantém o escopo por
+      tenant em toda parte, contra a alternativa de tirar `admin_id` das
+      leituras — que teria significado enfraquecer a query em vez do índice.
+      Dupla execução da migration provada no banco de dev, com o `INDEXDEF`
+      conferido depois de cada rodada. Commit `ae4e4191`.
+- [x] `docs/auditoria/achados-code-review-2026-08-25.md` — marcar os 10 achados.
+      ✅ Os 10 achados (Tasks 5.1 a 5.10) marcados inline com o commit que
+      fechou cada um, e os 3 achados novos descobertos na própria execução
+      registrados em seção própria no fim do documento.
+- [x] 🔬 `grep -rn "format_exc" --include=*.py . | grep -v __pycache__ | grep -v tests/`
+      — nenhum resultado fora de log. ✅ O grep de fecho achou a mesma classe de
+      vazamento da Task 1 viva em `error_handlers.py` (handler global) e
+      `production_routes.py`, que mandavam `traceback.format_exc()` para
+      `error.html` em todo `500` do app. Corrigido e env-gated como `main.py`,
+      em commit próprio fora do plano original: `356c2cf9`.
+
+
+## A guarda da Task 6 que o gate derrubou
+
+> 🔴 **O gate de fecho reprovou a própria onda, e o achado é bom.** Seis testes
+> caíram, todos com a mesma causa: a guarda de `obra_id + data_relatorio` que a
+> Task 6 acrescentou a `salvar_rdo_flexivel` (`views/rdo.py:4038`, commit
+> `ce331094`). Revertida em `ed85d117`.
+
+**O que a guarda quebrou.** `test_arreio_custo_rdo_rotas` (mensalista em dois
+RDOs), `test_caracterizacao_apontamento_cronograma` (3 testes),
+`test_cronograma_duplicado_rdo` (R5 e R7) e `test_rdo_unificado_responsaveis`
+(S4). Este último parecia causa separada — terceiros não revertia para pendente
+— mas era a mesma: o POST do S4 era recusado pela guarda, o toggle reverso
+nunca rodava, e a tarefa ficava em 100%.
+
+**Por que a guarda estava errada.** Dois RDOs na mesma obra e mesmo dia são
+estado **legal** do domínio, não duplicata:
+
+- `services/custo_funcionario_dia.py` é arquitetado em torno disso — rateia a
+  diária entre os RDOs do dia e recalcula os vizinhos em cruz.
+- 🔬 **A Onda 3 / Task 9 desta mesma auditoria aprofundou exatamente esse
+  caso** ("quem aparecia em dois RDOs do mesmo dia tinha metade da diária
+  lançada em cada um"). Banir o estado agora contradiz decisão já entregue com
+  gate verde.
+- Dois testes de caracterização congelam a regra de propósito, com docstring
+  explicando por que não é defeito: **o diarista tem teto diário, o mensalista
+  não** — a unidade de um é o DIA, a do outro é a HORA.
+
+**E a guarda recusava em silêncio.** Respondia `302` + `flash` — sucesso aos
+olhos de todo chamador que confere status. Foi assim que matou o toggle reverso
+sem que nada reportasse. É a **mesma classe de defeito que esta onda foi
+escrita para matar**, introduzida por ela.
+
+**O achado tinha duas metades, e a corrigida foi a errada.** `views/rdo.py:4002`
+dizia: `salvar_rdo_flexivel` **ignora `rdo_id`** *e* não tem guarda de obra+data.
+A Task 6 só pôs a guarda. A metade real — quem manda `rdo_id` de um RDO
+existente pedindo edição recebe um RDO **novo** — ficou intocada, e é ela que
+produz duplicata de verdade. 🔬 Conferido: o único chamador de produção é
+`templates/rdo/novo.html`, que **não** manda `rdo_id`; só
+`tests/test_fase5_matriz_rdo.py:201` manda.
+
+**O que `ed85d117` fez:** a guarda cega saiu, com comentário no lugar dizendo
+por que não deve voltar; `rdo_id`, quando aponta RDO da obra e do tenant, passa
+a **editar** (número e autoria preservados) em vez de criar. Adjacência:
+`1176 passed` em `-k "rdo or cronograma or custo"`.
+
+⚠️ **Fica em aberto (não é regressão, é escopo novo):** a duplicata acidental
+por duplo-submit do form "Novo RDO" segue possível. Barrá-la é trabalho de UI
+(confirmação explícita para o 2º RDO do dia), não de guarda cega no backend.
