@@ -348,11 +348,15 @@ def aplicar_entregas_no_rdo(rdo, form_data, admin_id=None):
                 continue
             if t.obra_id != rdo.obra_id:
                 continue
-            mudou = (float(t.percentual_concluido or 0) != 0.0) or (t.data_entrega_real is not None)
+            # Reverter é desfazer a MARCA (100% + data_entrega_real), nunca
+            # apagar progresso parcial: subempreitada em 45% é dado real, e
+            # era zerada por qualquer salvamento de RDO que não a marcasse.
+            # O docstring sempre prometeu só "reverter para pendente".
+            if float(t.percentual_concluido or 0) != 100.0:
+                continue
             t.percentual_concluido = 0.0
             t.data_entrega_real = None
-            if mudou:
-                qtd_revertidas += 1
+            qtd_revertidas += 1
         return (qtd, qtd_revertidas)
     except Exception as e:
         logger.error(f"Erro aplicar_entregas_no_rdo: {e}")

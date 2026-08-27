@@ -369,6 +369,63 @@ def test_o_diff_ve_o_item_sem_snapshot_de_subtotal():
     assert alterados[0]['delta_valor'] == 500
 
 
+# ---------------------------------------------------------------------------
+# Task 5 — o progresso que é apagado e o retrocesso que passa
+# ---------------------------------------------------------------------------
+
+def test_toggle_reverso_nao_apaga_progresso_parcial():
+    """🔴 `entregas_terceiros.py:340` — o toggle reverso zerava
+    `percentual_concluido` de TODA tarefa visível não marcada: subempreitada
+    em 45% era apagada no próximo salvamento de RDO que não a marcasse.
+
+    Reverter é desfazer a MARCA (100 + data_entrega_real), não apagar
+    progresso parcial — progresso é dado real, não estado do toggle.
+    """
+    from datetime import date
+    from types import SimpleNamespace
+
+    from test_cronograma_versao_service import _ambiente
+
+    from models import TarefaCronograma
+    from services.entregas_terceiros import aplicar_entregas_no_rdo
+
+    with app.app_context():
+        admin, obra = _ambiente()
+
+        def tarefa_terceiro(pct, entregue):
+            t = TarefaCronograma(
+                obra_id=obra.id, admin_id=admin.id,
+                nome_tarefa=f'Sub {uuid.uuid4().hex[:6]}', ordem=0,
+                responsavel='terceiros', duracao_dias=5,
+                percentual_concluido=pct,
+                data_entrega_real=date(2026, 8, 1) if entregue else None)
+            db.session.add(t)
+            db.session.flush()
+            return t
+
+        em_andamento = tarefa_terceiro(45.0, entregue=False)
+        marcada = tarefa_terceiro(100.0, entregue=True)
+        db.session.commit()
+
+        rdo_falso = SimpleNamespace(obra_id=obra.id,
+                                    data_relatorio=date(2026, 8, 20))
+        form = {'terceiros_tarefa_ids_lista[]': [str(em_andamento.id),
+                                                 str(marcada.id)],
+                'entrega_tarefa_ids[]': []}
+        qtd, revertidas = aplicar_entregas_no_rdo(
+            rdo_falso, form, admin_id=admin.id)
+        db.session.commit()
+
+        depois_45 = db.session.get(TarefaCronograma, em_andamento.id)
+        depois_100 = db.session.get(TarefaCronograma, marcada.id)
+        assert float(depois_45.percentual_concluido) == 45.0, (
+            'o toggle reverso apagou os 45% da subempreitada em andamento')
+        assert float(depois_100.percentual_concluido) == 0.0, (
+            'desmarcar a tarefa ENTREGUE deve revertê-la para pendente')
+        assert depois_100.data_entrega_real is None
+        assert revertidas == 1
+
+
 def test_a_tela_de_comparar_e_alcancavel_pela_navegacao():
     """Entrega inalcançável não é entrega."""
     import subprocess
