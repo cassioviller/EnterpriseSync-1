@@ -383,8 +383,14 @@ def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
 
     # Último percentual acumulado ANTES deste RDO (para incremento e
     # validação de retrocesso, nos dois modos).
+    # A MESMA preferência de `recomputar_cadeia`: `percentual_acumulado`
+    # primeiro, `percentual_realizado` como fallback. Lendo só o realizado
+    # (travado em 100), uma superexecução de 120 deixava a guarda de
+    # retrocesso cega: a regressão real para 110 passava (110 > 100) e
+    # gravava +10 — que qualquer recompute depois virava −10.
     pct_ant_row = (
-        db.session.query(RDOApontamentoCronograma.percentual_realizado)
+        db.session.query(RDOApontamentoCronograma.percentual_acumulado,
+                         RDOApontamentoCronograma.percentual_realizado)
         .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
         .filter(
             RDOApontamentoCronograma.tarefa_cronograma_id == tarefa.id,
@@ -394,7 +400,10 @@ def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
         .order_by(RDO.data_relatorio.desc(), RDOApontamentoCronograma.id.desc())
         .first()
     )
-    pct_ant = float(pct_ant_row[0]) if pct_ant_row and pct_ant_row[0] is not None else 0.0
+    pct_ant = 0.0
+    if pct_ant_row is not None:
+        pct_ant = float(pct_ant_row[0] if pct_ant_row[0] is not None
+                        else (pct_ant_row[1] or 0.0))
 
     # Planejado na data do RDO (None = tarefa sem plano calculável).
     progresso = calcular_progresso_rdo(tarefa.id, rdo.data_relatorio, admin_id)

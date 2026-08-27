@@ -442,6 +442,43 @@ def test_falha_no_meio_das_entregas_nao_deixa_escrita_parcial():
         'o chamador commita escrita parcial reportada como nada')
 
 
+def test_regressao_real_depois_de_superexecucao_e_barrada():
+    """🔴 `cronograma_apontamento_service.py:397` — `pct_ant` lia só
+    `percentual_realizado` (travado em 100) enquanto `recomputar_cadeia`
+    prefere `percentual_acumulado`. Depois de uma superexecução (120/100),
+    uma regressão real para 110% passava por baixo da guarda
+    `RetrocessoNaoPermitido` e gravava +10, que qualquer recompute vira −10.
+    """
+    from datetime import date
+
+    from test_cronograma_apontamento_service import _rdo, _tarefa
+    from test_cronograma_versao_service import _ambiente
+
+    from services.cronograma_apontamento_service import (
+        RetrocessoNaoPermitido, registrar_apontamento)
+
+    with app.app_context():
+        admin, obra = _ambiente()
+        ctx = {'admin_id': admin.id, 'obra_id': obra.id}
+        tarefa = _tarefa(ctx, quantidade_total=None)
+
+        rdo1 = _rdo(ctx, date(2026, 8, 10))
+        registrar_apontamento(rdo1, tarefa, percentual_acumulado=120.0,
+                              admin_id=admin.id, permitir_sobreexecucao=True)
+        db.session.commit()
+
+        rdo2 = _rdo(ctx, date(2026, 8, 12))
+        # 110 ainda é sobre-execução (>100), então o chamador a confirma — e
+        # é exatamente assim que a regressão real passava por baixo da guarda
+        # de retrocesso: 110 < 120 (acumulado), mas o pct_ant lido era o
+        # realizado travado em 100, e 110 > 100 não disparava nada.
+        with pytest.raises(RetrocessoNaoPermitido):
+            registrar_apontamento(rdo2, tarefa, percentual_acumulado=110.0,
+                                  admin_id=admin.id,
+                                  permitir_sobreexecucao=True)
+        db.session.rollback()
+
+
 def test_a_tela_de_comparar_e_alcancavel_pela_navegacao():
     """Entrega inalcançável não é entrega."""
     import subprocess
