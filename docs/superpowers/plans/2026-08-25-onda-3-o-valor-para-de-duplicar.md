@@ -1,6 +1,12 @@
 # Onda 3 — O Valor Para de Duplicar ou Sumir Implementation Plan
 
-> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — pronto para executar** — 10 tasks. Fecha a automação **A12** do backlog. O 16º achado da onda (`financeiro_service.py:619`) **não está aqui** — espera a decisão D2.
+> **Estado em 2026-08-27:** ✅ **FECHADA 27/08** — 10/10 tasks, 6 fix rounds ao
+> todo, gate completo verde (**2798 passed, 6 skipped, 201 deselected, 2
+> xfailed**), review final da branch inteira limpa (zero Critical). Fecha a
+> automação **A12** do backlog. O 16º achado da onda (`financeiro_service.py:619`)
+> foi fechado à parte pelo mini-plano
+> `docs/superpowers/plans/2026-08-27-gemeos-consciente-de-estado.md` (D2/Task 3.6,
+> commits `5be4a5bd`+`0d244e48`).
 >
 > Escrito na varredura de 25/08. Índice de estado de todos os planos e specs em
 > `docs/planos-em-aberto-2026-08-25.md`.
@@ -1094,9 +1100,20 @@ fora.
 
 ## Fecho da onda
 
-- [ ] `bash run_tests.sh --gate` verde, com a contagem registrada.
-- [ ] **A12 riscada** de `docs/reconferencia-backlog-2026-08-23.md`.
-- [ ] `docs/auditoria/achados-code-review-2026-08-25.md` — marcar os 15 achados
-      desta onda (o 16º, `financeiro_service.py:619`, segue esperando a D2).
-- [ ] 🔬 `grep -rn "AlmoxarifadoEstoque(" --include=*.py . | grep -v __pycache__`
+- [x] `bash run_tests.sh --gate` verde, com a contagem registrada. ✅ **2798
+      passed, 6 skipped, 201 deselected, 2 xfailed** (régua antiga: 2560 passed).
+      Dos +238 verdes a mais, ~48 são os testes novos desta onda
+      (`test_onda3_*.py`); o resto é drift da régua — escrita em 23/08, **antes**
+      de a Onda 2 e o trabalho de medição do tenant fantasma entrarem na `main`
+      em 26/08.
+- [x] **A12 riscada** de `docs/reconferencia-backlog-2026-08-23.md`. ✅ Movida
+      de ABERTO para ENTREGUE, com os commits `0668989b`+`552e7699`.
+- [x] `docs/auditoria/achados-code-review-2026-08-25.md` — marcar os 15 achados
+      desta onda (o 16º, `financeiro_service.py:619`, segue esperando a D2). ✅
+      Os 16 achados marcados inline (a D2/Task 3.6 fechou o 16º em commit
+      separado, `5be4a5bd`+`0d244e48`), e os 5 achados novos descobertos na
+      execução registrados em seção própria no fim do documento.
+- [x] 🔬 `grep -rn "AlmoxarifadoEstoque(" --include=*.py . | grep -v __pycache__`
       — todo construtor restante passa por `criar_lote`, ou tem as três colunas.
+      ✅ Conferido: todos os 8 restantes (fora `models.py` e `tests/`) carregam
+      as três colunas.

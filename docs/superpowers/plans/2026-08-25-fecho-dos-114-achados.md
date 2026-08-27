@@ -19,7 +19,7 @@
 > |---|---|---|---|
 > | 1 — o dinheiro entra errado (5 achados) | `2026-08-25-onda-1-parser-de-dinheiro.md` | 6 | ✅ escrito. 🔬 O código do plano foi **extraído e executado**: 32 passed |
 > | 2 — o tenant vaza (14) | `2026-08-25-onda-2-o-tenant-para-de-vazar.md` | 8 | ✅ **FECHADA 26/08** — 8/8 tasks, 7 fix rounds, gate verde. 15 achados marcados |
-> | 3 — o valor duplica ou some (16) | `2026-08-25-onda-3-o-valor-para-de-duplicar.md` | 10 | ✅ escrito. A 16ª (`financeiro_service.py:619`) **não está lá** — espera a D2 |
+> | 3 — o valor duplica ou some (16) | `2026-08-25-onda-3-o-valor-para-de-duplicar.md` | 10 | ✅ **FECHADA 27/08** — 10/10 tasks + D2/3.6, gate 2798/6/201/2, 16 achados marcados |
 > | 4 — o relatório que nunca funcionou (11) | `2026-08-25-onda-4-o-relatorio-passa-a-funcionar.md` | 7 | ✅ escrito. Duas tasks bloqueadas por D3/D4 |
 > | 5 — grava o que foi recusado (10) | `2026-08-25-onda-5-o-recusado-para-de-ser-gravado.md` | 8 | ✅ escrito |
 > | 6 — os testes prometidos | `2026-08-25-onda-6-os-testes-prometidos.md` | 6 | ✅ escrito. Derrubou **dois** resíduos que eram falso alarme |
@@ -298,6 +298,32 @@ manutenção. A Task 4.5 assume apagar; diga se prefere o contrário.
 ---
 
 ## Onda 3 — o valor se duplica ou some (16 achados)
+
+> **✅ FECHADA em 27/08.** Branch `sdd/onda-3-o-valor-para-de-duplicar`, 10/10 tasks +
+> o mini-plano D2/Task 3.6, executados via subagent-driven development em 5 lanes
+> paralelas, 6 fix rounds ao todo, review final da branch inteira limpa (zero
+> Critical). Gate completo verde: **2798 passed, 6 skipped, 201 deselected, 2
+> xfailed** (régua antiga: 2560 passed — dos +238 verdes a mais, ~48 são os testes
+> novos desta onda, `test_onda3_*.py`; o resto é drift da régua, escrita em 23/08
+> **antes** de a Onda 2 e o trabalho de medição do tenant fantasma entrarem na
+> `main` em 26/08). Os 16 achados estão marcados inline em
+> `docs/auditoria/achados-code-review-2026-08-25.md` com o commit que fechou cada
+> um. A automação **A12** do backlog (`docs/reconferencia-backlog-2026-08-23.md`)
+> fecha junto (Task 8, commits `0668989b`+`552e7699`). Ledger completo da execução
+> em `.superpowers/sdd/2026-08-25-onda-3-o-valor-para-de-duplicar/` (git-ignored;
+> será destruído — os commits são o registro).
+>
+> ⚠️ **Cinco achados novos, descobertos durante a própria execução da Onda 3 —
+> NÃO estavam na varredura de 25/08 e não têm task de correção ainda.** Registrados
+> em "Achados novos da execução da Onda 3 (27/08)", no fim de
+> `docs/auditoria/achados-code-review-2026-08-25.md`. O mais estrutural: o cânon
+> pai×filho recalcula `valor_total` mas nunca `saldo`, consistentemente, nas três
+> rotinas que sobrevivem ao pai compartilhado.
+>
+> ✅ **27/08 — item de deploy registrado.** A decisão D2 (gêmeos de reembolso
+> conscientes de estado) faz `saldo_final_projetado` **piorar** para todo tenant
+> com gêmeo de reembolso em aberto no próximo deploy — efeito pretendido, não
+> regressão. Nota em `docs/deploy-checklist-easypanel.md`, seção 8.
 
 ### 3a. Estoque que pode sair duas vezes
 

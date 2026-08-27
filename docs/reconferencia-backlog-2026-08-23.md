@@ -11,17 +11,25 @@
 > estritamente cronológico pós-rebase; confirmado com `060146ac`). As
 > conferências usaram `git log --date=short | awk '$2 >= "2026-08-04"'`.
 
+> ✅ **27/08 — a Onda 3 fechou o A12.** Reprocesso de folha passou a estornar
+> `FolhaPagamento`, `GestaoCustoPai`/`Filho` da folha e `LancamentoContabil` da
+> rodada anterior antes de recriar — o estorno preserva o pai compartilhado com
+> outras origens (RDO, transporte etc.), em vez de deixá-lo órfão. Commits
+> `0668989b`+`552e7699`. Marcado inline abaixo.
+
 ## A manchete
 
 Dos 25 itens "vivos" em 04/08: **9 foram entregues** pelo trabalho das últimas
 semanas (sem ninguém atualizar a lista), **7 estão parciais** (vários com
 recorte bem menor que o registrado) e **9 seguem exatamente como estavam**.
+(Atualização de 27/08: A12 saiu de ABERTO para ENTREGUE, fechado pela Onda 3 —
+ver tabela abaixo.)
 
 | Veredito hoje | Itens |
 |---|---|
-| ✅ **ENTREGUE** (9) | A02, A03, A05, A06, A07, A09, A10, A14, A19 |
+| ✅ **ENTREGUE** (10) | A02, A03, A05, A06, A07, A09, A10, A12, A14, A19 |
 | 🟡 **PARCIAL** (7) | A11, A13 (quase fechado), A15, A16, A18*, A22, A24* |
-| 🔴 **ABERTO** (9) | A01, A04*, A08, A12, A17, A20, A21, A23, A25* |
+| 🔴 **ABERTO** (8) | A01, A04*, A08, A17, A20, A21, A23, A25* |
 
 \* Travados por decisão humana ou credencial, não por falta de braço:
 **A04** (conta de débito da despesa geral — pergunta do contador),
@@ -45,7 +53,7 @@ a mão de obra continua ~28% subestimada até alguém decidir ligá-lo),
 | A09 | ABERTO → ✅ | `entrada_ja_lancada` guarda as 2 rotas de entrada manual (resta só bug em código morto sem chamador) |
 | A10 | MUDOU_DE_FORMA → ✅ | `/novo_ponto` reusa o registro do dia; perda de custo do turno partido resolvida, com testes |
 | A11 | PARCIAL → 🟡 menor | Chave cruzada unificada; falta só a guarda RDO×ponto no ramo horista |
-| A12 | ABERTO → ABERTO | Reprocesso de folha segue `delete()` puro, sem estorno |
+| A12 | ABERTO → ✅ ENTREGUE (27/08) | Reprocesso passa a estornar Folha/Pai-Filho/Lançamento antes de recriar (`0668989b`+`552e7699`, Onda 3) |
 | A13 | PARCIAL → 🟡 quase | Os 5 consumidores residuais corrigidos; falta a origem (decisão adiada) + edge de 3,2% |
 | A14 | PARCIAL → ✅ | 3º caminho de `handle_proposta_aprovada` semeia serviços e fecha lead; 27 testes |
 | A15 | PARCIAL → 🟡 | Portal ainda gera `MedicaoObra` paralela sem itens/recalculo |
@@ -62,11 +70,11 @@ a mão de obra continua ~28% subestimada até alguém decidir ligá-lo),
 
 ## A lista de trabalho real que sobra (sem decisões humanas)
 
-Em ordem de dor provável: **A12** (reprocesso de folha sem estorno — risco de
-custo duplicado), **A11** (guarda RDO×ponto no ramo horista), **A01**
-(transferências do extrato), **A15** (medição do portal paralela), **A17**
-(RDO carregando o tenant inteiro), **A08**, **A23**, **A20**, **A21**, **A22**
-(cauda), **A13/A16** (recortes finais).
+Em ordem de dor provável: ~~**A12** (reprocesso de folha sem estorno — risco de
+custo duplicado)~~ **fechado 27/08, Onda 3** — **A11** (guarda RDO×ponto no ramo
+horista), **A01** (transferências do extrato), **A15** (medição do portal
+paralela), **A17** (RDO carregando o tenant inteiro), **A08**, **A23**,
+**A20**, **A21**, **A22** (cauda), **A13/A16** (recortes finais).
 
 Decisões que destravam o resto: **A24** (um chamador liga rateio de encargos
 já pronto), **A04** (uma resposta do contador), **A25** (uma credencial),
@@ -509,7 +517,15 @@ decisão de negócio pura.
 
 ---
 
-### A12 — Reprocesso de folha estornar antes de recriar — **ABERTO → ABERTO (inalterado)**
+### A12 — Reprocesso de folha estornar antes de recriar — **ABERTO → ✅ ENTREGUE (27/08, Onda 3)**
+
+> ✅ **Fechado em 27/08** pela Task 8 da Onda 3 (`docs/superpowers/plans/2026-08-25-onda-3-o-valor-para-de-duplicar.md`),
+> commits `0668989b`+`552e7699`. `reprocessar_folha` passa a estornar
+> `FolhaPagamento`, `GestaoCustoPai`/`Filho` da folha e `LancamentoContabil`
+> **antes** de recriar — e o estorno preserva o pai compartilhado quando ele
+> também tem filhos de outra origem (RDO, transporte), em vez de apagá-lo com
+> o cascade. O relato abaixo é o estado ANTES da correção, mantido como
+> evidência histórica.
 
 **Evidência atual:** `folha_pagamento_views.py:141-153` — `reprocessar == 'true'`
 ainda faz só `FolhaPagamento.query.filter_by(...).delete()` + commit (linha ~148-152).
@@ -596,7 +612,7 @@ para só origem + o 3,2% de edge case sem linha — praticamente todo o recorte 
 | A09 | ABERTO → ENTREGUE | `entrada_ja_lancada` (admin_id+nota_fiscal+item_id) guarda as duas rotas de entrada manual, testado; só sobra bug de tenant em código morto (`processar_xml_nfe`, sem chamador). |
 | A10 | MUDOU_DE_FORMA (derrubado) → ENTREGUE | `/novo_ponto` passou a reusar o registro do dia (turno partido vira almoço) e a chave de custo perdeu `obra_id` + ganhou `order_by`, resolvendo a perda de custo que o cético achou; testes dedicados passam. |
 | A11 | PARCIAL → PARCIAL (recorte bem menor) | Chave cruzada `rdo_custo_diario`×`rdo_mao_obra` unificada e regressão do p1 corrigida; falta só a guarda cruzada RDO×ponto no ramo horista. |
-| A12 | ABERTO → ABERTO | Zero mudança: reprocesso de folha continua `delete()` puro, sem estornar Pai/Filho, evento ou lançamento contábil anteriores. |
+| A12 | ABERTO → ✅ ENTREGUE (27/08) | Reprocesso passa a estornar `FolhaPagamento`, `GestaoCustoPai`/`Filho` e `LancamentoContabil` da rodada anterior antes de recriar, preservando pai compartilhado com outras origens (Task 8 da Onda 3, `0668989b`+`552e7699`). |
 | A13 | PARCIAL → PARCIAL (quase fechado) | Os 5 consumidores residuais citados em 04/08 (notifications, catálogo, saldo, template, rateio) foram todos corrigidos com teste; só falta a origem (decisão adiada) e o edge case de 3,2% sem linha de custo. |
 
 ## Reconferência A14–A19 — 23/08/2026 (base: doc de 04/08/2026)

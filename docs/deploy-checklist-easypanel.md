@@ -203,6 +203,23 @@ DATABASE_URL='<url de producao>' python scripts/medir_tenant_fantasma.py
 - ⚠️ A medição de DEV **não substitui** esta: dev não tem as tabelas `reembolso`
   nem `custo_escritorio`, e o veredito de lá é "parcial, 288/384 pares".
 
+### 9. 🟡 `saldo_final_projetado` VAI PIORAR para tenant com gêmeo de reembolso em aberto — não é regressão
+
+A Onda 3 (D2, decisão de 26/08 no plano-mãe
+`docs/superpowers/plans/2026-08-25-fecho-dos-114-achados.md`) mudou a exclusão
+dos "gêmeos" de reembolso em `financeiro_service.py:619` de incondicional para
+**consciente de estado** (commits `5be4a5bd`+`0d244e48`,
+`docs/superpowers/plans/2026-08-27-gemeos-consciente-de-estado.md`). Antes, todo
+gêmeo saía de `saidas_previstas` mesmo com a outra perna do par ainda pendente —
+a obrigação evaporava da projeção de caixa. Agora ela só sai quando a outra
+perna realmente entra.
+
+No próximo deploy, todo tenant com gêmeo de reembolso em aberto vai ver o
+`saldo_final_projetado` **cair** — a obrigação que estava invisível volta a
+contar. **Isto é o efeito pretendido da correção, não uma regressão.** Merece
+nota de release para quem for explicar um número de caixa que mudou sem
+nenhuma transação nova.
+
 ## A ordem sugerida do próximo deploy
 
 0. 🔴 **`scripts/medir_tenant_fantasma.py` contra produção** (item 8). É a única

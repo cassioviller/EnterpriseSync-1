@@ -52,6 +52,29 @@
 >    o idioma existe e não foi aplicado nos demais.
 
 
+> **27/08 — a Onda 3 fechou os 16 achados de valor duplicado/evaporado.** Marcados
+> inline com o commit que fechou cada um: `quantidade_disponivel` do almoxarifado
+> passa a ser mantida por um ponto único (Tasks 1-3), a disciplina "contar filho,
+> nunca somar valor" do `GestaoCustoPai`×filhos chegou a reembolso e à migração de
+> contas a pagar (Tasks 4-5), o card e o detalhe do financeiro pararam de discordar
+> (Task 6), os gêmeos de reembolso ficaram conscientes de estado (D2/Task 3.6), a
+> ressalva de compra parou de zerar parcelas e o lote ganhou guarda de fechamento
+> (Task 7), a folha parou de dobrar no reprocesso — **a automação A12 fecha junto**
+> (Task 8), as quatro dobras de mão de obra da folha foram cortadas (Task 9), e o
+> ponto/RDO pararam de perder e de sobre-cobrar custo (Task 10). Executada em 27/08
+> via subagent-driven development em 5 lanes paralelas, 10/10 tasks + o mini-plano
+> D2, 6 rounds de correção, review final da branch inteira limpa (zero Critical).
+>
+> Gate ao fim da onda: **2798 passed, 6 skipped, 201 deselected, 2 xfailed** (régua
+> antiga: 2560 passed). Dos +238 verdes a mais, ~48 são os testes novos desta onda
+> (`test_onda3_*.py`); o resto é drift da régua — ela foi escrita em 23/08, **antes**
+> de a Onda 2 e o trabalho de medição do tenant fantasma entrarem na `main` em 26/08.
+>
+> ⚠️ **Cinco achados novos, descobertos durante a própria execução da Onda 3 — não
+> estavam na varredura de 25/08.** Registrados em
+> "Achados novos da execução da Onda 3 (27/08)", no fim deste documento.
+
+
 ## Placar
 
 | Módulo | 🔴 | 🟡 | ⚪ | Passada |
@@ -127,7 +150,7 @@ Kahn em `scripts/limpar_tenants_teste_dev.py`.
 
 ## 2. Financeiro e contabilidade — 10 🔴
 
-🔴 **`financeiro_service.py:619` — a obrigação não muda de lado, ela evapora.**
+🔴 **`financeiro_service.py:619` ✅ **CORRIGIDO** (Onda 3, D2/Task 3.6 — commits `5be4a5bd`+`0d244e48`) — a obrigação não muda de lado, ela evapora.**
 As exclusões de gêmeos (`_gemeos_compra` :619, `_gemeos_reembolso` :621) são
 incondicionais, mas `ContaPagar` **nunca** alimenta `saidas_previstas` em
 `calcular_fluxo_caixa`. Um pedido de R$ 100k ainda PENDENTE mostra
@@ -165,7 +188,7 @@ duplicada: uma partida de R$ 840 em ~300 tenants semeados vira R$ 252.000, com
 crédito de `valor_total`, disparando "Lançamento desbalanceado" sempre que o ICMS
 está embutido no preço — que é a norma brasileira.
 
-🔴 **`gestao_custos_views.py:1433` — a migração "idempotente" perde a corrida toda.**
+🔴 **`gestao_custos_views.py:1433` ✅ **CORRIGIDO** (Onda 3, Task 5 — commit `60ca071e`) — a migração "idempotente" perde a corrida toda.**
 Monta `GestaoCustoFilho` com `obra_id` possivelmente NULL e sem
 `centro_custo_id`, violando `ck_gestao_custo_filho_destino` (`models.py:7261`).
 `custos_escritorio_views._criar_conta_pagar` cria toda despesa de escritório sem
@@ -174,7 +197,7 @@ Monta `GestaoCustoFilho` com `obra_id` possivelmente NULL e sem
 migrado naquela execução se perde — num botão anunciado como *"ação segura e pode
 ser repetida"*.
 
-🔴 **`gestao_custos_views.py:1415` — o passivo encolhe sozinho.**
+🔴 **`gestao_custos_views.py:1415` ✅ **CORRIGIDO** (Onda 3, Task 5 — commit `60ca071e`) — o passivo encolhe sozinho.**
 O pai nasce com `valor_total=valor_original` e o único filho com `valor=saldo_cp`,
 e a query inclui de propósito contas PARCIAL onde os dois diferem. Um
 `ContaPagar(valor_original=1000, valor_pago=400, saldo=600)` dá um pai de 1000 com
@@ -190,7 +213,7 @@ ataque) — mas `novo()` e `editar()` (:1074) ficaram de fora. Um POST forjado g
 custo na obra de outro tenant, e `sincronizar_obra_do_pai` propaga para o pai,
 disparando `recalcular_obra` no snapshot orçado×real da vítima.
 
-🔴 **`services/financeiro_compra.py:433` — a ressalva D6 zera todas as parcelas.**
+🔴 **`services/financeiro_compra.py:433` ✅ **CORRIGIDO** (Onda 3, Task 7 — commits `1074e658`+`de18c64c`) — a ressalva D6 zera todas as parcelas.**
 `if total_aberto > 0 and atestado != total_aberto:` não tem guarda `atestado > 0`.
 O caminho da ressalva existe justamente para liberar uma conta com "sem atesto de
 recebimento" em aberto; quando é usado (alcançável de `compras_views.py:1580`),
@@ -219,11 +242,11 @@ validação de sinal nem de ordem de grandeza, e `FinanceiroService.baixar_pagam
 (`saldo_atual -= -100`), deixa `saldo = 1100`, mantém PENDENTE e mostra sucesso.
 Errar `10000` por `1000.00` debita R$ 10.000 contra dívida de R$ 1.000.
 `receber_conta` (:840) é idêntico.
-🟡 `services/financeiro_compra.py:420` — `liberar()` seleciona por
+🟡 `services/financeiro_compra.py:420` ✅ **CORRIGIDO** (Onda 3, Task 7 — commits `1074e658`+`de18c64c`) — `liberar()` seleciona por
 `pedido_compra_id` sem filtrar `fechamento_id`. Fechar um lote com a parcela 1 de
 3 libera as parcelas 2 e 3 — pagáveis sem nunca terem estado em lote fechado,
 porque `pagar_conta` só olha `situacao_liberacao` (`financeiro_views.py:506`).
-🟡 `services/financeiro_compra.py:566` — `reabrir_lote` volta o `status` para
+🟡 `services/financeiro_compra.py:566` ✅ **CORRIGIDO** (Onda 3, Task 7 — commits `1074e658`+`de18c64c`) — `reabrir_lote` volta o `status` para
 'ABERTO' mas não reverte a `situacao_liberacao` que `fechar_lote` pôs em
 'liberada'. Fecha, reabre, tira a conta do lote: ela fica pagável para sempre sem
 lote nenhum a autorizando.
@@ -231,7 +254,7 @@ lote nenhum a autorizando.
 `contabilizar_*` carrega por PK pelada, lançando sob o `admin_id` **do documento**.
 Tenant A cria centro de custo e lançamento no razão do tenant B. Só o achado 5
 impede a escrita de aterrissar hoje.
-🟡 `financeiro_service.py:752` — pai PARCIAL: `valor_pai` é o `saldo` restante mas
+🟡 `financeiro_service.py:752` ✅ **CORRIGIDO** (Onda 3, Task 6 — commit `dd96623d`) — pai PARCIAL: `valor_pai` é o `saldo` restante mas
 o laço de filhos manuais soma cada filho pelo `valor` cheio e descarta o `resto`
 negativo. Dois filhos de R$ 500 com R$ 600 pagos dão `saidas_previstas = 400` no
 card e R$ 1.000 de previsto no detalhe — os R$ 600 pagos contados duas vezes na
@@ -279,10 +302,10 @@ do formulário sem checagem de tenant nem de existência.
 `Funcionario.query.filter_by(email=...)` sem escopo e **cai num `return 10`
 hardcoded**.
 
-🟡 `views/rdo.py:2867` — o caminho unificado de edição apaga `RDOMaoObra` em bloco
+🟡 `views/rdo.py:2867` ✅ **CORRIGIDO** (Onda 3, Task 10 — commits `6be3b790`+`ed17ab7f`+`297ac8fe`+`d585a399`, fix rounds `02882e5d`+`cead7569`+`aa657b9f`) — o caminho unificado de edição apaga `RDOMaoObra` em bloco
 sem `remover_custos_rdo`/`remover_custo_diario_rdo`: o trabalhador removido segue
 sendo cobrado.
-🟡 `views/rdo.py:1888` — `reabrir_rdo` desfaz o percentual do cronograma mas deixa
+🟡 `views/rdo.py:1888` ✅ **CORRIGIDO** (Onda 3, Task 10 — commits `6be3b790`+`ed17ab7f`+`297ac8fe`+`d585a399`, fix rounds `02882e5d`+`cead7569`+`aa657b9f`) — `reabrir_rdo` desfaz o percentual do cronograma mas deixa
 o custo de mão de obra já lançado no razão enquanto o RDO está em `rascunho`.
 🟡 `views/rdo.py:4002` — `salvar_rdo_flexivel` ignora `rdo_id` e não tem guarda de
 obra+data: é o produtor dos RDOs duplicados na mesma data que os serviços de
@@ -290,7 +313,7 @@ exportação e atualização contornam.
 🟡 `views/rdo.py:3969` — a checagem de colisão de `numero_rdo` é escopada por
 `admin_id` embora a coluna seja `UNIQUE` global; uma linha com `admin_id` NULL
 causa `IntegrityError` em laço permanente.
-🟡 `services/custo_funcionario_dia.py:97` — para diaristas o `componente_folha` é
+🟡 `services/custo_funcionario_dia.py:97` ✅ **CORRIGIDO** (Onda 3, Task 9 — commits `a174e8b1`+`171043d7`+`9caa8ce9`+`0e78e1cb`+`e2e69035`) — para diaristas o `componente_folha` é
 rateado mas `custo_hora_normal` não, então a tela mostra o dobro do que foi
 efetivamente lançado.
 
@@ -370,7 +393,7 @@ de item único, em :1019, acerta). Mesmo `InvalidRequestError`, desta vez engoli
 pelo `except Exception` de :1381 → toda devolução de carrinho serializado devolve
 500 "Erro ao processar operação" sem mensagem útil.
 
-🔴 **`views/almoxarifado/movimentos.py:411` (e :455) — a "TRANSAÇÃO ATÔMICA" não é atômica.**
+🔴 **`views/almoxarifado/movimentos.py:411` (e :455) ✅ **CORRIGIDO** (Onda 3, Task 3 — commit `673e73a9`) — a "TRANSAÇÃO ATÔMICA" não é atômica.**
 `EventManager.emit('material_entrada', …)` roda **dentro** do laço, antes do
 `db.session.commit()` da rota (:467); o handler
 `criar_conta_pagar_entrada_material` chama `db.session.commit()`
@@ -379,7 +402,7 @@ item 3 chama `db.session.rollback()` e não desfaz nada — metade do carrinho f
 no estoque enquanto o chamador é informado de que a operação falhou. A rota de
 item único (:185, :236) emite **depois** do commit; esta divergiu.
 
-🔴 **`almoxarifado_utils.py:602` — a mesma unidade pode ser emitida duas vezes.**
+🔴 **`almoxarifado_utils.py:602` ✅ **CORRIGIDO** (Onda 3, Task 1 — commit `fda7d189`) — a mesma unidade pode ser emitida duas vezes.**
 `apply_movimento_manual`/`rollback_movimento_manual` mantêm só
 `estoque.quantidade`, nunca `quantidade_disponivel`/`quantidade_inicial`, enquanto
 a saída valida em `func.sum(quantidade_disponivel)` (`movimentos.py:597`). Quebra
@@ -388,13 +411,13 @@ NULL`, então a guarda de saída vê 0 e recusa; SAÍDA manual contra lote de co
 zera `quantidade` mas deixa `quantidade_disponivel` em 100 — **as mesmas unidades
 saem de novo.**
 
-🔴 **`views/almoxarifado/movimentos.py:1066` — material devolvido some do estoque.**
+🔴 **`views/almoxarifado/movimentos.py:1066` ✅ **CORRIGIDO** (Onda 3, Task 2 — commit `aeb41ca9`) — material devolvido some do estoque.**
 `processar_devolucao` (consumível) cria o lote de retorno só com `quantidade`.
 Mesma consequência do anterior: o devolvido é invisível para
 `sum(quantidade_disponivel)` e nunca mais pode ser emitido.
 `processar_devolucao_multipla:1330` tem a omissão idêntica.
 
-🔴 **`views/almoxarifado/movimentos.py:1045` — toda devolução vai para a obra 1.**
+🔴 **`views/almoxarifado/movimentos.py:1045` ✅ **CORRIGIDO** (Onda 3, Task 3 — commit `673e73a9`) — toda devolução vai para a obra 1.**
 `obra_id=estoque.obra_id or 1`, mas `estoque.obra_id = None` foi atribuído três
 linhas antes (:1031). A expressão é **sempre** `1`: todo movimento de devolução
 serializada é carimbado com a obra de id 1 — obra arbitrária, possivelmente de
@@ -421,7 +444,7 @@ pendente" — progresso parcial é dado real.
 de os laços já terem mutado `TarefaCronograma` na sessão. O chamador commita
 assim mesmo: falha no meio persiste escrita parcial reportando que nada foi
 aplicado.
-🟡 `views/almoxarifado/movimentos.py:857` — em `processar_saida_multipla`, a fase 2
+🟡 `views/almoxarifado/movimentos.py:857` ✅ **CORRIGIDO** (Onda 3, Task 3 — commit `673e73a9`) — em `processar_saida_multipla`, a fase 2
 re-consulta cada lote alocado e faz `continue` em silêncio quando ele não está mais
 `DISPONIVEL`. Duas alocações no mesmo `estoque_id` (ou saída concorrente entre a
 validação e o processamento) emitem menos que o pedido, e a resposta ainda é
@@ -582,24 +605,24 @@ usuário autenticado.
 `api_bater_ponto` repassa `funcionario_id`/`obra_id` do corpo do request sem
 checagem; o serviço cria `RegistroPonto` para o funcionário alheio **e devolve o
 nome dele**. `api_registrar_falta` tem o mesmo furo.
-🔴 **`ponto_views.py:1487` — o mês importado vale zero hora.** A importação Excel
+🔴 **`ponto_views.py:1487` ✅ **CORRIGIDO** (Onda 3, Task 10 — commits `6be3b790`+`ed17ab7f`+`297ac8fe`+`d585a399`, fix rounds `02882e5d`+`cead7569`+`aa657b9f`) — o mês importado vale zero hora.** A importação Excel
 nunca calcula `horas_trabalhadas`: o mês lido marca 0h, a folha cobra todo dia como
 falta cheia e nenhum custo de obra é gerado. O ramo de atualização ainda descarta
 `obra_id`/`tipo_registro`.
-🔴 **`folha_pagamento_views.py:148` — reprocessar dobra a folha.** `reprocessar`
+🔴 **`folha_pagamento_views.py:148` ✅ **CORRIGIDO** (Onda 3, Task 8 — commits `0668989b`+`552e7699` — esta é a automação A12) — reprocessar dobra a folha.** `reprocessar`
 apaga só `FolhaPagamento`; o `GestaoCustoPai`/`Filho` e o lançamento contábil da
 rodada anterior sobrevivem e são recriados — **a folha dobra no contas a pagar e no
 razão.**
 
-🟡 `services/folha_service.py:761` — atraso é descontado duas vezes: as horas
+🟡 `services/folha_service.py:761` ✅ **CORRIGIDO** (Onda 3, Task 9 — commits `a174e8b1`+`171043d7`+`9caa8ce9`+`0e78e1cb`+`e2e69035`) — atraso é descontado duas vezes: as horas
 faltantes já estão dentro de `horas_falta`, e `desconto_atrasos` cobra de novo.
-🟡 `services/folha_service.py:1444` — `processar_e_salvar_folha_obra` lança a folha
+🟡 `services/folha_service.py:1444` ✅ **CORRIGIDO** (Onda 3, Task 9 — commits `a174e8b1`+`171043d7`+`9caa8ce9`+`0e78e1cb`+`e2e69035`) — `processar_e_salvar_folha_obra` lança a folha
 **inteira do mês** contra *cada* obra trabalhada: o custo de mão de obra por obra e
 qualquer roll-up entre obras ficam inflados.
-🟡 `services/folha_service.py:1336` — a composição de custo usa `salario_bruto` (que
+🟡 `services/folha_service.py:1336` ✅ **CORRIGIDO** (Onda 3, Task 9 — commits `a174e8b1`+`171043d7`+`9caa8ce9`+`0e78e1cb`+`e2e69035`) — a composição de custo usa `salario_bruto` (que
 já inclui HE e DSR) como "Salário Base" e **soma HE 50/100 e DSR outra vez** como
 fatias separadas.
-🟡 `ponto_views.py:2446` — as duas rotas de ponto facial commitam sem chamar
+🟡 `ponto_views.py:2446` ✅ **CORRIGIDO** (Onda 3, Task 10 — commits `6be3b790`+`ed17ab7f`+`297ac8fe`+`d585a399`, fix rounds `02882e5d`+`cead7569`+`aa657b9f`) — as duas rotas de ponto facial commitam sem chamar
 `PontoService._calcular_horas`, então `horas_trabalhadas` fica 0.0;
 `/api/identificar-e-registrar` também nunca emite `ponto_registrado`, então nenhuma
 linha de custo é criada.
@@ -630,12 +653,12 @@ latitude/longitude: o controle é consultivo, não impositivo.
 
 ## 9. Frota, transporte, alimentação e reembolso — 3 🔴
 
-🔴 **`reembolso_views.py:330` — excluir um reembolso apaga os dos colegas.**
+🔴 **`reembolso_views.py:330` ✅ **CORRIGIDO** (Onda 3, Task 4 — commits `6d2d5423`+`c860d712`) — excluir um reembolso apaga os dos colegas.**
 Excluir apaga o `GestaoCustoPai` **compartilhado**; o cascade
 `all, delete-orphan` (`models.py:7203`) leva junto os filhos de **todos os outros
 reembolsos do mesmo funcionário**. É a armadilha que
 `transporte_views.py:565-579` documenta e evita.
-🔴 **`reembolso_views.py:293` — editar faz os irmãos evaporarem.** Sobrescreve
+🔴 **`reembolso_views.py:293` ✅ **CORRIGIDO** (Onda 3, Task 4 — commits `6d2d5423`+`c860d712`) — editar faz os irmãos evaporarem.** Sobrescreve
 `pai.valor_total` com o valor de um único reembolso (o pai é compartilhado) e nunca
 atualiza o `GestaoCustoFilho`: pai e filhos divergem.
 🔴 **`veiculos_services.py:16 ✅ **CORRIGIDO** (Onda 2, Task 6 — commit `af913fce`)7` — o veículo muda de tenant por POST.** `setattr`
@@ -715,3 +738,58 @@ mas, ao contrário do irmão `ObraContratoVersao.obra` criado no mesmo hunk, omi
 chama `congelar_base_medicoes_recebidas(obra, anterior)` antes de escrever, com os
 mesmos filtros e a mesma guarda `anterior <= 0`, e roda antes do ramo antecipado de
 `admin_id is None`. Sem regressão.
+
+---
+
+## Achados novos da execução da Onda 3 (27/08)
+
+> Nenhum destes estava na varredura de 25/08 — surgiram do próprio trabalho de
+> corrigir os 16 achados originais: um implementer que precisou entender a fundo
+> uma rotina viu a rachadura ao lado dela. Não têm task nem commit de correção
+> ainda; são insumo para a próxima rodada.
+
+1. **`transporte_views._limpar_gestao_custo_filho`, `reembolso_views` (excluir) e
+   `folha_service.estornar_folha_do_mes` — o cânon pai×filho recalcula
+   `valor_total` mas nunca `saldo`.** As três rotinas que a Onda 3 corrigiu ou
+   escreveu seguem, **consistentemente**, o mesmo padrão parcial: quando o
+   `GestaoCustoPai` sobrevive (porque ainda tem filho de outra origem), elas
+   atualizam `valor_total` a partir dos filhos remanescentes e não tocam `saldo`.
+   `financeiro_service.calcular_fluxo_caixa` lê `saldo` **primeiro**. Cenário
+   concreto: um reprocesso de folha cujo pai é compartilhado com um filho de RDO
+   deixa o pai sobrevivente com `saldo` fantasma da folha antiga somado ao pai
+   novo da rodada nova — resíduo de duplicação, ainda que menor que o problema
+   original. Correção futura: um helper compartilhado que, quando o pai
+   sobrevive e `saldo` não é NULL, faça `pai.saldo = valor_total -
+   (valor_pago or 0)`. (Achado da review final da branch, 27/08.)
+
+2. **`_gemeos_compra`, `financeiro_service.py` — a família 1 dos gêmeos tem a
+   MESMA evaporação que a D2 corrigiu na família 2.** A D2/Task 3.6 tornou
+   `_gemeos_reembolso` consciente de estado, mas `_gemeos_compra` continua
+   excluindo incondicionalmente: a obrigação some de `saidas_previstas` sem a
+   outra perna do par ter entrado em projeção nenhuma. Exige um join novo,
+   simétrico ao que a D2 já escreveu para reembolso. (Flagado pelo implementer
+   da D2, 27/08.)
+
+3. **`folha_service.py` (event_manager por funcionário) × view (agregado) — dupla
+   via de criação de `LancamentoContabil` da folha.** Um tenant com plano legado
+   e V2 ativos simultaneamente pode dobrar o razão na **primeira** rodada de
+   folha, porque as duas vias criam lançamento independentemente. Não é um
+   problema novo de reprocesso: o estorno da Task 8 já apaga as duas formas
+   simetricamente, então reprocessar não compõe mais o defeito — mas a primeira
+   rodada, nesses tenants, ainda pode dobrar. (Achado da Task 8, pré-existente à
+   Onda 3.)
+
+4. **`salvar_folha_processada` / `processar_e_salvar_folha_obra` — `FolhaProcessada`
+   não é escrita por nada em produção.** As correções das dobras 2 e 3 da Task 9
+   (o `salario_bruto` que duplica HE/DSR, e a folha inteira do mês lançada contra
+   cada obra) estão corretas — mas dormentes: as duas funções não têm chamador
+   fora de teste. Decisão do dono do repositório: ligar um chamador de produção,
+   ou marcar o módulo como dormente explicitamente. Se for ligado, `folha_service.
+   estornar_folha_do_mes` precisa crescer uma quarta tabela a estornar (apagar
+   também `FolhaProcessada`), senão o reprocesso reintroduz o store velho ao lado
+   do novo. (Review da Task 9 + review final da branch.)
+
+5. **`utils.calcular_custos_salariais_completos` — código morto e quebrado.**
+   `utils.py:315` usa `Funcionario` sem importar — todo chamador levanta
+   `NameError`. Zero chamadores de produção além do próprio re-export. Apagar.
+   (Descoberto no fix round da Task 10.)

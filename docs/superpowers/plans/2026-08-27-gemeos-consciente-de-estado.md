@@ -1,9 +1,12 @@
 # Os gêmeos saem da projeção só quando a outra perna entra (D2, saída a)
 
-> **Estado em 2026-08-27:** 🟡 ABERTO — 1 task. É a Task 3.6 da spec, destravada
-> pela decisão **D2 (26/08)** registrada em
-> `docs/superpowers/plans/2026-08-25-fecho-dos-114-achados.md`. Executa na lane B
-> da Onda 3 (mesmo arquivo da Task 6), **depois** dela e em commit separado.
+> **Estado em 2026-08-27:** ✅ **FECHADA 27/08.** Commits `5be4a5bd`+`0d244e48`. É a
+> Task 3.6 da spec, destravada pela decisão **D2 (26/08)** registrada em
+> `docs/superpowers/plans/2026-08-25-fecho-dos-114-achados.md`. Executou na lane B
+> da Onda 3 (mesmo arquivo da Task 6), depois dela e em commit separado. Efeito
+> visível: `saldo_final_projetado` **piora** para todo tenant com gêmeo de
+> reembolso em aberto — é o ponto da correção, registrado em
+> `docs/deploy-checklist-easypanel.md`, seção 8.
 
 **Goal:** `financeiro_service.py:619` exclui os "gêmeos" de reembolso de
 `saidas_previstas`, mas `ContaPagar` **nunca** alimenta essa soma — a obrigação
