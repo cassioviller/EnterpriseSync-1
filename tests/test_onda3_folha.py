@@ -524,3 +524,67 @@ def test_rateio_da_folha_nao_perde_o_centavo_do_arredondamento():
     assert sum(fatias.values()) == Decimal('100.00')
     assert fatias[3] == Decimal('66.67')
 
+
+# ---------------------------------------------------------------------------
+# Task 9 / dobra 4 — o R$/h do diarista bate com o que foi lançado
+# ---------------------------------------------------------------------------
+
+def test_custo_hora_do_diarista_bate_com_a_diaria_rateada():
+    """🔴 dobra 4 — `services/custo_funcionario_dia.py:calcular_custo_funcionario_no_rdo`.
+
+    Diarista que aparece em dois RDOs do mesmo dia tem a diária RATEADA entre
+    eles (`componente_folha = valor_diaria * proporção`), mas o
+    `custo_hora_normal` gravado era `valor_diaria / horas_no_rdo` — a diária
+    CHEIA sobre as horas de um RDO só. A tela do RDO multiplica horas por
+    esse R$/h e mostrava o dobro do que foi lançado.
+    """
+    from models import RDO, RDOCustoDiario, RDOMaoObra
+    from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+
+    valor_diaria = 200.0
+    data_rdo = date(ANO_REF, MES_REF, 10)
+
+    with app.app_context():
+        t = um_tenant('onda3_diarista', com_fatos=False,
+                      tipo_remuneracao='diaria', valor_diaria=valor_diaria)
+        admin_id = t.admin_id
+        obra_b = _segunda_obra(admin_id, t.cliente_id, t.marca)
+
+        rdos = []
+        for sufixo, obra_id in (('A', t.obra_id), ('B', obra_b)):
+            rdo = RDO(numero_rdo=f'R{t.marca[-8:]}{sufixo}', obra_id=obra_id,
+                      data_relatorio=data_rdo, admin_id=admin_id,
+                      status='Finalizado', criado_por_id=admin_id)
+            db.session.add(rdo)
+            db.session.flush()
+            db.session.add(RDOMaoObra(
+                rdo_id=rdo.id, funcionario_id=t.funcionario_id,
+                funcao_exercida='Pedreiro', horas_trabalhadas=4.0,
+                admin_id=admin_id))
+            rdos.append(rdo)
+        db.session.commit()
+
+        for rdo in rdos:
+            gravar_custo_funcionario_rdo(rdo, admin_id)
+
+        linhas = RDOCustoDiario.query.filter_by(
+            admin_id=admin_id, funcionario_id=t.funcionario_id,
+            data=data_rdo, tipo_lancamento='rdo').all()
+
+        assert len(linhas) == 2, (
+            f'pré-condição: um lançamento por RDO do dia, veio {len(linhas)}')
+
+        # Pré-condição: a diária foi mesmo rateada — metade em cada RDO.
+        for linha in linhas:
+            assert float(linha.componente_folha) == pytest.approx(
+                valor_diaria / 2, abs=0.01), (
+                'pré-condição: a diária precisa estar rateada entre os RDOs')
+
+        for linha in linhas:
+            lancado = Decimal(str(linha.componente_folha))
+            exibido = (Decimal(str(linha.horas_normais))
+                       * Decimal(str(linha.custo_hora_normal)))
+            assert exibido == pytest.approx(lancado, abs=Decimal('0.01')), (
+                f'a tela mostra {exibido:.2f} para um lançamento de '
+                f'{lancado:.2f} (R$/h={linha.custo_hora_normal} '
+                f'x {linha.horas_normais}h)')

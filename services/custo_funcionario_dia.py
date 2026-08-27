@@ -96,9 +96,15 @@ def calcular_custo_funcionario_no_rdo(
         valor_diaria = float(getattr(funcionario, 'valor_diaria', 0) or 0)
         folha = Decimal(str(round(valor_diaria * proporcao, 2)))
         resultado['componente_folha'] = folha
-        if valor_diaria > 0 and horas_no_rdo > 0:
+        # Onda 3 / Task 9 — dobra 4: o R$/h sai da diária JÁ RATEADA.
+        # Era `valor_diaria / horas_no_rdo`: a diária CHEIA sobre as horas de
+        # um RDO só. Quem aparecia em dois RDOs do mesmo dia tinha metade da
+        # diária lançada em cada um e a tela do RDO, que multiplica horas por
+        # este R$/h, mostrava o dobro do lançado. Com um RDO só (proporção 1)
+        # o valor é o mesmo de antes.
+        if folha > 0 and horas_no_rdo > 0:
             resultado['custo_hora_normal'] = Decimal(
-                str(round(valor_diaria / horas_no_rdo, 4))
+                str(round(float(folha) / horas_no_rdo, 4))
             )
     else:
         du = dias_uteis_mes(data_ref.year, data_ref.month)
