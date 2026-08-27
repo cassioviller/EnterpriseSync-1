@@ -424,21 +424,37 @@ def liberar(pedido, *, usuario=None, justificativa=None, fechamento_id=None):
                 f'perguntar.')
         ressalva = texto
 
-    filtros = dict(pedido_compra_id=pedido.id, admin_id=pedido.admin_id)
+    # `todas_abertas` é sempre o pedido INTEIRO — `fechamento_id` só decide o
+    # que é LIBERADO nesta chamada (`liberar_agora`), nunca o que entra no
+    # cálculo do rateio. Comparar o atestado do pedido inteiro contra o
+    # aberto só do lote infla o valor da parcela liberada pelo que falta
+    # cobrir das parcelas que ainda não entraram em lote nenhum: um lote com
+    # a parcela 1 de 3 (R$1000 de R$3000) veria `total_aberto == 1000` e
+    # reescreveria a parcela 1 para o atestado do PEDIDO INTEIRO. É o mesmo
+    # defeito de fundo que a guarda `atestado > 0` corrige (rateio comparando
+    # grandezas de escopos diferentes), só que na direção de inflar em vez de
+    # zerar.
+    todas = ContaPagar.query.filter_by(
+        pedido_compra_id=pedido.id, admin_id=pedido.admin_id).order_by(
+            ContaPagar.parcela_numero).all()
+    todas_abertas = [c for c in todas if (c.status or '').upper() not in ('PAGO',)]
+    if not todas_abertas:
+        return []
+
     if fechamento_id is not None:
-        filtros['fechamento_id'] = fechamento_id
-    contas = ContaPagar.query.filter_by(**filtros).order_by(
-        ContaPagar.parcela_numero).all()
-    abertas = [c for c in contas if (c.status or '').upper() not in ('PAGO',)]
-    if not abertas:
+        liberar_agora = [c for c in todas_abertas if c.fechamento_id == fechamento_id]
+    else:
+        liberar_agora = todas_abertas
+    if not liberar_agora:
         return []
 
     atestado = _d(valor_atestado(pedido))
-    total_aberto = sum(_d(c.valor_original) for c in abertas)
+    total_aberto = sum(_d(c.valor_original) for c in todas_abertas)
     diferenca, pct, dentro = divergencia_nota_atestado(pedido)
+    ultima_do_pedido = todas_abertas[-1]
 
     agora = datetime.utcnow()
-    for idx, cp in enumerate(abertas, start=1):
+    for cp in liberar_agora:
         # `atestado > 0` é a guarda que faltava. O rateio existe para pagar o
         # que foi atestado em vez do que foi pedido — mas a ressalva D6 libera
         # JUSTAMENTE sem atesto, e aí `atestado` é 0: sem esta guarda, toda
@@ -448,8 +464,9 @@ def liberar(pedido, *, usuario=None, justificativa=None, fechamento_id=None):
         if atestado > 0 and total_aberto > 0 and atestado != total_aberto:
             proporcao = _d(cp.valor_original) / total_aberto
             novo = (atestado * proporcao).quantize(_d('0.01'))
-            if idx == len(abertas):   # a última absorve o arredondamento
-                novo = atestado - sum(_d(c.valor_original) for c in abertas[:-1])
+            if cp is ultima_do_pedido:   # a última absorve o arredondamento
+                novo = atestado - sum(_d(c.valor_original)
+                                      for c in todas_abertas[:-1])
             anterior = _d(cp.valor_original)
             cp.valor_original = novo
             cp.saldo = novo - _d(cp.valor_pago)
@@ -471,7 +488,7 @@ def liberar(pedido, *, usuario=None, justificativa=None, fechamento_id=None):
             cp.liberacao_justificativa = ressalva
 
     db.session.flush()
-    return abertas
+    return liberar_agora
 
 
 class SegregacaoViolada(ErroFinanceiroCompra):

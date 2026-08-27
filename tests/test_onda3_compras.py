@@ -179,6 +179,11 @@ def test_fechar_lote_nao_libera_parcelas_fora_dele():
     """🔴 `services/financeiro_compra.py:420` — `liberar()` seleciona por
     `pedido_compra_id` sem filtrar `fechamento_id`. Fechar um lote com a
     parcela 1 de 3 liberava as 2 e 3, que nunca estiveram em lote fechado.
+
+    Também cobre a regressão apontada na revisão: escopar a SELEÇÃO por
+    `fechamento_id` sem escopar o RATEIO junto infla o valor da parcela
+    liberada — `total_aberto` ficava só o do lote (R$1000) contra o
+    `atestado` do PEDIDO INTEIRO (R$3000), e a parcela 1 virava R$3000.
     """
     from models import ContaPagar
     from services.financeiro_compra import criar_obrigacao, fechar_lote
@@ -216,6 +221,21 @@ def test_fechar_lote_nao_libera_parcelas_fora_dele():
             'a parcela 2 nunca esteve num lote fechado e foi liberada junto')
         assert p3.situacao_liberacao == 'bloqueada', (
             'a parcela 3 nunca esteve num lote fechado e foi liberada junto')
+
+        # o atestado (R$3000) bate com o aberto do PEDIDO INTEIRO (R$3000),
+        # então o rateio não tem por que mexer em nada — se o cálculo comparar
+        # o atestado do pedido contra o aberto só do LOTE (R$1000, só a
+        # parcela 1), a divergência é de escopo, não de valor real, e infla a
+        # parcela liberada para o atestado inteiro.
+        assert p1.valor_original == Decimal('1000.00'), (
+            f'a parcela 1 (R$1000 de R$3000) virou {p1.valor_original} ao '
+            'fechar um lote parcial — o rateio comparou o atestado do pedido '
+            'inteiro contra o aberto só do lote')
+        assert p1.saldo == Decimal('1000.00'), (
+            f'saldo da parcela 1 virou {p1.saldo} — mesma inflação, no saldo')
+        # parcelas fora do lote não são tocadas nem pelo rateio
+        assert p2.valor_original == Decimal('1000.00')
+        assert p3.valor_original == Decimal('1000.00')
 
 
 # ---------------------------------------------------------------------------
