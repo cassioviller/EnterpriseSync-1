@@ -1502,15 +1502,35 @@ def processar_importacao():
             ).first()
             
             if registro_existente:
-                # Atualizar registro existente
-                registro_existente.hora_entrada = registro['hora_entrada']
-                registro_existente.hora_saida = registro['hora_saida']
-                registro_existente.hora_almoco_saida = registro['hora_almoco_saida']
-                registro_existente.hora_almoco_retorno = registro['hora_almoco_retorno']
+                # Atualizar registro existente.
+                #
+                # `.get()` e não `[...]`: as linhas de falta/folga chegam SEM
+                # nenhuma chave de horário (`services/ponto_importacao.py:604`),
+                # e o acesso direto derrubava a importação inteira no
+                # `except` da rota — planilha com um único dia de atestado
+                # perdia o mês todo.
+                registro_existente.hora_entrada = registro.get('hora_entrada')
+                registro_existente.hora_saida = registro.get('hora_saida')
+                registro_existente.hora_almoco_saida = registro.get('hora_almoco_saida')
+                registro_existente.hora_almoco_retorno = registro.get('hora_almoco_retorno')
+                # O tipo declarado na planilha é o que a reimportação quer
+                # dizer — sem ele o dia corrigido para 'ATESTADO' continuava
+                # 'trabalhado'. A obra só entra quando a planilha informou:
+                # célula vazia é "não mexe", e apagar a obra do registro
+                # deixaria o dia sem custo de obra.
+                if registro.get('tipo_registro'):
+                    registro_existente.tipo_registro = registro['tipo_registro']
+                if registro.get('obra_id'):
+                    registro_existente.obra_id = registro['obra_id']
+                # A hora não se calculava em ramo nenhum: o mês importado
+                # marcava 0h, a folha cobrava todo dia como falta cheia e
+                # nenhum custo de obra saía.
+                PontoService._calcular_horas(registro_existente)
                 total_atualizados += 1
             else:
                 # Criar novo registro
                 novo_registro = RegistroPonto(**registro)
+                PontoService._calcular_horas(novo_registro)
                 db.session.add(novo_registro)
                 novos_registros_import.append((novo_registro, registro['funcionario_id']))
                 total_importados += 1
