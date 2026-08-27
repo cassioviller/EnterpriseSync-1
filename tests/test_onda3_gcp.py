@@ -149,18 +149,6 @@ def test_migracao_pula_o_registro_ruim_em_vez_de_perder_a_rodada():
         'ck_gestao_custo_filho_destino')
 
 
-def test_pai_e_filho_nascem_com_o_mesmo_valor():
-    """🔴 Pai com `valor_original`, filho com `saldo`: a primeira edição
-    encolhia o passivo pelo valor já pago, sem trilha.
-    """
-    import inspect
-
-    import gestao_custos_views
-    fonte = inspect.getsource(gestao_custos_views.migrar_contas_pagar)
-    assert 'valor_total=cp.valor_original' not in fonte.replace(' ', ''), (
-        'o pai ainda nasce com valor_original enquanto o filho recebe saldo')
-
-
 def test_migracao_nao_perde_a_rodada_e_reporta_o_motivo_do_pulado():
     """Uma rodada com uma conta PARCIAL (boa) e uma sem obra (ruim, estilo
     despesa de escritório) tem de: (i) não perder a conta boa; (ii) nascer

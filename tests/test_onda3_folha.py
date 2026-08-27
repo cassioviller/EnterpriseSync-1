@@ -554,6 +554,37 @@ def test_rateio_da_folha_nao_perde_o_centavo_do_arredondamento():
     assert fatias[3] == Decimal('66.67')
 
 
+def test_folha_de_obra_unica_recebe_cem_por_cento_do_custo_do_mes():
+    """Pin: quem apontou horas em UMA única obra no mês não pode ficar com
+    uma fatia rateada — o peso da única obra concorrente é 100%.
+    """
+    from models import FolhaProcessada, Funcionario
+    from services.folha_service import (processar_e_salvar_folha_obra,
+                                        processar_folha_funcionario)
+
+    with app.app_context():
+        t = um_tenant('onda3_obra_unica', com_fatos=False)
+        admin_id, obra_id = t.admin_id, t.obra_id
+        _seed_parametros_legais(admin_id)
+        _seed_horario_trabalho(admin_id, t.funcionario_id, t.marca)
+        _seed_ponto_mes_completo(admin_id, t.funcionario_id, obra_id)
+
+        funcionario = Funcionario.query.filter_by(
+            id=t.funcionario_id, admin_id=admin_id).first()
+        do_mes = processar_folha_funcionario(funcionario, ANO_REF, MES_REF)
+        assert do_mes is not None, 'pré-condição: a folha precisa processar'
+
+        processar_e_salvar_folha_obra(obra_id, ANO_REF, MES_REF, admin_id)
+
+        folha = FolhaProcessada.query.filter_by(
+            admin_id=admin_id, ano=ANO_REF, mes=MES_REF, obra_id=obra_id).first()
+        assert folha is not None, 'a única obra trabalhada ficou sem folha'
+        assert Decimal(str(folha.custo_total_empresa)) == Decimal(
+            str(do_mes['custo_total_empresa'])).quantize(Decimal('0.01')), (
+            f'obra única recebeu {folha.custo_total_empresa} de '
+            f'{do_mes["custo_total_empresa"]} do mês — devia ser 100%')
+
+
 # ---------------------------------------------------------------------------
 # Task 9 / dobra 4 — o R$/h do diarista bate com o que foi lançado
 # ---------------------------------------------------------------------------
