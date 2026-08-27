@@ -619,13 +619,34 @@ class FinanceiroService:
             # R$ 490.950, 24% do valor aberto.
             #
             # A pergunta que a subquery responde agora é "a outra perna JÁ
-            # entra na projeção?". Ela entra por UM caminho só: a baixa
-            # (`pagar_conta` acima, `:124` e `:134`) debita `banco.saldo_atual`, e
-            # `banco.saldo_atual` é o `saldo_inicial` deste fluxo. Logo só a
-            # gêmea BAIXADA (status 'PAGO', o que a baixa escreve quando o
-            # saldo zera) justifica tirar o Pai das previstas — aí sim manter
-            # a prevista subtrairia a mesma despesa duas vezes, que é a dupla
+            # entra na projeção?", e o marcador que o sistema TEM para
+            # respondê-la é o `status`: `baixar_pagamento` acima (`:118-126`)
+            # escreve 'PAGO' quando o saldo zera. Quando a baixa passa por
+            # banco (`:130-140`), ela debita `banco.saldo_atual` — e
+            # `banco.saldo_atual` é o `saldo_inicial` deste fluxo (`:554`).
+            # Aí a obrigação está de fato contada de novo, e manter a prevista
+            # do Pai subtrairia a mesma despesa duas vezes: é a dupla
             # subtração que a B6.2 fechou e que continua fechada.
+            #
+            # ⚠️ RESÍDUO DECLARADO — a baixa SEM banco. O `status` e o débito
+            # bancário não são equivalentes: 'PAGO' é escrito
+            # incondicionalmente, mas o débito só roda `if banco_id`, e a rota
+            # deixa o banco OPCIONAL (`financeiro_views.py:520`:
+            # `request.form.get('banco_id', type=int) or None`; `:328`
+            # documenta `banco_id` NULL = baixa sem banco OU conta
+            # pré-migração-280). Nessa fatia o gêmeo sai das previstas sem que
+            # nada tenha entrado no `saldo_inicial` — a evaporação sobrevive
+            # ali, e está escrito aqui em vez de escondido.
+            #
+            # Por que o predicado NÃO foi apertado com `banco_id.isnot(None)`:
+            # conta pré-migração-280 genuinamente paga tem `banco_id` NULL por
+            # nascimento (a coluna não existia; é a mesma forma do import,
+            # `importacao_excel.py:2414-2430`), e apertar re-projetaria
+            # obrigação que já foi quitada de verdade — trocaria este resíduo
+            # por um erro maior e no sentido oposto. Além disso a baixa sem
+            # banco é o operador registrando pagamento explicitamente: tratá-la
+            # como paga é o que corresponde à intenção dele. Fechar esta fatia
+            # exige um marcador de que o dinheiro saiu, e não existe um hoje.
             #
             # PARCIAL fica FORA da exclusão de propósito: só parte do dinheiro
             # saiu do banco, e o resto da obrigação não está projetado em

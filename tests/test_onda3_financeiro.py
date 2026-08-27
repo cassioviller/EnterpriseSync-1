@@ -160,16 +160,24 @@ def test_pai_com_saldo_maior_que_os_filhos_mantem_a_linha_de_resto():
 # "a outra perna JÁ entra na projeção?": ela entra pela baixa da CP, que debita
 # `banco.saldo_atual` — o `saldo_inicial` deste mesmo fluxo. CP PENDENTE não
 # entra em lugar nenhum, e a obrigação tem de continuar projetada.
+#
+# ⚠️ O marcador que o sistema tem é o `status`, e ele NÃO é equivalente ao
+# débito bancário: `baixar_pagamento` escreve 'PAGO' sempre, e só debita banco
+# `if banco_id` (a rota deixa o banco opcional). O resíduo da baixa sem banco
+# está declarado no comentário do service; o teste de fixação no fim do arquivo
+# é o que prende o caminho COMPLETO — baixa real, banco real, as duas pernas.
 
 
 def _par_gemeo_reembolso(admin_id, obra_id, valor, status_cp):
-    """GCP PENDENTE + a `ContaPagar` gêmea, no estado pedido.
+    """GCP PENDENTE + a `ContaPagar` gêmea no estado pedido — devolve os dois.
 
     Espelha a montagem de `tests/test_b6_familia2_reembolso_import.py`: o
     `origem_tipo` vai MINÚSCULO como o import grava, e o filho nasce sem
     `origem_tabela` (é o que o torna invisível à exclusão da família 1).
     `valor_pago`/`saldo`/`data_pagamento` da CP acompanham o status porque é o
-    que `FinanceiroService.pagar_conta` escreve na baixa.
+    que `FinanceiroService.baixar_pagamento` escreve na baixa — quem quer a
+    baixa DE VERDADE monta o par PENDENTE e chama o service (ver o teste de
+    fixação abaixo).
     """
     valor = Decimal(str(valor))
     pago = valor if status_cp == 'PAGO' else Decimal('0')
@@ -185,15 +193,16 @@ def _par_gemeo_reembolso(admin_id, obra_id, valor, status_cp):
         pai_id=pai.id, admin_id=admin_id, obra_id=obra_id,
         descricao='reembolso', valor=valor, data_referencia=HOJE,
         origem_tabela=None, origem_id=None))
-    db.session.add(ContaPagar(
+    cp = ContaPagar(
         descricao=f'CP gemea {pai.entidade_nome}', valor_original=valor,
         valor_pago=pago, saldo=valor - pago, data_emissao=HOJE,
         data_vencimento=HOJE + timedelta(days=10),
         data_pagamento=(HOJE if status_cp == 'PAGO' else None),
         status=status_cp, origem_tipo='gestao_custo_pai', origem_id=pai.id,
-        obra_id=obra_id, admin_id=admin_id))
+        obra_id=obra_id, admin_id=admin_id)
+    db.session.add(cp)
     db.session.commit()
-    return pai
+    return pai, cp
 
 
 def _linhas_previstas(fluxo, marca):
@@ -212,7 +221,7 @@ def test_gemeo_com_conta_pagar_pendente_continua_previsto():
     """
     with app.app_context():
         t = um_tenant('onda3_gemeo_pend', com_fatos=False)
-        pai = _par_gemeo_reembolso(t.admin_id, t.obra_id, 1000, 'PENDENTE')
+        pai, _ = _par_gemeo_reembolso(t.admin_id, t.obra_id, 1000, 'PENDENTE')
 
         fluxo = FinanceiroService.calcular_fluxo_caixa(
             t.admin_id, HOJE, JANELA_FIM)
@@ -232,7 +241,7 @@ def test_gemeo_com_conta_pagar_paga_sai_das_previstas():
     `saldo_final_projetado` — é a exclusão que a B6.2 criou, e ela fica."""
     with app.app_context():
         t = um_tenant('onda3_gemeo_pago', com_fatos=False)
-        pai = _par_gemeo_reembolso(t.admin_id, t.obra_id, 700, 'PAGO')
+        pai, _ = _par_gemeo_reembolso(t.admin_id, t.obra_id, 700, 'PAGO')
 
         fluxo = FinanceiroService.calcular_fluxo_caixa(
             t.admin_id, HOJE, JANELA_FIM)
@@ -272,3 +281,65 @@ def test_gemeo_com_conta_pagar_paga_de_outro_tenant_continua_previsto():
         assert fluxo['saidas_previstas'] == pytest.approx(500.0)
         assert _linhas_previstas(fluxo, pai.entidade_nome), (
             'GCP excluido por CP PAGA de OUTRO tenant — misjoin')
+
+
+def test_baixa_real_com_banco_move_a_obrigacao_de_lado_sem_mudar_o_projetado():
+    """Teste de FIXAÇÃO do caminho completo — dirige a baixa DE VERDADE.
+
+    Os outros casos deste bloco escrevem `status`/`valor_pago` à mão, e por
+    isso não veem a outra metade da correção: que o mesmo evento que tira o
+    gêmeo das previstas é o que debita o banco. Aqui quem paga é
+    `FinanceiroService.baixar_pagamento` com um `banco_id` real, e as DUAS
+    pernas são afirmadas — a que sai (`saidas_previstas`) e a que entra
+    (`banco.saldo_atual`, que vira o `saldo_inicial` do fluxo).
+
+    ⚠️ Não nasce vermelho: o comportamento já funciona depois da correção da
+    D2. Ele existe para PRENDER o par — quebrar qualquer uma das pernas
+    (a exclusão parar de olhar o estado, ou a baixa parar de debitar o banco)
+    derruba este teste.
+
+    O oráculo forte é a última asserção: o `saldo_final_projetado` NÃO muda
+    com a baixa. A obrigação muda de lado — sai das previstas e entra no saldo
+    do banco — em vez de evaporar (que baixaria o previsto sem baixar o saldo)
+    ou de ser contada duas vezes (que baixaria os dois).
+    """
+    with app.app_context():
+        t = um_tenant('onda3_gemeo_baixa', com_fatos=False)
+        banco = FinanceiroService.criar_banco(
+            t.admin_id, 'Banco D2', '0001', f'CC-{uuid.uuid4().hex[:6]}',
+            'CORRENTE', saldo_inicial=Decimal('5000'))
+        pai, cp = _par_gemeo_reembolso(t.admin_id, t.obra_id, 700, 'PENDENTE')
+
+        antes = FinanceiroService.calcular_fluxo_caixa(
+            t.admin_id, HOJE, JANELA_FIM)
+        assert antes['saldo_inicial'] == pytest.approx(5000.0)
+        assert antes['saidas_previstas'] == pytest.approx(700.0)
+        assert _linhas_previstas(antes, pai.entidade_nome)
+
+        FinanceiroService.baixar_pagamento(
+            cp.id, t.admin_id, Decimal('700'), HOJE, 'PIX',
+            banco_id=banco.id)
+
+        # Perna 1 — o dinheiro saiu do banco, e o banco É o saldo_inicial.
+        assert float(banco.saldo_atual) == pytest.approx(4300.0), (
+            f'banco.saldo_atual={banco.saldo_atual}: a baixa real nao debitou '
+            f'o banco — sem isso a obrigacao nao entrou em projecao nenhuma')
+
+        depois = FinanceiroService.calcular_fluxo_caixa(
+            t.admin_id, HOJE, JANELA_FIM)
+        assert depois['saldo_inicial'] == pytest.approx(4300.0)
+
+        # Perna 2 — e por isso, e so por isso, o gemeo sai das previstas.
+        assert depois['saidas_previstas'] == pytest.approx(0.0), (
+            f"saidas_previstas={depois['saidas_previstas']}: a gemea foi "
+            f'baixada pelo banco e a prevista do Pai continua — a mesma '
+            f'despesa subtraida duas vezes do saldo projetado')
+        assert not _linhas_previstas(depois, pai.entidade_nome)
+
+        # As duas pernas juntas: a obrigacao MUDOU DE LADO, nao evaporou nem
+        # foi contada duas vezes.
+        assert depois['saldo_final_projetado'] == pytest.approx(
+            antes['saldo_final_projetado']), (
+            f"saldo_final_projetado foi de {antes['saldo_final_projetado']} "
+            f"para {depois['saldo_final_projetado']}: a baixa mexeu em uma "
+            f'perna so')
