@@ -449,17 +449,51 @@ def test_toggle_reverso_nao_apaga_progresso_parcial():
 def test_falha_no_meio_das_entregas_nao_deixa_escrita_parcial():
     """🔴 `entregas_terceiros.py:357` — o `except` devolvia `(0, 0)` DEPOIS
     de os laços já terem mutado `TarefaCronograma` na sessão, e o chamador
-    commitava: escrita parcial reportando que nada foi aplicado."""
-    import inspect
+    commitava: escrita parcial reportando que nada foi aplicado.
 
-    from services import entregas_terceiros
-    fonte = inspect.getsource(entregas_terceiros.aplicar_entregas_no_rdo)
-    posicao_except = fonte.rfind('except Exception')
-    assert posicao_except > 0
-    corpo_except = fonte[posicao_except:]
-    assert 'rollback' in corpo_except, (
-        'o except devolve (0, 0) sem desfazer o que os laços já mutaram — '
-        'o chamador commita escrita parcial reportada como nada')
+    ⚠️ **Reescrito no fix round de 28/08.** A versão original procurava a
+    palavra `rollback` no texto do `except` com `inspect.getsource()`. Passava
+    verde sobre um `db.session.rollback()` que era da sessão INTEIRA e apagava
+    a transação do chamador — o defeito que o code review encontrou depois do
+    gate verde. Um teste que lê o código não vê o que o código faz: agora a
+    afirmação é olhada no banco. A cobertura do descarte da transação do
+    chamador está em
+    `tests/test_onda5_fix_round_edicao_e_rollback.py`.
+    """
+    from datetime import date
+    from types import SimpleNamespace
+
+    from test_cronograma_versao_service import _ambiente
+
+    from models import TarefaCronograma
+    from services.entregas_terceiros import aplicar_entregas_no_rdo
+
+    with app.app_context():
+        admin, obra = _ambiente()
+        alvo = TarefaCronograma(
+            obra_id=obra.id, admin_id=admin.id,
+            nome_tarefa=f'Sub {uuid.uuid4().hex[:6]}', ordem=0,
+            responsavel='terceiros', duracao_dias=5,
+            percentual_concluido=0.0)
+        db.session.add(alvo)
+        db.session.commit()
+        alvo_id = alvo.id
+
+        # `rdo` sem `obra_id`: o laço quebra DEPOIS de já ter marcado a
+        # tarefa como entregue na sessão.
+        rdo_quebrado = SimpleNamespace(data_relatorio=date(2026, 8, 20))
+        qtd, revertidas = aplicar_entregas_no_rdo(
+            rdo_quebrado, {'entrega_tarefa_ids[]': [str(alvo_id)]},
+            admin_id=admin.id)
+        assert (qtd, revertidas) == (0, 0)
+
+        db.session.commit()  # o chamador commita, como sempre faz
+
+        depois = db.session.get(TarefaCronograma, alvo_id)
+        assert float(depois.percentual_concluido) == 0.0, (
+            'a mutação parcial dos laços foi commitada pelo chamador, com a '
+            'função reportando (0, 0) — "nada aplicado"')
+        assert depois.data_entrega_real is None
 
 
 def test_regressao_real_depois_de_superexecucao_e_barrada():

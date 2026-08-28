@@ -4047,9 +4047,16 @@ def salvar_rdo_flexivel():
         _rdo_alvo = None
         _rdo_id_form = (request.form.get('rdo_id') or '').strip()
         if _rdo_id_form.isdigit():
-            _rdo_alvo = RDO.query.filter_by(
-                id=int(_rdo_id_form), obra_id=obra_id,
-                admin_id=admin_id).first()
+            # O tenant se resolve pela OBRA, não por `RDO.admin_id`: a coluna
+            # é `nullable=True` (`models.py:1212`) e as linhas pré-tenant têm
+            # NULL. Com `filter_by(admin_id=...)` um RDO legado devolvia
+            # `None`, caía no ramo de criação e produzia exatamente a
+            # duplicata que esta correção existe para impedir. Mesmo join de
+            # `rdo_salvar_unificado` (`:2891`), que existe pelo mesmo motivo.
+            _rdo_alvo = RDO.query.join(Obra).filter(
+                RDO.id == int(_rdo_id_form),
+                RDO.obra_id == obra_id,
+                Obra.admin_id == admin_id).first()
             if _rdo_alvo is None:
                 logger.warning(
                     '[EDIT] rdo_id=%s nao pertence a obra=%s/admin=%s — '
@@ -4114,15 +4121,66 @@ def salvar_rdo_flexivel():
             # ficam como estão — autoria e documento não mudam de dono numa
             # edição.
             rdo = _rdo_alvo
-            rdo.local = request.form.get('local', rdo.local or 'Campo')
-            rdo.clima_geral = (
-                request.form.get('clima_geral') or '').strip() or rdo.clima_geral
-            rdo.temperatura_media = (
-                request.form.get('temperatura_media') or '').strip() or rdo.temperatura_media
-            rdo.condicoes_trabalho = (
-                request.form.get('condicoes_trabalho') or '').strip() or rdo.condicoes_trabalho
+
+            # O campo AUSENTE do form preserva o valor gravado; o campo
+            # PRESENTE e vazio limpa. `x or rdo.x` não distinguia os dois, e
+            # quem abria o RDO para apagar um `condicoes_trabalho` errado
+            # recebia flash de sucesso com o valor antigo intacto.
+            def _editar(campo, chave=None):
+                chave = chave or campo
+                if chave in request.form:
+                    setattr(rdo, campo, (request.form.get(chave) or '').strip() or None)
+
+            # `data_relatorio` era parseada, usada para o `numero_rdo` e nunca
+            # atribuída: a correção da data era engolida em silêncio. Pior que
+            # cosmético — `custo_funcionario_dia` rateia a diária entre os
+            # RDOs de UMA data, então o custo ficava no dia errado.
+            rdo.data_relatorio = data_relatorio
+            if 'local' in request.form:
+                rdo.local = (request.form.get('local') or '').strip() or 'Campo'
+            _editar('clima_geral')
+            _editar('temperatura_media')
+            _editar('condicoes_trabalho')
             if _comentario_geral:
                 rdo.comentario_geral = _comentario_geral
+
+            # Os filhos SAEM antes de o corpo da rota relançá-los. Sem isto a
+            # edição apendava: `custo_funcionario_dia.py:223-230` soma
+            # `horas_trabalhadas` sobre TODAS as linhas do `rdo_id`, e o dia
+            # do trabalhador dobrava na primeira edição. Mesma ordem e mesmo
+            # conjunto de tabelas de `rdo_salvar_unificado` (`:2916-2941`),
+            # que é o irmão que sempre fez certo — inclusive o `CustoObra`,
+            # que nenhum dos dois removedores alcança e que deixava o
+            # trabalhador removido cobrando a obra para sempre.
+            try:
+                from services.rdo_custos import remover_custos_rdo
+                remover_custos_rdo(rdo, admin_id)
+            except Exception as _e:
+                logger.warning(f"[rdo-custo] remover_custos_rdo falhou: {_e}")
+            try:
+                from services.custo_funcionario_dia import remover_custo_diario_rdo
+                remover_custo_diario_rdo(rdo.id)
+            except Exception as _e:
+                logger.warning(f"[custo-dia] remover_custo_diario_rdo falhou: {_e}")
+
+            from models import CustoObra
+            db.session.query(CustoObra).filter(
+                CustoObra.rdo_id == rdo.id).delete(synchronize_session=False)
+
+            # `RDOEquipamento`/`RDOOcorrencia` ficam de fora: quem as
+            # substitui neste fluxo é `replace_equipamentos_ocorrencias`,
+            # adiante na própria rota.
+            #
+            # `RDOFoto` também fica, e é decisão consciente: nenhum caminho
+            # de edição irmão a apaga, e o form de edição não reenvia os
+            # arquivos já gravados — apagar aqui destruiria evidência
+            # fotográfica a cada edição. Uma reedição ainda pode ANEXAR foto
+            # repetida se o usuário reenviar a mesma; isso é problema de
+            # deduplicação de upload, não de delete cego, e não se resolve
+            # destruindo o que já está lá.
+            RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).delete()
+            RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
+
             logger.info('[EDIT] RDO %s editado pelo flexivel (id=%s)',
                         rdo.numero_rdo, rdo.id)
         else:

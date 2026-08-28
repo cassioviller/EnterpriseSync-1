@@ -300,68 +300,84 @@ def aplicar_entregas_no_rdo(rdo, form_data, admin_id=None):
     Retorna tupla (qtd_marcadas, qtd_revertidas). NAO faz commit (chamador commita).
     """
     try:
-        def _getlist(name):
-            if hasattr(form_data, 'getlist'):
-                return form_data.getlist(f'{name}[]') or form_data.getlist(name)
-            v = form_data.get(f'{name}[]') or form_data.get(name) or []
-            return v if isinstance(v, list) else [v]
-
-        ids_raw = _getlist('entrega_tarefa_ids')
-        lista_raw = _getlist('terceiros_tarefa_ids_lista')
-
-        def _to_int_set(seq):
-            out = set()
-            for raw in seq:
-                try:
-                    out.add(int(raw))
-                except (TypeError, ValueError):
-                    continue
-            return out
-
-        marcados = _to_int_set(ids_raw)
-        visiveis = _to_int_set(lista_raw)
-
-        data_ref = rdo.data_relatorio if rdo and rdo.data_relatorio else date.today()
-        qtd = 0
-        for tid in marcados:
-            q = TarefaCronograma.query.filter_by(id=tid)
-            if admin_id is not None:
-                q = q.filter_by(admin_id=admin_id)
-            t = q.first()
-            if not t or (t.responsavel or '').lower() != 'terceiros':
-                continue
-            if t.obra_id != rdo.obra_id:
-                continue
-            t.percentual_concluido = 100.0
-            t.data_entrega_real = data_ref
-            qtd += 1
-
-        # Toggle reverso: tarefas listadas na UI mas não marcadas → pendente
-        para_desmarcar = visiveis - marcados
-        qtd_revertidas = 0
-        for tid in para_desmarcar:
-            q = TarefaCronograma.query.filter_by(id=tid)
-            if admin_id is not None:
-                q = q.filter_by(admin_id=admin_id)
-            t = q.first()
-            if not t or (t.responsavel or '').lower() != 'terceiros':
-                continue
-            if t.obra_id != rdo.obra_id:
-                continue
-            # Reverter é desfazer a MARCA (100% + data_entrega_real), nunca
-            # apagar progresso parcial: subempreitada em 45% é dado real, e
-            # era zerada por qualquer salvamento de RDO que não a marcasse.
-            # O docstring sempre prometeu só "reverter para pendente".
-            if float(t.percentual_concluido or 0) != 100.0:
-                continue
-            t.percentual_concluido = 0.0
-            t.data_entrega_real = None
-            qtd_revertidas += 1
-        return (qtd, qtd_revertidas)
+        # SAVEPOINT: o que esta função desfaz ao falhar é o que ELA mutou, e
+        # nada além disso. `db.session.rollback()` aqui era da sessão INTEIRA
+        # — e os três chamadores (`views/rdo.py:3487`, `:4497`,
+        # `rdo_editar_sistema.py:503`) chamam no meio da transação deles, com
+        # o `commit()` poucas linhas abaixo. Como a falha é engolida e vira
+        # `(0, 0)`, o `except` do chamador nunca dispara: o rollback global
+        # apagava o RDO inteiro que ele acabara de montar, o commit seguinte
+        # persistia uma sessão vazia e a tela dizia "salvo com sucesso".
+        # A docstring acima sempre prometeu "NAO faz commit (chamador
+        # commita)"; o savepoint é o que torna a promessa verdadeira.
+        with db.session.begin_nested():
+            return _aplicar_entregas(rdo, form_data, admin_id)
     except Exception as e:
         logger.error(f"Erro aplicar_entregas_no_rdo: {e}")
-        # Os laços acima já podem ter mutado TarefaCronograma na sessão, e o
-        # chamador commita ao voltar: sem o rollback, `(0, 0)` reportava
-        # "nada aplicado" com escrita parcial a caminho do banco.
-        db.session.rollback()
         return (0, 0)
+
+
+def _aplicar_entregas(rdo, form_data, admin_id):
+    """Corpo de `aplicar_entregas_no_rdo`, executado dentro do SAVEPOINT.
+
+    Separado só para que o `with` acima envolva TODA mutação sem aninhar o
+    corpo inteiro mais um nível.
+    """
+    def _getlist(name):
+        if hasattr(form_data, 'getlist'):
+            return form_data.getlist(f'{name}[]') or form_data.getlist(name)
+        v = form_data.get(f'{name}[]') or form_data.get(name) or []
+        return v if isinstance(v, list) else [v]
+
+    ids_raw = _getlist('entrega_tarefa_ids')
+    lista_raw = _getlist('terceiros_tarefa_ids_lista')
+
+    def _to_int_set(seq):
+        out = set()
+        for raw in seq:
+            try:
+                out.add(int(raw))
+            except (TypeError, ValueError):
+                continue
+        return out
+
+    marcados = _to_int_set(ids_raw)
+    visiveis = _to_int_set(lista_raw)
+
+    data_ref = rdo.data_relatorio if rdo and rdo.data_relatorio else date.today()
+    qtd = 0
+    for tid in marcados:
+        q = TarefaCronograma.query.filter_by(id=tid)
+        if admin_id is not None:
+            q = q.filter_by(admin_id=admin_id)
+        t = q.first()
+        if not t or (t.responsavel or '').lower() != 'terceiros':
+            continue
+        if t.obra_id != rdo.obra_id:
+            continue
+        t.percentual_concluido = 100.0
+        t.data_entrega_real = data_ref
+        qtd += 1
+
+    # Toggle reverso: tarefas listadas na UI mas não marcadas → pendente
+    para_desmarcar = visiveis - marcados
+    qtd_revertidas = 0
+    for tid in para_desmarcar:
+        q = TarefaCronograma.query.filter_by(id=tid)
+        if admin_id is not None:
+            q = q.filter_by(admin_id=admin_id)
+        t = q.first()
+        if not t or (t.responsavel or '').lower() != 'terceiros':
+            continue
+        if t.obra_id != rdo.obra_id:
+            continue
+        # Reverter é desfazer a MARCA (100% + data_entrega_real), nunca
+        # apagar progresso parcial: subempreitada em 45% é dado real, e
+        # era zerada por qualquer salvamento de RDO que não a marcasse.
+        # O docstring sempre prometeu só "reverter para pendente".
+        if float(t.percentual_concluido or 0) != 100.0:
+            continue
+        t.percentual_concluido = 0.0
+        t.data_entrega_real = None
+        qtd_revertidas += 1
+    return (qtd, qtd_revertidas)
