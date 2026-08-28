@@ -17,11 +17,11 @@
 >
 > | Onda | Plano de execução | Tasks | Estado |
 > |---|---|---|---|
-> | 1 — o dinheiro entra errado (5 achados) | `2026-08-25-onda-1-parser-de-dinheiro.md` | 6 | ✅ escrito. 🔬 O código do plano foi **extraído e executado**: 32 passed |
+> | 1 — o dinheiro entra errado (5 achados) | `2026-08-25-onda-1-parser-de-dinheiro.md` | 6 | ✅ **EXECUTADA** — 6/6 tasks. Conferido doc-contra-código em 28/08: os 5 chamadores delegam ao parser único, 67 testes verdes no gate. A linha anterior dizia só "escrito" |
 > | 2 — o tenant vaza (14) | `2026-08-25-onda-2-o-tenant-para-de-vazar.md` | 8 | ✅ **FECHADA 26/08** — 8/8 tasks, 7 fix rounds, gate verde. 15 achados marcados |
 > | 3 — o valor duplica ou some (16) | `2026-08-25-onda-3-o-valor-para-de-duplicar.md` | 10 | ✅ **FECHADA 27/08** — 10/10 tasks + D2/3.6, gate 2798/6/201/2, 16 achados marcados |
 > | 4 — o relatório que nunca funcionou (11) | `2026-08-25-onda-4-o-relatorio-passa-a-funcionar.md` | 7 | ✅ escrito. Duas tasks bloqueadas por D3/D4 |
-> | 5 — grava o que foi recusado (10) | `2026-08-25-onda-5-o-recusado-para-de-ser-gravado.md` | 8 | ✅ **FECHADA 28/08** — 8/8 tasks + 1 fecho-fix + 1 correção de gate, 13 commits, gate 2839/6/201/2 (a 1ª rodada reprovou: 6 failed de guarda própria). 10 achados marcados |
+> | 5 — grava o que foi recusado (10) | `2026-08-25-onda-5-o-recusado-para-de-ser-gravado.md` | 8 | ✅ **FECHADA 28/08** — 8/8 tasks + 1 fecho-fix + 1 correção de gate, 13 commits, gate 2839/6/201/2 (a 1ª rodada reprovou: 6 failed de guarda própria). 10 achados marcados. 🔴 **Reaberta e re-fechada no mesmo dia**: o `/code-review max` achou 3 defeitos que o gate verde não via, 2 deles introduzidos pela correção de fecho — ver "O fix round de 28/08" no plano da onda. Gate final **2840/10/201/2** |
 > | 6 — os testes prometidos | `2026-08-25-onda-6-os-testes-prometidos.md` | 6 | ✅ escrito. Derrubou **dois** resíduos que eram falso alarme |
 >
 > 🔬 **Profundidade, medida — não é uniforme, e é de propósito.** Das **45 tasks**,
@@ -52,12 +52,26 @@
 
 ## 🔴 Bloqueios e decisões antes de começar
 
-### D1 — o push dos 25 commits está bloqueado por um defeito de dinheiro
+### ✅ D1 — VENCIDA em 25/08, registrado só em 28/08
 
-🔬 `main` está **25 commits à frente do `origin`**, e a Fase 6 inteira está só nesta
-máquina. Mas 📖 `views/aditivos_views.py:102` infla contrato em **100×** e lança a
-diferença no razão. **Empurrar antes de corrigir é publicar o defeito.** A Task 1.1
-existe para destravar exatamente isto, e é a primeira coisa a fazer.
+> ⚠️ **Este bloqueio não existe mais, e ficou três dias no documento como se
+> existisse.** Quem lesse o plano-mestre nesse intervalo concluiria que a `main`
+> não podia subir. Podia.
+
+🔬 O texto original: `main` está **25 commits à frente do `origin`**, e a Fase 6
+inteira está só nesta máquina; mas 📖 `views/aditivos_views.py:102` infla contrato
+em **100×** e lança a diferença no razão, então **empurrar antes de corrigir é
+publicar o defeito**.
+
+**O que aconteceu:** a Task 2 da Onda 1 (o plano dizia "1.1") corrigiu o defeito em
+`169ddd68 fix(aditivo): o contrato para de ser inflado em 100x`, de 25/08, **já na
+`main`**. 🔬 Conferido em 28/08: `views/aditivos_views.py` importa
+`parse_decimal_br` e trata `ValorAmbiguo`, e `tests/test_onda1_dinheiro_entra_certo.py`
+passa verde no gate.
+
+O push segue **destravado por este motivo**. Se a `main` ainda não subiu — e em
+28/08 estava 35 commits à frente do `origin` — é decisão de quando empurrar, não
+bloqueio técnico desta D1.
 
 ### 🔴 D2 (DECISÃO SUA) — o teste que afirma o defeito como intencional
 

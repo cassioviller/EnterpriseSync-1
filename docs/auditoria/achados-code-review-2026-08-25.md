@@ -887,3 +887,106 @@ mesmos filtros e a mesma guarda `anterior <= 0`, e roda antes do ramo antecipado
     — a função agora está **consertada em vez de quebrada**, mas continua sem
     nenhum chamador de produção. Decisão pendente para o Módulo 07: ligar uma
     rota, ou apagar a função. (Task 6, 28/08.)
+
+
+## Achados do `/code-review max` sobre a branch da Onda 5 (28/08)
+
+> 🔴 **Passada nova, escopo novo: os 14 commits da branch
+> `sdd/onda-5-o-recusado-para-de-ser-gravado`, DEPOIS de a onda ter fechado com
+> gate verde de 2839.** Não são achados da varredura de 25/08 — são defeitos
+> introduzidos ou deixados passar pela execução das ondas.
+>
+> **Por que existiram apesar do gate verde:** três dos testes centrais da Onda 5
+> provam por `inspect.getsource()`. Um teste que lê o texto do código não vê o
+> que o código faz.
+
+### ✅ Corrigidos no fix round (`938cc92d`, `2d736fc0`)
+
+| # | Arquivo:linha | Defeito |
+|---|---|---|
+| R1 | `services/entregas_terceiros.py:366` | O `db.session.rollback()` do `except` é da sessão INTEIRA e apagava a transação do chamador. Como a falha vira `(0, 0)`, o `except` do chamador nunca dispara: o RDO sumia, o commit persistia sessão vazia, a tela dizia sucesso. **Perda silenciosa.** → SAVEPOINT |
+| R2 | `views/rdo.py:4116` | O ramo de edição de `ed85d117` nunca apagava os filhos: `custo_funcionario_dia.py:223-230` soma horas sobre todas as linhas do `rdo_id`, e o dia do trabalhador dobrava na 1ª edição. → delete igual ao de `rdo_salvar_unificado:2916-2941` |
+| R3 | `views/rdo.py:4117` | `data_relatorio` parseada e nunca atribuída no ramo de edição; `x or rdo.x` não distinguia campo ausente de campo esvaziado |
+| R4 | `views/rdo.py:4050` | `_rdo_alvo` filtrava `RDO.admin_id`, que é `nullable=True`: RDO legado caía na criação e produzia a duplicata que a correção existia para impedir. → `join(Obra)`, como `:2891` |
+
+### 🔴 Abertos — não tocados no fix round
+
+**Autorização (os dois mais sérios):**
+
+- 📖 **`views/aditivos_views.py:144`** — `aprovar` (e `novo:88`, `cancelar:189`)
+  usa `@obra_required(PapelObra.GESTOR)` → `pode_editar_obra`
+  (`utils/autorizacao.py:194`) → `papel_de_usuario_na_obra`, que devolve
+  **GESTOR para todo usuário autenticado do tenant** quando `escopo_obra_ativo`
+  está desligado — e a coluna é `default=False` (`models.py:4441`), então é o
+  estado de todo tenant existente. Qualquer FUNCIONARIO move a linha de base do
+  contrato: nova `ObraContratoVersao`, delta contábil e deslocamento de
+  cronograma, **irreversível por desenho**.
+
+  ⚠️ **O permissivo NÃO é bug em `utils/autorizacao.py`, e o código diz isso.**
+  🔬 `:147-160` documenta a escolha: com a flag desligada o eixo de obra "não
+  está em vigor, nem para alargar nem para estreitar", e devolver LEITOR
+  "tiraria a edição de todo não-admin no dia do deploy — exatamente o que a
+  flag existe para impedir". A decisão é consciente e defensável.
+
+  **O achado é outro:** uma ação financeira irreversível foi pendurada num
+  predicado cujo default é permissivo, como se `PapelObra.GESTOR` já fosse uma
+  restrição real. Hoje não é. A correção não é mexer no fallback — é a rota de
+  aprovação de aditivo exigir garantia que não dependa da flag (a mesma Onda 5
+  pôs `@admin_required` no portal para capacidade estritamente menor), **ou**
+  ligar `escopo_obra_ativo` conscientemente por tenant. É decisão sua.
+- 📖 **`medicao_views.py:449`** — o `@admin_required` que a onda pôs em
+  `portal_obras.gerar_medicao` é contornável trocando a URL: `medicao.gerar_medicao`
+  responde em `/medicao/obra/<id>/gerar` e `/obras/<id>/medicao/fechar` com
+  **só `@login_required`**. Todo o `medicao_bp` roda assim.
+
+**Vazamento de informação:**
+
+- 📖 `views/rdo.py:3581` — `flash()` com 500 caracteres de `format_exc()` mais
+  `current_user.email` e `admin_id`. Mesma classe que a Task 1 fechou, no arquivo
+  que a onda mais editou; o teste-guarda itera só sobre `(ponto_views, equipe_views)`.
+- 📖 `production_routes.py:124,201,279,336` — `error_message=f"...{str(e)}"` sem
+  gate, e `templates/error.html:17` renderiza `{{ error_message }}` cru. Só
+  `error_details` está atrás do `{% if %}`. `str(e)` de erro SQLAlchemy carrega
+  SQL e parâmetros.
+- 📖 `portal_obras_views.py:647` — `db.session.commit()` sem guarda dentro do
+  `except`, e a linha 648 relaia a exceção crua para visitante **anônimo**.
+
+**Contradição interna:**
+
+- 📖 `services/cronograma_apontamento_service.py:398` — `pct_ant` limita a janela
+  com `RDO.data_relatorio < rdo.data_relatorio` **estrito**, então um RDO irmão
+  do MESMO dia é invisível à guarda de retrocesso — no mesmo commit em que
+  `views/rdo.py:4035` afirma que dois RDOs no mesmo dia são estado legal.
+
+**Outros:**
+
+- 📖 `ponto_views.py:2454` — o fix de geofencing fechou o furo de
+  latitude/longitude e deixou dois: omitir `obra_id`, ou mandar um irresolvível,
+  pula o geofencing inteiro e grava `RegistroPonto` com `obra_id=None`.
+- 📖 `models.py:7616` — a migration 315 alargou `uq_contrato_versao_vigente` para
+  `(obra_id, admin_id)` e deixou a irmã `uq_contrato_versao_obra_versao` como
+  `UNIQUE(obra_id, versao)`, sem escopo de tenant, enquanto `abrir_versao`
+  numera por tenant. A obra travada continua travada — só muda o nome da
+  constraint no erro.
+- 📖 `services/cronograma_proposta.py:609,685` — o `if not tarefa.ativa:
+  tarefa.ativa = True` reimplementa, incompleto, o
+  `reativar_tarefas_de_itens_reincluidos` do mesmo módulo (`:892-965`): não limpa
+  `arquivada_em` nem cascateia para as filhas arquivadas.
+- 📖 `services/proposta_diff.py:92` — compara `subtotal_calculado` (snapshot
+  `Numeric(15,2)` do banco) com o produto `quantidade × preco_unitario` não
+  arredondado (até 5 casas): linha intocada vira "alterado". E
+  `templates/propostas/comparar.html:78-79` não acompanhou a mudança.
+- 📖 `portal_obras_views.py:774,696,786,939` — o redesenho "um evento commitado
+  por tentativa" foi aplicado a 2 das 6 rotas que registram trilha. `ver_comprovante`
+  registra e devolve `send_file` sem commit algum: **toda visualização de
+  comprovante pelo cliente some no `session.remove()`**.
+
+### 🔴 Um achado sobre o próprio gate
+
+📖 `tests/test_propagacao_proposta_obra.py:35` — a fixture faz
+`Usuario.query.filter_by(tipo_usuario='ADMIN').first()`, um `.first()` **sem
+`ORDER BY`** num banco com **185.784 ADMINs**, e `pytest.skip()` quando o
+sorteado não tem obra. Qualquer escrita reembaralha o sorteio: no gate de
+28/08 **6 testes pararam de rodar** sem que nada sinalizasse, e isso não havia
+acontecido em nenhum dos oito gates anteriores. Não é regressão de código — é
+uma verificação que parece cobrir mais do que cobre.

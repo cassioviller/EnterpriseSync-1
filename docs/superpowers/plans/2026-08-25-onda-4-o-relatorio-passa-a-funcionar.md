@@ -66,11 +66,32 @@ honesto que consertar**. A Task 4 pergunta antes de agir.
 | `views/almoxarifado/relatorios.py` | Modificar `:39`, `:286` | Task 3 |
 | `views/almoxarifado/movimentos.py` | Modificar `:1239`, `:1302` | Tasks 3, 6 |
 | `relatorios_financeiros_avancados.py` | Apagar **ou** modificar | Task 4 — depende da D4 |
+| `dashboards_especificos.py` | Modificar `:394`, `:446`, `:461` | 🔴 **ACRESCENTADO 28/08** — ver abaixo |
 | `views/vehicles.py` | Apagar seis rotas | Task 5 — depende da D3 |
 | `services/evm.py` | Modificar `:130`, `:100` | Task 7 |
 | `services/medicao_service.py` | Modificar `:178` | Task 7 |
 | `services/custo_orcado.py` | Modificar `:84` | Task 7 |
 | `tests/test_onda4_relatorio_funciona.py` | **Criar** | Todos os testes desta onda |
+
+### 🔴 `dashboards_especificos.py` — o alvo que faltava (achado em 28/08)
+
+> **Executar esta onda exatamente como estava escrita deixaria três chamadas do
+> mesmo defeito vivas.** A varredura de 25/08 mapeou `UsoVeiculo.km_rodado` em
+> `relatorios_financeiros_avancados.py` e parou ali.
+
+🔬 Conferido na varredura de fecho de 28/08:
+
+- A coluna real é **`km_percorrido`** (`models.py:5249`). `km_rodado` **não
+  existe** em `UsoVeiculo` — o acesso levanta `AttributeError`.
+- Além de `relatorios_financeiros_avancados.py:154,246`, o mesmo `km_rodado`
+  está vivo em **`dashboards_especificos.py:394, 446, 461`**.
+- E `dashboards_especificos.py` **não é módulo morto**: é blueprint registrado
+  (`main.py:149`, `url_prefix='/dashboards/especificos'`) e consta da lista de
+  módulos de `app.py:1107`.
+
+⚠️ A diferença importa para a **D4**: mesmo que `relatorios_financeiros_avancados.py`
+seja apagado, `dashboards_especificos.py` continua de pé e continua quebrado.
+As duas decisões são independentes.
 
 ---
 

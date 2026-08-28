@@ -7,6 +7,16 @@
 > A 1ª reprovou com 6 failed, todas de uma guarda que esta onda introduziu;
 > ver "A guarda da Task 6 que o gate derrubou", no fim.
 >
+> 🔴 **REABERTA E RE-FECHADA em 28/08, no mesmo dia.** O gate verde de 2839 não
+> era prova suficiente: o `/code-review max` sobre os 14 commits achou **três
+> defeitos**, dois deles introduzidos pela correção de fecho `ed85d117`. Um deles
+> perdia dado em silêncio — o rollback de `entregas_terceiros` apagava a
+> transação inteira do chamador e a tela dizia "salvo com sucesso". Passaram pelo
+> gate porque **três dos testes centrais desta onda provam por
+> `inspect.getsource()`**, lendo o texto do código em vez do comportamento.
+> Corrigidos em `938cc92d` e `2d736fc0`; gate final **2840 passed, 10 skipped,
+> 201 deselected, 2 xfailed**. Ver "O fix round de 28/08", no fim.
+>
 > Duas decisões explícitas registradas nesta onda: **o geofencing consultivo
 > vira impositivo** — obra cercada e sem coordenada agora **recusa** o ponto,
 > obra sem geofence configurado segue aceitando (Task 1, commit `7ec18fe0`) — e
@@ -571,12 +581,36 @@ Expected: **2560 passed, 6 skipped, 201 deselected, 2 xfailed** — ou mais verd
       ✅ Os 10 achados (Tasks 5.1 a 5.10) marcados inline com o commit que
       fechou cada um, e os 3 achados novos descobertos na própria execução
       registrados em seção própria no fim do documento.
-- [x] 🔬 `grep -rn "format_exc" --include=*.py . | grep -v __pycache__ | grep -v tests/`
-      — nenhum resultado fora de log. ✅ O grep de fecho achou a mesma classe de
-      vazamento da Task 1 viva em `error_handlers.py` (handler global) e
-      `production_routes.py`, que mandavam `traceback.format_exc()` para
-      `error.html` em todo `500` do app. Corrigido e env-gated como `main.py`,
-      em commit próprio fora do plano original: `356c2cf9`.
+- [x] 🔬 O grep de fecho achou a mesma classe de vazamento da Task 1 viva em
+      `error_handlers.py` (handler global) e `production_routes.py`, que
+      mandavam `traceback.format_exc()` para `error.html` em todo `500` do app.
+      Corrigido e env-gated como `main.py`, em commit próprio fora do plano
+      original: `356c2cf9`.
+
+      ⚠️ **A evidência citada aqui estava errada, e foi reescrita em 28/08.** O
+      texto original era: *"`grep -rn "format_exc" ... | grep -v tests/` — nenhum
+      resultado fora de log"*. **Esse grep não devolve nenhum resultado; devolve
+      mais de vinte**, incluindo `error_handlers.py:24,75` e
+      `production_routes.py:101…379` — as próprias linhas que a correção
+      manteve. Quem reconferisse pelo comando citado concluiria que a correção
+      sumiu.
+
+      🔬 **A correção está certa; o que não prestava era a prova.** O que a
+      torna verdadeira não é a ausência de `format_exc`, é o gate de saída:
+      `_detalhes_na_resposta()` (`error_handlers.py:10`, `production_routes.py:13`)
+      devolve `None` sob `IS_PRODUCTION`, e é ela que alimenta `error_details`
+      nos 6 pontos de render. O critério honesto é **o que chega ao template**,
+      não o que aparece no arquivo — que é exatamente o que
+      `test_nenhum_traceback_fora_de_log` já afirma ao exigir `logger.` na mesma
+      linha, em vez de proibir a ocorrência.
+
+      🔴 **Resíduo da mesma família, ainda aberto:** os handlers de
+      `production_routes.py` passam `error_message=f"...{str(e)}"` **sem gate**, e
+      `templates/error.html:17` renderiza `{{ error_message }}` cru — só
+      `error_details` está atrás do `{% if %}`. Num erro de SQLAlchemy, `str(e)`
+      carrega o SQL e os parâmetros vinculados. Os handlers globais de
+      `error_handlers.py` estão limpos (mensagem constante). Achado do
+      `/code-review max` de 28/08, confirmado de fora.
 
 
 ## A guarda da Task 6 que o gate derrubou
@@ -627,3 +661,112 @@ a **editar** (número e autoria preservados) em vez de criar. Adjacência:
 ⚠️ **Fica em aberto (não é regressão, é escopo novo):** a duplicata acidental
 por duplo-submit do form "Novo RDO" segue possível. Barrá-la é trabalho de UI
 (confirmação explícita para o 2º RDO do dia), não de guarda cega no backend.
+
+
+## O fix round de 28/08 — o gate verde não era prova suficiente
+
+> 🔴 **A onda foi dada como fechada com gate verde de 2839, e estava errada em
+> três pontos.** O `/code-review max` sobre os 14 commits da branch achou os
+> três; dois deles foram **introduzidos pela própria correção de fecho**
+> (`ed85d117`), a que consertou a guarda que o gate tinha derrubado.
+
+**Por que o gate não viu.** Três dos testes centrais da onda provam por
+`inspect.getsource()` — leem o TEXTO do código e procuram uma palavra. Um teste
+que lê o código não vê o que o código faz. O caso mais claro:
+
+```python
+# tests/test_onda5_recusado_nao_grava.py, versão original
+corpo_except = fonte[fonte.rfind('except Exception'):]
+assert 'rollback' in corpo_except
+```
+
+Passava verde sobre um `db.session.rollback()` que apagava a transação inteira
+do chamador. A palavra estava lá; o comportamento era o oposto do pretendido.
+
+### Os três defeitos
+
+**1. `services/entregas_terceiros.py:366` — o rollback do serviço apagava a
+transação do chamador.** A docstring promete *"NAO faz commit (chamador
+commita)"*, e os três chamadores (`views/rdo.py:3487`, `:4497`,
+`rdo_editar_sistema.py:503`) chamam no meio da transação deles — em
+`views/rdo.py` o `db.session.commit()` está **seis linhas abaixo**. Como a falha
+é engolida e vira `(0, 0)`, o `except` do chamador nunca dispara: o RDO inteiro
+que ele acabara de montar sumia no rollback, o commit seguinte persistia uma
+sessão vazia, e a tela dizia "salvo com sucesso". **Perda silenciosa de dado.**
+Virou SAVEPOINT (`db.session.begin_nested()`): o serviço desfaz o que ELE mutou.
+
+**2. `views/rdo.py:4116` — a edição duplicava mão de obra.** O ramo novo reusava
+o RDO e nunca apagava os filhos: em toda a função (3747-4732) não havia **um
+único `.delete()`**. `custo_funcionario_dia.py:223-230` soma
+`horas_trabalhadas` sobre TODAS as linhas do `rdo_id` — o dia do trabalhador
+**dobrava na primeira edição**. Todo caminho de edição irmão apaga antes
+(`rdo_editar_sistema.py:264`, `crud_rdo_completo.py:298`,
+`rdo_salvar_unificado:2916`). No mesmo bloco: `data_relatorio` era parseada,
+usada para o `numero_rdo` e **nunca atribuída**, e o `x or rdo.x` não distinguia
+campo ausente de campo esvaziado.
+
+⚠️ **`RDOFoto` ficou de fora do delete, contra o que o review sugeria.** Nenhum
+caminho irmão apaga fotos, e o form de edição não reenvia arquivo já gravado:
+apagar destruiria evidência fotográfica a cada edição. Foto repetida é problema
+de deduplicação de upload, e não se resolve destruindo o que já está lá.
+
+**3. `views/rdo.py:4050` — o tenant resolvido pela coluna errada.** `_rdo_alvo`
+filtrava `RDO.admin_id`, que é `nullable=True` (`models.py:1212`): as linhas
+pré-tenant têm NULL, devolviam `None`, caíam no ramo de criação e produziam
+**exatamente a duplicata que a correção existe para impedir**. Passa a resolver
+pela obra, mesmo join de `rdo_salvar_unificado` (`:2891`), que existe pelo mesmo
+motivo.
+
+### O que foi feito com os testes
+
+Um teste da onda foi **reescrito**: `test_falha_no_meio_das_entregas_nao_deixa_escrita_parcial`
+deixou de ler o fonte e passou a afirmar no banco. Cinco testes novos em
+`tests/test_onda5_fix_round_edicao_e_rollback.py`, todos de comportamento.
+
+⚠️ **Um deles nasceu verde, e o docstring diz isso.** Ao revisar o próprio diff
+apareceu a dúvida: `salvar_rdo_flexivel` **não tem guarda de estado nenhuma**, e
+o delete novo passaria a destruir mão de obra de RDO assinado. O teste foi
+escrito esperando vermelho e passou. 🔬 Conferido de fora em vez de aceito: quem
+barra é o `before_flush` de `rdo_ciclo_vida.py:309`, que levanta `RDOImutavel`
+no autoflush disparado pelo **próprio delete** — nenhuma linha chega a sair.
+O teste ficou porque o delete é seguro por causa de uma guarda que mora em outro
+módulo; se alguém afrouxar aquela, é ele que avisa.
+
+### O gate reprovou de novo, e de novo a causa era própria
+
+1ª rodada: **1 failed, 2843 passed** —
+`test_fase5_rdo_ciclo_vida.py::test_backfill_marcou_os_rdos_historicos_como_preenchido`.
+O teste de caracterização novo fazia `rdo.estado = 'assinado'` na mão; escrita
+direta não grava `rdo_transicao_estado`, e RDO assinado **sem trilha** é a
+assinatura de autoria forjada que aquele invariante varre o banco inteiro atrás.
+O teste reprovador estava certo e ficou como estava; o novo passou a usar
+`transicionar()`. Quatro linhas forjadas que as rodadas deixaram no banco
+compartilhado voltaram para `'preenchido'` — uma coluna, só nas linhas com a
+marca dos tenants de teste.
+
+2ª rodada: ✅ **2840 passed, 10 skipped, 201 deselected, 2 xfailed**, zero falhas.
+
+### 🔴 Um achado sobre o próprio gate
+
+Os skips subiram de 6 para 10: **6 testes de
+`tests/test_propagacao_proposta_obra.py` pararam de rodar**, e isso não havia
+acontecido em nenhum dos oito gates anteriores. A fixture faz
+`Usuario.query.filter_by(tipo_usuario='ADMIN').first()` — um `.first()` **sem
+`ORDER BY`** num banco com **185.784 ADMINs** — e pula quando o sorteado não tem
+obra. Qualquer escrita reembaralha o sorteio.
+
+Não é regressão de código: é a mesma família de problema que esta onda inteira
+enfrentou — **uma verificação que parece cobrir mais do que cobre**. Aqui a
+falha é de sorteio, não de `getsource`. Fica em aberto: o conserto é escolher um
+admin que tenha obra, em vez do primeiro que aparecer.
+
+### Commits
+
+| Commit | O quê |
+|---|---|
+| `938cc92d` | Os três defeitos + 5 testes de comportamento + a reescrita do teste-`getsource` |
+| `2d736fc0` | O RDO assinado passa pela máquina de estados + registro da limpeza do banco |
+
+⚠️ **Os outros 12 achados do `/code-review max` seguem abertos**, registrados em
+`docs/auditoria/achados-code-review-2026-08-25.md`. Os dois mais sérios são de
+autorização: `views/aditivos_views.py:144` e `medicao_views.py:449`.

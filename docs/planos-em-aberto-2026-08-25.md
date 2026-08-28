@@ -191,6 +191,16 @@ código do próprio plano extraído e executado (🔬 32 passed) antes da entreg
 ordem recomendada é 1 → 2 → 3 → 5 → 4 → 6, e o porquê está no cabeçalho do
 documento de fecho.
 
+> **Atualização de 28/08 — este parágrafo envelheceu.** Quatro das seis ondas já
+> foram executadas: **1, 2, 3 e 5**. Restam a **4** (duas tasks travadas por D3 e
+> D4, e um alvo acrescentado hoje: `dashboards_especificos.py`) e a **6** (4 dos
+> 5 arquivos de teste prometidos não existem). A **D1 está vencida** — o defeito
+> que bloqueava o push foi corrigido em `169ddd68`, já na `main`. A Onda 5 foi
+> reaberta e re-fechada em 28/08 depois de um `/code-review max` achar três
+> defeitos que o gate verde não via; **12 achados dessa passada seguem abertos**,
+> registrados no fim de `docs/auditoria/achados-code-review-2026-08-25.md`.
+> O estado por onda vive na tabela do documento de fecho.
+
 ---
 
 ## As 25 automações — o estado continua sendo o de 23/08
