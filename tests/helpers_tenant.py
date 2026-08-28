@@ -22,6 +22,16 @@ acidental que estes testes procuram, e um fixture que reaproveita registro
 Cada tenant carrega uma `marca` única no nome de tudo que semeia. É por ela
 que o teste procura o vazamento, e não por contagem: contar dá o mesmo número
 quando os dois tenants têm um registro cada.
+
+Armadilha de isolamento (achada na Task 1 do plano "a porta irmã"): dois
+`cliente.post()`/`.get()` de usuários DIFERENTES dentro do MESMO
+`with app.app_context():` compartilham o `flask.g` — o flask-login guarda
+`_login_user` em `g` e só recarrega se `not hasattr(g, '_login_user')`, então
+o segundo request autentica silenciosamente como o primeiro usuário. Cada
+`cliente_de(...).post()`/`.get()` deve ficar FORA de qualquer `app_context`
+que o teste abra; o `app_context` serve só para semear e para conferir o
+banco depois (padrão em `tests/test_fase6_aditivo.py` e
+`tests/test_porta_irma.py`).
 """
 import uuid
 from datetime import date
