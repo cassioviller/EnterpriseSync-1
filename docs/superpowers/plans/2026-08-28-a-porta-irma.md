@@ -54,8 +54,8 @@ seção "O fix round de 28/08".
   `dois_tenants`, `cliente_de`) já existe. Use.
 - **Gate ao fim:** `bash run_tests.sh --gate`. Piso: **2840 passed, 10 skipped,
   201 deselected, 2 xfailed** (medido em 28/08). Alvo ao fim das 8 tasks:
-  **2846 passed, 4 skipped** — o skip CAI, porque a Task 7 devolve ao gate os 6
-  testes que a fixture sorteada tinha tirado.
+  **skipped em 6** — o skip CAI, porque a Task 7 devolve ao gate os 4 testes que
+  a fixture sorteada tinha tirado.
 
 ---
 
@@ -869,7 +869,7 @@ git commit -m "fix(cronograma): a guarda de retrocesso passa a ver o rdo irmao d
 > linha o PostgreSQL devolve num `SELECT ... LIMIT 1` sem ordenação é o que a
 > varredura encontrar primeiro, e isso muda com qualquer escrita. No gate de
 > 28/08 o sorteado foi `f3m_37ad1f04@test.local` (id 132306), que não tem obra —
-> e **6 testes pararam de rodar**, sem nada no gate sinalizando. Não havia
+> e **4 testes pararam de rodar**, sem nada no gate sinalizando. Não havia
 > acontecido em nenhum dos oito gates anteriores.
 >
 > É o mesmo padrão desta onda num eixo diferente: **a verificação parece cobrir
@@ -999,12 +999,13 @@ git commit -m "fix(teste): a fixture de propagacao semeia o tenant em vez de sor
 - [ ] **Step 1: Rodar o gate inteiro**
 
 Run: `bash run_tests.sh --gate`
-Expected: **2846 passed, 4 skipped, 201 deselected, 2 xfailed** — ou mais
-verdes, somando os testes deste plano.
+Expected: **skipped CAI de 10 para 6**, e passed sobe de 2840 pelo número de
+testes que este plano acrescentou. Zero failed.
 
-⚠️ **O número de SKIPPED tem de CAIR de 10 para 4**: a Task 7 devolve ao gate
-os 6 testes de `tests/test_propagacao_proposta_obra.py` que a fixture sorteada
-tinha tirado. Se continuar em 10, a Task 7 não pegou. E siga conferindo o skip
+⚠️ **O número de SKIPPED tem de CAIR**: a Task 7 devolve ao gate os **4** testes
+de `tests/test_propagacao_proposta_obra.py` que a fixture sorteada tinha tirado.
+🔬 Contagem corrigida em 28/08 (ruling R7): o plano dizia 6, e 6 estava errado —
+`grep -c "test_propagacao_proposta_obra.*SKIPPED"` na saída do gate devolve 4. Se continuar em 10, a Task 7 não pegou. E siga conferindo o skip
 nas rodadas seguintes: skip subindo não é ruído, é cobertura saindo sem aviso.
 
 - [ ] **Step 2: Marcar os achados**
@@ -1031,7 +1032,7 @@ git commit -m "docs(porta-irma): a onda fecha, com o gate e os seis achados marc
 
 ## Notas de execução
 
-**Ordem recomendada:** 7 PRIMEIRO (devolve 6 testes ao gate — executar as
+**Ordem recomendada:** 7 PRIMEIRO (devolve 4 testes ao gate — executar as
 outras sem ela é medir com régua curta) → 1 → 2 (autorização, maior superfície
 e independentes entre si) → 3 → 4 (vazamento, e a Task 3 pode acusar alvos que
 mudam o escopo da 4) → 5 → 6 (comportamento, e a 6 é a que mais mexe em área

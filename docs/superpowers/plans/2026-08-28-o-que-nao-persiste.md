@@ -835,7 +835,7 @@ Run: `bash run_tests.sh --gate`
 Expected: **2840 passed, 10 skipped, 201 deselected, 2 xfailed** — ou mais
 verdes, somando os testes deste plano.
 
-⚠️ **Confira o número de SKIPPED, não só o de failed.** 🔬 No gate de 28/08 seis
+⚠️ **Confira o número de SKIPPED, não só o de failed.** 🔬 No gate de 28/08 quatro
 testes de `tests/test_propagacao_proposta_obra.py` pararam de rodar em silêncio.
 Skip subindo é cobertura saindo sem aviso.
 

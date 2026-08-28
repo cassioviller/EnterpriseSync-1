@@ -987,6 +987,6 @@ mesmos filtros e a mesma guarda `anterior <= 0`, e roda antes do ramo antecipado
 `Usuario.query.filter_by(tipo_usuario='ADMIN').first()`, um `.first()` **sem
 `ORDER BY`** num banco com **185.784 ADMINs**, e `pytest.skip()` quando o
 sorteado não tem obra. Qualquer escrita reembaralha o sorteio: no gate de
-28/08 **6 testes pararam de rodar** sem que nada sinalizasse, e isso não havia
+28/08 **4 testes pararam de rodar** sem que nada sinalizasse, e isso não havia
 acontecido em nenhum dos oito gates anteriores. Não é regressão de código — é
 uma verificação que parece cobrir mais do que cobre.
