@@ -94,3 +94,80 @@ def test_funcionario_nao_aprova_aditivo():
         assert versoes_depois == versoes_antes, (
             'FUNCIONARIO moveu a linha de base do contrato — '
             f'{versoes_depois - versoes_antes} versão(ões) nova(s)')
+
+
+def test_gestor_nao_admin_aprova_aditivo_com_escopo_ativo():
+    """R5 — com `escopo_obra_ativo` LIGADA, `obra_required(PapelObra.GESTOR)`
+    já é guarda de verdade (Fase 1): quem tem vínculo `UsuarioObra` como
+    GESTOR da obra tem de conseguir abrir E aprovar aditivo, mesmo sem ser
+    ADMIN da conta.
+
+    Esta é a metade que faltava do caso de `test_funcionario_nao_aprova_aditivo`
+    — sem ela, nada impede alguém de trocar a guarda nova por um
+    `@admin_required` incondicional de novo amanhã. Foi exatamente essa troca
+    larga demais que quebrou
+    `tests/test_fase6_aditivo.py::test_quem_nao_e_gestor_da_obra_nao_aprova_aditivo`
+    no primeiro round desta task.
+    """
+    from models import (AditivoContrato, Obra, ObraContratoVersao, PapelObra,
+                        UsuarioObra)
+    from scripts.flag_escopo_obra import definir_flag
+    from services.contrato_obra import ORIGEM_CADASTRO, definir_valor_contrato
+
+    with app.app_context():
+        marca = uuid.uuid4().hex[:8]
+        t = um_tenant('adit-gestor', com_fatos=False)
+
+        # `um_tenant` já semeia `valor_contrato=100000`, mas por atribuição
+        # direta — sem passar por `definir_valor_contrato`, não existe
+        # `ObraContratoVersao` v1 ainda, e `abrir_aditivo` exige contrato
+        # vigente (D2). Zera e regrava pelo escritor único para nascer o
+        # baseline de verdade.
+        obra = db.session.get(Obra, t.obra_id)
+        obra.valor_contrato = 0
+        db.session.flush()
+        definir_valor_contrato(obra, 100000.0, ORIGEM_CADASTRO,
+                               motivo='contrato original')
+        db.session.commit()
+
+        definir_flag(t.admin_id, True)
+        db.session.commit()
+
+        gestor_id = _funcionario_logavel(t.admin_id, marca)
+        db.session.add(UsuarioObra(
+            usuario_id=gestor_id, obra_id=t.obra_id, papel=PapelObra.GESTOR,
+            admin_id=t.admin_id, ativo=True))
+        db.session.commit()
+
+        cliente = cliente_de(gestor_id)
+
+        resposta_abrir = cliente.post(
+            f'/obras/{t.obra_id}/aditivos/novo',
+            data={'tipo': 'acrescimo', 'valor_novo': '130.000,00',
+                  'motivo': f'reforco-{marca}'},
+            follow_redirects=False)
+        # 302 sozinho não distingue sucesso (→ `aditivos.listar`) de recusa
+        # (→ `main.dashboard`, o que `admin_required` faz) — os dois são
+        # redirect. É o DESTINO que prova qual dos dois aconteceu.
+        destino_abrir = resposta_abrir.headers.get('Location') or ''
+        assert resposta_abrir.status_code in (302, 303) and (
+            f'/obras/{t.obra_id}/aditivos' in destino_abrir), (
+            'GESTOR não-admin não conseguiu abrir aditivo com escopo ativo '
+            f'(status={resposta_abrir.status_code}, destino={destino_abrir!r})')
+
+        aditivo = AditivoContrato.query.filter_by(obra_id=t.obra_id).one()
+
+        resposta_aprovar = cliente.post(
+            f'/obras/{t.obra_id}/aditivos/{aditivo.id}/aprovar',
+            follow_redirects=False)
+        destino_aprovar = resposta_aprovar.headers.get('Location') or ''
+        assert resposta_aprovar.status_code in (302, 303) and (
+            f'/obras/{t.obra_id}/aditivos' in destino_aprovar), (
+            'GESTOR não-admin não conseguiu aprovar aditivo com escopo ativo '
+            f'(status={resposta_aprovar.status_code}, destino={destino_aprovar!r})')
+
+        versoes = ObraContratoVersao.query.filter_by(
+            obra_id=t.obra_id).count()
+        assert versoes == 2, (
+            'aprovação do GESTOR não-admin não abriu a versão 2 do '
+            f'contrato — {versoes} versão(ões) encontrada(s)')

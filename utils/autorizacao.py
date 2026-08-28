@@ -353,3 +353,80 @@ def obra_required(papel_minimo=None):
             return f(*args, **kwargs)
         return wrapper
     return decorador
+
+
+def exige_admin_sem_escopo(f):
+    """Exige ADMIN/SUPER_ADMIN — mas SÓ quando `escopo_obra_ativo` do
+    tenant está DESLIGADA. Fase 6/Onda 5, Task 1 (fix round 1, ruling R5).
+
+    O problema que este decorador fecha: com a flag desligada (default de
+    todo tenant existente), `papel_de_usuario_na_obra` devolve GESTOR para
+    QUALQUER usuário do tenant — de propósito, para preservar o
+    comportamento pré-Fase 1 (ver o comentário lá). Isso é aceitável para
+    ações reversíveis, mas aprovar aditivo grava `ObraContratoVersao`,
+    lança delta contábil e desloca cronograma: irreversível por desenho,
+    e não pode ficar pendurado num fallback pensado para outra coisa.
+
+    O que este decorador NÃO pode fazer: barrar quem `obra_required` já
+    deixaria passar. Com a flag LIGADA, o vínculo `usuario_obra` é guarda
+    de verdade (Fase 1) — um GESTOR não-admin da obra tem de continuar
+    aprovando. Colocar `@admin_required` incondicional aqui removeria essa
+    capacidade; foi exatamente esse excesso que quebrou
+    `tests/test_fase6_aditivo.py::test_quem_nao_e_gestor_da_obra_nao_aprova_aditivo`
+    no primeiro round. Por isso a checagem é condicional à flag, e por
+    isso este decorador tem de vir ANTES de `obra_required` na cadeia —
+    ele só decide alguma coisa quando o escopo por obra ainda não está em
+    vigor; com a flag ligada, ele se afasta e deixa `obra_required` (que
+    vem depois) ser a única guarda.
+
+    Resposta para quem é barrado: **404**, não 403/302 — mesma forma de
+    `obra_required`, pela mesma razão (não vazar a existência de obra fora
+    de alcance; escolha travada em
+    `tests/test_cronograma_permissoes.py`). Um `admin_required` genérico
+    (que redireciona, 302) NÃO serve aqui.
+
+    Uso — depois de `@login_required`, antes de `@obra_required(...)`:
+
+        @login_required
+        @exige_admin_sem_escopo
+        @obra_required(PapelObra.GESTOR)
+        def aprovar(obra_id): ...
+    """
+    from functools import wraps
+
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        from flask import abort, jsonify, redirect, request, url_for
+
+        quer_json = request.path.startswith('/api/') or \
+            request.accept_mimetypes.best == 'application/json'
+
+        try:
+            autenticado = current_user.is_authenticated
+        except Exception:
+            autenticado = False
+        if not autenticado:
+            if quer_json:
+                return jsonify({'error': 'Autenticação necessária'}), 401
+            return redirect(url_for('main.login'))
+
+        obra_id = kwargs.get('obra_id') or kwargs.get('id')
+        if obra_id is None:
+            logger.error('exige_admin_sem_escopo em rota sem obra_id: %s',
+                         request.endpoint)
+            abort(500)
+
+        tenant = get_tenant_admin_id()
+
+        if _escopo_ativo(tenant):
+            # Escopo por obra em vigor: `obra_required`, logo abaixo na
+            # cadeia, já é a guarda de verdade. Este decorador se afasta.
+            return f(*args, **kwargs)
+
+        if _e_admin_do_tenant():
+            return f(*args, **kwargs)
+
+        if quer_json:
+            return jsonify({'error': 'Obra não encontrada'}), 404
+        abort(404)
+    return wrapper

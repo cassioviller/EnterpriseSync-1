@@ -32,9 +32,8 @@ from flask import (Blueprint, flash, redirect, render_template, request,
 from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException
 
-from auth import admin_required
 from models import AditivoContrato, Obra, ObraContratoVersao, PapelObra, db
-from utils.autorizacao import obra_required
+from utils.autorizacao import exige_admin_sem_escopo, obra_required
 from utils.decimal_br import parse_decimal_br
 from utils.tenant import get_tenant_admin_id
 
@@ -86,14 +85,19 @@ def listar(obra_id: int):
 
 @aditivos_bp.route('/<int:obra_id>/aditivos/novo', methods=['GET', 'POST'])
 @login_required
-# D5 — `@obra_required(PapelObra.GESTOR)` NÃO restringe hoje: com
-# `escopo_obra_ativo` desligado (default de todo tenant existente),
-# `papel_de_usuario_na_obra` devolve GESTOR para qualquer usuário do
-# tenant, e isso é deliberado (utils/autorizacao.py:147-160). Aprovar
-# aditivo é irreversível — não pode depender de uma flag que quase
-# ninguém ligou. Quando `escopo_obra_ativo` for a norma, este
-# `@admin_required` pode sair e o `@obra_required` volta a bastar.
-@admin_required
+# D5 (fix round 1, ruling R5) — `@obra_required(PapelObra.GESTOR)` sozinho
+# NÃO restringe quando `escopo_obra_ativo` está desligada (default de todo
+# tenant existente): `papel_de_usuario_na_obra` devolve GESTOR para
+# qualquer usuário do tenant, e isso é deliberado
+# (utils/autorizacao.py:147-160). Aprovar aditivo é irreversível — não
+# pode depender de uma flag que quase ninguém ligou. Mas um
+# `@admin_required` incondicional é largo demais: com a flag LIGADA,
+# `obra_required` já é guarda de verdade (Fase 1) e um GESTOR não-admin
+# da obra tem de continuar aprovando — ver
+# `utils/autorizacao.exige_admin_sem_escopo`, que só age quando a flag
+# está desligada e devolve 404 (não 302) para não vazar existência de
+# obra fora de alcance, igual a `obra_required`.
+@exige_admin_sem_escopo
 @obra_required(PapelObra.GESTOR)
 def novo(obra_id: int):
     """Abre um aditivo em rascunho. NÃO toca no baseline — quem toca é aprovar.
@@ -150,8 +154,9 @@ def novo(obra_id: int):
 @aditivos_bp.route('/<int:obra_id>/aditivos/<int:aid>/aprovar',
                    methods=['POST'])
 @login_required
-# D5 — ver comentário em `novo`, acima: mesmo furo, mesma correção.
-@admin_required
+# D5 (fix round 1, ruling R5) — ver comentário em `novo`, acima: mesmo
+# furo, mesma correção.
+@exige_admin_sem_escopo
 @obra_required(PapelObra.GESTOR)
 def aprovar(obra_id: int, aid: int):
     """`rascunho` → `aprovado`: o único ponto em que o aditivo vale.
@@ -197,8 +202,9 @@ def aprovar(obra_id: int, aid: int):
 @aditivos_bp.route('/<int:obra_id>/aditivos/<int:aid>/cancelar',
                    methods=['POST'])
 @login_required
-# D5 — ver comentário em `novo`, acima: mesmo furo, mesma correção.
-@admin_required
+# D5 (fix round 1, ruling R5) — ver comentário em `novo`, acima: mesmo
+# furo, mesma correção.
+@exige_admin_sem_escopo
 @obra_required(PapelObra.GESTOR)
 def cancelar(obra_id: int, aid: int):
     """`rascunho` → `cancelado`. Não toca no baseline.
