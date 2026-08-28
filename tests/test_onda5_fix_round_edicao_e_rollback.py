@@ -226,7 +226,15 @@ def test_edicao_pelo_flexivel_nao_destroi_filhos_de_rdo_assinado():
         rdo = RDO.query.filter_by(obra_id=t.obra_id).one()
         assert RDOMaoObra.query.filter_by(rdo_id=rdo.id).count() == 1
 
-        rdo.estado = 'assinado'
+        # Pela máquina de estados, nunca `rdo.estado = 'assinado'` na mão:
+        # escrita direta deixa o RDO assinado SEM trilha em
+        # `rdo_transicao_estado`, que é a assinatura de autoria forjada por
+        # backfill — e `test_fase5_rdo_ciclo_vida.py:119` varre o banco
+        # inteiro atrás exatamente disso. Num banco compartilhado pela suíte,
+        # o atalho aqui reprovava um invariante lá.
+        from services.rdo_ciclo_vida import ASSINADO, PREENCHIDO, transicionar
+        transicionar(rdo, PREENCHIDO)
+        transicionar(rdo, ASSINADO)
         db.session.commit()
 
         _post_rdo(cliente, t.obra_id, t.funcionario_id, data_rel,
