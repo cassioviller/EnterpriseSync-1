@@ -39,7 +39,10 @@ def setup_obra_proposta():
     gate não tem como avisar: skip não é falha.
 
     `um_tenant` semeia admin + obra próprios. O teste deixa de depender do
-    que já estava no banco, e não pula mais.
+    que já estava no banco, e não pula mais. O `assert obra is not None`
+    logo abaixo É a guarda de regressão: se algum dia a fixture voltar a
+    depender do que já estava no banco (ou `um_tenant` quebrar), o teste
+    FALHA alto em vez de sumir do gate como skip silencioso.
     """
     from helpers_tenant import um_tenant
 
@@ -141,7 +144,9 @@ def test_handle_proposta_aprovada_propagacao_falha_aborta_tudo(monkeypatch):
     Segunda cópia do mesmo defeito da Task 7: escolhia o tenant com
     `Usuario.query.filter_by(tipo_usuario='ADMIN').first()` sem `ORDER BY` e
     pulava quando o sorteado não tinha obra. `um_tenant` semeia o próprio
-    tenant — não pula mais.
+    tenant — não pula mais. O `assert obra is not None` abaixo É a guarda de
+    regressão: se a escolha do tenant voltar a depender do que já estava no
+    banco, o teste FALHA alto em vez de sumir do gate como skip silencioso.
     """
     from handlers import propostas_handlers as ph
     from models import ContaReceber

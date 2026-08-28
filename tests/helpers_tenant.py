@@ -26,8 +26,9 @@ quando os dois tenants têm um registro cada.
 Armadilha de isolamento (achada na Task 1 do plano "a porta irmã"): dois
 `cliente.post()`/`.get()` de usuários DIFERENTES dentro do MESMO
 `with app.app_context():` compartilham o `flask.g` — o flask-login guarda
-`_login_user` em `g` e só recarrega se `not hasattr(g, '_login_user')`, então
-o segundo request autentica silenciosamente como o primeiro usuário. Cada
+`_login_user` em `g` e só recarrega se `"_login_user" not in g`
+(`flask_login/utils.py:369`), então o segundo request autentica
+silenciosamente como o primeiro usuário. Cada
 `cliente_de(...).post()`/`.get()` deve ficar FORA de qualquer `app_context`
 que o teste abra; o `app_context` serve só para semear e para conferir o
 banco depois (padrão em `tests/test_fase6_aditivo.py` e
