@@ -533,27 +533,148 @@ def test_regressao_real_depois_de_superexecucao_e_barrada():
         db.session.rollback()
 
 
-def test_reuso_por_chave_natural_restaura_a_tarefa_arquivada():
-    """🔴 `cronograma_proposta.py:602`/`:675` — os ramos de reúso por chave
-    natural reaproveitavam a tarefa casada SEM restaurar `ativa`:
-    item suprimido e re-adicionado como novo ficava sem tarefa viva, em
-    silêncio (`natural_key_index` não filtra `ativa` — casa a arquivada).
+def test_reuso_por_chave_natural_em_nivel_inferior_restaura_a_subtarefa():
+    """🔴 `cronograma_proposta.py:707-727` — o ramo de reúso por chave
+    natural EM NÍVEL INFERIOR (subatividade, não a raiz do serviço).
+
+    Antes de `e404a5e8` este ramo (como o irmão da raiz, `:601-645`)
+    reimplementava incompleto o `reativar_tarefas_de_itens_reincluidos`:
+    `if not tarefa.ativa: tarefa.ativa = True`, sem limpar `arquivada_em`
+    nem cascatear para as NETAS arquivadas. Este teste prova o
+    COMPORTAMENTO olhando o banco, não o texto do módulo — a raiz
+    permanece ATIVA o tempo todo (nunca passa pelo ramo `:601`), então só
+    o ramo de nível inferior pode ter restaurado a subtarefa e a neta.
+
+    Cobertura que os dois testes de comportamento já existentes em
+    `test_o_que_nao_persiste.py` NÃO têm:
+    - `test_reativar_tarefa_arquivada_limpa_arquivada_em_e_cascateia`
+      chama `reativar_tarefas_de_itens_reincluidos` DIRETO — nunca passa
+      pelo ponto de chamada dentro de `materializar_cronograma`.
+    - `test_materializar_cronograma_reativa_por_id_proprio_nao_pelo_da_
+      revisao_atual` passa por `materializar_cronograma`, mas com a RAIZ
+      arquivada — exercita só o ramo `:601-645`. A subtarefa lá é
+      reativada de carona pela cascata da raiz (e tem
+      `gerada_por_proposta_item_id` próprio, então seria semente direta de
+      qualquer forma) — o ramo `:707-727` nunca chega a rodar com
+      `not tarefa.ativa` verdadeiro nesse cenário, porque a subtarefa já
+      chega ativa quando `_rec` a processa.
+
+    Aqui a raiz já existe ATIVA (reúso no `:601` não dispara reativação —
+    `if not tarefa_serv.ativa` é falso) e só a subtarefa (mais a neta,
+    arquivada por baixo dela) estão arquivadas — forçando o gatilho a
+    passar exclusivamente pelo `:707-727`.
     """
-    import inspect
+    from datetime import datetime
+    from decimal import Decimal
 
-    from services import cronograma_proposta
+    from models import Proposta, PropostaItem, TarefaCronograma
+    from services.cronograma_proposta import materializar_cronograma
 
-    fonte = inspect.getsource(cronograma_proposta)
-    reusos = []
-    for numero, linha in enumerate(fonte.splitlines(), start=1):
-        if '— reuso' in linha or '- reusar' in linha.lower() \
-                or 'reusar' in linha.lower():
-            reusos.append(numero)
-    assert len(reusos) >= 2, 'os dois ramos de reúso sumiram do fonte?'
+    with app.app_context():
+        t = um_tenant('reuso-nivel', com_fatos=False)
+        arquivada = datetime(2026, 8, 1)
 
-    assert fonte.count('.ativa = True') >= 2, (
-        'os ramos de reúso não restauram `ativa` — item suprimido e '
-        're-adicionado fica sem tarefa viva, em silêncio')
+        proposta = Proposta(
+            numero=f'P-{uuid.uuid4().hex[:8]}', admin_id=t.admin_id,
+            cliente_nome='Cliente Teste')
+        db.session.add(proposta)
+        db.session.flush()
+
+        # Item ANCESTRAL — o que a subtarefa arquivada carrega. Distinto do
+        # item ATUAL (abaixo) para não colidir com a idempotência de camada
+        # 1 (`ja_existem`, que olha só o `proposta_item_id` do nível 0) nem
+        # ser achado como semente por acidente antes da hora.
+        item_ancestral = PropostaItem(
+            admin_id=t.admin_id, proposta_id=proposta.id, item_numero=1,
+            descricao='Item ancestral', quantidade=Decimal('1'),
+            unidade='un', preco_unitario=Decimal('100.00'), ordem=1)
+        db.session.add(item_ancestral)
+        db.session.flush()
+
+        # Item da revisão ATUAL — o que a árvore manda para o nível 0.
+        item_atual = PropostaItem(
+            admin_id=t.admin_id, proposta_id=proposta.id, item_numero=1,
+            descricao='Item atual', quantidade=Decimal('1'),
+            unidade='un', preco_unitario=Decimal('100.00'), ordem=1)
+        db.session.add(item_atual)
+        db.session.flush()
+
+        nome_raiz = f'Servico {uuid.uuid4().hex[:6]}'
+        nome_sub = f'Sub {uuid.uuid4().hex[:6]}'
+        nome_neta = f'Neta {uuid.uuid4().hex[:6]}'
+
+        # Raiz: ATIVA, sem lápide — nunca vai precisar de restauração.
+        raiz = TarefaCronograma(
+            obra_id=t.obra_id, admin_id=t.admin_id, nome_tarefa=nome_raiz,
+            ordem=0, responsavel='empresa', duracao_dias=5,
+            percentual_concluido=0.0, ativa=True, arquivada_em=None,
+            gerada_por_proposta_item_id=item_ancestral.id)
+        db.session.add(raiz)
+        db.session.flush()
+
+        # Subtarefa: ARQUIVADA. Semente direta do restaurador (tem o
+        # próprio `gerada_por_proposta_item_id`, do item ancestral).
+        sub = TarefaCronograma(
+            obra_id=t.obra_id, admin_id=t.admin_id, nome_tarefa=nome_sub,
+            ordem=1, responsavel='empresa', duracao_dias=2,
+            percentual_concluido=0.0, ativa=False, arquivada_em=arquivada,
+            tarefa_pai_id=raiz.id,
+            gerada_por_proposta_item_id=item_ancestral.id)
+        db.session.add(sub)
+        db.session.flush()
+
+        # Neta: ARQUIVADA, SEM `gerada_por_proposta_item_id` próprio — só
+        # pode voltar pela CASCATA a partir da subtarefa, nunca como
+        # semente direta. Prova o item 3 da afirmação (filhas cascateadas)
+        # especificamente através do ramo de nível inferior.
+        neta = TarefaCronograma(
+            obra_id=t.obra_id, admin_id=t.admin_id, nome_tarefa=nome_neta,
+            ordem=2, responsavel='empresa', duracao_dias=1,
+            percentual_concluido=0.0, ativa=False, arquivada_em=arquivada,
+            tarefa_pai_id=sub.id)
+        db.session.add(neta)
+        db.session.commit()
+        raiz_id, sub_id, neta_id = raiz.id, sub.id, neta.id
+
+        # A árvore reencontra a raiz por nome (reúso — mas ela já está
+        # ativa, então o ramo `:601` não dispara reativação nenhuma) e a
+        # subtarefa por nome+pai (reúso arquivado — dispara o `:707-727`).
+        arvore = [{
+            'marcado': True,
+            'servico_nome': nome_raiz,
+            'proposta_item_id': item_atual.id,
+            'servico_id': None,
+            'sem_template': False,
+            'filhos': [
+                {'marcado': True, 'nome': nome_sub},
+            ],
+        }]
+
+        criadas = materializar_cronograma(
+            proposta, t.admin_id, t.obra_id, arvore)
+        db.session.commit()
+
+        # PRIMEIRO: prova de que o cenário passou pelo caminho de REUSO
+        # (nenhuma tarefa nova), não criou substitutas por engano.
+        assert criadas == 0, (
+            f'materializar_cronograma criou {criadas} tarefa(s) nova(s) — '
+            'o cenário não exercitou o caminho de reuso/reativação')
+
+        db.session.refresh(raiz)
+        assert raiz.ativa is True and raiz.arquivada_em is None, (
+            'a raiz não devia ter sido tocada — este cenário prova o ramo '
+            'de nível inferior, não o da raiz')
+
+        for alvo, id_, rotulo in ((sub, sub_id, 'a subtarefa'),
+                                  (neta, neta_id, 'a neta')):
+            db.session.refresh(alvo)
+            assert alvo.ativa is True, (
+                f'{rotulo} não voltou — o ramo de reúso em nível inferior '
+                '(`:707-727`) não restaura `ativa`')
+            assert alvo.arquivada_em is None, (
+                f'{rotulo} voltou viva com lápide: ativa=True e '
+                f'arquivada_em={alvo.arquivada_em} — o ramo de nível '
+                'inferior reimplementa incompleto o restaurador')
 
 
 # ---------------------------------------------------------------------------
