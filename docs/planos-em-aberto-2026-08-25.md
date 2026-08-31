@@ -139,7 +139,7 @@ em aberto.
 |---|---|---|
 | `2026-08-04-plano-consolidado.md` | 🔬 54/59, mas **dois dos cinco eram falso alarme** (ver o bloco de estado no próprio plano). Resíduo real: `test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py` | 🔴 **Vale corrigir.** 🔬 Zero testes citam `entrada_ja_lancada`: a **A09** foi dada como ENTREGUE por leitura de código, e o furo de tenant do dedup (`almoxarifado_utils.py:257`) é a prova do custo. O do **A05** foi deliberadamente não criado, com razão escrita — o arreio B0.3 cobre |
 | `2026-08-06-rodada-b6-varredura.md` | 🔬 15/20. Os quatro `test_b6_404_{obras,frota,cauda,miscelanea}.py` nunca foram escritos | O recorte entregue foi `test_b6_estorno_recebimento.py` e `test_b6_familia2_reembolso_import.py` |
-| `2026-08-06-rodada-b5-varredura.md` | 🔬 18/19. `test_b5_curva_baseline.py` | — |
+| `2026-08-06-rodada-b5-varredura.md` | ❌ **sem resíduo** (31/08): o arquivo era da Task B5.5, **cortada em 06/08** | — |
 | `2026-06-02-bloco1-blindagem-acesso-plan.md` | `test_isolamento_tenant_bloco1.py` nunca existiu com esse nome | 🔴 **e é mais que resíduo:** o code review de 25/08 achou **furos de tenant vivos** (`multitenant_helper.py:25`, `transporte_views.py:204`, `veiculos_services.py:167`). A blindagem deste bloco **não cobriu o parque** |
 | `2026-06-05-bloco3-bdi-plan.md` | `scripts/preflight_migracao.py` nunca existiu | inofensivo |
 | `2026-06-08-remediacao-saude-app-plan.md` | `services/tenant_config.py` nunca existiu | inofensivo |

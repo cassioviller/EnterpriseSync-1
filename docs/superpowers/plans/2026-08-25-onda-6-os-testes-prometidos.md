@@ -36,6 +36,7 @@ A medição mecânica listou cinco testes ausentes no `2026-08-04-plano-consolid
 | `test_a05_custo_mensalista_por_rota.py` | ❌ **Não é resíduo.** 📖 A nota da Task B1.5 (`:812`) diz que o arquivo **não será criado**, e por quê: o arreio B0.3 `tests/test_arreio_custo_rdo_rotas.py` já posta nas rotas com mensalista (🔬 11 ocorrências) e afirma sobre `GestaoCustoFilho`/`CustoObra`/`RDOCustoDiario`. Um arquivo separado seria segunda cópia da mesma prova |
 | *"nada desta Task foi feito"* (B1.5) | ❌ **A nota envelheceu.** 📖 `views/rdo.py:2175` registra a saída da chamada direta a `gerar_custos_mao_obra_rdo`. A nota é de 04/08; o trabalho veio depois |
 | `test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py` | 🔴 **Resíduo real.** 🔬 **Zero** testes citam `entrada_ja_lancada` |
+| `tests/test_b5_curva_baseline.py` | ❌ **Não é resíduo** (conferido em 31/08, Task 3). 🔬 O arquivo era da **Task B5.5, CORTADA em 06/08 por decisão do Cássio** (`rodada-b5:681-696`): sem medição de produção, a série de baseline não foi construída. Escrever o teste de uma feature deliberadamente não construída seria escrever um teste vermelho para sempre |
 | `test_a10_ponto_manual_nao_perde_custo.py` | ❌ **Não é resíduo** (conferido em 31/08, Task 2). 🔬 `tests/test_arreio_presenca_rotas.py:123` já lança dois pontos no mesmo dia pela rota `POST /novo_ponto` e afirma as duas coisas que o arquivo faria: **um** `RegistroPonto` e custo do dia = 2× o da primeira metade (a sobrescrita). Decisão registrada no `2026-08-04-plano-consolidado.md`, no formato da nota do A05 |
 | `test_b6_404_*` | 🔴 **Cinco, não quatro:** `obras`, `frota`, `cauda`, `miscelanea` **e `propostas`** (`rodada-b6:593`) |
 
@@ -47,7 +48,7 @@ A medição mecânica listou cinco testes ausentes no `2026-08-04-plano-consolid
 |---|---|---|
 | `tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py` | **Criar** | Task 1 — a guarda que faltava, e que teria pego o furo de tenant |
 | `tests/test_arreio_presenca_rotas.py` | Modificar **ou** nada | Task 2 — só se a cobertura do A10 não estiver lá |
-| `tests/test_b5_curva_baseline.py` | **Criar** | Task 3 |
+| ~~`tests/test_b5_curva_baseline.py`~~ | ❌ **Não criar** | Task 3 — a Task-mãe (B5.5) foi cortada em 06/08 |
 | `tests/test_b6_404_{obras,frota,cauda,miscelanea,propostas}.py` | **Criar** (5) | Task 4 |
 | `tests/test_isolamento_tenant_bloco1.py` | **Criar** | Task 5 |
 | — | Rodar | Task 6 — a jornada E2E |
@@ -279,22 +280,38 @@ nota do A05.
 
 ---
 
-### Task 3: `test_b5_curva_baseline.py`
+### Task 3: `test_b5_curva_baseline.py` — ❌ **não será criado**
 
-**Files:**
-- Create: `tests/test_b5_curva_baseline.py`
+✅ **Decidido em 31/08, no Step 1: o arquivo não é resíduo.** Ler o que o plano
+prometeu (que é o que este Step manda fazer) mostrou que a promessa foi
+**revogada**: a Task B5.5, dona do arquivo, foi **CORTADA em 06/08** —
 
-- [ ] **Step 1: Read what the plan promised**
+> **Status: ⛔ CORTADA em 06/08 — decisão do Cássio** [...] "O Cássio decidiu
+> não rodar as consultas de produção; sem a medição, decide a evidência
+> disponível: 🔬⚠️ dev, **uma** obra no banco inteiro onde a série seria
+> calculável e diferente, com Δ máx **1,1 p.p. na direção contrária** à do
+> risco 6, e 🔬 o SPI/SV não é exibido a ninguém."
+> — `docs/superpowers/plans/2026-08-06-rodada-b5-varredura.md:683-688`
 
-```bash
-sed -n '680,710p' docs/superpowers/plans/2026-08-06-rodada-b5-varredura.md
-```
+A terceira série da curva **não existe no código**, por decisão. Um teste
+escrito contra ela nasceria vermelho e ficaria vermelho — não é RED de defeito,
+é RED de feature ausente, e a diferença importa: o primeiro é dívida, o segundo
+é ruído no gate.
 
-O plano nomeia o dataset e o comportamento. Escreva o teste **contra o que ele
-descreve**, não contra o que o código faz hoje — se os dois divergirem, é achado,
-e ele entra em `docs/auditoria/achados-code-review-2026-08-25.md`.
+🔬 **A medição mecânica de 25/08 contou o arquivo como dívida porque olhou a
+lista de arquivos prometidos, não o Status da Task que os prometia.** É o mesmo
+erro de método que já derrubou dois itens desta onda (o A05 e a nota da B1.5) e
+que a Task 2 acabou de derrubar no A10 — três de cinco itens da lista original
+eram falso alarme.
 
-- [ ] **Step 2-4:** RED (ou verde com justificativa), verde, commit.
+**Se o SE mudar** (uma medição de produção, ou usuário reclamando de curva que
+não mostra atraso), o recorte da B5.5 continua no plano como o COMO — e aí o
+teste nasce junto com o código, não sete meses antes dele.
+
+- [x] **Step 1: Read what the plan promised** — feito; a promessa estava revogada.
+- [x] **Step 2-4:** não se aplicam. Registrado no cabeçalho do
+      `2026-08-06-rodada-b5-varredura.md` (que dizia "resíduo nomeado" e agora
+      diz "sem resíduo") e na linha do b5 em `docs/planos-em-aberto-2026-08-25.md`.
 
 ---
 
