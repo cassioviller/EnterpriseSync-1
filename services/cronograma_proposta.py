@@ -614,11 +614,23 @@ def materializar_cronograma(
             # A seed query do restaurador casa por
             # `gerada_por_proposta_item_id.in_(ids)` — mas o `pi_id` daqui é
             # o do PropostaItem da revisão ATUAL (clone com id novo a cada
-            # revisão, `propostas_handlers.py:97-98`), enquanto a tarefa
-            # casada por natural key pode carregar o id do clone ANCESTRAL
-            # que a materializou. Passar só `pi_id` deixaria a própria
-            # tarefa de fora da seed e ela nunca voltaria — mandamos os dois
-            # ids (o dela e o da revisão atual) para garantir autocasamento.
+            # revisão: criar uma revisão faz `db.session.add(PropostaItem(...))`
+            # por item de origem, com id novo, setando
+            # `proposta_item_origem_id=(it.proposta_item_origem_id or it.id)`
+            # para preservar a linhagem — `propostas_consolidated.py:1454-1463`),
+            # enquanto a tarefa casada por natural key pode carregar o id do
+            # clone ANCESTRAL que a materializou.
+            #
+            # E não é só "pode": por construção, tem que ser. A idempotência
+            # de camada 1 (`ja_existem`, `:507-517`) já faz `continue` no nó
+            # inteiro se `pi_id` for `gerada_por_proposta_item_id` de
+            # QUALQUER TarefaCronograma da obra — ativa ou arquivada. Todo
+            # caminho que chega aqui já provou que `pi_id` NÃO é o
+            # `gerada_por_proposta_item_id` de nenhuma tarefa existente,
+            # inclusive a que acabou de ser casada por natural key. Passar só
+            # `pi_id` na seed deixaria a própria tarefa de fora SEMPRE, não
+            # só em revisões antigas — mandamos os dois ids (o dela e o da
+            # revisão atual) para garantir autocasamento.
             if not tarefa_serv.ativa:
                 reativar_tarefas_de_itens_reincluidos(
                     obra_id, admin_id,
@@ -697,7 +709,7 @@ def materializar_cronograma(
                     # Task #144 — tarefa equivalente já existe; reusar
                     tarefa = existente
                     # Mesmo caso do nó-raiz: a casada pode estar arquivada, e
-                    # delega ao mesmo restaurador — ver comentário em :609
+                    # delega ao mesmo restaurador — ver comentário em :605
                     # sobre por que os dois ids (o da tarefa e o de `pi_id`)
                     # vão na seed.
                     if not tarefa.ativa:
