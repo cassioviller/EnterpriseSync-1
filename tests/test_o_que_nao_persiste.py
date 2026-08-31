@@ -483,3 +483,86 @@ def test_versao_de_contrato_e_unica_por_tenant_nao_por_obra():
         assert vivas == 3, (
             'a numeração do tenant colidiu com a versão de outro tenant na '
             'mesma obra — uq_contrato_versao_obra_versao não tem admin_id')
+
+
+def test_linha_intocada_nao_vira_alterado_por_arredondamento():
+    """🔴 `services/proposta_diff.py:92` — `dv = _dec(it.subtotal_calculado) -
+    _dec(anterior.subtotal_calculado)`, sem normalizar para centavos.
+
+    `PropostaItem.subtotal_calculado` (`models.py:4029`) devolve o snapshot
+    persistido (`subtotal`, `Numeric(15,2)`) quando existe, e o fallback
+    `quantidade × preco_unitario` (`Numeric(10,3) × Numeric(10,2)`, até 5
+    casas) quando não. Uma linha intocada cujo lado sem snapshot cai no
+    fallback dá diferença de arredondamento — não zero — e sai como
+    'alterado'.
+
+    🔬 Andaime corrigido: o brief original criava o item "sem snapshot" só
+    deixando `subtotal=None` no construtor. Isso não sobrevive — há um
+    listener `before_insert`/`before_update` em `PropostaItem`
+    (`models.py:8380-8383`, `_calc_proposta_item_snapshot`) que preenche
+    `subtotal = quantidade * preco_unitario` sempre que está `None`, e a
+    coluna é `Numeric(15,2)`: o Postgres arredonda o valor ao gravar, então
+    depois do `commit()` (que expira os objetos) os DOIS lados voltam com
+    `subtotal` já arredondado a 2 casas e IGUAIS — o teste passaria verde
+    mesmo com o código velho, sem nunca alcançar o caminho do fallback.
+    Confirmado batendo o cenário num REPL antes de escrever a asserção:
+    sem o passo abaixo, `subtotal_calculado` dos dois lados vinha `14.06`
+    nos dois, e não `14.06`/`14.05560`.
+
+    Por isso o `subtotal` do item ATUAL é zerado por SQL cru DEPOIS do
+    commit — simula o caso real que o comentário de `proposta_diff.py`
+    descreve (item cujo snapshot nunca foi escrito por essa listener: dado
+    migrado antes dela existir, ou uma correção por SQL direto) sem passar
+    pelo ORM, que reagiria e preencheria de novo.
+
+    Os dois itens compartilham `item_numero=1` e não têm
+    `proposta_item_origem_id` — o fallback de linhagem para revisões antigas
+    (`handlers/propostas_handlers.py:42-45`) é o que os pareia.
+    """
+    from decimal import Decimal
+
+    from sqlalchemy import text
+
+    from models import Proposta, PropostaItem
+    # 🔬 Nome conferido (`services/proposta_diff.py:48`):
+    # `diff_versoes(origem, destino) -> list[dict]`. Não existe
+    # `diff_de_propostas`.
+    from services.proposta_diff import diff_versoes
+
+    with app.app_context():
+        t = um_tenant('diff-arred', com_fatos=False)
+
+        def _proposta():
+            # 🔬 Campos NOT NULL conferidos (`models.py:3710-3719`):
+            # `numero`, `cliente_nome`. `data_proposta` tem default.
+            p = Proposta(admin_id=t.admin_id, numero=f'P-{uuid.uuid4().hex[:8]}',
+                        cliente_nome='Cliente Teste')
+            db.session.add(p)
+            db.session.flush()
+            # 🔬 Campos NOT NULL conferidos (`models.py:3960-3966`):
+            # `admin_id`, `item_numero`, `descricao`, `quantidade`,
+            # `unidade`, `preco_unitario`.
+            item = PropostaItem(
+                proposta_id=p.id, admin_id=t.admin_id, item_numero=1,
+                descricao='Item', unidade='m2',
+                quantidade=Decimal('4.505'), preco_unitario=Decimal('3.12'))
+            db.session.add(item)
+            db.session.flush()
+            return p, item
+
+        anterior, item_anterior = _proposta()
+        atual, item_atual = _proposta()
+        db.session.commit()
+
+        # Zera o snapshot do item ATUAL por fora do ORM — ver docstring.
+        db.session.execute(
+            text('UPDATE proposta_itens SET subtotal = NULL WHERE id = :id'),
+            {'id': item_atual.id})
+        db.session.commit()
+        db.session.expire_all()
+
+        linhas = diff_versoes(anterior, atual)
+        situacoes = {l['situacao'] for l in linhas}
+        assert situacoes == {'mantido'}, (
+            f'linha intocada saiu como {situacoes} — a diferença é só o '
+            f'arredondamento do snapshot')

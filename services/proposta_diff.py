@@ -21,13 +21,32 @@ lados têm `origem_id` NULL e cada item seria raiz de si mesmo.
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 logger = logging.getLogger(__name__)
+
+CENTAVO = Decimal('0.01')
 
 
 def _dec(v) -> Decimal:
     return Decimal(str(v or 0))
+
+
+def _em_centavos(v) -> Decimal:
+    """Dinheiro se compara em centavos.
+
+    `subtotal_calculado` devolve `Numeric(15,2)` quando há snapshot
+    persistido e o produto `quantidade × preco_unitario` (até 5 casas,
+    `Numeric(10,3) × Numeric(10,2)`) quando não há. Sem normalizar, o caso
+    misto — item sem snapshot ao lado de item com snapshot — fazia linha
+    INTOCADA dar diferença de arredondamento (ex.: 0.00315) e sair como
+    'alterado'. `subtotal_calculado` nunca tem mais de 2 casas com
+    significado monetário real neste sistema: o snapshot persistido já é
+    `Numeric(15,2)`, e o próprio total é sempre exibido e conferido em
+    centavos — então uma diferença abaixo de um centavo não é "real" em
+    nenhum contexto que este diff alimenta.
+    """
+    return _dec(v).quantize(CENTAVO, rounding=ROUND_HALF_UP)
 
 
 def _chaves(item) -> list:
@@ -89,7 +108,16 @@ def diff_versoes(origem, destino) -> list[dict]:
         # todo item fora do caminho de explosão da Task #89, e NULL − NULL = 0
         # fazia revisão que muda só o preço sair como "mantido" com impacto
         # R$ 0,00.
-        dv = _dec(it.subtotal_calculado) - _dec(anterior.subtotal_calculado)
+        #
+        # Em centavos, os dois lados: `subtotal_calculado` mistura snapshot
+        # de 2 casas com produto cru de até 5, e uma linha intocada cujo lado
+        # sem snapshot cai no fallback dava diferença de arredondamento — não
+        # zero — e saía como "alterado". `delta_quantidade` (`dq`, acima)
+        # continua SEM arredondar de propósito: uma edição real de
+        # quantidade, por menor que seja, tem que continuar acusando
+        # "alterado" mesmo que o impacto em reais fique abaixo do centavo.
+        dv = _em_centavos(it.subtotal_calculado) - _em_centavos(
+            anterior.subtotal_calculado)
         mudou = (dq != 0 or dv != 0
                  or (it.descricao or '') != (anterior.descricao or '')
                  or (it.unidade or '') != (anterior.unidade or ''))

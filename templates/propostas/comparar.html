@@ -75,8 +75,12 @@
             <td class="text-end">{{ l.origem and '%.2f'|format(l.origem.quantidade or 0)|replace('.', ',') or '—' }}</td>
             <td class="text-end">{{ l.destino and '%.2f'|format(l.destino.quantidade or 0)|replace('.', ',') or '—' }}</td>
             <td class="text-end">{{ l.delta_quantidade is not none and ('%.2f'|format(l.delta_quantidade)|replace('.', ',')) or '—' }}</td>
-            <td class="text-end">{{ l.origem and '%.2f'|format(l.origem.subtotal or 0)|replace('.', ',') or '—' }}</td>
-            <td class="text-end">{{ l.destino and '%.2f'|format(l.destino.subtotal or 0)|replace('.', ',') or '—' }}</td>
+            {# `subtotal_calculado`, nunca `subtotal` cru: é o mesmo valor que o
+               diff usa para classificar a linha (services/proposta_diff.py:92)
+               — com `subtotal` cru, o caso de snapshot NULL renderizava
+               0,00 aqui e um Δ Valor bem diferente na última coluna. #}
+            <td class="text-end">{{ l.origem and '%.2f'|format(l.origem.subtotal_calculado or 0)|replace('.', ',') or '—' }}</td>
+            <td class="text-end">{{ l.destino and '%.2f'|format(l.destino.subtotal_calculado or 0)|replace('.', ',') or '—' }}</td>
             <td class="text-end fw-semibold">{{ l.delta_valor is not none and ('%.2f'|format(l.delta_valor)|replace('.', ',')) or '—' }}</td>
           </tr>
         {% else %}
