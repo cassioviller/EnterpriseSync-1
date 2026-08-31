@@ -1,6 +1,74 @@
 # Onda 2 — O Tenant Para de Vazar Implementation Plan
 
-> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — pronto para executar** — 8 tasks. A Task 1 é **medição obrigatória antes de corrigir**: consertar o resolvedor torna invisível, de uma vez, todo dado carimbado no tenant fantasma.
+> **Estado em 2026-08-31 (conferência doc-contra-código):** ✅ **FECHADO — 8/8
+> tasks.** O cabeçalho dizia "ABERTO — pronto para executar" havia seis dias; a
+> onda foi implementada e mergeada em `fed8f19b` ("merge: a Onda 2 (o tenant
+> para de vazar) entra na main", 26/08) — um implementador só descobriu o fecho
+> ao tentar criar um arquivo que já existia. Ledger da execução (21 rulings) em
+> `docs/auditoria/execucao-onda-2-tenant-2026-08-26.md`; os 15 achados estão
+> marcados inline em `docs/auditoria/achados-code-review-2026-08-25.md` com o
+> commit que fechou cada um (`0139dcb7`). Gate no merge: **2753 passed, 6
+> skipped, 2 xfailed**.
+>
+> 🔬 **As 8 tasks, reconferidas na fonte em 31/08, uma a uma:**
+> 1. Medir o estrago — `scripts/medir_tenant_fantasma.py` existe e roda contra
+>    um banco real. Ver resíduo abaixo: a medição de hoje é **parcial**.
+> 2. O resolvedor único — 📖 `utils/tenant.py:15` define
+>    `get_tenant_admin_id()`. `multitenant_helper.py` não tem mais lógica
+>    própria: `get_admin_id()` faz `from utils.tenant import
+>    get_tenant_admin_id; return get_tenant_admin_id()` — a divergência em
+>    `GESTOR_EQUIPES`/`ALMOXARIFE` que mandava para um tenant inexistente
+>    desapareceu.
+> 3. Morre o `return 10` — 🔬 `grep -n "return 10" multitenant_helper.py
+>    views/rdo.py` não devolve nada.
+> 4. O portal do cliente para de mostrar compra interna — 🔬
+>    `portal_obras_views.py:326-330` acrescentou `tipo_compra='aprovacao_cliente'`
+>    ao filtro de `compras_resolvidas`, com comentário citando o próprio
+>    achado; `_get_compra_do_portal` é usado nas 4 rotas do plano.
+> 5. FK vinda de formulário, validada num lugar só — 🔬 `utils/fk_do_tenant.py`
+>    existe: `fk_do_tenant(modelo, valor, admin_id, *, campo,
+>    obrigatorio=False)`, mesma doutrina de mensagem genérica do achado
+>    original.
+> 6. O `setattr` cego — 🔬 `veiculos_services.py` tem a lista branca
+>    `CAMPOS_EDITAVEIS_VEICULO` e o laço em `atualizar_veiculo` (`:188`) pula
+>    todo campo fora dela antes do `setattr`; `admin_id` não está na lista.
+> 7. As consultas que esqueceram `admin_id` — 🔬 `almoxarifado_utils.py:257`
+>    filtra `xml_hash` **e** `admin_id`; `ponto_service.py` escopa
+>    `ConfiguracaoHorario` por `admin_id=registro.admin_id`;
+>    `contabilidade_views.py` tem os dois pontos do plano escopados por
+>    `admin_id`.
+> 8. Falhar fechado, apagar armadilhas — 🔬 `vinculos_audit_views.py:_admin_id()`
+>    delega para `require_tenant()`; `grep -n "def get_tenant_filter\|def
+>    can_access_data" auth.py` não devolve nada — os dois helpers mortos foram
+>    apagados.
+>
+> ⚠️ **Três achados fora do escopo, registrados em `77d885a9` no plano-mãe e
+> ainda abertos** — a próxima onda deveria pegar primeiro:
+> 1. Restam **~11 resolvedores de tenant com lógica própria**
+>    (`clientes_views`, `crm_views`, `equipe_views`, `views/metricas_views`,
+>    `subempreiteiros_views`, `views/almoxarifado/__init__.py` e outros) no
+>    padrão `admin_id if set else current_user.id` — o mesmo defeito que a
+>    Task 2 fechou, vivo noutros módulos. O de
+>    `views/almoxarifado/__init__.py` é o mais urgente: alimenta
+>    `fk_do_tenant`.
+> 2. Os 8 módulos que importavam `multitenant_helper` somam **225 usos de
+>    `admin_id` em query e zero guardas de `None`**.
+> 3. **Padrão sistêmico:** `except Exception` dos handlers engole a
+>    `HTTPException` de `abort()`, então o 400/403 das guardas às vezes não
+>    chega ao cliente. Faltam 6 handlers no idioma `except HTTPException:
+>    raise` que `views/rdo.py` já usa em 9 lugares.
+>
+> ⚠️ **Resíduo da Task 1, medido em 31/08:** `scripts/medir_tenant_fantasma.py`
+> rodado hoje contra o banco de DEV devolveu **0 registros no tenant fantasma
+> em 402 pares (usuário, tabela)** — mas a medição é **PARCIAL**, porque 2 das
+> 8 tabelas do escopo não existem com aquele nome: `custo_escritorio` não
+> existe em `models.py`, e `reembolso` é na verdade `reembolso_funcionario`.
+> Nessas duas, "0" significa "não medido", não "zero confirmado". E é dev:
+> **produção continua sendo o número que decide**, e ninguém mediu produção.
+>
+> ⚠️ **A régua de gate escrita nas Global Constraints abaixo ("2560 passed, 6
+> skipped, 201 deselected, 2 xfailed") está DESATUALIZADA.** O piso medido em
+> 31/08 é **2854 passed, 6 skipped, 201 deselected, 2 xfailed**.
 >
 > Escrito na varredura de 25/08. Índice de estado de todos os planos e specs em
 > `docs/planos-em-aberto-2026-08-25.md`.
