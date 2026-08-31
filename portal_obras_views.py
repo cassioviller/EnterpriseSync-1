@@ -640,12 +640,23 @@ def aprovar_compra(token: str, compra_id: int):
         flash('Compra aprovada com sucesso!', 'success')
     except Exception as e:
         db.session.rollback()
-        logger.error(f"[PORTAL] Erro ao aprovar compra {compra_id}: {e}", exc_info=True)
-        # A trilha da tentativa sobrevive ao rollback: registra e commita só ela.
-        _registrar_acesso(obra, 'compra_aprovar', 'pedido_compra', compra_id,
-                          {'resultado': 'erro'})
-        db.session.commit()
-        flash(f'Erro ao aprovar compra: {e}', 'danger')
+        logger.error(f"[PORTAL] Erro ao aprovar compra {compra_id}: {e}",
+                     exc_info=True)
+        # A trilha da tentativa sobrevive ao rollback: registra e commita só
+        # ela — mas o commit da AUDITORIA não pode derrubar o handler. Sem
+        # esta guarda, uma falha aqui virava 500 cru para visitante anônimo,
+        # onde antes havia mensagem tratada.
+        try:
+            _registrar_acesso(obra, 'compra_aprovar', 'pedido_compra',
+                              compra_id, {'resultado': 'erro'})
+            db.session.commit()
+        except Exception as e_trilha:
+            db.session.rollback()
+            logger.error(f"[PORTAL] trilha da falha não gravou: {e_trilha}")
+        # `str(e)` traz SQL e parâmetros vinculados, e quem lê isto é um
+        # portador de token NÃO autenticado. Detalhe vive no log.
+        flash('Não foi possível aprovar a compra. O erro foi registrado; '
+              'acione o responsável pela obra.', 'danger')
 
     return redirect(url_for('portal_obras.portal_obra', token=token))
 
