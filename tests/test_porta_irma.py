@@ -11,6 +11,7 @@ sobre a instância que o defeito da vez expôs.
 import os
 import sys
 import uuid
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -585,3 +586,104 @@ def test_ponto_facial_nao_pula_geofencing_por_obra_id(
         depois = RegistroPonto.query.filter_by(funcionario_id=func_id).count()
         assert depois == antes, (
             f'{caso}: gravou ponto sem passar pelo geofencing')
+
+
+# ---------------------------------------------------------------------------
+# Task 6 — a guarda que não via o RDO irmão do mesmo dia
+# ---------------------------------------------------------------------------
+
+def _tarefa_e_dois_rdos(prefixo, dia, **kwargs_tarefa):
+    """Uma tarefa e DOIS RDOs da mesma obra no MESMO dia.
+
+    Dois RDOs, não um: `registrar_apontamento` faz UPSERT por (rdo, tarefa),
+    então um só atualizaria a própria linha e não exercitaria a janela do
+    acumulado anterior — que é o que está sob teste.
+    """
+    from models import RDO, TarefaCronograma
+
+    t = um_tenant(prefixo, com_fatos=False)
+    campos = dict(obra_id=t.obra_id, admin_id=t.admin_id,
+                  nome_tarefa=f'Tarefa {uuid.uuid4().hex[:6]}', ordem=0,
+                  responsavel='propria', duracao_dias=10,
+                  percentual_concluido=0.0)
+    campos.update(kwargs_tarefa)
+    tarefa = TarefaCronograma(**campos)
+    db.session.add(tarefa)
+
+    rdos = []
+    for sufixo in ('A', 'B'):
+        r = RDO(numero_rdo=f'RDO-{uuid.uuid4().hex[:8]}-{sufixo}',
+                obra_id=t.obra_id, data_relatorio=dia, local='Campo',
+                admin_id=t.admin_id)
+        db.session.add(r)
+        rdos.append(r)
+    db.session.commit()
+    return t, tarefa, rdos[0], rdos[1]
+
+
+def test_retrocesso_e_barrado_entre_rdos_do_mesmo_dia():
+    """🔴 `cronograma_apontamento_service.py:398` — janela com `<` estrito.
+
+    O commit `ed85d117` afirma, em `views/rdo.py:4035`, que dois RDOs na
+    mesma obra e mesmo dia são estado LEGAL (a diária é rateada entre eles).
+    E `recomputar_cadeia` (`:183`) reprocessa em ordem `(data_relatorio,
+    id)`, logo ENXERGA o irmão do mesmo dia.
+
+    A guarda não enxergava: RDO A do dia 20 registra acumulado 120
+    (superexecução confirmada); RDO B, mesma obra e MESMO dia 20, registra
+    50. `pct_ant` lia só o estritamente anterior ao dia 20, achava 0, e
+    50 > 0 passava. O recompute depois virava isso em incremento de −70.
+    """
+    from services.cronograma_apontamento_service import (
+        RetrocessoNaoPermitido, registrar_apontamento)
+
+    with app.app_context():
+        t, tarefa, rdo_a, rdo_b = _tarefa_e_dois_rdos(
+            'retro-mesmo-dia', date(2026, 8, 20))
+
+        # 🔬 `quantidade_dia` XOR `percentual_acumulado` (`:311`). A
+        # superexecução de 120 exige `permitir_sobreexecucao=True`, senão a
+        # guarda de SOBRE-execução barra antes e o teste provaria a guarda
+        # errada.
+        registrar_apontamento(rdo_a, tarefa, percentual_acumulado=120.0,
+                              admin_id=t.admin_id,
+                              permitir_sobreexecucao=True)
+        db.session.commit()
+
+        with pytest.raises(RetrocessoNaoPermitido):
+            registrar_apontamento(rdo_b, tarefa, percentual_acumulado=50.0,
+                                  admin_id=t.admin_id)
+
+
+def test_acumulado_quantitativo_enxerga_o_rdo_irmao_do_mesmo_dia():
+    """🔴 A porta irmã DENTRO da Task 6: `acum_ant` (`:378`) tem a MESMA
+    janela estrita de `pct_ant` (`:398`).
+
+    O plano só nomeia o `pct_ant`. Mas o modo quantitativo soma
+    `quantidade_executada_dia` na mesma janela `RDO.data_relatorio <
+    rdo.data_relatorio` — e `recomputar_cadeia` acumula percorrendo as
+    linhas em `(data_relatorio, id)`, somando o irmão do mesmo dia como
+    qualquer outro. Consertar só o percentual e deixar o quantitativo é
+    literalmente o padrão que este plano existe para fechar.
+
+    Cenário: tarefa de 100 un. RDO A do dia 20 executa 30 un. RDO B, mesmo
+    dia, executa 40. O acumulado de B tem de ser 70 — não 40.
+    """
+    from services.cronograma_apontamento_service import registrar_apontamento
+
+    with app.app_context():
+        t, tarefa, rdo_a, rdo_b = _tarefa_e_dois_rdos(
+            'acum-mesmo-dia', date(2026, 8, 20),
+            unidade_medida='un', quantidade_total=100.0)
+
+        registrar_apontamento(rdo_a, tarefa, quantidade_dia=30.0,
+                              admin_id=t.admin_id)
+        db.session.commit()
+
+        ap_b = registrar_apontamento(rdo_b, tarefa, quantidade_dia=40.0,
+                                     admin_id=t.admin_id)
+        db.session.commit()
+
+        assert float(ap_b.quantidade_acumulada) == 70.0, (
+            'o acumulado de B ignorou as 30 un do RDO irmão do mesmo dia — '
+            f'leu {ap_b.quantidade_acumulada}, e o recompute lê 70')

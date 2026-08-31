@@ -308,6 +308,46 @@ def recomputar_cadeia(tarefa_id: int, a_partir_de, admin_id: int) -> int:
     return alteradas
 
 
+def _janela_anterior(rdo, linha_propria_id):
+    """Tudo que `recomputar_cadeia` processaria ANTES desta linha.
+
+    A janela era `RDO.data_relatorio < rdo.data_relatorio`, ESTRITA — o RDO
+    irmão do MESMO dia ficava invisível. E `views/rdo.py:4035` afirma, no
+    mesmo commit que escreveu esta guarda, que dois RDOs na mesma obra e
+    mesmo dia são estado legal: a diária é rateada entre eles.
+    `recomputar_cadeia` (:183) já ordena por `(data_relatorio, id)` e soma o
+    irmão como qualquer outra linha. Os dois discordavam, e o apontamento que
+    a guarda deixava passar era o que o recompute depois virava incremento
+    negativo — a forma exata do defeito que este serviço foi escrito para
+    corrigir, um eixo ao lado.
+
+    O desempate usa o id do APONTAMENTO, não o do RDO, porque é o que o
+    recompute usa. Duas situações:
+
+    - linha nova (`linha_propria_id is None`): ela receberá o maior id do
+      dia, então TODO irmão do mesmo dia vem antes dela;
+    - UPSERT de linha existente: só os irmãos com id menor vêm antes — ler os
+      de id maior poria esta linha à frente de si mesma no tempo.
+
+    O `rdo_id != rdo.id` fecha o caso degenerado que sobra: sem ele,
+    reprocessar o próprio RDO leria o apontamento que ele mesmo acabou de
+    gravar, e a guarda barraria a própria escrita.
+    """
+    from sqlalchemy import and_, or_
+
+    mesmo_dia = [
+        RDO.data_relatorio == rdo.data_relatorio,
+        RDOApontamentoCronograma.rdo_id != rdo.id,
+    ]
+    if linha_propria_id is not None:
+        mesmo_dia.append(RDOApontamentoCronograma.id < linha_propria_id)
+
+    return or_(
+        RDO.data_relatorio < rdo.data_relatorio,
+        and_(*mesmo_dia),
+    )
+
+
 def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
                           percentual_acumulado=None,
                           admin_id,
@@ -358,6 +398,16 @@ def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
 
     from sqlalchemy import func as sqlfunc
 
+    # O id da PRÓPRIA linha (None se ainda não existe) — o UPSERT lá embaixo
+    # (:471) busca a mesma coisa, mas as janelas abaixo precisam dele ANTES,
+    # para saber quais irmãos do mesmo dia vêm antes desta linha.
+    linha_propria_id = (
+        db.session.query(RDOApontamentoCronograma.id)
+        .filter_by(rdo_id=rdo.id, tarefa_cronograma_id=tarefa.id)
+        .scalar()
+    )
+    janela_anterior = _janela_anterior(rdo, linha_propria_id)
+
     # Acumulado ANTES deste RDO — soma dos dias em RDOs com data anterior,
     # IGNORANDO as linhas gravadas em percentual.
     #
@@ -374,7 +424,7 @@ def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
         .filter(
             RDOApontamentoCronograma.tarefa_cronograma_id == tarefa.id,
             RDOApontamentoCronograma.admin_id == admin_id,
-            RDO.data_relatorio < rdo.data_relatorio,
+            janela_anterior,
             sqlfunc.coalesce(
                 RDOApontamentoCronograma.tipo_apontamento, '') != 'percentual',
         )
@@ -395,7 +445,7 @@ def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
         .filter(
             RDOApontamentoCronograma.tarefa_cronograma_id == tarefa.id,
             RDOApontamentoCronograma.admin_id == admin_id,
-            RDO.data_relatorio < rdo.data_relatorio,
+            janela_anterior,
         )
         .order_by(RDO.data_relatorio.desc(), RDOApontamentoCronograma.id.desc())
         .first()
