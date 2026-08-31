@@ -7620,8 +7620,21 @@ class ObraContratoVersao(db.Model):
         # travando a obra — a 315 consertou a irmã e deixou esta, e o único
         # efeito foi mudar o NOME da constraint no IntegrityError. Migration
         # 316.
-        db.UniqueConstraint('obra_id', 'admin_id', 'versao',
-                            name='uq_contrato_versao_obra_versao'),
+        #
+        # Fix round 1/5 da 316: declarado como `db.Index(unique=True)` — NÃO
+        # `db.UniqueConstraint` (a 1ª versão desta correção) — de propósito,
+        # igual à irmã `uq_contrato_versao_vigente` logo acima. `create_all()`
+        # roda ANTES das migrações em todo boot, inclusive em banco NOVO
+        # (`app.py:589-613`); com `UniqueConstraint`, um banco novo ganhava
+        # esse nome como CONSTRAINT genuína (`ALTER TABLE ADD CONSTRAINT`),
+        # enquanto a migration 316 (e a 271 antes dela) sempre mexeram nele
+        # como ÍNDICE solto (`DROP/CREATE INDEX`) — e `DROP INDEX` numa
+        # constraint falha com `DependentObjectsStillExist` (reproduzido ao
+        # vivo: o índice pertence à constraint, `IF EXISTS` não salva). Usar
+        # `db.Index` aqui elimina a dualidade na raiz: `create_all()` e a
+        # migration passam a produzir sempre o MESMO objeto físico.
+        db.Index('uq_contrato_versao_obra_versao', 'obra_id', 'admin_id',
+                 'versao', unique=True),
     )
 
     id = db.Column(db.Integer, primary_key=True)

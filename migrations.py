@@ -7426,22 +7426,34 @@ def _migration_316_versao_contrato_por_tenant():
     (obra_id, versao) para (obra_id, admin_id, versao) é AFROUXAR, então toda
     linha existente continua válida — mas se já houver duplicata no trio
     novo, a constraint não nasce. Daí a checagem explícita. Idempotente:
-    DROP IF EXISTS + checagem + CREATE, sempre nessa ordem — a dupla
-    execução sempre começa derrubando o objeto de antes (novo ou velho,
-    tanto faz o formato) e termina recriando o mesmo, no mesmo estado;
+    detecta o formato físico + checagem + CREATE, sempre nessa ordem — a
+    dupla execução sempre começa derrubando o objeto de antes (qualquer que
+    seja o formato) e termina recriando o mesmo índice, no mesmo estado;
     nunca tenta criar sobre um objeto que já existe.
 
-    🔬 O objeto físico NÃO é uma constraint: a migration 271
-    (`migrations.py:5788`) criou `uq_contrato_versao_obra_versao` como
-    `CREATE UNIQUE INDEX`, não `ALTER TABLE ... ADD CONSTRAINT` — apesar de
-    o modelo declarar `db.UniqueConstraint(...)`. Conferido no banco real
-    (`pg_constraint` não tem essa linha; `pg_indexes` tem). Um primeiro
-    rascunho desta migration usava `DROP/ADD CONSTRAINT` e falhava com
-    `DuplicateTable` no ADD: o DROP CONSTRAINT não achava nada para
-    derrubar (o nome pertence a um índice, não a uma constraint), e o
-    CREATE colidia com o índice que sobrava. Por isso aqui é
-    `DROP INDEX` / `CREATE UNIQUE INDEX`, o mesmo mecanismo que a 271 usou
-    e que a 315 usa para a irmã.
+    🔬 Fix round 1/5: dois formatos físicos possíveis, não um só.
+    Em produção (banco já existente antes desta migration), o objeto é um
+    ÍNDICE solto — a migration 271 (`migrations.py:5788`) criou
+    `uq_contrato_versao_obra_versao` via `CREATE UNIQUE INDEX`, não
+    `ALTER TABLE ... ADD CONSTRAINT` (confirmado consultando `pg_indexes` /
+    `pg_constraint` no banco real; só aparece no primeiro). Mas
+    `db.create_all()` roda ANTES das migrações em TODO boot, inclusive
+    banco NOVO (`app.py:589-613`) — e antes desta correção o modelo
+    declarava `db.UniqueConstraint(...)`, então um banco nascido do zero
+    ganhava esse nome como CONSTRAINT genuína (`ALTER TABLE ADD
+    CONSTRAINT`). `DROP INDEX` sobre uma constraint falha com
+    `DependentObjectsStillExist` — reproduzido ao vivo numa tabela
+    descartável (`_rev_scratch`) pelo coordenador desta task; `IF EXISTS`
+    não salva porque o erro não é "não existe", é "existe e tem
+    dependente". O modelo (`models.py:7616` em diante) foi corrigido nesta
+    mesma rodada para `db.Index(unique=True)`, igual à irmã
+    `uq_contrato_versao_vigente` — isso fecha a fonte do problema para
+    QUALQUER banco criado a partir de agora. Mas um banco já nascido entre
+    o commit anterior (`UniqueConstraint`) e este (`Index`) — CI, dev,
+    disaster-recovery rodado nesse intervalo — pode já ter a forma
+    CONSTRAINT gravada. Por isso a migration detecta o formato em
+    `pg_constraint` antes de agir, em vez de assumir qual dos dois vai
+    encontrar.
 
     Verificado sobre os dados reais em 31/08 (leitura, antes de escrever
     esta migration): 73420 linhas em `obra_contrato_versao`, zero colisão em
@@ -7451,8 +7463,24 @@ def _migration_316_versao_contrato_por_tenant():
     """
     from sqlalchemy import text as sa_text
     with db.engine.begin() as conn:
-        conn.execute(sa_text(
-            "DROP INDEX IF EXISTS uq_contrato_versao_obra_versao"))
+        tipo = conn.execute(sa_text(
+            "SELECT c.contype FROM pg_constraint c "
+            "JOIN pg_class t ON t.oid = c.conrelid "
+            "WHERE t.relname = 'obra_contrato_versao' "
+            "AND c.conname = 'uq_contrato_versao_obra_versao'"
+        )).scalar()
+        if tipo is not None:
+            # Existe como CONSTRAINT genuína — DROP INDEX falharia com
+            # DependentObjectsStillExist (o índice pertence à constraint).
+            conn.execute(sa_text(
+                "ALTER TABLE obra_contrato_versao "
+                "DROP CONSTRAINT uq_contrato_versao_obra_versao"))
+        else:
+            # Ausente, ou presente como ÍNDICE solto (forma real de
+            # produção, herdada da migration 271) — IF EXISTS cobre os
+            # dois casos sem erro.
+            conn.execute(sa_text(
+                "DROP INDEX IF EXISTS uq_contrato_versao_obra_versao"))
         colisoes = conn.execute(sa_text(
             "SELECT obra_id, admin_id, versao, count(*) "
             "FROM obra_contrato_versao "
@@ -7464,6 +7492,9 @@ def _migration_316_versao_contrato_por_tenant():
             raise RuntimeError(
                 f"obra_contrato_versao tem {len(colisoes)} colisao(oes) em "
                 f"(obra_id, admin_id, versao) — resolva antes: {colisoes[:5]}")
+        # Sempre recria como ÍNDICE — a forma que o modelo agora declara
+        # (`db.Index(unique=True)`) e que `create_all()` produzirá em
+        # qualquer banco novo daqui em diante, eliminando a dualidade.
         conn.execute(sa_text(
             "CREATE UNIQUE INDEX uq_contrato_versao_obra_versao "
             "ON obra_contrato_versao (obra_id, admin_id, versao)"))
