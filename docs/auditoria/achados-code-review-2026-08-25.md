@@ -926,34 +926,29 @@ mesmos filtros e a mesma guarda `anterior <= 0`, e roda antes do ramo antecipado
 | A5 | `ponto_views.py:2454` | Omitir `obra_id` (ou mandar um irresolvível) pulava o geofencing inteiro. A tela veio junto: dizia "Obra (opcional)" e mandava `obra_id: obraId \|\| null`, então o caminho padrão passaria a tomar 400 | `b3af3549` |
 | A6 | `services/cronograma_apontamento_service.py:398` | Janela de `pct_ant` com `<` estrito não via o RDO irmão do mesmo dia. **A porta irmã estava dentro do próprio achado:** `acum_ant` (`:378`) tinha a janela idêntica no modo quantitativo — RDO B lia acumulado 40 onde o recompute lê 70 | `7d494cb9` |
 
-### 🔴 Abertos — os cinco que sobraram
+### ✅ Corrigidos pelo plano "O Que Não Persiste" (31/08)
 
-> Causa diferente: escrita que não chega ao banco, ou chega pela metade. Plano
-> próprio em `docs/superpowers/plans/2026-08-28-o-que-nao-persiste.md`.
+> Plano: `docs/superpowers/plans/2026-08-28-o-que-nao-persiste.md`. TDD com RED
+> citado em todas as tasks. **Gate de fecho: 2872 passed, 6 skipped, 201
+> deselected, 2 xfailed, 0 failed** (46min44s) — 18 verdes acima do piso de
+> 2854 deixado pela onda "A Porta Irmã", e o skipped ficou nos mesmos 6.
 
-- 📖 `portal_obras_views.py:647` — `db.session.commit()` sem guarda dentro do
-  `except`, e a linha 648 relaia a exceção crua para visitante **anônimo**.
+| # | Arquivo:linha | Defeito | Commit |
+|---|---|---|---|
+| N1 | `portal_obras_views.py:647` | `db.session.commit()` sem guarda dentro do `except`, e a linha 648 relaiando a exceção crua para visitante **anônimo**. O commit da trilha de erro ganhou guarda própria, e a exceção parou de subir para o anônimo | `42c17ddb` |
+| N2 | `models.py:7616` | A migration 315 alargou `uq_contrato_versao_vigente` para `(obra_id, admin_id)` e deixou a irmã `uq_contrato_versao_obra_versao` como `UNIQUE(obra_id, versao)`, enquanto `abrir_versao` numera por tenant: a obra travada continuava travada. Migration 316 dá o `admin_id` à irmã. **A porta irmã apareceu dentro do próprio fix:** `create_all()` roda ANTES das migrações em todo boot, então em banco novo o modelo criava a irmã como CONSTRAINT genuína enquanto a 316 sempre a tratou como ÍNDICE solto — `DROP INDEX` estourava `DependentObjectsStillExist`, e `IF EXISTS` não salvava | `416967b9` `f906e20f` |
+| N3 | `services/cronograma_proposta.py:609,685` | `if not tarefa.ativa: tarefa.ativa = True` reimplementava, incompleto, o `reativar_tarefas_de_itens_reincluidos` do mesmo módulo: não limpava `arquivada_em` nem cascateava para as filhas arquivadas. Os dois ramos de reúso passam a delegar ao restaurador | `e404a5e8` `22fa7e4e` `915462d0` |
+| N4 | `services/proposta_diff.py:92` | Comparava o snapshot `Numeric(15,2)` com o produto `quantidade × preco_unitario` não arredondado (até 5 casas): linha intocada virava "alterado", e `templates/propostas/comparar.html:78-79` imprimia um valor diferente do que o diff usava. A classificação passou a comparar em centavos e a tela mostra o mesmo número. **Fix round:** `total_do_diff` misturava centavos com valor cru e arredondava linha a linha — um reajuste distribuído por muitos itens, cada delta abaixo de meio centavo, somaria zero apesar do impacto agregado; agora soma bruto e arredonda uma vez só, no fim | `6ce5c90a` `aba6df97` |
+| N5 | `portal_obras_views.py:774,696,786,939` | O redesenho "um evento commitado por tentativa" tinha sido aplicado a 2 das 6 rotas que registram trilha; `ver_comprovante` registrava e devolvia `send_file` sem commit algum, e **toda visualização de comprovante pelo cliente sumia no `session.remove()`**. As seis rotas commitam, e a tentativa recusada também deixa rastro | `b581da0d` |
 
-- 📖 `models.py:7616` — a migration 315 alargou `uq_contrato_versao_vigente` para
-  `(obra_id, admin_id)` e deixou a irmã `uq_contrato_versao_obra_versao` como
-  `UNIQUE(obra_id, versao)`, sem escopo de tenant, enquanto `abrir_versao`
-  numera por tenant. A obra travada continua travada — só muda o nome da
-  constraint no erro.
-
-- 📖 `services/cronograma_proposta.py:609,685` — o `if not tarefa.ativa:
-  tarefa.ativa = True` reimplementa, incompleto, o
-  `reativar_tarefas_de_itens_reincluidos` do mesmo módulo (`:892-965`): não limpa
-  `arquivada_em` nem cascateia para as filhas arquivadas.
-
-- 📖 `services/proposta_diff.py:92` — compara `subtotal_calculado` (snapshot
-  `Numeric(15,2)` do banco) com o produto `quantidade × preco_unitario` não
-  arredondado (até 5 casas): linha intocada vira "alterado". E
-  `templates/propostas/comparar.html:78-79` não acompanhou a mudança.
-
-- 📖 `portal_obras_views.py:774,696,786,939` — o redesenho "um evento commitado
-  por tentativa" foi aplicado a 2 das 6 rotas que registram trilha. `ver_comprovante`
-  registra e devolve `send_file` sem commit algum: **toda visualização de
-  comprovante pelo cliente some no `session.remove()`**.
+⚠️ **O padrão do teste que nasce verde reapareceu aqui**, agora dentro do
+próprio fix round: `test_reuso_por_chave_natural_restaura_a_tarefa_arquivada`
+contava ocorrências de `.ativa = True` no fonte com `inspect.getsource()` — o
+padrão que estes planos existem para eliminar — e **reprovava a melhora de
+comportamento** do N3, porque delegar ao restaurador derrubava a contagem de 3
+para 1. Reescrito em `915462d0` para provar pelo banco, via
+`materializar_cronograma`, que o ramo de reúso em nível inferior restaura
+`ativa`, limpa `arquivada_em` e cascateia para a neta arquivada.
 
 ### ✅ Um achado sobre o próprio gate — fechado pela Task 7 (`dd8ff183`)
 

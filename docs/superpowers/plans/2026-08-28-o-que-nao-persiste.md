@@ -1,6 +1,30 @@
 # O Que Não Persiste, e o Que Persiste Pela Metade Implementation Plan
 
-> **Estado em 2026-08-28:** 🟡 **ABERTO — pronto para executar** — 6 tasks.
+> **Estado em 2026-08-31:** ✅ **FECHADO — 6/6 tasks.** Gate de fecho na branch
+> `sdd/a-porta-irma`: **2872 passed, 6 skipped, 201 deselected, 2 xfailed, 0
+> failed** (46min44s) — 18 verdes acima do piso de 2854, e o skipped ficou nos
+> mesmos 6 (nenhuma cobertura saiu do gate). Os cinco achados estão marcados
+> como corrigidos em `docs/auditoria/achados-code-review-2026-08-25.md`, seção
+> "✅ Corrigidos pelo plano 'O Que Não Persiste' (31/08)", com o commit de cada
+> um.
+>
+> | Task | Commit |
+> |---|---|
+> | 1 — o `except` do portal para de commitar às cegas | `42c17ddb` |
+> | 2 — a trilha existe nas seis rotas | `b581da0d` |
+> | 3 — a reativação inline delega ao restaurador | `e404a5e8` `22fa7e4e` `915462d0` |
+> | 4 — a constraint irmã de versão ganha o tenant (migration 316) | `416967b9` `f906e20f` |
+> | 5 — o diff de proposta compara maçã com maçã | `6ce5c90a` `aba6df97` |
+> | 6 — o gate, e o fecho | este bloco |
+>
+> ⚠️ **Dois fix rounds, e os dois vieram de porta irmã.** A migration 316
+> falhava em banco novo porque `create_all()` cria a irmã como CONSTRAINT
+> enquanto a migration a tratava como ÍNDICE (`f906e20f`); e o
+> `total_do_diff` continuava misturando centavos com valor cru depois do fix
+> da Task 5 (`aba6df97`). Um terceiro achado foi sobre o próprio teste: um
+> teste da Onda 5 provava por `inspect.getsource()` e reprovava a melhora de
+> comportamento da Task 3 — reescrito para provar pelo banco (`915462d0`).
+>
 > Nasceu do `/code-review max` sobre a branch da Onda 5. Evidência em
 > `docs/auditoria/achados-code-review-2026-08-25.md`, seção "Achados do
 > `/code-review max` sobre a branch da Onda 5 (28/08)".
@@ -829,7 +853,7 @@ git commit -m "fix(proposta): o diff compara em centavos, e a tela de comparar m
 **Files:**
 - Nenhum. Só verificação.
 
-- [ ] **Step 1: Rodar o gate inteiro**
+- [x] **Step 1: Rodar o gate inteiro**
 
 Run: `bash run_tests.sh --gate`
 Expected: **2840 passed, 10 skipped, 201 deselected, 2 xfailed** — ou mais
@@ -843,12 +867,12 @@ Skip subindo é cobertura saindo sem aviso.
 ler o resultado do gate — migration não aplicada faz o teste passar pelo motivo
 errado.
 
-- [ ] **Step 2: Marcar os achados**
+- [x] **Step 2: Marcar os achados**
 
 Em `docs/auditoria/achados-code-review-2026-08-25.md`, seção de 28/08, mover os
 cinco de "Abertos" para corrigidos, **com o commit que fechou cada um**.
 
-- [ ] **Step 3: Commit do fecho**
+- [x] **Step 3: Commit do fecho**
 
 ```bash
 git add docs/

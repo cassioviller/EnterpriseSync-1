@@ -1,6 +1,19 @@
 # Fecho do Que Está Aberto — Implementation Plan
 
-> **Estado em 2026-08-31:** 🟡 **ABERTO — pronto para executar** — 10 tasks.
+> **Estado em 2026-08-31:** 🟡 **EM EXECUÇÃO — 5 de 10 tasks fechadas.**
+>
+> | Task | Estado |
+> |---|---|
+> | 1 — as três decisões sobem para quem decide | ✅ `0b7abc49` `556f1bc3` — **aguardando decisão humana** (D6, VIGA-I, FASE8-T1) |
+> | 2 — apagar `relatorios_financeiros_avancados.py` (D4) | ✅ `3d0873a4` `41b605d0` |
+> | 3 — apagar as seis rotas mortas de veículos (D3) | ✅ `0b3f932c` `0d1a7c6d` |
+> | 4 — Onda 2 (o tenant para de vazar) | ✅ nada a executar: já mergeada em `fed8f19b` (26/08); doc corrigido em `b13e23c9` |
+> | 5 — `o-que-nao-persiste` (os cinco achados restantes) | ✅ 6/6 tasks, gate 2872/6 skipped |
+> | 6 — Onda 6 (os testes prometidos) | ⬜ próxima |
+> | 7 — Onda 4 (o relatório passa a funcionar) | ⬜ |
+> | 8 — Resgate da Espinha Financeira (9 de 10 tasks) | ⬜ |
+> | 9 — as oito issues de arquitetura viram plano | ⬜ |
+> | 10 — o índice volta a valer, gate consolidado, merge da branch | ⬜ |
 >
 > ⚠️ **Este é um plano de SEQUENCIAMENTO.** Ele não reescreve as 47 tasks que
 > já existem nos seis planos abertos — elas já estão escritas com TDD e RED
@@ -47,9 +60,10 @@ a Onda 5, `a-porta-irma` nem `o-que-nao-persiste`. A Task 10 o substitui.
 ## Global Constraints
 
 - **Gate:** `bash run_tests.sh --gate` (= `pytest tests/ -m "not browser"`).
-- **Piso medido em 31/08, ao fim da onda "A Porta Irmã":** **2854 passed, 6
-  skipped, 201 deselected, 2 xfailed, 0 failed** (43min55s). Toda task que
-  fecha uma etapa roda o gate e compara contra este piso.
+- **Piso vigente, medido em 31/08 ao fim da Task 5 (`o-que-nao-persiste`):**
+  **2872 passed, 6 skipped, 201 deselected, 2 xfailed, 0 failed** (46min44s).
+  Toda task que fecha uma etapa roda o gate e compara contra este piso. (O piso
+  anterior, da onda "A Porta Irmã", era 2854 passed / 6 skipped em 43min55s.)
 - **O skipped nunca sobe.** 🔬 Em 28/08, 4 testes saíram do gate sem que nada
   sinalizasse, e isso só foi descoberto por acaso. Skip subindo é cobertura
   saindo sem aviso — se subir, pare e descubra por quê antes de seguir.
@@ -616,7 +630,7 @@ git commit -m "docs(onda-2): a onda fecha, com o gate e as 8 tasks marcadas"
 - Consumes: nada.
 - Produces: nada que outra task deste plano consuma.
 
-- [ ] **Step 1: Conferir que os cinco achados ainda existem na fonte**
+- [x] **Step 1: Conferir que os cinco achados ainda existem na fonte**
 
 Os cinco, e onde estão listados como abertos em
 `docs/auditoria/achados-code-review-2026-08-25.md`, seção
@@ -630,17 +644,19 @@ grep -n "portal_obras_views.py:647\|models.py:7616\|cronograma_proposta.py:609\|
 fonte antes de corrigir** — a própria onda "A Porta Irmã" encontrou duas
 alegações do review que não batiam.
 
-- [ ] **Step 2: Executar as 6 tasks pela sub-skill**
+- [x] **Step 2: Executar as 6 tasks pela sub-skill**
 
 Use `superpowers:subagent-driven-development` ou
 `superpowers:executing-plans`, task a task.
 
-- [ ] **Step 3: Gate**
+- [x] **Step 3: Gate**
 
 Run: `bash run_tests.sh --gate`
 Expected: **0 failed**, **skipped ≤ 6**.
+✅ **Medido em 31/08:** 2872 passed, 6 skipped, 201 deselected, 2 xfailed, 0
+failed (46min44s). +18 verdes sobre o piso de 2854; skipped ficou em 6.
 
-- [ ] **Step 4: Marcar o plano e o documento de auditoria**
+- [x] **Step 4: Marcar o plano e o documento de auditoria**
 
 Feche o cabeçalho do plano, e em
 `docs/auditoria/achados-code-review-2026-08-25.md` mova os cinco de
@@ -648,7 +664,7 @@ Feche o cabeçalho do plano, e em
 commit de cada um — exatamente como a seção
 "✅ Corrigidos pela onda 'A Porta Irmã' (31/08)" faz.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-28-o-que-nao-persiste.md docs/auditoria/achados-code-review-2026-08-25.md
