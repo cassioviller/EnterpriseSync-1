@@ -22,6 +22,25 @@ def _endpoints():
     return {r.endpoint for r in app.url_map.iter_rules()}
 
 
+def test_o_url_map_esta_populado():
+    """A base de todas as afirmações de ausência deste arquivo.
+
+    Um teste que afirma "endpoint X não existe" passa vacuamente se o
+    `url_map` estiver vazio — e `main.py` registra cada blueprint dentro de
+    um `try/except Exception` que só loga e segue, então um registro pode
+    morrer em silêncio. Sem esta âncora, o arquivo inteiro viraria andaime
+    no dia em que a inicialização quebrasse.
+
+    Medido em 31/08: 759 endpoints com o app subindo inteiro. O piso de 500
+    é folgado abaixo disso — pega colapso de inicialização, não variação
+    normal de contagem de rotas.
+    """
+    endpoints = _endpoints()
+    assert len(endpoints) > 500, (
+        f'url_map com só {len(endpoints)} endpoints — o app não subiu '
+        'inteiro, e as afirmações de ausência deste arquivo não valem')
+
+
 def test_relatorios_financeiros_avancados_esta_extinto():
     """🔴 D4 — o módulo respondia `{"success": true, "dados": {}}` em vez de
     errar, por seis defeitos independentes.
