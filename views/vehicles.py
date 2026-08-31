@@ -5,7 +5,6 @@ from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from datetime import datetime, date, timedelta
 from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
 import logging
 
 from views import main_bp
