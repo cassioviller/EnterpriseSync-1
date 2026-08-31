@@ -315,3 +315,133 @@ def test_gerar_medicao_e_fechada_nas_duas_urls():
         depois = MedicaoObra.query.filter_by(obra_id=obra_id).count()
         assert depois == antes, (
             f'FUNCIONARIO gerou {depois - antes} medição(ões) por URL alternativa')
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — o traceback na resposta
+# ---------------------------------------------------------------------------
+
+# Diretórios que não são código desta aplicação: dependências vendorizadas,
+# caches de build e o museu. Varrer isso devolve dezenas de falsos positivos
+# do gunicorn/pytest/tensorflow e o guarda vira ruído que ninguém lê.
+_FORA_DA_VARREDURA = (
+    'pythonlibs/', 'cache/', 'archive/', 'entrega_baia_rev10/', '.venv/',
+    'node_modules/', 'migrations/', 'tests/', 'static/', 'attached_assets/',
+)
+
+
+def _arquivos_da_aplicacao():
+    """Todo `.py` desta aplicação — a lista cresce sozinha.
+
+    O guarda da Onda 5 nomeava dois módulos à mão
+    (`test_onda5_recusado_nao_grava.py:44` itera sobre `ponto_views` e
+    `equipe_views`). Foi por isso que `views/rdo.py` passou: não estava na
+    lista. Uma lista escrita à mão num app de centenas de módulos é a mesma
+    porta irmã que este plano inteiro persegue, só que em escala maior — por
+    isso aqui não há lista, há varredura.
+    """
+    import pathlib
+
+    raiz = pathlib.Path(__file__).resolve().parent.parent
+    for caminho in sorted(raiz.rglob('*.py')):
+        relativo = caminho.relative_to(raiz).as_posix()
+        if any(relativo.startswith(p) or f'/{p}' in relativo
+               for p in _FORA_DA_VARREDURA):
+            continue
+        if caminho.name.startswith('_') or 'test' in caminho.name:
+            continue
+        yield relativo, caminho
+
+
+def test_nenhum_modulo_de_view_manda_traceback_para_a_resposta():
+    """🔴 `views/rdo.py:3581` e `views/obras.py:2279` — `flash()` com o
+    `format_exc()` inteiro dentro.
+
+    A Onda 5 fechou esta classe em `ponto_views` e `equipe_views` e escreveu
+    um guarda que itera sobre esses DOIS módulos. Este substitui: varre a
+    aplicação inteira e exige que o traceback só apareça em linha de log.
+
+    Duas formas de vazamento, porque as duas existem no mundo:
+      1. `t = format_exc()` e depois `flash(f'...{t}')` — o caso dos dois
+         defeitos de hoje;
+      2. `flash(f'...{traceback.format_exc()}')` direto, sem variável.
+
+    O que NÃO é vazamento, e por isso não entra: `format_exc()` guardado em
+    dict de diagnóstico (`utils/observability.py:120`,
+    `utils/production_error_handler.py:38`) ou passado a `logger`. Atribuir
+    o traceback é legítimo — o que não pode é ele chegar à RESPOSTA. Um
+    guarda que reprovasse essas três linhas seria ruído, e guarda ruidoso
+    vira guarda desligado.
+    """
+    ALVOS = ('flash(', 'render_template(')
+    suspeitos = []
+
+    for relativo, caminho in _arquivos_da_aplicacao():
+        fonte = caminho.read_text(encoding='utf-8', errors='replace')
+        if 'format_exc' not in fonte:
+            continue
+        linhas = fonte.splitlines()
+        for numero, linha in enumerate(linhas, start=1):
+            if 'format_exc' not in linha:
+                continue
+            if 'logger.' in linha or 'logging.' in linha:
+                continue
+
+            # (2) o traceback entra direto na chamada que responde.
+            if any(alvo in linha for alvo in ALVOS):
+                suspeitos.append(
+                    f'{relativo}:{numero} traceback direto na resposta '
+                    f'→ {linha.strip()[:80]}')
+                continue
+
+            # (1) o traceback vira variável — segue-se a variável.
+            if '=' not in linha:
+                continue
+            nome_var = linha.split('=')[0].strip()
+            if not nome_var.isidentifier():
+                continue
+            for n2, l2 in enumerate(linhas, start=1):
+                if nome_var not in l2 or not any(alvo in l2 for alvo in ALVOS):
+                    continue
+                if '_detalhes_na_resposta' in l2:
+                    continue   # o gate de produção já existe
+                suspeitos.append(
+                    f'{relativo}:{n2} manda {nome_var} para a resposta '
+                    f'→ {l2.strip()[:80]}')
+
+    assert not suspeitos, (
+        'traceback pode chegar à resposta em:\n  ' + '\n  '.join(suspeitos))
+
+
+def test_erro_ao_salvar_rdo_nao_vaza_frames_nem_email():
+    """A prova pela porta: o POST que quebra não conta a vida do usuário.
+
+    A varredura acima lê texto; esta lê a RESPOSTA — é a que valeria mesmo
+    se alguém reescrevesse o vazamento numa forma que o texto não pega.
+
+    Nota de gatilho: o plano mandava POSTar `obra_id` inexistente. Não serve
+    — `views/rdo.py:2951-2956` trata obra ausente com `flash('Obra não
+    encontrada.')` e redirect, um caminho VALIDADO que nunca chega ao
+    `except`. O teste passaria verde antes da correção, provando nada: é o
+    mesmo andaime que não podia falhar que o R8 tirou daqui.
+
+    O que quebra de verdade é a data: `datetime.strptime(..., '%Y-%m-%d')`
+    (`:2948`) roda ANTES da busca da obra e estoura `ValueError` em formato
+    diferente — cai no `except Exception` que monta o flash com o traceback.
+    """
+    with app.app_context():
+        t = um_tenant('rdo-flash', com_fatos=False)
+        admin_id = t.admin_id
+
+    cliente = cliente_de(admin_id)
+
+    # Data em formato brasileiro: `strptime('%Y-%m-%d')` estoura e a rota cai
+    # no `except Exception` — o caminho que vazava frames, e-mail e admin_id.
+    resposta = cliente.post('/rdo/salvar',
+                            data={'obra_id': '999999999',
+                                  'data_relatorio': '31/08/2026'},
+                            follow_redirects=True)
+    corpo = resposta.get_data(as_text=True)
+    for vazamento in ('Traceback (most recent call last)', 'File "/home/',
+                      'ADMIN_ID:', 'TRACE:'):
+        assert vazamento not in corpo, f'{vazamento!r} vazou na resposta'

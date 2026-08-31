@@ -2275,8 +2275,12 @@ def detalhes_obra(id):
         error_traceback = traceback.format_exc()
         logger.error(f"ERRO DETALHES OBRA: {str(e)}")
         logger.error(f"TRACEBACK COMPLETO:\n{error_traceback}")
-        # Exibir traceback completo em modo desenvolvimento
-        flash(f'Erro ao carregar detalhes da obra: {str(e)}\n\nTraceback:\n{error_traceback}', 'error')
+        # O comentário antigo dizia "em modo desenvolvimento" — não havia
+        # checagem nenhuma: o traceback ia para a tela em produção também.
+        # Mesma classe do `flash` de `views/rdo.py:3581`, e o motivo de o
+        # guarda desta task varrer o app em vez de nomear módulos.
+        flash('Não foi possível carregar os detalhes da obra. O erro foi '
+              'registrado; tente novamente ou acione o suporte.', 'error')
         return redirect(url_for('main.obras'))
 
 

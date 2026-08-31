@@ -3575,10 +3575,16 @@ def rdo_salvar_unificado():
         
         import traceback
         error_trace = traceback.format_exc()
+        # O traceback, o e-mail e o admin_id iam para o FLASH: frames,
+        # caminhos absolutos e o SQL com parâmetros vinculados, renderizados
+        # na tela seguinte. Alcançável por FUNCIONARIO pela rota-alias
+        # `/funcionario/rdo/criar` (:3588), que delega aqui. Detalhe vive no
+        # log; o usuário vê mensagem.
         logger.error(f"TRACEBACK COMPLETO:\n{error_trace}")
-        
-        # Flash com erro detalhado para debugging
-        flash(f'ERRO DETALHADO: {str(e)} | USER: {current_user.email} | ADMIN_ID: {current_user.admin_id} | TRACE: {error_trace[:500]}...', 'error')
+        logger.error(f"contexto: user={current_user.email} "
+                     f"admin_id={current_user.admin_id}")
+        flash('Não foi possível salvar o RDO. O erro foi registrado; '
+              'tente novamente ou acione o suporte.', 'error')
         
         rdo_id = request.form.get('rdo_id', type=int)
         if rdo_id:
