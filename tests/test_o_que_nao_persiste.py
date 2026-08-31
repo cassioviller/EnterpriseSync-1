@@ -566,3 +566,135 @@ def test_linha_intocada_nao_vira_alterado_por_arredondamento():
         assert situacoes == {'mantido'}, (
             f'linha intocada saiu como {situacoes} — a diferença é só o '
             f'arredondamento do snapshot')
+
+
+def test_total_do_diff_nao_mistura_2_e_5_casas_em_incluido():
+    """🟠 Fix round 1 — Important 1: `total_do_diff` somava
+    `_dec(item.subtotal_calculado)` SEM arredondar nos ramos
+    incluido/suprimido, enquanto os deltas de mantido/alterado já vinham em
+    centavos — misturando termos de 2 e de até 5 casas na mesma soma.
+
+    Um item incluído sem snapshot (`subtotal` NULL, mesmo cenário legado do
+    teste de arredondamento acima) cai no fallback `quantidade ×
+    preco_unitario`, até 5 casas. O total tem que sair em centavos mesmo
+    assim — arredondado uma vez só, no fim, não por parcela.
+    """
+    from decimal import Decimal
+
+    from sqlalchemy import text
+
+    from models import Proposta, PropostaItem
+    from services.proposta_diff import diff_versoes, total_do_diff
+
+    with app.app_context():
+        t = um_tenant('diff-total-incl', com_fatos=False)
+
+        def _proposta():
+            p = Proposta(admin_id=t.admin_id, numero=f'P-{uuid.uuid4().hex[:8]}',
+                        cliente_nome='Cliente Teste')
+            db.session.add(p)
+            db.session.flush()
+            return p
+
+        anterior = _proposta()  # sem itens
+        atual = _proposta()
+        item = PropostaItem(
+            proposta_id=atual.id, admin_id=t.admin_id, item_numero=1,
+            descricao='Item novo', unidade='m2',
+            quantidade=Decimal('4.505'), preco_unitario=Decimal('3.12'))
+        db.session.add(item)
+        db.session.flush()
+        item_id = item.id
+        db.session.commit()
+
+        # Zera o snapshot por fora do ORM, simulando o item legado sem
+        # `subtotal` — ver docstring do teste de arredondamento acima.
+        db.session.execute(
+            text('UPDATE proposta_itens SET subtotal = NULL WHERE id = :id'),
+            {'id': item_id})
+        db.session.commit()
+        db.session.expire_all()
+
+        linhas = diff_versoes(anterior, atual)
+        assert {l['situacao'] for l in linhas} == {'incluido'}, (
+            'andaime: o item devia sair como incluído, sem parear com nada '
+            'na origem (que não tem itens)')
+
+        total = total_do_diff(linhas)
+        # 4.505 * 3.12 = 14.05560 (bruto, do fallback) — o total tem de sair
+        # 14.06, não 14.05560 nem qualquer coisa com mais de 2 casas.
+        assert total == Decimal('14.06'), (
+            f'total saiu {total} — misturou o fallback de 5 casas '
+            '(quantidade × preço) com a precisão de centavos')
+
+
+def test_total_do_diff_soma_deltas_antes_de_arredondar():
+    """🟠 Fix round 1 — Important 2: arredondar CADA linha antes de somar
+    esconde efeito sistêmico. Cenário do revisor: um reajuste distribuído
+    por muitos itens, cada delta individual abaixo de meio centavo — cada
+    linha classifica 'mantido' (correto: a task 5 existe para isso), mas a
+    SOMA dos deltas brutos é material e o total tem que mostrá-la.
+
+    Reusa o mesmo par (snapshot 2 casas vs. fallback 5 casas, `4.505 ×
+    3.12`) do teste de arredondamento, repetido em N itens: cada linha tem
+    delta bruto de `14.05560 - 14.06 = -0.00440` — abaixo de meio centavo,
+    então cada uma isolada arredonda para 0,00 e classifica 'mantido'. Com
+    N=20, a soma bruta é `-0.08800`, que arredonda para -0,09: material, e
+    seria invisível se cada linha tivesse arredondado antes de somar.
+    """
+    from decimal import Decimal
+
+    from sqlalchemy import text
+
+    from models import Proposta, PropostaItem
+    from services.proposta_diff import diff_versoes, total_do_diff
+
+    with app.app_context():
+        t = um_tenant('diff-total-sist', com_fatos=False)
+
+        def _proposta():
+            p = Proposta(admin_id=t.admin_id, numero=f'P-{uuid.uuid4().hex[:8]}',
+                        cliente_nome='Cliente Teste')
+            db.session.add(p)
+            db.session.flush()
+            return p
+
+        anterior = _proposta()
+        atual = _proposta()
+
+        N = 20
+        itens_atual_ids = []
+        for n in range(1, N + 1):
+            db.session.add(PropostaItem(
+                proposta_id=anterior.id, admin_id=t.admin_id, item_numero=n,
+                descricao=f'Item {n}', unidade='m2',
+                quantidade=Decimal('4.505'), preco_unitario=Decimal('3.12')))
+            item_atual = PropostaItem(
+                proposta_id=atual.id, admin_id=t.admin_id, item_numero=n,
+                descricao=f'Item {n}', unidade='m2',
+                quantidade=Decimal('4.505'), preco_unitario=Decimal('3.12'))
+            db.session.add(item_atual)
+            db.session.flush()
+            itens_atual_ids.append(item_atual.id)
+        db.session.commit()
+
+        # Zera o snapshot de cada item ATUAL por fora do ORM — os N itens
+        # ficam sem `subtotal`, e cada um cai no fallback de 5 casas.
+        for iid in itens_atual_ids:
+            db.session.execute(
+                text('UPDATE proposta_itens SET subtotal = NULL WHERE id = :id'),
+                {'id': iid})
+        db.session.commit()
+        db.session.expire_all()
+
+        linhas = diff_versoes(anterior, atual)
+        situacoes = {l['situacao'] for l in linhas}
+        assert situacoes == {'mantido'}, (
+            f'cada linha tem diferença sub-centavo — continuam "mantido", '
+            f'não {situacoes}')
+
+        total = total_do_diff(linhas)
+        assert total == Decimal('-0.09'), (
+            f'total saiu {total} — o efeito sistêmico de {N} deltas '
+            'sub-centavo sumiu porque cada linha foi arredondada antes de '
+            'somar')

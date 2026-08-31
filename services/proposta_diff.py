@@ -109,16 +109,28 @@ def diff_versoes(origem, destino) -> list[dict]:
         # fazia revisão que muda só o preço sair como "mantido" com impacto
         # R$ 0,00.
         #
-        # Em centavos, os dois lados: `subtotal_calculado` mistura snapshot
-        # de 2 casas com produto cru de até 5, e uma linha intocada cujo lado
-        # sem snapshot cai no fallback dava diferença de arredondamento — não
-        # zero — e saía como "alterado". `delta_quantidade` (`dq`, acima)
-        # continua SEM arredondar de propósito: uma edição real de
-        # quantidade, por menor que seja, tem que continuar acusando
-        # "alterado" mesmo que o impacto em reais fique abaixo do centavo.
-        dv = _em_centavos(it.subtotal_calculado) - _em_centavos(
+        # Duas responsabilidades, dois números — de propósito:
+        #
+        # `dv_centavos` decide SÓ a classificação (mantido vs alterado), em
+        # centavos: `subtotal_calculado` mistura snapshot de 2 casas com
+        # produto cru de até 5, e uma linha intocada cujo lado sem snapshot
+        # cai no fallback dava diferença de arredondamento — não zero — e
+        # saía como "alterado".
+        #
+        # `dv` (bruto, sem arredondar) é o que entra em `delta_valor` e,
+        # dali, no somatório de `total_do_diff`. Arredondar CADA linha antes
+        # de somar esconderia um efeito sistêmico: um reajuste de preço
+        # espalhado por muitos itens, cada delta abaixo do centavo, somaria
+        # zero linha a linha mesmo que o impacto real, agregado, seja
+        # material — `total_do_diff` arredonda uma vez só, no fim.
+        # `delta_quantidade` (`dq`, acima) já era bruto e continua: uma
+        # edição real de quantidade, por menor que seja, tem que continuar
+        # acusando "alterado" mesmo que o impacto em reais fique abaixo do
+        # centavo.
+        dv = _dec(it.subtotal_calculado) - _dec(anterior.subtotal_calculado)
+        dv_centavos = _em_centavos(it.subtotal_calculado) - _em_centavos(
             anterior.subtotal_calculado)
-        mudou = (dq != 0 or dv != 0
+        mudou = (dq != 0 or dv_centavos != 0
                  or (it.descricao or '') != (anterior.descricao or '')
                  or (it.unidade or '') != (anterior.unidade or ''))
         linhas.append({'situacao': 'alterado' if mudou else 'mantido',
@@ -140,6 +152,14 @@ def total_do_diff(linhas) -> Decimal:
     menos o dos suprimidos. É o número que o extrato de contrato mostra como
     "impacto do aditivo" — e ele tem de bater com a diferença dos totais das
     duas versões, senão o diff perdeu ou duplicou linha.
+
+    A soma acumula em precisão BRUTA (o mesmo `subtotal_calculado`, sem
+    arredondar por linha) e só arredonda para centavos no final. Rodar
+    `_em_centavos` por parcela — inclusive nos ramos `incluido`/`suprimido`,
+    que somam `subtotal_calculado` direto — misturaria termos de 2 casas com
+    termos de até 5 na mesma soma, e arredondar cada termo individualmente
+    apagaria um efeito sistêmico real (muitos deltas abaixo do centavo que,
+    somados, são materiais).
     """
     total = Decimal('0')
     for l in linhas:
@@ -149,4 +169,4 @@ def total_do_diff(linhas) -> Decimal:
             total += _dec(l['destino'].subtotal_calculado)
         elif l['situacao'] == 'suprimido':
             total -= _dec(l['origem'].subtotal_calculado)
-    return total
+    return _em_centavos(total)
