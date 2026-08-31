@@ -47,7 +47,6 @@ MODULOS = {
     'Subempreiteiros': ['subempreiteiros_views.py'],
     # financeiro / custos
     'Financeiro': ['financeiro_views.py'],
-    'Relatórios financeiros avançados': ['relatorios_financeiros_avancados.py'],
     'Contabilidade': ['contabilidade_views.py'],
     'Custos de obra': ['custos_views.py'],
     'Gestão de custos': ['gestao_custos_views.py'],
