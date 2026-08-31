@@ -226,3 +226,194 @@ def test_tentativa_recusada_no_portal_tambem_deixa_rastro():
         depois = PortalAcessoEvento.query.filter_by(obra_id=obra_id).count()
         assert depois > antes, (
             'a tentativa recusada de upload não deixou rastro')
+
+
+def test_reativar_tarefa_arquivada_limpa_arquivada_em_e_cascateia():
+    """🔴 `cronograma_proposta.py:609` — `if not t.ativa: t.ativa = True`.
+
+    Reimplementa incompleto o `reativar_tarefas_de_itens_reincluidos`
+    (`:892`), que cumpre DUAS obrigações: limpa `arquivada_em` e cascateia
+    para as filhas. O inline faz nem uma nem outra.
+
+    `ativa=True` com `arquivada_em` preenchido é estado que nenhum outro
+    escritor produz — e que o próprio restaurador nunca poderá limpar,
+    porque filtra `ativa.is_(False)`.
+
+    🔬 Andaime: o brief original passava `[pai.gerada_por_proposta_item_id]`
+    sem nunca ter setado esse campo no construtor — `None`, filtrado pelo
+    `if i` de `reativar_tarefas_de_itens_reincluidos` (`:927`), vira lista
+    vazia, e a função devolve 0 ANTES de tocar em qualquer tarefa
+    (`if not ids: return 0`, `:928-929`). Isso teria dado RED por um motivo
+    que nada tem a ver com o defeito — o gatilho nem chegava na cascata. Por
+    isso aqui há um `PropostaItem` real, ligado ao pai por
+    `gerada_por_proposta_item_id`, exatamente como o próprio brief avisou
+    que seria preciso.
+    """
+    from datetime import datetime
+
+    from models import Proposta, PropostaItem, TarefaCronograma
+
+    with app.app_context():
+        t = um_tenant('reativa', com_fatos=False)
+        arquivada = datetime(2026, 8, 1)
+
+        proposta = Proposta(
+            numero=f'P-{uuid.uuid4().hex[:8]}', admin_id=t.admin_id,
+            cliente_nome='Cliente Teste')
+        db.session.add(proposta)
+        db.session.flush()
+
+        item = PropostaItem(
+            admin_id=t.admin_id, proposta_id=proposta.id, item_numero=1,
+            descricao='Servico do item', quantidade=Decimal('1'),
+            unidade='un', preco_unitario=Decimal('100.00'), ordem=1)
+        db.session.add(item)
+        db.session.flush()
+
+        pai = TarefaCronograma(
+            obra_id=t.obra_id, admin_id=t.admin_id,
+            nome_tarefa=f'Servico {uuid.uuid4().hex[:6]}', ordem=0,
+            responsavel='propria', duracao_dias=5,
+            percentual_concluido=0.0, ativa=False, arquivada_em=arquivada,
+            gerada_por_proposta_item_id=item.id)
+        db.session.add(pai)
+        db.session.flush()
+
+        filha = TarefaCronograma(
+            obra_id=t.obra_id, admin_id=t.admin_id,
+            nome_tarefa=f'Sub {uuid.uuid4().hex[:6]}', ordem=1,
+            responsavel='propria', duracao_dias=2,
+            percentual_concluido=0.0, ativa=False, arquivada_em=arquivada,
+            tarefa_pai_id=pai.id)
+        db.session.add(filha)
+        db.session.commit()
+
+        from services.cronograma_proposta import (
+            reativar_tarefas_de_itens_reincluidos)
+        # A prova é do INVARIANTE, não do caminho: depois de restaurar, não
+        # pode existir tarefa viva com lápide, nem filha esquecida.
+        n = reativar_tarefas_de_itens_reincluidos(
+            t.obra_id, t.admin_id, [pai.gerada_por_proposta_item_id])
+        assert n == 2, (
+            f'o restaurador reativou {n} tarefa(s), esperava 2 (pai+filha) '
+            '— o gatilho não atravessou a cascata')
+        db.session.commit()
+
+        for alvo, rotulo in ((pai, 'o serviço'), (filha, 'a subtarefa')):
+            db.session.refresh(alvo)
+            assert alvo.ativa is True, f'{rotulo} não voltou'
+            assert alvo.arquivada_em is None, (
+                f'{rotulo} voltou viva com lápide: ativa=True e '
+                f'arquivada_em={alvo.arquivada_em}')
+
+
+def test_materializar_cronograma_reativa_por_id_proprio_nao_pelo_da_revisao_atual():
+    """🔴 `cronograma_proposta.py:609` e `:685`, no PONTO DE CHAMADA real —
+    dentro de `materializar_cronograma`, não chamando o restaurador direto.
+
+    A pré-condição que o brief não conferiu: `reativar_tarefas_de_itens_
+    reincluidos` casa tarefa por `gerada_por_proposta_item_id.in_(ids)`
+    (`:934-940`). Mas o nó de árvore que bate no natural-key match
+    (`existente_serv = nat_idx.get(chave_serv)`, `:601`) é casado por NOME,
+    não por id — e `pi_id` ali (`nivel0.get('proposta_item_id')`) é o id do
+    `PropostaItem` da revisão ATUAL, que `propostas_handlers.py:97-98`
+    documenta ser um CLONE com id novo a cada revisão ("valor novo é sempre
+    o id de um PropostaItem recém-clonado"). A tarefa arquivada guarda o id
+    do clone ANCESTRAL que a materializou originalmente — quase sempre
+    diferente do `pi_id` da revisão corrente.
+
+    Delegar com `reativar_tarefas_de_itens_reincluidos(obra_id, admin_id,
+    [pi_id])` (a correção ingênua do brief) faria a seed query da função
+    não achar a própria tarefa casada — `alvo` ficaria vazio e ela
+    continuaria `ativa=False` para sempre, uma REGRESSÃO pior que o defeito
+    atual (que ao menos reativava a flag, mesmo sem limpar a lápide). A
+    correção usada aqui passa `tarefa_serv.gerada_por_proposta_item_id`
+    (o id que a própria tarefa carrega) junto com `pi_id`, garantindo
+    auto-casamento na seed independente de qual dos dois a query pede.
+    """
+    from datetime import datetime
+
+    from models import Proposta, PropostaItem, TarefaCronograma
+    from services.cronograma_proposta import materializar_cronograma
+
+    with app.app_context():
+        t = um_tenant('reativa3', com_fatos=False)
+        arquivada = datetime(2026, 8, 1)
+
+        proposta = Proposta(
+            numero=f'P-{uuid.uuid4().hex[:8]}', admin_id=t.admin_id,
+            cliente_nome='Cliente Teste')
+        db.session.add(proposta)
+        db.session.flush()
+
+        # Item ANCESTRAL — o clone que materializou a tarefa originalmente,
+        # antes de o item ser suprimido numa revisão e a tarefa arquivada.
+        item_ancestral = PropostaItem(
+            admin_id=t.admin_id, proposta_id=proposta.id, item_numero=1,
+            descricao='Item ancestral', quantidade=Decimal('1'),
+            unidade='un', preco_unitario=Decimal('100.00'), ordem=1)
+        db.session.add(item_ancestral)
+        db.session.flush()
+
+        # Item da revisão ATUAL — clone com id novo, é o que
+        # `nivel0.get('proposta_item_id')` traz para materializar_cronograma.
+        item_atual = PropostaItem(
+            admin_id=t.admin_id, proposta_id=proposta.id, item_numero=1,
+            descricao='Item atual', quantidade=Decimal('1'),
+            unidade='un', preco_unitario=Decimal('100.00'), ordem=1)
+        db.session.add(item_atual)
+        db.session.flush()
+
+        nome_raiz = f'Servico {uuid.uuid4().hex[:6]}'
+        nome_filha = f'Sub {uuid.uuid4().hex[:6]}'
+
+        raiz = TarefaCronograma(
+            obra_id=t.obra_id, admin_id=t.admin_id, nome_tarefa=nome_raiz,
+            ordem=0, responsavel='empresa', duracao_dias=5,
+            percentual_concluido=0.0, ativa=False, arquivada_em=arquivada,
+            gerada_por_proposta_item_id=item_ancestral.id)
+        db.session.add(raiz)
+        db.session.flush()
+
+        filha = TarefaCronograma(
+            obra_id=t.obra_id, admin_id=t.admin_id, nome_tarefa=nome_filha,
+            ordem=1, responsavel='empresa', duracao_dias=2,
+            percentual_concluido=0.0, ativa=False, arquivada_em=arquivada,
+            tarefa_pai_id=raiz.id,
+            gerada_por_proposta_item_id=item_ancestral.id)
+        db.session.add(filha)
+        db.session.commit()
+        raiz_id, filha_id = raiz.id, filha.id
+
+        arvore = [{
+            'marcado': True,
+            'servico_nome': nome_raiz,
+            'proposta_item_id': item_atual.id,  # id da revisão ATUAL — != item_ancestral.id
+            'servico_id': None,
+            'sem_template': False,
+            'filhos': [
+                {'marcado': True, 'nome': nome_filha},
+            ],
+        }]
+
+        criadas = materializar_cronograma(
+            proposta, t.admin_id, t.obra_id, arvore)
+        db.session.commit()
+
+        # PRIMEIRO: prova de que o gatilho passou pelo caminho de REUSO
+        # (natural-key match), não criou tarefas novas por engano — senão a
+        # afirmação abaixo não estaria testando a reativação de nada.
+        assert criadas == 0, (
+            f'materializar_cronograma criou {criadas} tarefa(s) nova(s) — '
+            'o cenário não exercitou o caminho de reuso/reativação')
+
+        for id_, rotulo in ((raiz_id, 'a raiz'), (filha_id, 'a filha')):
+            tarefa_db = db.session.get(TarefaCronograma, id_)
+            db.session.refresh(tarefa_db)
+            assert tarefa_db.ativa is True, (
+                f'{rotulo} não voltou — delegar ao restaurador só com o '
+                '`pi_id` da revisão atual não bate na seed query, que casa '
+                'pelo `gerada_por_proposta_item_id` que a tarefa carrega')
+            assert tarefa_db.arquivada_em is None, (
+                f'{rotulo} voltou viva com lápide: ativa=True e '
+                f'arquivada_em={tarefa_db.arquivada_em}')

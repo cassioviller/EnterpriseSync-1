@@ -603,11 +603,26 @@ def materializar_cronograma(
             # Reusar tarefa existente (Task #144) — preenche PI se faltar
             tarefa_serv = existente_serv
             # `natural_key_index` não filtra `ativa`: a casada pode ser uma
-            # tarefa ARQUIVADA (item suprimido numa revisão anterior). Sem
-            # restaurá-la, o item re-adicionado ficava sem tarefa viva, em
-            # silêncio.
+            # tarefa ARQUIVADA (item suprimido numa revisão anterior). Quem
+            # sabe restaurar é `reativar_tarefas_de_itens_reincluidos`
+            # (:892), e ele cumpre DUAS obrigações que o `ativa = True`
+            # inline ignorava: limpa `arquivada_em` e cascateia para as
+            # filhas arquivadas. `ativa=True` com lápide era estado que
+            # nenhum outro escritor produz, e que o próprio restaurador
+            # nunca poderia limpar (ele filtra `ativa.is_(False)`).
+            #
+            # A seed query do restaurador casa por
+            # `gerada_por_proposta_item_id.in_(ids)` — mas o `pi_id` daqui é
+            # o do PropostaItem da revisão ATUAL (clone com id novo a cada
+            # revisão, `propostas_handlers.py:97-98`), enquanto a tarefa
+            # casada por natural key pode carregar o id do clone ANCESTRAL
+            # que a materializou. Passar só `pi_id` deixaria a própria
+            # tarefa de fora da seed e ela nunca voltaria — mandamos os dois
+            # ids (o dela e o da revisão atual) para garantir autocasamento.
             if not tarefa_serv.ativa:
-                tarefa_serv.ativa = True
+                reativar_tarefas_de_itens_reincluidos(
+                    obra_id, admin_id,
+                    [i for i in (tarefa_serv.gerada_por_proposta_item_id, pi_id) if i])
             if tarefa_serv.gerada_por_proposta_item_id is None and pi_id:
                 tarefa_serv.gerada_por_proposta_item_id = pi_id
             if tarefa_serv.servico_id is None and servico_id_no:
@@ -681,9 +696,14 @@ def materializar_cronograma(
                 if existente is not None:
                     # Task #144 — tarefa equivalente já existe; reusar
                     tarefa = existente
-                    # Mesmo caso do nó-raiz: a casada pode estar arquivada.
+                    # Mesmo caso do nó-raiz: a casada pode estar arquivada, e
+                    # delega ao mesmo restaurador — ver comentário em :609
+                    # sobre por que os dois ids (o da tarefa e o de `pi_id`)
+                    # vão na seed.
                     if not tarefa.ativa:
-                        tarefa.ativa = True
+                        reativar_tarefas_de_itens_reincluidos(
+                            obra_id, admin_id,
+                            [i for i in (tarefa.gerada_por_proposta_item_id, pi_id) if i])
                     if tarefa.gerada_por_proposta_item_id is None and pi_id:
                         tarefa.gerada_por_proposta_item_id = pi_id
                     # Task #4 — preencher servico_id quando faltar
