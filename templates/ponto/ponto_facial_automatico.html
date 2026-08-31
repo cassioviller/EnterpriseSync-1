@@ -128,8 +128,12 @@
     </div>
     
     <div class="controls-area">
-        <select class="form-select form-select-sm mb-2" id="obra_id">
-            <option value="">Obra (opcional)</option>
+        {# A obra deixou de ser opcional: sem ela o backend não tem contra o
+           que validar o geofencing, e o controle virava consultivo —
+           ponto_views.py:2453. O rótulo tem de dizer isso, senão a tela pede
+           uma coisa e a API exige outra. #}
+        <select class="form-select form-select-sm mb-2" id="obra_id" required>
+            <option value="">Selecione a obra</option>
             {% for obra in obras %}
             <option value="{{ obra.id }}">{{ obra.nome }}</option>
             {% endfor %}
@@ -721,7 +725,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const fotoBase64 = capturarFoto();
         const obraId = document.getElementById('obra_id').value;
         const tipoPonto = tipoPontoInput.value;
-        
+
+        // Sem obra o backend recusa com 400 (geofencing não tem contra o que
+        // validar). Barrar aqui poupa a captura e dá a mensagem na hora.
+        if (!obraId) {
+            resultadoContainer.innerHTML =
+                '<div class="alert alert-warning mb-0">' +
+                '<i class="fas fa-exclamation-triangle me-2"></i>' +
+                'Selecione a obra antes de registrar o ponto.</div>';
+            return;
+        }
+
         cameraOverlay.classList.add('show');
         btnRegistrar.disabled = true;
         resultadoContainer.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin me-2"></i>Obtendo localização...</div>';
@@ -737,7 +751,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     foto_base64: fotoBase64,
-                    obra_id: obraId || null,
+                    obra_id: obraId,
                     tipo_ponto: tipoPonto,
                     latitude: latitude,
                     longitude: longitude

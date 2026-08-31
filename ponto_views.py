@@ -2450,22 +2450,39 @@ def identificar_e_registrar():
         # `validar_localizacao_na_obra` já tem a semântica certa: obra com
         # geofence configurado e sem coordenada RECUSA; obra sem geofence
         # segue aceitando.
+        # `obra_id` é obrigatório e tem de resolver NO TENANT. Antes,
+        # `if obra_id:` era falso na omissão e `if obra:` era falso para id
+        # alheio — nos dois casos o validador não rodava e o ponto nascia com
+        # obra_id=None. É a mesma frase do defeito anterior descrita acima
+        # ("bastava não mandar latitude/longitude") com outra palavra: bastava
+        # não mandar obra_id.
         distancia_obra = None
-        if obra_id:
-            obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
-            if obra:
-                valido_geo, distancia_obra, msg_geo = validar_localizacao_na_obra(
-                    latitude_func, longitude_func, obra
-                )
-                logger.info(f"Geofencing para {funcionario.nome}: {msg_geo}")
+        if not obra_id:
+            return jsonify({
+                'success': False,
+                'message': 'Obra não informada. Selecione a obra antes de '
+                           'registrar o ponto.'
+            }), 400
 
-                if not valido_geo:
-                    return jsonify({
-                        'success': False,
-                        'message': f'Você está fora da área permitida da obra. {msg_geo}',
-                        'funcionario_nome': funcionario.nome,
-                        'distancia_obra': round(distancia_obra, 1) if distancia_obra else None
-                    }), 403
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if obra is None:
+            return jsonify({
+                'success': False,
+                'message': 'Obra não encontrada para esta empresa.'
+            }), 404
+
+        valido_geo, distancia_obra, msg_geo = validar_localizacao_na_obra(
+            latitude_func, longitude_func, obra
+        )
+        logger.info(f"Geofencing para {funcionario.nome}: {msg_geo}")
+
+        if not valido_geo:
+            return jsonify({
+                'success': False,
+                'message': f'Você está fora da área permitida da obra. {msg_geo}',
+                'funcionario_nome': funcionario.nome,
+                'distancia_obra': round(distancia_obra, 1) if distancia_obra else None
+            }), 403
         
         # Registrar o ponto
         hoje = get_date_brasil()

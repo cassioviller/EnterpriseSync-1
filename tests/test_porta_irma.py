@@ -510,3 +510,78 @@ def test_rotas_safe_nao_mandam_excecao_crua_na_mensagem(monkeypatch):
                           'Traceback (most recent call last)'):
             assert vazamento not in corpo, (
                 f'{rota}: {vazamento!r} vazou na resposta em produção')
+
+
+# ---------------------------------------------------------------------------
+# Task 5 — o geofencing pulável por omissão
+# ---------------------------------------------------------------------------
+
+def _funcionario_identificavel(monkeypatch, funcionario_id):
+    """Faz o reconhecimento facial ACERTAR, para o teste chegar ao geofencing.
+
+    Sem isto o POST morre em 404 'Nenhum funcionário com foto cadastrada'
+    (conferido: é o que a rota devolve para o payload do plano) e o teste
+    passa verde sem nunca ter olhado a guarda — o mesmo andaime que o R8
+    tirou daqui e que já apareceu duas vezes nesta onda.
+
+    Dois grampos, nos dois pontos que barram a foto sintética:
+      - `validar_qualidade_foto_avancada` (`ponto_views.py:2375`), que
+        recusa um PNG 1x1;
+      - `identificar_por_cache` (`:2393`), que devolve o id do funcionário.
+        A rota ainda busca esse id COM filtro de `admin_id` (`:2401`), então
+        o grampo não fura o escopo de tenant — só entrega a identificação.
+    """
+    import ponto_views
+
+    monkeypatch.setattr(ponto_views, 'validar_qualidade_foto_avancada',
+                        lambda *a, **k: (True, 'ok', {}))
+    monkeypatch.setattr(ponto_views, 'identificar_por_cache',
+                        lambda *a, **k: (funcionario_id, 0.10, None))
+
+
+@pytest.mark.parametrize('caso,payload_extra', [
+    ('obra_id omitido', {}),
+    ('obra_id de outro tenant', {'obra_id': 999999999}),
+])
+def test_ponto_facial_nao_pula_geofencing_por_obra_id(
+        monkeypatch, caso, payload_extra):
+    """🔴 `ponto_views.py:2453` — `if obra_id:` / `if obra:`.
+
+    O comentário em `:2447` diz que o defeito ANTIGO era "bastava não mandar
+    latitude/longitude". A frase continua verdadeira trocando uma palavra:
+    hoje basta não mandar `obra_id` — ele vem de `data.get('obra_id')`
+    (`:2311`) sem checagem. Nos dois casos o validador não roda e o
+    RegistroPonto nasce com obra_id=None.
+
+    Os dois casos são parametrizados de propósito: consertar a omissão e
+    deixar o id-de-outro-tenant é repetir o padrão que este plano fecha.
+    """
+    from models import Funcionario, RegistroPonto
+
+    with app.app_context():
+        t = um_tenant('ponto-geo', com_fatos=False)
+        admin_id, func_id = t.admin_id, t.funcionario_id
+        # A rota só considera funcionários COM foto: sem isto ela para em
+        # 404 antes do geofencing.
+        f = db.session.get(Funcionario, func_id)
+        f.foto_base64 = 'data:image/png;base64,iVBORw0KGgo='
+        db.session.commit()
+        antes = RegistroPonto.query.filter_by(funcionario_id=func_id).count()
+
+    _funcionario_identificavel(monkeypatch, func_id)
+
+    payload = {'foto_base64': 'data:image/png;base64,iVBORw0KGgo=',
+               'tipo_ponto': 'entrada'}
+    payload.update(payload_extra)
+    # 🔬 Rota conferida: `@ponto_bp.route('/api/identificar-e-registrar')`
+    # sobre `url_prefix='/ponto'`.
+    resposta = cliente_de(admin_id).post('/ponto/api/identificar-e-registrar',
+                                         json=payload)
+
+    assert resposta.status_code in (400, 403, 404), (
+        f'{caso}: recebeu {resposta.status_code} — geofencing pulado')
+
+    with app.app_context():
+        depois = RegistroPonto.query.filter_by(funcionario_id=func_id).count()
+        assert depois == antes, (
+            f'{caso}: gravou ponto sem passar pelo geofencing')
