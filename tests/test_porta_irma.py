@@ -445,3 +445,68 @@ def test_erro_ao_salvar_rdo_nao_vaza_frames_nem_email():
     for vazamento in ('Traceback (most recent call last)', 'File "/home/',
                       'ADMIN_ID:', 'TRACE:'):
         assert vazamento not in corpo, f'{vazamento!r} vazou na resposta'
+
+
+# ---------------------------------------------------------------------------
+# Task 4 — a mensagem que não passa pelo gate
+# ---------------------------------------------------------------------------
+
+def test_rotas_safe_nao_mandam_excecao_crua_na_mensagem(monkeypatch):
+    """🔴 `production_routes.py:124,201,279,336,387` —
+    `error_message=f"...{str(e)}"` SEM gate.
+
+    `_detalhes_na_resposta()` (`356c2cf9`) fechou `error_details` e deixou a
+    mensagem intocada. `templates/error.html:17` renderiza
+    `{{ error_message }}` CRU — só `error_details` está atrás do `{% if %}`
+    (`:30`). Num erro de SQLAlchemy, `str(e)` traz
+    `'(psycopg2.errors.X) ... [SQL: SELECT ...] [parameters: {...}]'` para
+    dentro do `<h5>`.
+
+    Nota de gatilho — o plano avisava, e com razão: se nenhuma rota quebrar,
+    o teste passa sem provar nada, e teste-que-nasce-verde é exatamente o
+    que deixou estes defeitos passarem. Em vez de forçar o erro à mão uma
+    vez e desfazer, o erro é INJETADO aqui: `get_safe_admin_id` é chamada
+    dentro do `try` das cinco rotas (`:46,134,240,292,349`), então trocá-la
+    por uma que estoura `ProgrammingError` leva as cinco ao `except` de
+    forma determinística — e o teste segue sendo guarda depois desta rodada,
+    não só uma conferência manual.
+
+    O que se afirma é o INVARIANTE de produção, não o texto: sob
+    `IS_PRODUCTION`, nenhuma das cinco pode devolver SQL na resposta.
+    """
+    import app as app_module
+    import production_routes
+    from sqlalchemy.exc import ProgrammingError
+
+    def _estoura(*args, **kwargs):
+        raise ProgrammingError(
+            'SELECT funcionario.id FROM funcionario WHERE admin_id = %(id)s',
+            {'id': 42},
+            Exception('coluna "x" nao existe'))
+
+    monkeypatch.setattr(production_routes, 'get_safe_admin_id', _estoura)
+
+    with app.app_context():
+        t = um_tenant('prod-safe', com_fatos=False)
+        admin_id = t.admin_id
+
+    cliente = cliente_de(admin_id)
+    rotas = ('/prod/safe-funcionarios', '/prod/safe-dashboard',
+             '/prod/safe-obras', '/prod/safe-veiculos',
+             '/prod/safe-alimentacao')
+
+    monkeypatch.setattr(app_module, 'IS_PRODUCTION', True)
+
+    for rota in rotas:
+        resposta = cliente.get(rota)
+        corpo = resposta.get_data(as_text=True)
+        # A rota tem de ter QUEBRADO — senão o teste não olhou o caminho
+        # de erro e o verde não vale.
+        assert resposta.status_code == 500, (
+            f'{rota}: respondeu {resposta.status_code}, não entrou no except '
+            '— o gatilho de erro parou de funcionar e este teste virou andaime')
+        for vazamento in ('[SQL:', '[parameters:', 'psycopg2.',
+                          'sqlalchemy.exc', 'ProgrammingError',
+                          'Traceback (most recent call last)'):
+            assert vazamento not in corpo, (
+                f'{rota}: {vazamento!r} vazou na resposta em produção')
