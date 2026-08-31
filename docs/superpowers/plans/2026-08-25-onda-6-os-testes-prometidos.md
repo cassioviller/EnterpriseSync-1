@@ -36,7 +36,7 @@ A medição mecânica listou cinco testes ausentes no `2026-08-04-plano-consolid
 | `test_a05_custo_mensalista_por_rota.py` | ❌ **Não é resíduo.** 📖 A nota da Task B1.5 (`:812`) diz que o arquivo **não será criado**, e por quê: o arreio B0.3 `tests/test_arreio_custo_rdo_rotas.py` já posta nas rotas com mensalista (🔬 11 ocorrências) e afirma sobre `GestaoCustoFilho`/`CustoObra`/`RDOCustoDiario`. Um arquivo separado seria segunda cópia da mesma prova |
 | *"nada desta Task foi feito"* (B1.5) | ❌ **A nota envelheceu.** 📖 `views/rdo.py:2175` registra a saída da chamada direta a `gerar_custos_mao_obra_rdo`. A nota é de 04/08; o trabalho veio depois |
 | `test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py` | 🔴 **Resíduo real.** 🔬 **Zero** testes citam `entrada_ja_lancada` |
-| `test_a10_ponto_manual_nao_perde_custo.py` | 🟡 **A verificar.** 🔬 `tests/test_arreio_presenca_rotas.py` menciona `novo_ponto` — pode já cobrir. **Task 2 confere antes de escrever** |
+| `test_a10_ponto_manual_nao_perde_custo.py` | ❌ **Não é resíduo** (conferido em 31/08, Task 2). 🔬 `tests/test_arreio_presenca_rotas.py:123` já lança dois pontos no mesmo dia pela rota `POST /novo_ponto` e afirma as duas coisas que o arquivo faria: **um** `RegistroPonto` e custo do dia = 2× o da primeira metade (a sobrescrita). Decisão registrada no `2026-08-04-plano-consolidado.md`, no formato da nota do A05 |
 | `test_b6_404_*` | 🔴 **Cinco, não quatro:** `obras`, `frota`, `cauda`, `miscelanea` **e `propostas`** (`rodada-b6:593`) |
 
 ---
@@ -245,7 +245,7 @@ num lugar e o comete no outro."
 **Files:**
 - Modify: `tests/test_arreio_presenca_rotas.py` **ou** nada
 
-- [ ] **Step 1: Check whether the coverage already exists**
+- [x] **Step 1: Check whether the coverage already exists**
 
 ```bash
 grep -n "novo_ponto" tests/test_arreio_presenca_rotas.py
@@ -257,7 +257,7 @@ grep -rn "dois lançamentos\|mesmo dia\|reusar\|reuso" tests/test_arreio_presenc
 custo do primeiro"* (`reconferencia-backlog-2026-08-23.md:404`). A correção foi
 `views/admin.py:100-290` passar a **reusar** o `RegistroPonto` do dia.
 
-- [ ] **Step 2: Decide, and say which**
+- [x] **Step 2: Decide, and say which**
   - **Se o arreio já cobre:** não crie arquivo. Registre a decisão neste plano e
     no `2026-08-04-plano-consolidado.md`, no mesmo formato da nota do A05 — que é
     o precedente da casa.
@@ -265,7 +265,17 @@ custo do primeiro"* (`reconferencia-backlog-2026-08-23.md:404`). A correção fo
     **não** em arquivo novo. Dois POSTs no mesmo dia, e a afirmação é sobre
     `RegistroPonto` (um só) e sobre o custo (não sobrescrito).
 
-- [ ] **Step 3: Commit**
+✅ **Decidido em 31/08: JÁ COBRE — nenhum arquivo criado.**
+`test_dois_lancamentos_no_mesmo_dia_custeiam_as_horas_das_duas_metades`
+(`tests/test_arreio_presenca_rotas.py:123`) posta 08:00-12:00 e 13:00-17:00 em
+`POST /novo_ponto` e afirma `len(registros) == 1` **e** `custo_do_dia ==
+custo_da_manha * 2` — o `RegistroPonto.count() == 1` que a Task pedia, mais a
+prova de que a segunda metade não sobrescreveu a primeira. Os dois vizinhos
+(trocar a obra do dia, `:168`; corrigir o horário, `:237`) também estão lá.
+Registrado no `2026-08-04-plano-consolidado.md`, na Task A10, no formato da
+nota do A05.
+
+- [x] **Step 3: Commit**
 
 ---
 

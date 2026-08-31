@@ -1167,11 +1167,29 @@ de `:181` idem. A resposta (`:192-196`) devolve `criado: true/false` além de
 Não é cosmético: é o que torna visível uma sobrescrita que hoje acontece em silêncio
 no custo.
 
-**Teste que prova:** `tests/test_a10_ponto_manual_nao_perde_custo.py` (escrito ANTES
-desta Task rodar verde: com B1.6 aplicado e esta não, o Teste 1 deve falhar em
-`RegistroPonto.count() == 1` — é essa falha que prova que o teste exercita o defeito,
-e não a forma). Usa `dois_tenants('a10', DATA_SEMENTE)` e
+**Teste que prova:** ~~`tests/test_a10_ponto_manual_nao_perde_custo.py`~~ — **ver a
+nota abaixo.** Usa `dois_tenants('a10', DATA_SEMENTE)` e
 `DIA = DATA_SEMENTE + timedelta(days=1)` — nunca `date.today()`.
+
+> **Nota de 31/08 (Onda 6, Task 2) — o arquivo de teste desta Task NÃO será
+> criado.** 🔬 Conferido antes de escrever, como manda a onda: a cobertura já
+> existe, pela mesma porta (a rota `POST /novo_ponto`) e sobre as mesmas duas
+> afirmações. `tests/test_arreio_presenca_rotas.py:123`
+> (`test_dois_lancamentos_no_mesmo_dia_custeiam_as_horas_das_duas_metades`)
+> lança manhã de 4h e tarde de 4h no mesmo dia/obra e afirma **(a)** que ficou
+> **um** `RegistroPonto` (`len(registros) == 1`, que é exatamente o
+> `RegistroPonto.count() == 1` que esta Task pedia) e **(b)** que o custo do dia
+> vale o dobro do custo da primeira metade — isto é, que o segundo lançamento
+> **não sobrescreveu** o primeiro, que é o defeito que a A10 fechou. O arreio
+> ainda cobre os dois vizinhos que o arquivo separado teria: trocar a obra do
+> dia (`:168`) e corrigir o horário do mesmo registro (`:237`).
+>
+> Escrever o arquivo separado seria uma segunda cópia da mesma prova, com o
+> risco conhecido de as duas divergirem — **o mesmo motivo, e o mesmo
+> precedente, da nota do A05 na Task B1.5** (`:812`). A tabela de casos abaixo
+> continua valendo como especificação; o que muda é onde ela vive. Se um caso
+> novo aparecer, ele entra em `tests/test_arreio_presenca_rotas.py`, não em
+> arquivo novo.
 
 | Teste | Ação | Asserção |
 |---|---|---|
