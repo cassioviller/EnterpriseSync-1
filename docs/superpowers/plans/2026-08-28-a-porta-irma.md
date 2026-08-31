@@ -1,6 +1,18 @@
 # A Porta Irmã — a guarda que fechou um caminho e deixou o gêmeo aberto Implementation Plan
 
-> **Estado em 2026-08-28:** 🟡 **ABERTO — pronto para executar** — 8 tasks.
+> **Estado em 2026-08-31:** ✅ **FECHADO — 8/8 tasks.** Gate de fecho: **2854
+> passed, 6 skipped, 2 xfailed, 0 failed** (43min55s); o skipped caiu de 10
+> para 6, que é a Task 7 devolvendo `test_propagacao_proposta_obra.py` ao gate.
+> Commits: `dd8ff183` (T7), `da778eba`+`5fa775e7`+`959fca86` (T1), `d966b34a`
+> (T2), `d8ebbd61` (T3), `39fe3a85` (T4), `b3af3549` (T5), `7d494cb9` (T6).
+>
+> ⚠️ **Três achados da execução, registrados em
+> `docs/auditoria/achados-code-review-2026-08-25.md`:** duas portas irmãs que o
+> review não viu (`views/obras.py:2279` e `acum_ant` em
+> `cronograma_apontamento_service.py:378`), e o fato de que **os testes escritos
+> NESTE plano para as Tasks 3, 4 e 5 passariam verdes sem tocar no defeito** —
+> os três gatilhos foram trocados por outros com RED medido. Se você for
+> reusar este plano como modelo, leia essa seção antes.
 > Nasceu do `/code-review max` sobre a branch da Onda 5, rodado DEPOIS de ela
 > fechar com gate verde de 2839. Evidência em
 > `docs/auditoria/achados-code-review-2026-08-25.md`, seção "Achados do
@@ -129,7 +141,7 @@ de dados, não decorador.
 - Consumes: `auth.admin_required` (já existe; é o que `portal_obras_views` usa).
 - Produces: nada que outra task consuma.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_porta_irma.py`:
 
@@ -232,13 +244,13 @@ def test_funcionario_nao_aprova_aditivo():
             f'{versoes_depois - versoes_antes} versão(ões) nova(s)')
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_porta_irma.py::test_funcionario_nao_aprova_aditivo -v`
 Expected: **FAIL** — o FUNCIONARIO passa pelo `@obra_required` e uma
 `ObraContratoVersao` nova aparece.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Em `views/aditivos_views.py`, nas três rotas (`novo`, `aprovar`, `cancelar`),
 somar `@admin_required` ao decorador existente:
@@ -266,7 +278,7 @@ Comentário obrigatório acima do primeiro `@admin_required`:
 # `@admin_required` pode sair e o `@obra_required` volta a bastar.
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest tests/test_porta_irma.py::test_funcionario_nao_aprova_aditivo -v`
 Expected: **PASS**.
@@ -277,7 +289,7 @@ Expected: verde. Se algum teste de Fase 6 logava como não-admin para aprovar,
 ele documentava o furo: **traga o caso aqui e decida explicitamente**, não
 afrouxe o decorador.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_porta_irma.py views/aditivos_views.py
@@ -300,7 +312,7 @@ git commit -m "fix(aditivo): a aprovacao para de depender de uma flag que ningue
 - Consumes: `_funcionario_logavel` da Task 1.
 - Produces: nada.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_gerar_medicao_e_fechada_nas_duas_urls():
@@ -336,12 +348,12 @@ def test_gerar_medicao_e_fechada_nas_duas_urls():
             f'FUNCIONARIO gerou {depois - antes} medição(ões) por URL alternativa')
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_porta_irma.py::test_gerar_medicao_e_fechada_nas_duas_urls -v`
 Expected: **FAIL** — as duas rotas aceitam o POST.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Em `medicao_views.py:445-448`, somar `@admin_required` — **uma vez, cobrindo as
 duas rotas**, já que as duas apontam para a mesma view:
@@ -354,7 +366,7 @@ duas rotas**, já que as duas apontam para a mesma view:
 def gerar_medicao(obra_id):
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest tests/test_porta_irma.py::test_gerar_medicao_e_fechada_nas_duas_urls -v`
 Expected: **PASS**.
@@ -362,7 +374,7 @@ Expected: **PASS**.
 Run: `python -m pytest tests/ -k medicao -m "not browser" -q`
 Expected: verde.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_porta_irma.py medicao_views.py
@@ -389,7 +401,7 @@ git commit -m "fix(medicao): o admin_required do portal deixa de ser contornavel
 - Consumes: nada.
 - Produces: `_modulos_de_view()` — helper do teste, usado só aqui.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 O guarda deixa de nomear módulos e passa a varrer o pacote:
 
@@ -457,12 +469,12 @@ def test_erro_ao_salvar_rdo_nao_vaza_frames_nem_email():
         assert vazamento not in corpo, f'{vazamento!r} vazou na resposta'
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_porta_irma.py -k "traceback or frames" -v`
 Expected: **FAIL** — `rdo.py` aparece na lista de suspeitos.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Em `views/rdo.py:3576-3581`, trocar o `flash` detalhado por mensagem, mantendo o
 log completo:
@@ -486,12 +498,12 @@ log completo:
 ⚠️ Se a varredura do Step 1 acusar outros módulos além de `views/rdo.py`,
 **conserte todos nesta task** — é o ponto do guarda ser uma varredura.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest tests/test_porta_irma.py -k "traceback or frames" -v`
 Expected: **PASS**.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_porta_irma.py views/rdo.py
@@ -519,7 +531,7 @@ git commit -m "fix(rdo): o flash para de mandar traceback, email e admin_id; o g
 - Consumes: `production_routes._detalhes_na_resposta` (já existe, `:13`).
 - Produces: nada.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_rotas_safe_nao_mandam_excecao_crua_na_mensagem():
@@ -558,7 +570,7 @@ def test_rotas_safe_nao_mandam_excecao_crua_na_mensagem():
         app_module.IS_PRODUCTION = original
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_porta_irma.py::test_rotas_safe_nao_mandam_excecao_crua_na_mensagem -v`
 
@@ -569,7 +581,7 @@ usada por `/prod/safe-funcionarios`, ou injete `raise SQLAlchemyError(...)` no
 `try`, confirme o RED, desfaça a injeção. **Não pule esta confirmação:** foi
 exatamente teste-que-nasce-verde que deixou os defeitos desta rodada passarem.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Nos cinco `render_template('error.html', ...)`, passar a mensagem pelo gate:
 
@@ -592,12 +604,12 @@ Nos cinco `render_template('error.html', ...)`, passar a mensagem pelo gate:
 ⚠️ `:387` (`safe-alimentacao`) **não passa `error_details` nenhum** — só a
 mensagem. Aplique o mesmo gate lá.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest tests/test_porta_irma.py::test_rotas_safe_nao_mandam_excecao_crua_na_mensagem -v`
 Expected: **PASS**.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_porta_irma.py production_routes.py
@@ -625,7 +637,7 @@ git commit -m "fix(erros): a mensagem das rotas safe passa pelo mesmo gate dos d
 - Consumes: `validar_localizacao_na_obra` (já existe).
 - Produces: nada.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 @pytest.mark.parametrize('caso,payload_extra', [
@@ -667,12 +679,12 @@ def test_ponto_facial_nao_pula_geofencing_por_obra_id(caso, payload_extra):
             f'{caso}: gravou ponto sem passar pelo geofencing')
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_porta_irma.py -k geofencing -v`
 Expected: **FAIL** nos dois casos — a rota segue adiante sem validar.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `obra_id` passa a ser **obrigatório e resolvível**, com o mesmo desenho que
 `validar_localizacao_na_obra` já tem para coordenada ausente:
@@ -706,7 +718,7 @@ Expected: **FAIL** nos dois casos — a rota segue adiante sem validar.
             }), 403
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest tests/test_porta_irma.py -k geofencing -v`
 Expected: **PASS** nos dois casos.
@@ -715,7 +727,7 @@ Run: `python -m pytest tests/ -k "ponto or geofenc" -m "not browser" -q`
 Expected: verde. ⚠️ Se algum teste existente POSTa sem `obra_id` e esperava
 sucesso, ele **documentava o furo** — traga o caso e decida explicitamente.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_porta_irma.py ponto_views.py
@@ -745,7 +757,7 @@ git commit -m "fix(ponto): omitir obra_id deixa de pular o geofencing inteiro"
 - Consumes: `RDOApontamentoCronograma`, `recomputar_cadeia` (já existem).
 - Produces: nada.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_retrocesso_e_barrado_entre_rdos_do_mesmo_dia():
@@ -807,12 +819,12 @@ def test_retrocesso_e_barrado_entre_rdos_do_mesmo_dia():
 distintos do cenário. Um só RDO atualizaria a própria linha e não exercitaria
 a janela de `pct_ant`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_porta_irma.py::test_retrocesso_e_barrado_entre_rdos_do_mesmo_dia -v`
 Expected: **FAIL** — `DID NOT RAISE RetrocessoNaoPermitido`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 A janela passa a casar com a ordem que `recomputar_cadeia` usa — mesma data,
 desempate por id:
@@ -838,7 +850,7 @@ desempate por id:
 ⚠️ **O `!= rdo.id` não é detalhe.** Sem ele, reprocessar o próprio RDO lê o
 apontamento que ele mesmo acabou de gravar e a guarda barra a própria escrita.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest tests/test_porta_irma.py::test_retrocesso_e_barrado_entre_rdos_do_mesmo_dia -v`
 Expected: **PASS**.
@@ -850,7 +862,7 @@ mesmo dia" (`test_cronograma_duplicado_rdo.py`,
 `test_caracterizacao_apontamento_cronograma.py`) **têm de continuar passando** —
 se caírem, a correção virou a guarda cega que `ed85d117` removeu.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_porta_irma.py services/cronograma_apontamento_service.py
@@ -883,7 +895,7 @@ git commit -m "fix(cronograma): a guarda de retrocesso passa a ver o rdo irmao d
 - Consumes: `tests/helpers_tenant.um_tenant`.
 - Produces: nada.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 O RED aqui não é um `assert` novo — é **provar que o skip acontece**, e ele
 depende de qual linha o banco devolve. Torne o defeito determinístico antes de
@@ -928,7 +940,7 @@ def test_a_fixture_de_propagacao_nao_depende_de_sorteio(monkeypatch):
 ⚠️ Este teste sozinho não força o skip — ele monta o cenário. O RED de verdade
 é o **Step 2**.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Com o órfão semeado, rode o arquivo alvo:
 
@@ -938,7 +950,7 @@ Expected: **6 SKIPPED**, com a razão `Sem obra para tenant — teste pula`.
 ⚠️ Se não pular, o sorteio caiu numa linha boa. Semeie mais órfãos e repita até
 ver o skip — **é o RED, e sem ele o conserto não prova nada**.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 A fixture para de sortear e passa a semear o próprio tenant, como todo o resto
 da suíte já faz:
@@ -974,7 +986,7 @@ ele deve **falhar**, não pular — skip que ninguém lê é cobertura perdida.
 
 Aplique o mesmo em `:133-140`, que tem a cópia da mesma fixture.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest tests/test_propagacao_proposta_obra.py -p no:randomly -v -rs`
 Expected: **6 passed, 0 skipped** — e o `-rs` não lista nada.
@@ -982,7 +994,7 @@ Expected: **6 passed, 0 skipped** — e o `-rs` não lista nada.
 Rode duas vezes seguidas: a segunda prova que a fixture não deixa resíduo que
 afete a primeira.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_propagacao_proposta_obra.py tests/test_porta_irma.py
@@ -996,7 +1008,7 @@ git commit -m "fix(teste): a fixture de propagacao semeia o tenant em vez de sor
 **Files:**
 - Nenhum. Só verificação.
 
-- [ ] **Step 1: Rodar o gate inteiro**
+- [x] **Step 1: Rodar o gate inteiro**
 
 Run: `bash run_tests.sh --gate`
 Expected: **skipped CAI de 10 para 6**, e passed sobe de 2840 pelo número de
@@ -1008,20 +1020,20 @@ de `tests/test_propagacao_proposta_obra.py` que a fixture sorteada tinha tirado.
 `grep -c "test_propagacao_proposta_obra.*SKIPPED"` na saída do gate devolve 4. Se continuar em 10, a Task 7 não pegou. E siga conferindo o skip
 nas rodadas seguintes: skip subindo não é ruído, é cobertura saindo sem aviso.
 
-- [ ] **Step 2: Marcar os achados**
+- [x] **Step 2: Marcar os achados**
 
 Em `docs/auditoria/achados-code-review-2026-08-25.md`, seção "Achados do
 `/code-review max` sobre a branch da Onda 5 (28/08)", mover cada um dos seis
 de "Abertos" para uma tabela de corrigidos, **com o commit que o fechou** — e
 marcar também "Um achado sobre o próprio gate", fechado pela Task 7.
 
-- [ ] **Step 3: Registrar o que a onda descobriu**
+- [x] **Step 3: Registrar o que a onda descobriu**
 
 Se alguma task revelou achado novo — e a Task 3 vai revelar, porque a varredura
 substitui uma lista de dois módulos por uma do app inteiro — registre em seção
 própria no fim do documento de auditoria, como as Ondas 3 e 5 fizeram.
 
-- [ ] **Step 4: Commit do fecho**
+- [x] **Step 4: Commit do fecho**
 
 ```bash
 git add docs/

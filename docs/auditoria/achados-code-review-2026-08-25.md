@@ -909,79 +909,53 @@ mesmos filtros e a mesma guarda `anterior <= 0`, e roda antes do ramo antecipado
 | R3 | `views/rdo.py:4117` | `data_relatorio` parseada e nunca atribuída no ramo de edição; `x or rdo.x` não distinguia campo ausente de campo esvaziado |
 | R4 | `views/rdo.py:4050` | `_rdo_alvo` filtrava `RDO.admin_id`, que é `nullable=True`: RDO legado caía na criação e produzia a duplicata que a correção existia para impedir. → `join(Obra)`, como `:2891` |
 
-### 🔴 Abertos — não tocados no fix round
+### ✅ Corrigidos pela onda "A Porta Irmã" (31/08)
 
-**Autorização (os dois mais sérios):**
+> Plano: `docs/superpowers/plans/2026-08-28-a-porta-irma.md`. TDD com RED
+> citado em todas as tasks. **Gate de fecho: 2854 passed, 6 skipped, 2
+> xfailed, 0 failed** (43min55s) — o skipped caiu de 10 para 6, que é a Task 7
+> devolvendo `tests/test_propagacao_proposta_obra.py` ao gate (os 6 testes do
+> arquivo aparecem PASSED na saída).
 
-- 📖 **`views/aditivos_views.py:144`** — `aprovar` (e `novo:88`, `cancelar:189`)
-  usa `@obra_required(PapelObra.GESTOR)` → `pode_editar_obra`
-  (`utils/autorizacao.py:194`) → `papel_de_usuario_na_obra`, que devolve
-  **GESTOR para todo usuário autenticado do tenant** quando `escopo_obra_ativo`
-  está desligado — e a coluna é `default=False` (`models.py:4441`), então é o
-  estado de todo tenant existente. Qualquer FUNCIONARIO move a linha de base do
-  contrato: nova `ObraContratoVersao`, delta contábil e deslocamento de
-  cronograma, **irreversível por desenho**.
+| # | Arquivo:linha | Defeito | Commit |
+|---|---|---|---|
+| A1 | `views/aditivos_views.py:144` | Ação financeira irreversível pendurada em `PapelObra.GESTOR`, cujo predicado devolve GESTOR para todo usuário do tenant enquanto `escopo_obra_ativo` está desligado — o default. **Decisão D5: garantia própria na rota**, não ligar a flag; o fallback permissivo de `utils/autorizacao.py` fica como está, porque é escolha consciente e documentada | `da778eba` `5fa775e7` `959fca86` |
+| A2 | `medicao_views.py:449` | O `@admin_required` do portal contornável trocando a URL: a mesma view responde em `/medicao/obra/<id>/gerar` e `/obras/<id>/medicao/fechar`. Decorator entra uma vez e cobre as duas | `d966b34a` |
+| A3 | `views/rdo.py:3581` | `flash()` com 500 caracteres de `format_exc()` mais e-mail e admin_id. **A varredura achou um segundo site que o review não tinha visto:** `views/obras.py:2279`, mesma forma, com um comentário dizendo "modo desenvolvimento" que não checava nada | `d8ebbd61` |
+| A4 | `production_routes.py:124,201,279,336,387` | `error_message=f"...{str(e)}"` sem gate, com `error.html:17` renderizando cru. O `:387` (safe-alimentacao) não passava `error_details` nenhum — a mensagem era o único vazamento da rota | `39fe3a85` |
+| A5 | `ponto_views.py:2454` | Omitir `obra_id` (ou mandar um irresolvível) pulava o geofencing inteiro. A tela veio junto: dizia "Obra (opcional)" e mandava `obra_id: obraId \|\| null`, então o caminho padrão passaria a tomar 400 | `b3af3549` |
+| A6 | `services/cronograma_apontamento_service.py:398` | Janela de `pct_ant` com `<` estrito não via o RDO irmão do mesmo dia. **A porta irmã estava dentro do próprio achado:** `acum_ant` (`:378`) tinha a janela idêntica no modo quantitativo — RDO B lia acumulado 40 onde o recompute lê 70 | `7d494cb9` |
 
-  ⚠️ **O permissivo NÃO é bug em `utils/autorizacao.py`, e o código diz isso.**
-  🔬 `:147-160` documenta a escolha: com a flag desligada o eixo de obra "não
-  está em vigor, nem para alargar nem para estreitar", e devolver LEITOR
-  "tiraria a edição de todo não-admin no dia do deploy — exatamente o que a
-  flag existe para impedir". A decisão é consciente e defensável.
+### 🔴 Abertos — os cinco que sobraram
 
-  **O achado é outro:** uma ação financeira irreversível foi pendurada num
-  predicado cujo default é permissivo, como se `PapelObra.GESTOR` já fosse uma
-  restrição real. Hoje não é. A correção não é mexer no fallback — é a rota de
-  aprovação de aditivo exigir garantia que não dependa da flag (a mesma Onda 5
-  pôs `@admin_required` no portal para capacidade estritamente menor), **ou**
-  ligar `escopo_obra_ativo` conscientemente por tenant. É decisão sua.
-- 📖 **`medicao_views.py:449`** — o `@admin_required` que a onda pôs em
-  `portal_obras.gerar_medicao` é contornável trocando a URL: `medicao.gerar_medicao`
-  responde em `/medicao/obra/<id>/gerar` e `/obras/<id>/medicao/fechar` com
-  **só `@login_required`**. Todo o `medicao_bp` roda assim.
+> Causa diferente: escrita que não chega ao banco, ou chega pela metade. Plano
+> próprio em `docs/superpowers/plans/2026-08-28-o-que-nao-persiste.md`.
 
-**Vazamento de informação:**
-
-- 📖 `views/rdo.py:3581` — `flash()` com 500 caracteres de `format_exc()` mais
-  `current_user.email` e `admin_id`. Mesma classe que a Task 1 fechou, no arquivo
-  que a onda mais editou; o teste-guarda itera só sobre `(ponto_views, equipe_views)`.
-- 📖 `production_routes.py:124,201,279,336` — `error_message=f"...{str(e)}"` sem
-  gate, e `templates/error.html:17` renderiza `{{ error_message }}` cru. Só
-  `error_details` está atrás do `{% if %}`. `str(e)` de erro SQLAlchemy carrega
-  SQL e parâmetros.
 - 📖 `portal_obras_views.py:647` — `db.session.commit()` sem guarda dentro do
   `except`, e a linha 648 relaia a exceção crua para visitante **anônimo**.
 
-**Contradição interna:**
-
-- 📖 `services/cronograma_apontamento_service.py:398` — `pct_ant` limita a janela
-  com `RDO.data_relatorio < rdo.data_relatorio` **estrito**, então um RDO irmão
-  do MESMO dia é invisível à guarda de retrocesso — no mesmo commit em que
-  `views/rdo.py:4035` afirma que dois RDOs no mesmo dia são estado legal.
-
-**Outros:**
-
-- 📖 `ponto_views.py:2454` — o fix de geofencing fechou o furo de
-  latitude/longitude e deixou dois: omitir `obra_id`, ou mandar um irresolvível,
-  pula o geofencing inteiro e grava `RegistroPonto` com `obra_id=None`.
 - 📖 `models.py:7616` — a migration 315 alargou `uq_contrato_versao_vigente` para
   `(obra_id, admin_id)` e deixou a irmã `uq_contrato_versao_obra_versao` como
   `UNIQUE(obra_id, versao)`, sem escopo de tenant, enquanto `abrir_versao`
   numera por tenant. A obra travada continua travada — só muda o nome da
   constraint no erro.
+
 - 📖 `services/cronograma_proposta.py:609,685` — o `if not tarefa.ativa:
   tarefa.ativa = True` reimplementa, incompleto, o
   `reativar_tarefas_de_itens_reincluidos` do mesmo módulo (`:892-965`): não limpa
   `arquivada_em` nem cascateia para as filhas arquivadas.
+
 - 📖 `services/proposta_diff.py:92` — compara `subtotal_calculado` (snapshot
   `Numeric(15,2)` do banco) com o produto `quantidade × preco_unitario` não
   arredondado (até 5 casas): linha intocada vira "alterado". E
   `templates/propostas/comparar.html:78-79` não acompanhou a mudança.
+
 - 📖 `portal_obras_views.py:774,696,786,939` — o redesenho "um evento commitado
   por tentativa" foi aplicado a 2 das 6 rotas que registram trilha. `ver_comprovante`
   registra e devolve `send_file` sem commit algum: **toda visualização de
   comprovante pelo cliente some no `session.remove()`**.
 
-### 🔴 Um achado sobre o próprio gate
+### ✅ Um achado sobre o próprio gate — fechado pela Task 7 (`dd8ff183`)
 
 📖 `tests/test_propagacao_proposta_obra.py:35` — a fixture faz
 `Usuario.query.filter_by(tipo_usuario='ADMIN').first()`, um `.first()` **sem
@@ -990,3 +964,59 @@ sorteado não tem obra. Qualquer escrita reembaralha o sorteio: no gate de
 28/08 **4 testes pararam de rodar** sem que nada sinalizasse, e isso não havia
 acontecido em nenhum dos oito gates anteriores. Não é regressão de código — é
 uma verificação que parece cobrir mais do que cobre.
+
+✅ **Fechado em `dd8ff183`:** a fixture semeia o próprio tenant em vez de
+sortear entre os 185.784 ADMINs. No gate de fecho da onda (31/08) os **6**
+testes do arquivo aparecem PASSED e o skipped total caiu de 10 para 6 — os 4
+que a Task 7 devolveu. 🔬 A contagem "4" é a do ruling R7: o plano dizia 6, e 6
+estava errado.
+
+
+## Achados novos da execução da onda "A Porta Irmã" (31/08)
+
+> Registrados no mesmo formato das Ondas 3 e 5: o que a execução revelou e o
+> review não tinha visto.
+
+1. **`views/obras.py:2279` — o gêmeo do vazamento do RDO.** Mesmo `flash` com
+   `format_exc()` inteiro, e o comentário dizia "exibir traceback completo em
+   modo desenvolvimento" quando não havia checagem nenhuma: ia para a tela em
+   produção também. Só apareceu porque o guarda da Task 3 deixou de nomear
+   módulos e passou a varrer o app. (Task 3, corrigido em `d8ebbd61`.)
+
+2. **`services/cronograma_apontamento_service.py:378` — a porta irmã dentro do
+   próprio achado.** O review nomeou o `pct_ant` (`:398`); o `acum_ant`
+   (`:378`), que alimenta o modo quantitativo, tinha a janela estrita idêntica,
+   e o `recomputar_cadeia` soma o irmão do mesmo dia nos DOIS modos. RED
+   medido: RDO A executa 30 un, RDO B no mesmo dia executa 40, e o acumulado de
+   B lia 40 em vez de 70. (Task 6, corrigido em `7d494cb9`.)
+
+3. **A correção do geofencing quebrava a própria tela.** `ponto_views` passou a
+   exigir `obra_id`, mas `templates/ponto/ponto_facial_automatico.html:131`
+   dizia "Obra (opcional)" e o JS mandava `obra_id: obraId || null` — o caminho
+   PADRÃO da interface passaria a tomar 400. Achado só porque se foi olhar quem
+   chamava a rota. Backend e tela têm de mudar no mesmo commit. (Task 5,
+   `b3af3549`.)
+
+### 🔴 O padrão que se repetiu: o teste que nasce verde
+
+**Em três das seis tasks, o teste escrito NO PLANO teria passado sem tocar no
+defeito** — e teria sido commitado como prova.
+
+| Task | O teste do plano | Por que não podia falhar |
+|---|---|---|
+| 3 | POST em `/rdo/salvar` com `obra_id` inexistente | Cai em `flash('Obra não encontrada')` + redirect (`:2951`), caminho validado que nunca chega ao `except`. Gatilho trocado por data em formato brasileiro, que estoura o `strptime` de `:2948` |
+| 4 | GET nas cinco rotas `/prod/safe-*` | Só falharia se alguma rota errasse por conta própria no ambiente. O plano mandava forçar o erro à mão e desfazer; o erro passou a ser injetado pelo teste (monkeypatch em `get_safe_admin_id`, chamada dentro do `try` das cinco), para o teste seguir sendo guarda |
+| 5 | POST facial sem `obra_id` | Morre em 404 "nenhum funcionário com foto cadastrada" antes do geofencing — e 404 estava na lista de status aceitos. Passou a semear foto e grampear os dois pontos que barram foto sintética |
+
+**A leitura que importa:** esta onda nasceu porque três testes da Onda 5
+provavam por `inspect.getsource()` — liam o texto do código e não viam o que
+ele fazia. O plano proibiu `getsource()` explicitamente, e mesmo assim três dos
+seus próprios testes traziam a versão seguinte do mesmo vício: **não ler o
+texto, mas também nunca chegar ao código sob teste.** Proibir a técnica não
+basta; o RED tem de ser medido e a mensagem do RED tem de citar o defeito, não
+só um status aceitável.
+
+Daí a regra que esta onda acrescenta, e que o teste da Task 4 já aplica: **um
+teste de guarda tem de reprovar também quando o próprio gatilho para de
+funcionar.** Ele exige status 500 em cada rota antes de olhar o vazamento — se
+o erro injetado deixar de ocorrer, o teste acusa em vez de virar andaime verde.
