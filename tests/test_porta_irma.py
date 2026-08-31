@@ -11,6 +11,7 @@ sobre a instância que o defeito da vez expôs.
 import os
 import sys
 import uuid
+from decimal import Decimal
 
 import pytest
 
@@ -251,3 +252,66 @@ def test_gestor_nao_admin_aprova_aditivo_com_escopo_ativo():
         assert versoes == 2, (
             'aprovação do GESTOR não-admin não abriu a versão 2 do '
             f'contrato — {versoes} versão(ões) encontrada(s)')
+
+
+# ---------------------------------------------------------------------------
+# Task 2 — a medição do portal
+# ---------------------------------------------------------------------------
+
+def test_gerar_medicao_e_fechada_nas_duas_urls():
+    """🔴 `medicao_views.py:445-448` — a mesma view em DUAS rotas, só
+    `@login_required`.
+
+    A Onda 5 fechou `portal_obras.gerar_medicao` com `@admin_required`. Quem
+    for barrado lá ainda POSTa em `/medicao/obra/<id>/gerar` ou
+    `/obras/<id>/medicao/fechar` e cria a `MedicaoObra` — mais a conta a
+    receber que ela auto-cria. O privilégio se recupera trocando a URL.
+
+    O teste itera sobre AS DUAS, de propósito: fechar uma e deixar a outra é
+    exatamente o defeito.
+
+    Nota de arreio: os dois `cliente.post()` ficam FORA do
+    `with app.app_context()` de semeadura/conferência — mesmo padrão de
+    `test_funcionario_nao_aprova_aditivo` acima. Aqui os dois posts são do
+    MESMO usuário (`func_id`), então a armadilha de `flask.g` compartilhado
+    entre usuários DIFERENTES não mudaria o veredito da identidade — mas o
+    padrão fica junto de qualquer forma: não é só sobre qual usuário
+    autentica, é sobre não reaproveitar o `AppContext` (e o teardown que ele
+    dispara) entre requests.
+
+    Nota de fixture: `gerar_medicao_quinzenal`
+    (`services/medicao_service.py:87-96`) recusa gerar SEM nenhum
+    `ItemMedicaoComercial` cadastrado — "Nenhum item de medição comercial
+    cadastrado para esta obra" — e devolve `erro` sem criar `MedicaoObra`,
+    de propósito, independente de quem faz o POST. Sem semear um item aqui
+    o teste passaria verde por essa recusa de dados, não pela guarda de
+    autorização que é o que se quer provar — o mesmo vício da chave de form
+    errada no teste de aditivo. Um item com `valor_comercial` basta.
+    """
+    from models import ItemMedicaoComercial, MedicaoObra
+
+    marca = uuid.uuid4().hex[:8]
+    with app.app_context():
+        t = um_tenant('medicao-authz', com_fatos=False)
+        obra_id = t.obra_id
+        func_id = _funcionario_logavel(t.admin_id, marca)
+
+        db.session.add(ItemMedicaoComercial(
+            admin_id=t.admin_id, obra_id=obra_id,
+            nome=f'Item {marca}', valor_comercial=Decimal('1000.00')))
+        db.session.commit()
+
+        antes = MedicaoObra.query.filter_by(obra_id=obra_id).count()
+
+    cliente = cliente_de(func_id)
+
+    for rota in (f'/medicao/obra/{obra_id}/gerar',
+                 f'/obras/{obra_id}/medicao/fechar'):
+        resposta = cliente.post(rota, data={}, follow_redirects=False)
+        assert resposta.status_code in (302, 403, 404), (
+            f'{rota}: FUNCIONARIO recebeu {resposta.status_code}')
+
+    with app.app_context():
+        depois = MedicaoObra.query.filter_by(obra_id=obra_id).count()
+        assert depois == antes, (
+            f'FUNCIONARIO gerou {depois - antes} medição(ões) por URL alternativa')
