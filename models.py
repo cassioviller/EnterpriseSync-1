@@ -7613,7 +7613,15 @@ class ObraContratoVersao(db.Model):
         db.Index('uq_contrato_versao_vigente', 'obra_id', 'admin_id',
                  unique=True,
                  postgresql_where=db.text('vigente_ate IS NULL')),
-        db.UniqueConstraint('obra_id', 'versao', name='uq_contrato_versao_obra_versao'),
+        # `admin_id` NÃO é decorativo aqui: `abrir_versao`
+        # (services/contrato_obra.py:196-198) calcula `max(versao)` filtrando
+        # por (obra_id, admin_id). Sem o tenant nesta constraint, a linha de
+        # admin_id divergente que a migration 315 descreve continuava
+        # travando a obra — a 315 consertou a irmã e deixou esta, e o único
+        # efeito foi mudar o NOME da constraint no IntegrityError. Migration
+        # 316.
+        db.UniqueConstraint('obra_id', 'admin_id', 'versao',
+                            name='uq_contrato_versao_obra_versao'),
     )
 
     id = db.Column(db.Integer, primary_key=True)

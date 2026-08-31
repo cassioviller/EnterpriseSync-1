@@ -7412,6 +7412,65 @@ def _migration_315_indice_vigencia_com_admin_id():
                 "(obra_id, admin_id) — o par que as queries filtram.")
 
 
+def _migration_316_versao_contrato_por_tenant():
+    """A irmã da 315: UNIQUE(obra_id, versao) → (obra_id, admin_id, versao).
+
+    A 315 escopou `uq_contrato_versao_vigente` por tenant e parou ali. Mas
+    `abrir_versao` (services/contrato_obra.py:196-198) calcula `max(versao)`
+    filtrando por (obra_id, admin_id): com uma linha de `admin_id` divergente
+    — o mesmo precedente da 266 que a 315 cita — o tenant correto renumera do
+    SEU máximo e colide com a linha alheia. A obra travada seguia travada; só
+    mudou o nome da constraint no erro.
+
+    Ao contrário da 315, NÃO é seguro sem olhar os dados. Alargar de
+    (obra_id, versao) para (obra_id, admin_id, versao) é AFROUXAR, então toda
+    linha existente continua válida — mas se já houver duplicata no trio
+    novo, a constraint não nasce. Daí a checagem explícita. Idempotente:
+    DROP IF EXISTS + checagem + CREATE, sempre nessa ordem — a dupla
+    execução sempre começa derrubando o objeto de antes (novo ou velho,
+    tanto faz o formato) e termina recriando o mesmo, no mesmo estado;
+    nunca tenta criar sobre um objeto que já existe.
+
+    🔬 O objeto físico NÃO é uma constraint: a migration 271
+    (`migrations.py:5788`) criou `uq_contrato_versao_obra_versao` como
+    `CREATE UNIQUE INDEX`, não `ALTER TABLE ... ADD CONSTRAINT` — apesar de
+    o modelo declarar `db.UniqueConstraint(...)`. Conferido no banco real
+    (`pg_constraint` não tem essa linha; `pg_indexes` tem). Um primeiro
+    rascunho desta migration usava `DROP/ADD CONSTRAINT` e falhava com
+    `DuplicateTable` no ADD: o DROP CONSTRAINT não achava nada para
+    derrubar (o nome pertence a um índice, não a uma constraint), e o
+    CREATE colidia com o índice que sobrava. Por isso aqui é
+    `DROP INDEX` / `CREATE UNIQUE INDEX`, o mesmo mecanismo que a 271 usou
+    e que a 315 usa para a irmã.
+
+    Verificado sobre os dados reais em 31/08 (leitura, antes de escrever
+    esta migration): 73420 linhas em `obra_contrato_versao`, zero colisão em
+    (obra_id, admin_id, versao) — o alargamento é seguro no ambiente atual.
+
+    Alocação: 316 (máximo real do repo em 31/08: 315).
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "DROP INDEX IF EXISTS uq_contrato_versao_obra_versao"))
+        colisoes = conn.execute(sa_text(
+            "SELECT obra_id, admin_id, versao, count(*) "
+            "FROM obra_contrato_versao "
+            "GROUP BY obra_id, admin_id, versao HAVING count(*) > 1"
+        )).fetchall()
+        if colisoes:
+            # Reporta, não mascara: constraint que não sobe em silêncio é
+            # pior que a antiga — some do modelo mental sem sumir do banco.
+            raise RuntimeError(
+                f"obra_contrato_versao tem {len(colisoes)} colisao(oes) em "
+                f"(obra_id, admin_id, versao) — resolva antes: {colisoes[:5]}")
+        conn.execute(sa_text(
+            "CREATE UNIQUE INDEX uq_contrato_versao_obra_versao "
+            "ON obra_contrato_versao (obra_id, admin_id, versao)"))
+    logger.info("[Migration 316] uq_contrato_versao_obra_versao agora cobre "
+                "(obra_id, admin_id, versao) — o trio que abrir_versao usa.")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7728,6 +7787,7 @@ def executar_migracoes():
             (313, "Reuniao 2026-08-20 — funcionario.cpf DROP NOT NULL: cadastro rapido sem documento em maos. UNIQUE mantido (Postgres aceita N nulos)", _migration_313_funcionario_cpf_nullable),
             (314, "Reuniao 2026-08-20 — cronograma_baseline.revisao (sequencial por obra+modo, com backfill por criada_em) e .motivo: historico de V1/V2 deixa de depender do texto do nome", _migration_314_baseline_revisao_e_motivo),
             (315, "Onda 5 / Task 8 — uq_contrato_versao_vigente ganha admin_id: o indice era UNIQUE(obra_id) e toda query filtra (obra_id, admin_id); linha com admin_id divergente travava a obra permanentemente", _migration_315_indice_vigencia_com_admin_id),
+            (316, "Fix round do code review — uq_contrato_versao_obra_versao ganha admin_id: a 315 escopou a irma e deixou esta, e abrir_versao numera por (obra_id, admin_id)", _migration_316_versao_contrato_por_tenant),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

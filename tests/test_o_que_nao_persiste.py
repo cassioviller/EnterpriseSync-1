@@ -417,3 +417,69 @@ def test_materializar_cronograma_reativa_por_id_proprio_nao_pelo_da_revisao_atua
             assert tarefa_db.arquivada_em is None, (
                 f'{rotulo} voltou viva com lápide: ativa=True e '
                 f'arquivada_em={tarefa_db.arquivada_em}')
+
+
+def test_versao_de_contrato_e_unica_por_tenant_nao_por_obra():
+    """🔴 `models.py:7616` — `UNIQUE(obra_id, versao)` sem `admin_id`.
+
+    A migration 315 escopou a irmã (`uq_contrato_versao_vigente`) por tenant
+    e deixou esta como estava. Com uma linha de admin_id divergente — o
+    cenário que a própria docstring da 315 cita — o tenant correto numera a
+    partir do SEU máximo e colide com a linha alheia.
+
+    🔬 Andaime corrigido, em duas frentes (o brief nunca chegava a exercitar
+    a constraint sob teste sem elas):
+
+    1. A coluna é `valor` (`models.py:7624`, Numeric), não `valor_contrato`
+       como o brief escrevia — e `vigente_de`/`origem_tipo` são NOT NULL
+       (`models.py:7626,7628`), como o próprio `abrir_versao` grava
+       (`services/contrato_obra.py:220-228`). Sem os três, o construtor
+       levantaria `TypeError`/violaria NOT NULL antes de qualquer INSERT.
+    2. `admin_id` tem FK real para `usuario.id`
+       (`obra_contrato_versao_admin_id_fkey`, conferido pelo erro do RED).
+       `t.admin_id + 999999` — o "tenant divergente" do brief — não é
+       usuário nenhum, e o INSERT da linha órfã falhava com
+       `ForeignKeyViolation` antes de chegar perto de
+       `uq_contrato_versao_obra_versao`. Por isso o admin_id divergente
+       aqui é o de um SEGUNDO tenant real (`dois_tenants`), exatamente o
+       cenário que a migration 266/315 descrevem: uma linha de
+       `obra_contrato_versao` cujo `admin_id` não é o dono da obra.
+    """
+    from models import ObraContratoVersao
+    from helpers_tenant import dois_tenants
+
+    with app.app_context():
+        a, b = dois_tenants('contrato-uq', com_fatos=False)
+
+        # A linha "órfã": obra do tenant A, admin_id do tenant B, versão
+        # alta, já fechada (histórica) — não precisa estar vigente para
+        # colidir com a numeração do tenant A, só precisa existir no par
+        # (obra_id, versao) que a constraint velha enxerga.
+        orfa = ObraContratoVersao(
+            obra_id=a.obra_id, admin_id=b.admin_id,
+            versao=3, valor=1000, origem_tipo='cadastro_manual',
+            vigente_de=date(2025, 1, 1), vigente_ate=date(2026, 1, 1))
+        db.session.add(orfa)
+        db.session.commit()
+
+        from models import Obra
+        from services.contrato_obra import ORIGEM_CADASTRO, abrir_versao
+
+        obra_ref = db.session.get(Obra, a.obra_id)
+        # 🔬 Assinatura conferida (`services/contrato_obra.py:114`):
+        # `abrir_versao(obra, valor, origem_tipo, *, origem_proposta_id=None,
+        # aditivo_id=None, motivo=None, criado_por_id=None, vigente_de=None,
+        # prazo_dias=None)`. `valor` e `origem_tipo` são POSICIONAIS e
+        # obrigatórios.
+        #
+        # O tenant A numera a partir do SEU máximo (0) — 1, 2, 3 — e é na
+        # terceira que ele encontra a órfã de versao=3.
+        for _ in range(3):
+            abrir_versao(obra_ref, 500, ORIGEM_CADASTRO)
+            db.session.commit()
+
+        vivas = ObraContratoVersao.query.filter_by(
+            obra_id=a.obra_id, admin_id=a.admin_id).count()
+        assert vivas == 3, (
+            'a numeração do tenant colidiu com a versão de outro tenant na '
+            'mesma obra — uq_contrato_versao_obra_versao não tem admin_id')
