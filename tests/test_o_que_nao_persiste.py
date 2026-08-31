@@ -118,3 +118,111 @@ def test_erro_ao_aprovar_compra_nao_conta_a_excecao_ao_anonimo(monkeypatch):
                       'Traceback (most recent call last)'):
         assert vazamento not in corpo, (
             f'{vazamento!r} vazou para visitante anônimo do portal')
+
+
+def _obra_com_token(marca):
+    from models import Obra
+    from helpers_tenant import um_tenant
+
+    t = um_tenant(marca, com_fatos=False)
+    obra = db.session.get(Obra, t.obra_id)
+    # 🔬 Campo conferido: `Obra.token_cliente` (`models.py:397`).
+    obra.token_cliente = token = uuid.uuid4().hex
+    db.session.commit()
+    return t, token
+
+
+def _compra_do_portal(t, obra, status='AGUARDANDO_APROVACAO_CLIENTE'):
+    """Uma `PedidoCompra` real, do tipo que o portal de fato oferece.
+
+    🔬 O andaime que o brief propunha usava `compra_id=999999999` — mas
+    `_get_compra_do_portal` (`portal_obras_views.py:530`) usa
+    `.first_or_404()` e aborta ANTES de `_registrar_acesso` ser chamado, tanto
+    em `ver_comprovante` (`:785`) quanto em `upload_comprovante` (`:707`). Um
+    id inexistente nunca alcançaria o trecho sob teste — o mesmo
+    andaime-que-não-podia-falhar que a Task 1 deste plano já tinha achado em
+    `aprovar_compra`. Por isso a compra aqui é real: pertence ao tenant, à
+    obra, e tem `tipo_compra='aprovacao_cliente'`.
+    """
+    from models import Fornecedor, PedidoCompra
+
+    forn = Fornecedor(nome='Fornecedor Teste', cnpj=uuid.uuid4().hex[:18],
+                      admin_id=t.admin_id, ativo=True)
+    db.session.add(forn)
+    db.session.flush()
+
+    compra = PedidoCompra(
+        fornecedor_id=forn.id, data_compra=date(2026, 8, 1),
+        obra_id=obra.id, condicao_pagamento='a_vista', parcelas=1,
+        valor_total=Decimal('1000.00'), tipo_compra='aprovacao_cliente',
+        processada_apos_aprovacao=False, admin_id=t.admin_id,
+        status_aprovacao_cliente=status)
+    db.session.add(compra)
+    db.session.commit()
+    return compra
+
+
+def test_visualizacao_de_comprovante_deixa_rastro():
+    """🔴 `portal_obras_views.py:785` — registra e devolve `send_file` sem
+    commit algum.
+
+    `_registrar_acesso` não commita (docstring `:138`), e o `session.remove()`
+    do teardown desfaz o evento. Toda visualização de comprovante de
+    pagamento pelo cliente sumia — e é o acesso que mais interessa auditar.
+
+    A conferência é feita em contexto NOVO, depois do teardown: dentro da
+    mesma sessão o evento apareceria e o teste passaria por engano.
+
+    A compra não precisa ter arquivo físico: `_registrar_acesso` roda ANTES
+    de `_arquivo_comprovante` resolver o caminho em disco (`:786`), então o
+    404 de arquivo ausente não impede o evento de ter sido gravado — é
+    justamente essa gravação que este teste prova.
+    """
+    from models import Obra, PortalAcessoEvento
+
+    with app.app_context():
+        t, token = _obra_com_token('portal-trilha')
+        obra = db.session.get(Obra, t.obra_id)
+        compra = _compra_do_portal(t, obra, status='APROVADO')
+        obra_id = t.obra_id
+        compra_id = compra.id
+        antes = PortalAcessoEvento.query.filter_by(
+            obra_id=obra_id, acao='compra_comprovante_ver').count()
+
+    app.test_client().get(
+        f'/portal/obra/{token}/compra/{compra_id}/comprovante')
+
+    with app.app_context():
+        depois = PortalAcessoEvento.query.filter_by(
+            obra_id=obra_id, acao='compra_comprovante_ver').count()
+        assert depois > antes, (
+            'a visualização de comprovante não deixou rastro — o teardown '
+            'desfez o evento que ninguém commitou')
+
+
+def test_tentativa_recusada_no_portal_tambem_deixa_rastro():
+    """🔴 `:707` `upload_comprovante` — registra na entrada e tem saídas
+    antecipadas que nunca alcançam commit.
+
+    Upload sem arquivo selecionado (mesma família de saída antecipada que
+    tipo errado, >5 MB, ou compra fora de APROVADO) some da trilha. É
+    exatamente o conjunto de tentativas para o qual uma auditoria existe.
+    """
+    from models import Obra, PortalAcessoEvento
+
+    with app.app_context():
+        t, token = _obra_com_token('portal-recusa')
+        obra = db.session.get(Obra, t.obra_id)
+        compra = _compra_do_portal(t, obra, status='APROVADO')
+        obra_id = t.obra_id
+        compra_id = compra.id
+        antes = PortalAcessoEvento.query.filter_by(obra_id=obra_id).count()
+
+    app.test_client().post(
+        f'/portal/obra/{token}/compra/{compra_id}/comprovante',
+        data={}, follow_redirects=True)
+
+    with app.app_context():
+        depois = PortalAcessoEvento.query.filter_by(obra_id=obra_id).count()
+        assert depois > antes, (
+            'a tentativa recusada de upload não deixou rastro')

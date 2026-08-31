@@ -172,6 +172,28 @@ def _registrar_acesso(obra, acao, alvo_tipo=None, alvo_id=None, detalhes=None):
         logger.error('[PORTAL] falha ao registrar trilha de acesso: %s', e)
 
 
+def _commit_trilha(obra, acao, alvo_tipo=None, alvo_id=None, detalhes=None):
+    """Registra o evento E commita só ele. Nunca levanta.
+
+    `_registrar_acesso` deliberadamente não commita, porque em rota de
+    ESCRITA o evento tem de viajar na transação do negócio. Mas quatro rotas
+    registram e nunca chegam a um commit — `ver_comprovante` devolve
+    `send_file` e o `session.remove()` do teardown desfaz o evento; as de
+    upload e de mapa têm saídas antecipadas.
+
+    Onde o evento é a ÚNICA escrita da requisição, ou onde a saída pode
+    acontecer antes do commit do negócio, use este. O portal é acessível por
+    visitante anônimo por token — uma falha ao gravar trilha não pode virar
+    500 para ele, por isso o commit tem guarda própria.
+    """
+    try:
+        _registrar_acesso(obra, acao, alvo_tipo, alvo_id, detalhes)
+        db.session.commit()
+    except Exception as e:   # auditoria não impede o cliente de agir
+        db.session.rollback()
+        logger.error(f"[PORTAL] trilha '{acao}' não gravou: {e}")
+
+
 @portal_obras_bp.route('/obra/<token>')
 def portal_obra(token: str):
     obra, inactive_response = _resolve_obra_for_view(token)
@@ -645,14 +667,12 @@ def aprovar_compra(token: str, compra_id: int):
         # A trilha da tentativa sobrevive ao rollback: registra e commita só
         # ela — mas o commit da AUDITORIA não pode derrubar o handler. Sem
         # esta guarda, uma falha aqui virava 500 cru para visitante anônimo,
-        # onde antes havia mensagem tratada.
-        try:
-            _registrar_acesso(obra, 'compra_aprovar', 'pedido_compra',
-                              compra_id, {'resultado': 'erro'})
-            db.session.commit()
-        except Exception as e_trilha:
-            db.session.rollback()
-            logger.error(f"[PORTAL] trilha da falha não gravou: {e_trilha}")
+        # onde antes havia mensagem tratada. Depois do rollback acima, o
+        # evento é a ÚNICA escrita pendente da requisição — exatamente o caso
+        # para o qual `_commit_trilha` existe (Task 2 do plano), então usa o
+        # mesmo helper em vez de repetir o try/except aqui.
+        _commit_trilha(obra, 'compra_aprovar', 'pedido_compra', compra_id,
+                       {'resultado': 'erro'})
         # `str(e)` traz SQL e parâmetros vinculados, e quem lê isto é um
         # portador de token NÃO autenticado. Detalhe vive no log.
         flash('Não foi possível aprovar a compra. O erro foi registrado; '
@@ -704,7 +724,7 @@ def upload_comprovante(token: str, compra_id: int):
     obra = _get_obra_by_token(token)
     compra = _get_compra_do_portal(obra, compra_id)
 
-    _registrar_acesso(obra, 'compra_comprovante', 'pedido_compra', compra_id)
+    _commit_trilha(obra, 'compra_comprovante', 'pedido_compra', compra_id)
 
     if compra.status_aprovacao_cliente != 'APROVADO':
         flash('Comprovante só pode ser enviado para compras aprovadas.', 'danger')
@@ -782,7 +802,7 @@ def ver_comprovante(token: str, compra_id: int):
     from flask import send_file
     obra = _get_obra_by_token(token)
     compra = _get_compra_do_portal(obra, compra_id)
-    _registrar_acesso(obra, 'compra_comprovante_ver', 'pedido_compra', compra_id)
+    _commit_trilha(obra, 'compra_comprovante_ver', 'pedido_compra', compra_id)
     return send_file(_arquivo_comprovante(compra))
 
 
@@ -794,7 +814,7 @@ def aprovar_mapa_concorrencia(token: str, mapa_id: int):
         id=mapa_id, obra_id=obra.id, admin_id=obra.admin_id
     ).first_or_404()
 
-    _registrar_acesso(obra, 'mapa_v1_aprovar', 'mapa_concorrencia', mapa_id)
+    _commit_trilha(obra, 'mapa_v1_aprovar', 'mapa_concorrencia', mapa_id)
 
     if mapa.status != 'pendente':
         flash('Este mapa de concorrência já foi concluído e não pode ser alterado.', 'warning')
@@ -947,7 +967,7 @@ def selecionar_mapa_v2(token: str, mapa_id: int):
         id=mapa_id, obra_id=obra.id, admin_id=obra.admin_id
     ).first_or_404()
 
-    _registrar_acesso(obra, 'mapa_v2_selecionar', 'mapa_concorrencia_v2', mapa_id)
+    _commit_trilha(obra, 'mapa_v2_selecionar', 'mapa_concorrencia_v2', mapa_id)
 
     if mapa.status == 'concluido':
         flash('Este mapa já foi aprovado e não pode ser alterado.', 'warning')
