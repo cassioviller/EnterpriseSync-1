@@ -1355,7 +1355,7 @@ def test_emissao_usa_a_faixa_efetiva_e_e_onde_o_fornecedor_novo_pesa():
     # efetiva pede 2 aprovações, e a guarda 2 passa a morder.
     html = _cliente_de(aid).post(
         f'/compras/requisicoes/{rid}/emitir-pedido',
-        data={'fornecedor_id': str(fid), 'data_compra': '2026-08-15'},
+        data={'fornecedor_id': str(fid), 'data_compra': date.today().isoformat()},
         follow_redirects=True).get_data(as_text=True)
 
     assert 'não pode emitir o pedido' in html, (
@@ -1536,6 +1536,20 @@ def test_o_pedido_do_fixture_nasce_dentro_da_janela_do_tenant():
 
     A janela não é literal: sai do default da coluna, mesma fonte que
     `janela_de_fracionamento` usa.
+
+    Esta guarda prova "dentro entra" (`dias_atras=0`) e "velho demais sai"
+    (`dias_atras=janela + 1`), mas deliberadamente não prova a borda exata
+    (`dias_atras=janela`, que pela comparação inclusiva `>=` deveria contar).
+    Duas razões: primeiro, depois desta correção nenhum fixture do parque
+    mora nessa borda — todos nascem em `dias_atras=0` — então a
+    inclusividade do `>=` deixou de ser load-bearing para qualquer teste
+    real. Segundo, `dias_atras=janela` seria a única asserção deste arquivo
+    capaz de virar sozinha à meia-noite: `data_compra = hoje₀ - janela`, e se
+    a query rodar depois da virada o corte anda e o pedido cai fora — uma
+    falha vermelha causada pelo relógio, num teste cujo propósito declarado
+    é justamente impedir falhas causadas pelo relógio. As duas asserções
+    acima são imunes por construção; adicionar a terceira trocaria essa
+    imunidade por uma cobertura que não paga o risco.
     """
     from services.alcada_compras import (acumulado_do_fornecedor,
                                          janela_de_fracionamento)
@@ -1939,11 +1953,11 @@ def _fechar_a_triade(pedido, admin, valor='4900.00'):
     from services.recebimento_pedido import registrar_recebimento
 
     item = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).first()
-    registrar_recebimento(pedido, usuario=admin, data=date(2026, 8, 2),
+    registrar_recebimento(pedido, usuario=admin, data=date.today(),
                           linhas=[(item.id, Decimal('1'))])
     lancar_nota(pedido, numero=uuid.uuid4().hex[:8], serie='1',
-                valor_total=Decimal(valor), data_emissao=date(2026, 8, 2),
-                data_vencimento=date(2026, 9, 2), usuario=admin)
+                valor_total=Decimal(valor), data_emissao=date.today(),
+                data_vencimento=date.today() + timedelta(days=30), usuario=admin)
     db.session.commit()
 
 
@@ -2586,7 +2600,7 @@ def test_ratificar_ainda_e_possivel_depois_de_a_emergencia_virar_pedido():
 
     _cliente_de(cid).post(f'/compras/requisicoes/{rid}/emitir-pedido',
                           data={'fornecedor_id': str(fid),
-                                'data_compra': '2026-08-15'},
+                                'data_compra': date.today().isoformat()},
                           follow_redirects=True)
 
     with app.app_context():

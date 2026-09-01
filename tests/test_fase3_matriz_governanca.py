@@ -209,7 +209,7 @@ def test_emitir_pedido(ator, cenario):
     _cliente_de(cenario['ids'][ator]).post(
         f"/compras/requisicoes/{cenario['req']}/emitir-pedido",
         data={'fornecedor_id': str(cenario['fornecedor']),
-              'data_compra': '2026-08-01', 'condicao_pagamento': 'a_vista'},
+              'data_compra': date.today().isoformat(), 'condicao_pagamento': 'a_vista'},
         follow_redirects=False)
 
     with app.app_context():

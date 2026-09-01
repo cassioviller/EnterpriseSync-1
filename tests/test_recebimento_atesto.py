@@ -2280,7 +2280,7 @@ def test_emissao_no_regime_novo_nao_promete_estoque_que_nao_criou():
     cli = cliente_de(admin_id)
     cli.post('/compras/nova', data={
         'fornecedor_id': forn_id, 'obra_id': obra_id,
-        'data_compra': '2026-08-05', 'tipo_compra': 'normal',
+        'data_compra': date.today().isoformat(), 'tipo_compra': 'normal',
         'condicao_pagamento': 'a_vista', 'parcelas': '1',
         'item_descricao[]': 'Cimento CP-II', 'item_quantidade[]': '50',
         'item_preco[]': '32.50',
@@ -2304,7 +2304,7 @@ def test_emissao_no_regime_antigo_continua_dizendo_o_que_dizia():
     cli = cliente_de(admin_id)
     cli.post('/compras/nova', data={
         'fornecedor_id': forn_id, 'obra_id': obra_id,
-        'data_compra': '2026-08-05', 'tipo_compra': 'normal',
+        'data_compra': date.today().isoformat(), 'tipo_compra': 'normal',
         'condicao_pagamento': 'a_vista', 'parcelas': '1',
         'item_descricao[]': 'Cimento CP-II', 'item_quantidade[]': '50',
         'item_preco[]': '32.50',
