@@ -91,7 +91,7 @@ def _pedido_do_fluxo_a(admin_id):
     db.session.commit()
     p = PedidoCompra(
         numero=f'PC-{uuid.uuid4().hex[:6].upper()}',
-        fornecedor_id=forn.id, data_compra=date(2026, 8, 1),
+        fornecedor_id=forn.id, data_compra=date.today(),
         obra_id=obra.id, condicao_pagamento='a_vista', parcelas=1,
         valor_total=Decimal('1625.00'), tipo_compra='normal',
         processada_apos_aprovacao=False, admin_id=admin_id,

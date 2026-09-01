@@ -85,7 +85,7 @@ def test_erro_ao_aprovar_compra_nao_conta_a_excecao_ao_anonimo(monkeypatch):
         db.session.flush()
 
         compra = PedidoCompra(
-            fornecedor_id=forn.id, data_compra=date(2026, 8, 1),
+            fornecedor_id=forn.id, data_compra=date.today(),
             obra_id=obra.id, condicao_pagamento='a_vista', parcelas=1,
             valor_total=Decimal('1000.00'), tipo_compra='aprovacao_cliente',
             processada_apos_aprovacao=False, admin_id=t.admin_id,
@@ -152,7 +152,7 @@ def _compra_do_portal(t, obra, status='AGUARDANDO_APROVACAO_CLIENTE'):
     db.session.flush()
 
     compra = PedidoCompra(
-        fornecedor_id=forn.id, data_compra=date(2026, 8, 1),
+        fornecedor_id=forn.id, data_compra=date.today(),
         obra_id=obra.id, condicao_pagamento='a_vista', parcelas=1,
         valor_total=Decimal('1000.00'), tipo_compra='aprovacao_cliente',
         processada_apos_aprovacao=False, admin_id=t.admin_id,

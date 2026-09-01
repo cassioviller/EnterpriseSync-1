@@ -73,7 +73,7 @@ def _pedido_fluxo_a(admin_id, obra_id, fornecedor_id, *, parcelas=1,
     from models import PedidoCompra, PedidoCompraItem
     p = PedidoCompra(
         numero=f'PC-{uuid.uuid4().hex[:6].upper()}',
-        fornecedor_id=fornecedor_id, data_compra=date(2026, 8, 1),
+        fornecedor_id=fornecedor_id, data_compra=date.today(),
         obra_id=obra_id, condicao_pagamento=condicao, parcelas=parcelas,
         valor_total=valor_total, tipo_compra='normal',
         processada_apos_aprovacao=False, admin_id=admin_id,

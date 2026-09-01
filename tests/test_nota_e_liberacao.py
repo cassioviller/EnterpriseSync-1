@@ -75,7 +75,7 @@ def _fornecedor(admin_id):
 def _pedido(admin_id, obra_id, fornecedor_id):
     p = PedidoCompra(
         numero=f'PC-{uuid.uuid4().hex[:6].upper()}',
-        fornecedor_id=fornecedor_id, data_compra=date(2026, 8, 1),
+        fornecedor_id=fornecedor_id, data_compra=date.today(),
         obra_id=obra_id, condicao_pagamento='a_vista', parcelas=1,
         valor_total=Decimal('1625.00'), tipo_compra='normal',
         processada_apos_aprovacao=False, admin_id=admin_id)

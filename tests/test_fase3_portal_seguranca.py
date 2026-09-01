@@ -75,7 +75,7 @@ def _compra(admin_id, obra_id, tipo='aprovacao_cliente'):
     db.session.add(forn)
     db.session.commit()
     p = PedidoCompra(
-        fornecedor_id=forn.id, data_compra=date(2026, 8, 1), obra_id=obra_id,
+        fornecedor_id=forn.id, data_compra=date.today(), obra_id=obra_id,
         condicao_pagamento='a_vista', parcelas=1,
         valor_total=Decimal('1000.00'), tipo_compra=tipo,
         processada_apos_aprovacao=False, admin_id=admin_id,
