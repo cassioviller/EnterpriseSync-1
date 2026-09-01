@@ -1,6 +1,12 @@
 """
-Utilitários para Reconhecimento Facial usando DeepFace
+Utilitários para Reconhecimento Facial — SFace nativo via OpenCV
 SIGE v9.0 - Sistema de Gestão Empresarial
+
+Trocado em 01/09/2026 (Task 8, plano as-decisoes-viram-codigo): o miolo
+saiu do DeepFace para `utils_facial_sface` (cv2.FaceRecognizerSF sobre o
+MESMO modelo SFace — equivalência medida em
+tests/test_sface_nativo_equivalencia.py). Os nomes públicos ficaram —
+`comparar_faces_deepface` inclusive — para os chamadores não mudarem.
 """
 
 import base64
@@ -31,83 +37,107 @@ def decodificar_base64_para_numpy(base64_string):
         logger.error(f"Erro ao decodificar imagem base64: {e}")
         return None
 
+_cascade_haar = None  # cache do detector (o mesmo backend 'opencv' de antes)
+
+
+def _get_cascade_haar():
+    global _cascade_haar
+    if _cascade_haar is None:
+        import cv2
+        _cascade_haar = cv2.CascadeClassifier(
+            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    return _cascade_haar
+
+
+def _recortar_rosto_bgr(img_rgb):
+    """RGB numpy → BGR recortado no maior rosto (Haar, margem de 20% —
+    o mesmo recorte de ponto_views.gerar_embedding_otimizado). Sem rosto
+    detectado, devolve a imagem inteira — espelho do
+    `enforce_detection=False` do caminho DeepFace antigo."""
+    import cv2
+    img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    faces = _get_cascade_haar().detectMultiScale(
+        gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    if len(faces) == 0:
+        return img_bgr
+    x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
+    margem = 0.2
+    alt, larg = img_bgr.shape[:2]
+    x1 = max(0, int(x - w * margem))
+    y1 = max(0, int(y - h * margem))
+    x2 = min(larg, int(x + w + w * margem))
+    y2 = min(alt, int(y + h + h * margem))
+    return img_bgr[y1:y2, x1:x2]
+
+
 def comparar_faces_deepface(foto_cadastro_base64, foto_capturada_base64, modelo='SFace'):
     """
-    Compara duas imagens em base64 usando DeepFace.
-    
+    Compara duas imagens em base64 — SFace nativo (nome mantido: o miolo
+    trocou em 01/09/2026, os chamadores não).
+
     Args:
         foto_cadastro_base64: Foto cadastrada do funcionário em base64
         foto_capturada_base64: Foto capturada no momento do registro em base64
-        modelo: Modelo a ser utilizado (SFace é leve e rápido, VGG-Face é pesado)
-    
+        modelo: mantido por compatibilidade de assinatura; só SFace existe
+
     Returns:
         tuple: (match: bool, distancia: float, erro: str|None)
                - match: True se as faces são da mesma pessoa
-               - distancia: Valor de distância (quanto menor, mais similar)
+               - distancia: distância de cosseno (quanto menor, mais
+                 similar — mesma escala que o DeepFace.verify devolvia)
                - erro: Mensagem de erro se houver problema na detecção
     """
     try:
-        from deepface import DeepFace
-        
+        from utils_facial_sface import (LIMIAR_COSSENO,
+                                        comparar_embeddings_sface,
+                                        gerar_embedding_sface)
+
         img1 = decodificar_base64_para_numpy(foto_cadastro_base64)
         img2 = decodificar_base64_para_numpy(foto_capturada_base64)
-        
+
         if img1 is None or img2 is None:
             logger.error("Falha ao decodificar uma ou ambas as imagens")
             return False, 1.0, "Erro ao processar imagem"
-        
-        resultado = DeepFace.verify(
-            img1_path=img1,
-            img2_path=img2,
-            model_name=modelo,
-            detector_backend='opencv',
-            enforce_detection=False
-        )
-        
-        match = resultado.get('verified', False)
-        distancia = resultado.get('distance', 1.0)
-        
+
+        e1 = gerar_embedding_sface(_recortar_rosto_bgr(img1))
+        e2 = gerar_embedding_sface(_recortar_rosto_bgr(img2))
+
+        similaridade = comparar_embeddings_sface(e1, e2)
+        distancia = 1.0 - similaridade  # escala do DeepFace.verify (cosseno)
+        match = similaridade >= LIMIAR_COSSENO
+
         logger.info(f"Reconhecimento facial: match={match}, distancia={distancia:.4f}")
-        
+
         return match, distancia, None
-        
-    except ValueError as e:
-        error_msg = str(e)
-        if "Face could not be detected" in error_msg or "no face" in error_msg.lower():
-            logger.warning(f"Nenhuma face detectada: {e}")
-            return False, 1.0, "Nenhuma face detectada na imagem. Posicione seu rosto corretamente."
-        logger.error(f"Erro de validação DeepFace: {e}")
-        return False, 1.0, f"Erro na validação facial: {error_msg}"
+
     except Exception as e:
-        logger.error(f"Erro no reconhecimento facial DeepFace: {e}")
+        logger.error(f"Erro no reconhecimento facial: {e}")
         return False, 1.0, f"Erro no reconhecimento: {str(e)}"
 
 def detectar_face(foto_base64):
     """
     Detecta se há uma face válida na imagem.
-    
+
     Args:
         foto_base64: Imagem em base64
-    
+
     Returns:
         bool: True se uma face foi detectada
     """
     try:
-        from deepface import DeepFace
-        
         img = decodificar_base64_para_numpy(foto_base64)
-        
+
         if img is None:
             return False
-        
-        faces = DeepFace.extract_faces(
-            img_path=img,
-            detector_backend='opencv',
-            enforce_detection=False
-        )
-        
-        return len(faces) > 0 and faces[0].get('confidence', 0) > 0.5
-        
+
+        import cv2
+        gray = cv2.cvtColor(cv2.cvtColor(img, cv2.COLOR_RGB2BGR),
+                            cv2.COLOR_BGR2GRAY)
+        faces = _get_cascade_haar().detectMultiScale(
+            gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        return len(faces) > 0
+
     except Exception as e:
         logger.error(f"Erro na detecção facial: {e}")
         return False
@@ -148,7 +178,11 @@ def validar_qualidade_foto(foto_base64, min_width=200, min_height=200):
 # ============================================================
 
 # Configurações de reconhecimento facial
-THRESHOLD_CONFIANCA = 0.80  # Ajustado - prioriza recall
+# Recalibrado em 01/09/2026 para o ponto de operação documentado do SFace
+# (cosseno >= 0.363 = match, ou seja, distância < 1 - 0.363). O valor
+# antigo era 0.80 ("prioriza recall"): aceitava cosseno > 0.20 — frouxo
+# demais para o mesmo modelo servido nativo.
+THRESHOLD_CONFIANCA = 0.637  # antes: 0.80
 MODELO_RECONHECIMENTO = 'SFace'  # Modelo rápido e preciso
 MIN_CONFIANCA_PERCENTUAL = 60  # Mínimo 60% de confiança para aceitar
 

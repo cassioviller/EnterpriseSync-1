@@ -794,7 +794,7 @@ Só executar com a Task 7 verde. Troca os pontos de uso, regenera o cache de emb
 - Consumes: `gerar_embedding_sface`/`comparar_embeddings_sface`/`LIMIAR_COSSENO` de `utils_facial_sface.py` (Task 7).
 - Produces: nada — contrato externo das funções de `utils_facial.py`/`ponto_views.py` inalterado.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 """Depois da troca, o caminho facial não importa deepface nem tensorflow.
@@ -822,21 +822,21 @@ def test_comparacao_facial_funciona_sem_deepface_no_processo():
     assert intrusos == [], f'caminho facial ainda importa: {intrusos}'
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_ponto_facial_sem_deepface.py -v`
 Expected: FAIL — `utils_facial` importa deepface no topo ou dentro das funções exercitadas.
 
-- [ ] **Step 3: Trocar os chamadores**
+- [x] **Step 3: Trocar os chamadores**
 
 Em cada ponto que hoje faz `from deepface import DeepFace` (liste com `grep -rn "from deepface" ponto_views.py utils_facial.py gerar_cache_facial.py`): substituir a geração de embedding por `gerar_embedding_sface` e a comparação por `comparar_embeddings_sface`, preservando assinatura e formato de retorno das funções públicas (`comparar_faces_deepface` mantém o nome — os chamadores dela não mudam nesta task; só o miolo troca). O limiar configurado hoje (procure `threshold` em `utils_facial.py:244-302`) é recalibrado para `LIMIAR_COSSENO` — deixe o valor antigo comentado ao lado, com a data.
 
-- [ ] **Step 4: Regenerar o cache de embeddings**
+- [x] **Step 4: Regenerar o cache de embeddings**
 
 Run: `python gerar_cache_facial.py`
 Expected: termina sem erro e reescreve `cache_facial.pkl`. ⚠️ O cache antigo (embeddings DeepFace) é **incompatível** com o novo — a regeneração não é opcional, e o commit deve dizer isso para quem operar produção.
 
-- [ ] **Step 5: Remover as dependências**
+- [x] **Step 5: Remover as dependências**
 
 Em `pyproject.toml`, remover as linhas de `deepface` e `retina-face` (manter `opencv-python-headless`). Depois:
 
@@ -847,7 +847,7 @@ python -m pytest tests/test_ponto_facial_sem_deepface.py tests/test_sface_nativo
 
 Expected: PASS. (Se o ambiente não tiver `uv`, o uninstall direto serve para o teste local; o lockfile é o que vale para o deploy.)
 
-- [ ] **Step 6: Rodar a regressão do ponto e commitar**
+- [x] **Step 6: Rodar a regressão do ponto e commitar**
 
 Run: `python -m pytest tests/ -k "facial or ponto" -m "not browser" -v`
 Expected: PASS (nenhum teste de ponto dependia de deepface diretamente; se algum importar, ele entra na troca do Step 3).
@@ -872,7 +872,7 @@ Decisão de 01/09: apagar, pelo roteiro que `0b3f932c` já usou nas seis quebrad
 - Consumes: nada.
 - Produces: nada — remoção.
 
-- [ ] **Step 1: Provar que estão mortas ANTES de apagar**
+- [x] **Step 1: Provar que estão mortas ANTES de apagar**
 
 ```bash
 for rota in "/veiculos" "/veiculos/novo" "/veiculos/lancamentos" "/veiculos/relatorios" "/veiculos/relatorios/exportar" "veiculos/uso" "veiculos/custo" "ultima-km" "/kpis" "api/veiculos"; do
@@ -882,7 +882,7 @@ done
 
 Expected: nenhuma referência viva (url_for de `main.*` de veículos, fetch/ajax para essas URLs). ⚠️ **Qualquer hit real interrompe a task**: a rota referenciada fica de fora da remoção e é registrada no commit como sobrevivente, com o porquê.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```python
 """D3, segunda leva — as 18 rotas de views/vehicles.py não existem mais.
@@ -917,21 +917,21 @@ def test_a_url_nao_existe_mais(url):
 
 ⚠️ Ajuste a lista de URLS à saída real de `grep -n "@main_bp.route" views/vehicles.py` (18 linhas, com métodos) — a de cima foi transcrita dela em 01/09.
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_vehicles_rotas_removidas.py -v`
 Expected: FAIL nas 18 (respondem 200/302/405 — estão vivas).
 
-- [ ] **Step 4: Remover o módulo e o registro**
+- [x] **Step 4: Remover o módulo e o registro**
 
 Apagar `views/vehicles.py` e a linha que o importa (localizada no Step "Modify" acima). Boot de conferência: `python -c "from app import app; print(len(list(app.url_map.iter_rules())))"` — o app sobe.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_vehicles_rotas_removidas.py tests/test_b6_404_frota.py -v`
 Expected: PASS nas 18 novas; os testes de frota inalterados (a família `frota.*` não foi tocada — os xfail de lá continuam XFAIL, não XPASS).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A views/ tests/test_vehicles_rotas_removidas.py
