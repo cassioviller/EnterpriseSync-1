@@ -26,6 +26,35 @@
 > que estavam bloqueadas por decisão e agora foram decididas — pequenas,
 > independentes e já pesquisadas na fonte.
 
+> **Complemento de 01/09:** `2026-09-01-as-decisoes-viram-codigo.md` executou
+> o trabalho órfão das decisões (a09, A04, A18-elo, A24-flag, SFace nativo,
+> 18 rotas de veículos, falha-fechada e censo total do tenant — 17
+> resolvedores fantasmas convergidos). Continuam SEM plano próprio, por
+> decisão registrada:
+> - **Automações A01, A08, A17, A20, A21, A23 (abertas) e A11, A13, A15,
+>   A16, A22 (parciais)** → próximo plano a escrever:
+>   `2026-09-XX-onda-das-automacoes.md`. São feature-sized; entrariam aqui
+>   só como placeholder, o que a casa proíbe.
+> - **Família 404 (70 xfail, B6.4–B6.8)** → as tasks JÁ EXISTEM em
+>   `2026-08-06-rodada-b6-varredura.md` (seções B6.4–B6.8); o refactor de
+>   ~60 sítios roda por lá, removendo os marcadores xfail à medida que fecha.
+>   O padrão `except HTTPException: raise` dos 5 pontos medidos é parte dele.
+> - **Os 225 usos de `admin_id` em query sem guarda de `None`** (medição da
+>   onda "A Porta Irmã") → o risco cai muito com as Tasks 10–11 de 01/09 (o
+>   `None` deixa de virar tenant fantasma e as guardas de rota abortam 403
+>   antes da query), mas a varredura guard-a-guard continua sem dono —
+>   registrar na onda das automações ou na issue B (falhas silenciosas).
+> - **Resolvedores ANINHADOS em função** (`rdo_editar_sistema.py:29`,
+>   `views/rdo.py:2864`) → fora do alcance do censo por construção;
+>   consolidá-los é refactor das funções-mãe, vai junto na onda das
+>   automações (registrados em `FORA_DO_CENSO` no próprio censo).
+> - **`obra.progresso_conclusao`** → funcionalidade nova, não conserto;
+>   entra na onda das automações ou morre — decisão do dono.
+> - **Fase 9a/9b** → segue adiada; reabrir pela seção "Premissas a
+>   reconfirmar" do próprio plano.
+> - **psycopg2→psycopg3** → registrado em decisoes-respondidas.md; não
+>   agendar antes de existir build de produção próprio.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recomendado) ou superpowers:executing-plans para executar este plano task a task. Os passos usam checkbox (`- [ ]`) para acompanhamento.
 
 **Goal:** Levar a zero a lista de trabalho em aberto do repositório — seis

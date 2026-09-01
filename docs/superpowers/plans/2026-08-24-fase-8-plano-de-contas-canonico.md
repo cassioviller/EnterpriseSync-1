@@ -1,5 +1,11 @@
 # Fase 8 — o plano de contas passa a significar uma coisa só
 
+> **Decisão de 01/09** (`2026-09-01-decisoes-respondidas.md` §D6/§FASE8-T1):
+> a Task 4 muda de método — detecção por **assinatura estrutural** dos ≥4
+> seeders concorrentes, não pela dupla que o plano assumia. Tasks 1–3 já são
+> executáveis; a medição de produção (Task 1, humana) ganhou as 3 perguntas
+> novas do §FASE8-T1 e segue aguardando acesso.
+>
 > **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — trabalho real pendente** — escrito em 24/08, **não executado** — 🔬 3 de 21 arquivos existem. Bloqueado por dois pontos nomeados no próprio plano: a Task 1 é humana (medir produção) e a **D6** (os dois seeders aposentados trocam o significado de `5.1.01` e `5.1.02` entre si). 🔬 3/21 dos arquivos prometidos existem na árvore.
 >
 > Este é um dos poucos planos que ainda pedem código. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são

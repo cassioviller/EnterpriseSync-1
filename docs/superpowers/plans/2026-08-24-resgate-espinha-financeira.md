@@ -1,5 +1,9 @@
 # Resgate da Espinha Financeira — trazer o PR #6 para o `main` de hoje
 
+> **Decisão de 01/09** (`2026-09-01-decisoes-respondidas.md` §VIGA-I): a verba
+> do telhado viga I segue a **opção B**; a C foi declarada morta. `RATIFICAR`
+> pendente — a Task 8 daqui destrava ao ratificar.
+>
 > **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — trabalho real pendente** — escrito em 24/08, **não executado** — 🔬 7 de 20 arquivos existem. Porte de 2.542 linhas do PR #6. Uma única task presa a decisão de negócio (verba/lucro do telhado viga I). 🔬 7/20 dos arquivos prometidos existem na árvore.
 >
 > Este é um dos poucos planos que ainda pedem código. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são

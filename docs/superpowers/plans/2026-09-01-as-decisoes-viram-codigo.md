@@ -1097,6 +1097,31 @@ git commit -m "fix(tenant): os resolvedores fora do censo entram e convergem ao 
 
 ### Task 12: Registro, operação agendada e o gate único
 
+> **Estado em 01/09 ~19:45 (sessão encerrada no meio do Step 2):**
+> - ✅ **Step 1 — gate único VERDE:** `3193 passed, 8 skipped, 201
+>   deselected, 72 xfailed, 0 failed` em 42:24
+>   (`tests/reports/gate_decisoes_1901.log`). Os 8 skips conferidos um a
+>   um: 6 antigos (test_processar_usa_cadastro ×5,
+>   test_regressao_classificacao ×1) + 2 NOVOS DELIBERADOS — o oráculo
+>   deepface de `test_sface_nativo_equivalencia.py`, que pula desde que a
+>   Task 8 removeu o deepface. O piso do gate passa a ser **skipped = 8**.
+> - 🟡 **Step 2 — `--suite` INTERROMPIDA a ~18%** com **2 FAILED** em
+>   `TestIntegracaoPropostaObra` (`test_criar_proposta_flash_sucesso` e
+>   `test_aprovar_proposta_gera_obra`) — log parcial em
+>   `tests/reports/suite_decisoes_1930.log`, SEM traceback (ele só sai no
+>   fim da rodada). Diagnóstico pendente: (1) rerodar os 2 isolados —
+>   `python -m pytest "tests/test_browser_all_modules.py::TestIntegracaoPropostaObra" -v`
+>   — para separar flake de real; (2) não há placar histórico da família
+>   browser nos reports, então NÃO se sabe se é regressão. O fluxo de
+>   proposta não foi tocado pelas Tasks 5–11 desta rodada; o vizinho mais
+>   próximo é a convergência de `propostas_consolidated` da Onda 6
+>   (`a6afcb8e`, papel SUPER_ADMIN — o browser loga como admin). Os demais
+>   ~110 browser rodados até a interrupção passaram, incluindo
+>   `test_relatorios_veiculos` já apontando para `/frota/dashboard`.
+> - ✅ Steps 3, 4 e 5 — runbook + registros escritos e commitados.
+> - ⬜ Step 6 — o commit final previsto virou o commit parcial desta nota;
+>   falta só fechar a suíte browser e, se verde, atualizar esta nota.
+
 A última: o que este plano decidiu NÃO fazer fica escrito (a regra da casa — adiar sem registrar é como as issues chegaram a 31/08), a operação agendada ganha runbook, e o placar costurado de 01/09 vira uma rodada única.
 
 **Files:**
@@ -1118,7 +1143,7 @@ setsid nohup bash run_tests.sh --gate > tests/reports/gate_decisoes_$(date +%H%M
 
 (~50-60 min; destacado do terminal — três gates já morreram com sessão em 01/09.) Expected ao fim: **0 failed, skipped ≤ 6, xfailed = 72** (74 − os 2 do a09), passed ≥ 3052 + os testes novos deste plano. Registrar a contagem exata no Step 6.
 
-- [x] **Step 2: Rodar a suíte com browser**
+- [ ] **Step 2: Rodar a suíte com browser**
 
 Run: `bash run_tests.sh --suite` (após o gate verde)
 Expected: verde — é a única prova de que a remoção da Task 9 não quebrou `test_browser_all_modules` (o gate deseleciona os 201 de browser).
@@ -1154,7 +1179,7 @@ Expected: verde — é a única prova de que a remoção da Task 9 não quebrou 
 
 ⚠️ Antes de commitar: conferir os nomes exatos dos comandos CLI (`flask --help` lista; `emitir-propostas-expirando` está em `notificacoes_cli.py:130`, o de cobertura em `cobertura_ociosa_cli.py`) e corrigir o runbook se divergirem.
 
-- [ ] **Step 4: Registrar as decisões nos planos que elas destravam**
+- [x] **Step 4: Registrar as decisões nos planos que elas destravam**
 
 1. `2026-08-31-decisoes-pendentes.md` — no topo:
 ```markdown
@@ -1166,7 +1191,7 @@ Expected: verde — é a única prova de que a remoção da Task 9 não quebrou 
 3. `2026-08-24-resgate-espinha-financeira.md` — nota no cabeçalho: VIGA-I decidida (opção B, RATIFICAR pendente); a Task 8 de lá destrava ao ratificar.
 4. `docs/reconferencia-backlog-2026-08-23.md` — riscar/atualizar: A04 (entregue, Task 4 daqui), A18 (elo entregue, Decisão 4 = congelar, RATIFICAR), A24 (flag entregue OFF, RATIFICAR liga), A25 (runbook escrito; falta só a credencial).
 
-- [ ] **Step 5: Registrar o que este plano NÃO cobre, com destino**
+- [x] **Step 5: Registrar o que este plano NÃO cobre, com destino**
 
 Na tabela de estado de `2026-08-31-fecho-do-que-esta-aberto.md`, acrescentar abaixo dela:
 

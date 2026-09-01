@@ -1,5 +1,9 @@
 # Decisões pendentes — o que trava a Fase 8 e o Resgate da Espinha
 
+> ✅ **RESPONDIDAS em 01/09** — ver `2026-09-01-decisoes-respondidas.md`.
+> D6: assinatura estrutural (≥4 seeders, não 2). FASE8-T1: segue aguardando
+> acesso a produção. VIGA-I: opção B; a C foi declarada morta.
+
 > **Para quem decide.** Três perguntas. Cada uma trava um plano inteiro que já
 > está escrito e pronto para executar. Nenhuma delas é técnica: são o
 > significado de uma conta contábil, uma medição de produção, e uma regra de
