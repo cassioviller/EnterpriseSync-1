@@ -325,10 +325,6 @@ def test_o_xml_de_outro_tenant_ainda_nao_entra_por_causa_da_chave_de_acesso():
             f'o tenant B não conseguiu importar o XML que A já importou: {do_b}')
 
 
-@pytest.mark.xfail(strict=True, reason='🔴 achado 31/08 — processar_xml_nfe '
-                   'cria Fornecedor sem `nome`, que é NOT NULL '
-                   '(almoxarifado_utils.py:290 x models.py:2270): toda '
-                   'importação de XML de emitente ainda não cadastrado morre')
 def test_xml_de_fornecedor_novo_estoura_not_null_em_fornecedor_nome():
     """🔴 O caminho comum da importação de XML não funciona.
 

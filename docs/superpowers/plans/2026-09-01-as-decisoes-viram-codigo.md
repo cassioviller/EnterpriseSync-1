@@ -169,16 +169,16 @@ git commit -m "fix(a09): chave de acesso da NF e unica por tenant, nao global (m
 - Consumes: nada.
 - Produces: nada além do conserto.
 
-- [ ] **Step 1: Transformar o xfail em RED**
+- [x] **Step 1: Transformar o xfail em RED**
 
 Apagar o decorator `@pytest.mark.xfail(strict=True, reason='🔴 achado 31/08 — processar_xml_nfe ...')` de `test_xml_de_fornecedor_novo_estoura_not_null_em_fornecedor_nome` (linha 332).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py::test_xml_de_fornecedor_novo_estoura_not_null_em_fornecedor_nome -v`
 Expected: FAIL com IntegrityError (NOT NULL em `fornecedor.nome`). RED a citar no commit.
 
-- [ ] **Step 3: Corrigir a criação do fornecedor**
+- [x] **Step 3: Corrigir a criação do fornecedor**
 
 Em `almoxarifado_utils.py`, no `Fornecedor(...)` dentro de `processar_xml_nfe`:
 
@@ -195,12 +195,12 @@ Em `almoxarifado_utils.py`, no `Fornecedor(...)` dentro de `processar_xml_nfe`:
 
 (Preserve os demais kwargs que existirem no construtor além dos mostrados.)
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py -v`
 Expected: **tudo PASS, zero xfail restante no arquivo.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add almoxarifado_utils.py tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py
