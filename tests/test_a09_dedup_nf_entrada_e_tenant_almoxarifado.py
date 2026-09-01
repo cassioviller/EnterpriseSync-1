@@ -287,10 +287,6 @@ def test_o_hash_de_outro_tenant_nao_e_mais_consultado_sem_escopo():
             'o dedup de XML voltou a ser global entre tenants')
 
 
-@pytest.mark.xfail(strict=True, reason='🔴 achado 31/08 — o UNIQUE GLOBAL de '
-                   'NotaFiscal.chave_acesso (models.py:2713) faz a nota de uma '
-                   'empresa bloquear a da outra. Escapar o dedup por hash '
-                   '(Onda 2) não bastou: o bloqueio desceu para o banco')
 def test_o_xml_de_outro_tenant_ainda_nao_entra_por_causa_da_chave_de_acesso():
     """🔴 O defeito que sobrou depois de a Onda 2 escopar o hash.
 

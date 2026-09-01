@@ -36,17 +36,17 @@ A árvore tem o resíduo da Onda 6 Task 5 (quatro resolvedores corrigidos + docs
 - Consumes: nada.
 - Produces: `tests/test_isolamento_tenant_bloco1.py` no repositório — as Tasks 9 e 10 o estendem.
 
-- [ ] **Step 1: Conferir que a árvore é o que se espera**
+- [x] **Step 1: Conferir que a árvore é o que se espera**
 
 Run: `git status --short`
 Expected: exatamente os 7 modificados e os untracked listados acima (mais este plano). Qualquer outra coisa: pare e pergunte ao dono antes de commitar.
 
-- [ ] **Step 2: Rodar o censo que os diffs referenciam**
+- [x] **Step 2: Rodar o censo que os diffs referenciam**
 
 Run: `python -m pytest tests/test_isolamento_tenant_bloco1.py -v`
 Expected: PASS em todos (as correções dos 4 módulos já estão na árvore; o censo é a prova delas).
 
-- [ ] **Step 3: Commit em dois pedaços**
+- [x] **Step 3: Commit em dois pedaços**
 
 ```bash
 git add tests/test_isolamento_tenant_bloco1.py contabilidade_views.py crud_rdo_completo.py folha_pagamento_views.py propostas_consolidated.py docs/planos-em-aberto-2026-08-25.md docs/reconferencia-backlog-2026-08-23.md docs/superpowers/plans/2026-08-25-onda-6-os-testes-prometidos.md
@@ -70,16 +70,16 @@ git commit -m "docs(decisoes): as 13 perguntas abertas ganham resposta com evide
 - Consumes: nada.
 - Produces: constraint `uq_nf_admin_chave_acesso UNIQUE (admin_id, chave_acesso)` em `nota_fiscal` — idêntica em banco novo (modelo) e banco migrado (317).
 
-- [ ] **Step 1: Transformar o xfail em RED**
+- [x] **Step 1: Transformar o xfail em RED**
 
 Em `tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py:290`, apagar o decorator `@pytest.mark.xfail(strict=True, reason='🔴 achado 31/08 — o UNIQUE GLOBAL de ...')` que cobre `test_o_xml_de_outro_tenant_ainda_nao_entra_por_causa_da_chave_de_acesso`. Não toque no corpo do teste.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py::test_o_xml_de_outro_tenant_ainda_nao_entra_por_causa_da_chave_de_acesso -v`
 Expected: FAIL (IntegrityError/violação de unique global ao segundo tenant importar). Este é o RED a citar no commit.
 
-- [ ] **Step 3: Corrigir o modelo**
+- [x] **Step 3: Corrigir o modelo**
 
 Em `models.py`, na classe `NotaFiscal`:
 
@@ -101,7 +101,7 @@ E em `__table_args__` da mesma classe (hoje tem os índices `idx_nf_admin_status
                             name='uq_nf_admin_chave_acesso'),
 ```
 
-- [ ] **Step 4: Escrever a migration 317**
+- [x] **Step 4: Escrever a migration 317**
 
 Em `migrations.py`, junto das vizinhas (`_migration_316_...` está em `:7415`):
 
@@ -143,12 +143,12 @@ E registrar na lista de migrações (mesmo formato da linha `migrations.py:7752`
             (317, "A09 — nota_fiscal.chave_acesso unica por (admin_id, chave_acesso), nao global", _migration_317_chave_acesso_por_tenant),
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py -v`
 Expected: PASS em todos exceto o segundo xfail (`test_xml_de_fornecedor_novo_estoura_not_null_em_fornecedor_nome`, que a Task 3 resolve e continua XFAIL aqui). Nenhum XPASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add models.py migrations.py tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py

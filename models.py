@@ -2710,7 +2710,11 @@ class NotaFiscal(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero = db.Column(db.String(20), nullable=False)
     serie = db.Column(db.String(5), nullable=False)
-    chave_acesso = db.Column(db.String(44), unique=True, nullable=False)
+    # A09 — chave de acesso é única POR TENANT: NFe é documento público e
+    # duas empresas podem importar a mesma nota. O unique global fazia a
+    # primeira bloquear a segunda (xfail medido em 31/08). Constraint
+    # nomeada para a migration 317 convergir com o create_all (lição N2).
+    chave_acesso = db.Column(db.String(44), nullable=False)
     
     # Fornecedor
     fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=False)
@@ -2751,6 +2755,8 @@ class NotaFiscal(db.Model):
     
     # Índices
     __table_args__ = (
+        db.UniqueConstraint('admin_id', 'chave_acesso',
+                            name='uq_nf_admin_chave_acesso'),
         db.Index('idx_nf_admin_status', 'admin_id', 'status'),
         db.Index('idx_nf_fornecedor_data', 'fornecedor_id', 'data_emissao'),
         db.Index('idx_nf_chave_acesso', 'chave_acesso'),

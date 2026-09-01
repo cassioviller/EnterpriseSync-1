@@ -7502,6 +7502,41 @@ def _migration_316_versao_contrato_por_tenant():
                 "(obra_id, admin_id, versao) — o trio que abrir_versao usa.")
 
 
+def _migration_317_chave_acesso_por_tenant():
+    """A09 — nota_fiscal.chave_acesso deixa de ser única GLOBAL.
+
+    O unique global (criado pelo unique=True do modelo antigo, constraint
+    `nota_fiscal_chave_acesso_key`) fazia a nota importada por uma empresa
+    bloquear a mesma nota em outra — NFe é documento público, e duas
+    empresas podem legitimamente importar a mesma. Passa a
+    UNIQUE (admin_id, chave_acesso).
+
+    Lição N2: em banco novo o create_all já cria a constraint nova pelo
+    modelo; aqui os dois passos são condicionais para convergir no mesmo
+    estado — DROP do global se existir, ADD da composta se faltar.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text("""
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_constraint
+                           WHERE conname = 'nota_fiscal_chave_acesso_key') THEN
+                    ALTER TABLE nota_fiscal
+                        DROP CONSTRAINT nota_fiscal_chave_acesso_key;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                               WHERE conname = 'uq_nf_admin_chave_acesso') THEN
+                    ALTER TABLE nota_fiscal
+                        ADD CONSTRAINT uq_nf_admin_chave_acesso
+                        UNIQUE (admin_id, chave_acesso);
+                END IF;
+            END $$;
+        """))
+    logger.info("[Migration 317] nota_fiscal.chave_acesso única por "
+                "(admin_id, chave_acesso) — o unique global saiu.")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7819,6 +7854,7 @@ def executar_migracoes():
             (314, "Reuniao 2026-08-20 — cronograma_baseline.revisao (sequencial por obra+modo, com backfill por criada_em) e .motivo: historico de V1/V2 deixa de depender do texto do nome", _migration_314_baseline_revisao_e_motivo),
             (315, "Onda 5 / Task 8 — uq_contrato_versao_vigente ganha admin_id: o indice era UNIQUE(obra_id) e toda query filtra (obra_id, admin_id); linha com admin_id divergente travava a obra permanentemente", _migration_315_indice_vigencia_com_admin_id),
             (316, "Fix round do code review — uq_contrato_versao_obra_versao ganha admin_id: a 315 escopou a irma e deixou esta, e abrir_versao numera por (obra_id, admin_id)", _migration_316_versao_contrato_por_tenant),
+            (317, "A09 — nota_fiscal.chave_acesso unica por (admin_id, chave_acesso), nao global", _migration_317_chave_acesso_por_tenant),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
