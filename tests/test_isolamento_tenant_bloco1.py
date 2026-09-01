@@ -48,17 +48,18 @@ Os quatro papéis restantes concordavam nos dezesseis — inclusive GESTOR_EQUIP
 ALMOXARIFE, os dois que o cabeçalho do `multitenant_helper` cita: aquela correção
 entrou e este censo a mantém entrada.
 
-## O que este censo ainda NÃO pergunta
+## A linha que estava fora do censo entrou (01/09)
 
-⚠️ Uma linha ficou de fora, deliberadamente: **FUNCIONARIO sem `admin_id`**.
-📖 `crud_rdo_completo.get_admin_id` tem, para esse caso, um ramo que resolve o
-tenant por FK (`utils.identidade.funcionario_do_usuario`), e o canônico
-devolveria `None` ali — os dois discordam, e nenhum dos dois está obviamente
-certo. Exercitar a linha tornaria o censo vermelho sobre uma decisão de produto
-(o RDO deve funcionar para funcionário sem vínculo de usuário?) que a Onda 6 não
-tem mandato para tomar. Por isso os três outros divergentes passaram a **delegar**
-ao canônico e este recebeu só a correção do papel medido, com a razão escrita no
-fonte. Quem for consolidar os resolvedores começa por aqui.
+A exceção deliberada — **FUNCIONARIO sem `admin_id`** — acabou: a decisão de
+produto que a Onda 6 não tinha mandato para tomar foi tomada em 01/09
+(`2026-09-01-decisoes-respondidas.md` §admin_id): usuário nesse estado é
+**defeito de dado** e falha FECHADO, como `utils/tenant.py` documenta. O ramo
+de `crud_rdo_completo.get_admin_id` que resolvia o tenant por FK
+(`utils.identidade.funcionario_do_usuario`) saiu; o módulo delega ao canônico
+como os outros três. O caso é exercitado por
+`test_funcionario_sem_admin_id_falha_fechado_tambem_no_rdo`, e o tamanho do
+reparo de dado em produção é medido por
+`scripts/medir_funcionarios_sem_admin_id.py` — rodar ANTES do deploy.
 """
 import importlib
 import os
@@ -221,6 +222,49 @@ def test_o_tenant_resolvido_e_um_usuario_real(parque, papel):
         f'{papel} resolveu para o tenant {resolvido!r}, que não é nem o admin '
         f'do parque nem ele mesmo — se for um id chumbado no código, ele '
         f'aponta para uma empresa de verdade em produção')
+
+
+def test_funcionario_sem_admin_id_falha_fechado_tambem_no_rdo(parque):
+    """A linha deliberadamente fora do censo entra (decisão de 01/09).
+
+    FUNCIONARIO com `admin_id` vazio mas com a FK `funcionario_id` viva:
+    `crud_rdo_completo.get_admin_id` resolvia o tenant pela FK onde o
+    canônico falha fechado (`None` ⇒ 403 nas guardas). Decisão registrada:
+    usuário nesse estado é DEFEITO DE DADO — conserta-se o dado, não se
+    adivinha o tenant. A medição do reparo em produção é
+    `scripts/medir_funcionarios_sem_admin_id.py`.
+    """
+    import crud_rdo_completo
+    from models import Funcionario
+    from datetime import date
+
+    with app.app_context():
+        marca = uuid.uuid4().hex[:6]
+        funcionario = Funcionario(
+            codigo=f'X{marca[:5]}', nome=f'Órfão {marca}',
+            data_admissao=date(2026, 1, 1), admin_id=parque['ADMIN'],
+            ativo=True)
+        db.session.add(funcionario)
+        db.session.flush()
+        usuario = Usuario(
+            username=f'orfao{marca}', email=f'orfao{marca}@t.local',
+            nome='Órfão', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=None, funcionario_id=funcionario.id)
+        db.session.add(usuario)
+        db.session.commit()
+        uid = usuario.id
+
+    esperado = _canonico(uid)
+    assert esperado is None, (
+        'pré-condição: o canônico falha FECHADO para FUNCIONARIO sem '
+        'admin_id — se isso mudou, o censo inteiro mudou de premissa')
+
+    obtido = _como(uid, crud_rdo_completo.get_admin_id)
+    assert obtido == esperado, (
+        f'crud_rdo_completo.get_admin_id devolve {obtido!r} onde o canônico '
+        f'falha fechado (None) — o ramo de FK ressuscitou, e um defeito de '
+        f'dado volta a virar tenant por adivinhação')
 
 
 def test_a_lista_do_censo_cobre_quem_tem_resolvedor_proprio():

@@ -14,40 +14,19 @@ logger = logging.getLogger(__name__)
 rdo_crud_bp = Blueprint('rdo_crud', __name__, url_prefix='/rdo')
 
 def get_admin_id():
-    """Obter admin_id correto baseado no usuário atual"""
-    from models import TipoUsuario
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
 
-    # Para usuários ADMIN e SUPER_ADMIN, usar o próprio ID.
-    #
-    # Onda 6 / Task 5 — SUPER_ADMIN faltava aqui, e caía até o `return None` do
-    # fim: trancado para fora do RDO sem mensagem. `utils/tenant.py:29` trata os
-    # dois papéis juntos, e o censo de `tests/test_isolamento_tenant_bloco1.py`
-    # mediu a discordância. Este arquivo NÃO delega ao canônico como os outros
-    # três corrigidos junto, e de propósito: o ramo de FUNCIONARIO abaixo
-    # resolve por FK quando `current_user.admin_id` é vazio, e o canônico
-    # devolveria None ali. Consolidar isso é decisão de outra onda.
-    if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario in (
-            TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
-        return current_user.id
-
-    # Para outros usuários, usar admin_id
-    if hasattr(current_user, 'admin_id') and current_user.admin_id:
-        return current_user.admin_id
-    
-    # Fase 1 — a identidade vem da FK, não de e-mail chumbado. O bloco
-    # anterior traduzia um e-mail de login específico para o e-mail de um
-    # funcionário específico, ambos literais no código, e buscava
-    # Funcionario por e-mail SEM admin_id — casando pessoa de outro
-    # tenant. Ver utils/identidade.py. Os literais não são reproduzidos
-    # aqui de propósito: `tests/test_fase1_identidade.py` proíbe a string
-    # no arquivo, e é essa proibição que impede a heurística de voltar.
-    if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.name == 'FUNCIONARIO':
-        from utils.identidade import funcionario_do_usuario
-        funcionario = funcionario_do_usuario()
-        if funcionario:
-            return funcionario.admin_id
-    
-    return None
+    Decisão de 01/09 (decisoes-respondidas.md §admin_id): o ramo que
+    resolvia FUNCIONARIO sem admin_id por FK
+    (utils.identidade.funcionario_do_usuario) saiu — usuário nesse estado é
+    DEFEITO DE DADO e falha FECHADO (None ⇒ 403 nas guardas), como
+    utils/tenant.py documenta. Era a última exceção do censo de
+    tests/test_isolamento_tenant_bloco1.py; a medição do tamanho do reparo
+    em produção é scripts/medir_funcionarios_sem_admin_id.py — rodar ANTES
+    do deploy que contém esta mudança.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 @rdo_crud_bp.route('/')
 @login_required

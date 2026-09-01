@@ -1047,7 +1047,7 @@ git commit -m "fix(tenant): FUNCIONARIO sem admin_id falha fechado tambem no RDO
 - Consumes: censo da Task 1/10; `get_tenant_admin_id()` canônico.
 - Produces: censo = cobertura total dos resolvedores do parque.
 
-- [ ] **Step 1: Levantar quem tem resolvedor próprio e está fora do censo**
+- [x] **Step 1: Levantar quem tem resolvedor próprio e está fora do censo**
 
 ```bash
 grep -rln "def get_admin_id\|def _get_admin_id" --include="*.py" . | grep -vE "pythonlibs|tests|archive|utils/tenant"
@@ -1055,14 +1055,14 @@ grep -rln "def get_admin_id\|def _get_admin_id" --include="*.py" . | grep -vE "p
 
 Compare com `RESOLVEDORES` (`tests/test_isolamento_tenant_bloco1.py:83`). Todo módulo da primeira lista fora da segunda entra. (O meta-teste `test_a_lista_do_censo_cobre_quem_tem_resolvedor_proprio` em `:226` já tenta pegar isso — se ele não pegou `metricas_views`/`subempreiteiros`, o padrão de grep DELE precisa do ajuste também: leia-o e alinhe.)
 
-- [ ] **Step 2: Estender a lista (RED)**
+- [x] **Step 2: Estender a lista (RED)**
 
 Acrescentar os módulos achados a `RESOLVEDORES`, em ordem alfabética.
 
 Run: `python -m pytest tests/test_isolamento_tenant_bloco1.py -v`
 Expected: FAIL nos módulos novos que divergem do canônico (tipicamente no papel SUPER_ADMIN ou no FUNCIONARIO-sem-admin_id — o fantasma). **Anote quais papéis falham em qual módulo: isso vai no commit.** Se algum módulo novo nascer verde, diga isso no commit também — cobertura nova, não conserto.
 
-- [ ] **Step 3: Convergir os divergentes**
+- [x] **Step 3: Convergir os divergentes**
 
 Em cada módulo que falhou, aplicar o diff-padrão (o de `contabilidade_views.py` na Task 1): o `get_admin_id` local vira
 
@@ -1081,12 +1081,12 @@ def get_admin_id():
 
 ⚠️ Um módulo por vez, rodando o censo entre um e outro — se a convergência de um módulo quebrar outro teste do gate (algum fluxo dependia do fantasma), **pare nesse módulo**, registre, e traga a decisão ao dono em vez de forçar.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_isolamento_tenant_bloco1.py -v`
 Expected: PASS — censo completo, zero exceções.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_isolamento_tenant_bloco1.py views/metricas_views.py subempreiteiros_views.py  # + os demais que o Step 1 achou
