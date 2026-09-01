@@ -849,8 +849,22 @@ def _fornecedor(admin_id):
     return f
 
 
-def _pedido(admin_id, fornecedor_id, obra_id=None, valor='100.00'):
-    p = PedidoCompra(fornecedor_id=fornecedor_id, data_compra=date(2026, 8, 1),
+def _pedido(admin_id, fornecedor_id, obra_id=None, valor='100.00',
+            dias_atras=0):
+    """Pedido emitido há `dias_atras` dias. A data é RELATIVA, de propósito.
+
+    A janela do acumulado é rolante (`acumulado_do_fornecedor`:
+    `data_compra >= date.today() - timedelta(days=janela)`), então data
+    absoluta aqui é bomba-relógio: o fixture sai da janela sozinho quando o
+    calendário anda. Foi o que aconteceu — `date(2026, 8, 1)` era o próprio
+    limite em 31/08/2026 e caiu fora em 01/09, derrubando dois testes com o
+    código de produção intacto.
+
+    `dias_atras` é o mesmo botão de `_req_na_etapa`, pela mesma razão: a borda
+    da janela só se exercita com a distância na mão.
+    """
+    p = PedidoCompra(fornecedor_id=fornecedor_id,
+                     data_compra=date.today() - timedelta(days=dias_atras),
                      obra_id=obra_id, valor_total=Decimal(valor),
                      admin_id=admin_id, tipo_compra='normal')
     db.session.add(p)
@@ -1505,6 +1519,45 @@ def test_a_janela_vem_da_configuracao_do_tenant_e_nao_do_codigo():
             'com a janela em 7 dias as irmãs de 10 dias atrás saem da conta — '
             'e ninguém tocou em código para isso')
         assert alvo.degrau_aplicado == ''
+
+
+def test_o_pedido_do_fixture_nasce_dentro_da_janela_do_tenant():
+    """Guarda de calendário: o fixture tem de contar para o acumulado HOJE.
+
+    A janela do acumulado é ROLANTE (`data_compra >= today - janela`), e data
+    absoluta em fixture sai dela sozinha quando o calendário anda. Aconteceu em
+    01/09/2026: `date(2026, 8, 1)` era exatamente o limite em 31/08 (janela
+    padrão de 30 dias, comparação inclusiva) e caiu fora no dia seguinte,
+    derrubando dois testes sem que uma linha de produção mudasse.
+
+    O sintoma aparecia longe da causa — faixa #1 onde se esperava #3 — e essa
+    é a razão desta guarda existir: aqui a mensagem diz "fixture vencido", que
+    é o que de fato aconteceu.
+
+    A janela não é literal: sai do default da coluna, mesma fonte que
+    `janela_de_fracionamento` usa.
+    """
+    from services.alcada_compras import (acumulado_do_fornecedor,
+                                         janela_de_fracionamento)
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        forn = _fornecedor(adm.id)
+        janela = janela_de_fracionamento(adm.id)
+
+        _pedido(adm.id, forn.id, obra_id=obra.id, valor='20000.00')
+        assert acumulado_do_fornecedor(adm.id, obra.id, forn.id) == \
+            Decimal('20000.00'), (
+                f'o pedido do fixture caiu FORA da janela de {janela} dias — '
+                f'data absoluta em `_pedido` vence sozinha com o calendário')
+
+        # E o botão da borda tem de ser real: mais velho que a janela não soma.
+        _pedido(adm.id, forn.id, obra_id=obra.id, valor='700.00',
+                dias_atras=janela + 1)
+        assert acumulado_do_fornecedor(adm.id, obra.id, forn.id) == \
+            Decimal('20000.00'), (
+                'pedido mais velho que a janela nao pode entrar na soma')
 
 
 def test_o_acumulado_por_fornecedor_aparece_so_na_emissao():
