@@ -649,7 +649,7 @@ git commit -m "feat(a24): rateio de encargos patronais liga atras de flag por te
 - Consumes: `utils_facial.py` (caminho DeepFace atual, ainda instalado — é o oráculo da equivalência).
 - Produces: `gerar_embedding_sface(imagem_bgr) -> np.ndarray` e `comparar_embeddings_sface(e1, e2) -> float` em `utils_facial_sface.py` — a Task 8 troca os chamadores para cá.
 
-- [ ] **Step 1: Baixar e fixar o modelo ONNX**
+- [x] **Step 1: Baixar e fixar o modelo ONNX**
 
 ```bash
 mkdir -p modelos_ml
@@ -660,7 +660,7 @@ sha256sum modelos_ml/face_recognition_sface_2021dec.onnx | tee modelos_ml/face_r
 
 Registre o sha256 no commit. (~37 MB; é o modelo oficial do opencv_zoo, mesma família que o DeepFace baixa.)
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```python
 """O SFace nativo do OpenCV produz o mesmo veredito que o DeepFace.
@@ -712,12 +712,12 @@ def test_mesma_imagem_e_match_e_imagens_diferentes_nao():
     assert comparar_embeddings_sface(a, c) < LIMIAR_COSSENO
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_sface_nativo_equivalencia.py -v`
 Expected: FAIL — `ModuleNotFoundError: utils_facial_sface`.
 
-- [ ] **Step 4: Write minimal implementation**
+- [x] **Step 4: Write minimal implementation**
 
 ```python
 """utils_facial_sface — embedding facial SFace via OpenCV puro, sem TensorFlow.
@@ -765,12 +765,12 @@ def comparar_embeddings_sface(e1: np.ndarray, e2: np.ndarray) -> float:
                            cv2.FaceRecognizerSF_FR_COSINE))
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `python -m pytest tests/test_sface_nativo_equivalencia.py -v`
 Expected: PASS. Se o segundo teste reprovar com rosto sintético, troque para fotos reais de fixture (nota no próprio teste) — o critério é decisão igual, e ruído aleatório pode não ser "rosto" o bastante; nesse caso o teste com fotos reais é o que vale.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add modelos_ml/ utils_facial_sface.py tests/test_sface_nativo_equivalencia.py
