@@ -221,7 +221,7 @@ Decisão de 01/09: **não** reaproveitar `6.1.02.001-003` (significados divergem
 - Consumes: `seed_plano_contas_if_needed(admin_id)` (`contabilidade_utils.py:1597`) e `gerar_lancamento_contabil_automatico(...)` (`contabilidade_utils.py:1668`), ambos existentes.
 - Produces: conta `6.1.02.009` e chave `MAPEAMENTO_CONTABIL['despesa_geral'] = {'debito': '6.1.02.009', 'credito': '2.1.01.001'}`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 """A04 — a despesa geral tem conta de débito própria e inequívoca.
@@ -292,12 +292,12 @@ def test_lancamento_de_despesa_geral_debita_a_conta_nova(tenant):
 
 ⚠️ Antes de rodar: leia a assinatura real de `gerar_lancamento_contabil_automatico` em `contabilidade_utils.py:1668` e ajuste os kwargs do terceiro teste a ela (a função pode exigir `origem`/`origem_id` — a B5.6 os tornou parâmetros). O que o teste afirma não muda: chave nova aceita, lançamento criado.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_a04_despesa_geral_contabil.py -v`
 Expected: FAIL — `KeyError: 'despesa_geral'` no primeiro; conta ausente no segundo.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Em `contabilidade_utils.py`:
 
@@ -317,12 +317,12 @@ Em `contabilidade_utils.py`:
     'despesa_geral':        {'debito': '6.1.02.009', 'credito': '2.1.01.001'},
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest tests/test_a04_despesa_geral_contabil.py -v`
 Expected: PASS (3/3).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add contabilidade_utils.py tests/test_a04_despesa_geral_contabil.py

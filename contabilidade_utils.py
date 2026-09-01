@@ -1540,6 +1540,9 @@ MAPEAMENTO_CONTABIL = {
     'despesa_transporte':   {'debito': '6.1.02.002', 'credito': '1.1.01.002'},
     'folha_pagamento':      {'debito': '6.1.01.001', 'credito': '2.1.02.001'},
     'pagamento_salario':    {'debito': '2.1.02.001', 'credito': '1.1.01.002'},
+    # A04 — decisão de 01/09 (decisoes-respondidas.md §A04): conta nova e
+    # inequívoca, crédito em fornecedores a pagar como despesa_alimentacao.
+    'despesa_geral':        {'debito': '6.1.02.009', 'credito': '2.1.01.001'},
 }
 
 # Contas mínimas necessárias para os lançamentos V2.
@@ -1589,6 +1592,11 @@ _V2_CONTAS_SEED = [
     ('6.1.02.001', 'Despesa com Combustível',      'DESPESA',  'DEVEDORA', 4, '6.1.02',  True),
     ('6.1.02.002', 'Despesa com Transporte',       'DESPESA',  'DEVEDORA', 4, '6.1.02',  True),
     ('6.1.02.003', 'Despesa com Material',         'DESPESA',  'DEVEDORA', 4, '6.1.02',  True),
+    # A04 — analítica própria da despesa geral. O código .009 não existe em
+    # NENHUM dos planos concorrentes (os .001-.003 divergem de significado
+    # entre eles — ver o comentário do DRE em :545, que exclui o subgrupo).
+    # RATIFICAR com o contador: nome e grupo; o código fica.
+    ('6.1.02.009', 'Despesas Gerais Diversas',     'DESPESA',  'DEVEDORA', 4, '6.1.02',  True),
 ]
 
 _v2_seeded_admins: set = set()
