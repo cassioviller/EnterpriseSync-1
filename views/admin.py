@@ -1,4 +1,6 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify
+from flask import (render_template, request, redirect, url_for, flash, jsonify,
+                   abort)
+from werkzeug.exceptions import HTTPException
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from models import db, Usuario, TipoUsuario, Funcionario, RegistroPonto
@@ -438,21 +440,31 @@ def admin_webhooks_reenviar(entrega_id):
             flash('Webhook desligado (N8N_WEBHOOK_URL não configurado).', 'warning')
             return redirect(url_for('main.admin_webhooks_listar'))
         entrega = db.session.get(WebhookEntrega, entrega_id)
-        if entrega is None:
-            flash(f'Entrega #{entrega_id} não encontrada.', 'warning')
-            return redirect(url_for('main.admin_webhooks_listar'))
-        if not _admin_can_see_entrega(entrega):
-            flash('Você não tem permissão para reenviar esta entrega.', 'danger')
-            return redirect(url_for('main.admin_webhooks_listar'))
+        if entrega is None or not _admin_can_see_entrega(entrega):
+            # 404, nunca 403 nem mensagem distinta: as duas respostas TÊM de
+            # ser indistinguíveis. Enquanto "não encontrada" e "sem permissão"
+            # fossem mensagens diferentes, um admin de A descobria quais ids de
+            # entrega existem em B — a diferença entre as respostas ERA a
+            # informação. É a mesma regra, com as mesmas palavras, de
+            # `views/almoxarifado/movimentos.py:276-280`.
+            logger.warning(
+                f'[admin_webhooks_reenviar] recusado: entrega {entrega_id} '
+                f'inexistente ou de outro tenant')
+            abort(404)
         ok = reentregar_uma(entrega_id)
         if ok:
             flash(f'Entrega #{entrega_id} reenviada com sucesso.', 'success')
         else:
             flash(f'Falha ao reenviar entrega #{entrega_id} — veja o log.', 'warning')
         return redirect(url_for('main.admin_webhooks_listar'))
+    except HTTPException:
+        # O 404 de cima é levantado DENTRO deste try. Sem este ramo, o
+        # `except Exception` o engoliria e devolveria 302 — o defeito que a
+        # família 404 da B6 existe para fechar, reintroduzido pelo próprio fix.
+        raise
     except Exception as e:
         logger.error(f"[admin_webhooks_reenviar] erro: {e}", exc_info=True)
-        flash(f'Erro ao reenviar webhook: {e}', 'danger')
+        flash('Erro ao reenviar webhook. Veja o log do servidor.', 'danger')
         return redirect(url_for('main.admin_webhooks_listar'))
 
 
