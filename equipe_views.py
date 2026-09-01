@@ -15,18 +15,15 @@ import logging
 equipe_bp = Blueprint('equipe', __name__, url_prefix='/equipe')
 
 def get_admin_id():
-    """Admin ID seguro - sem fallback perigoso"""
-    if not current_user.is_authenticated:
-        raise ValueError("Usuário não autenticado")
-    
-    if hasattr(current_user, 'tipo_usuario'):
-        if current_user.tipo_usuario == TipoUsuario.ADMIN:
-            return current_user.id
-        elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-            return current_user.admin_id
-    
-    # Fallback seguro baseado no ID do usuário atual
-    return current_user.id
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Convergido em 01/09 (Task 11): o "fallback seguro baseado no ID do
+    usuário atual" era um TENANT FANTASMA para usuário sem admin_id, onde
+    o canônico falha fechado. Medido pelo censo de
+    tests/test_isolamento_tenant_bloco1.py.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 def get_sunday_of_week(target_date):
     """Retorna domingo da semana (início da semana de 7 dias)"""

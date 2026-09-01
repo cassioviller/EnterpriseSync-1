@@ -10,9 +10,15 @@ cadastros_hub_bp = Blueprint('cadastros_hub', __name__, url_prefix='/cadastros')
 
 
 def _get_admin_id():
-    if hasattr(current_user, 'admin_id') and current_user.admin_id:
-        return current_user.admin_id
-    return current_user.id
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Convergido em 01/09 (Task 11): a cópia local devolvia current_user.id
+    como fallback — um TENANT FANTASMA para usuário sem admin_id, onde o
+    canônico falha fechado. Medido pelo censo de
+    tests/test_isolamento_tenant_bloco1.py.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 
 # ---------------------------------------------------------------------------

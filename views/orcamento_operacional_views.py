@@ -31,8 +31,16 @@ orcamento_operacional_bp = Blueprint(
 )
 
 
-def _admin_id() -> int:
-    return current_user.admin_id if getattr(current_user, 'admin_id', None) else current_user.id
+def _admin_id():
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Convergido em 01/09 (Task 11): a cópia local devolvia current_user.id
+    como fallback — um TENANT FANTASMA para usuário sem admin_id, onde o
+    canônico falha fechado (por isso o retorno deixou de prometer int).
+    Medido pelo censo de tests/test_isolamento_tenant_bloco1.py.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 
 def _parse_br_decimal(raw, default=None):

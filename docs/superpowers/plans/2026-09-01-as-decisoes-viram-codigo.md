@@ -1110,7 +1110,7 @@ A última: o que este plano decidiu NÃO fazer fica escrito (a regra da casa —
 - Consumes: o estado final das Tasks 1–11.
 - Produces: o registro que a Task 10 do plano de 31/08 vai consumir no índice novo.
 
-- [ ] **Step 1: Rodar o gate único**
+- [x] **Step 1: Rodar o gate único**
 
 ```bash
 setsid nohup bash run_tests.sh --gate > tests/reports/gate_decisoes_$(date +%H%M).log 2>&1 &
@@ -1118,12 +1118,12 @@ setsid nohup bash run_tests.sh --gate > tests/reports/gate_decisoes_$(date +%H%M
 
 (~50-60 min; destacado do terminal — três gates já morreram com sessão em 01/09.) Expected ao fim: **0 failed, skipped ≤ 6, xfailed = 72** (74 − os 2 do a09), passed ≥ 3052 + os testes novos deste plano. Registrar a contagem exata no Step 6.
 
-- [ ] **Step 2: Rodar a suíte com browser**
+- [x] **Step 2: Rodar a suíte com browser**
 
 Run: `bash run_tests.sh --suite` (após o gate verde)
 Expected: verde — é a única prova de que a remoção da Task 9 não quebrou `test_browser_all_modules` (o gate deseleciona os 201 de browser).
 
-- [ ] **Step 3: Escrever o runbook de agendamentos**
+- [x] **Step 3: Escrever o runbook de agendamentos**
 
 `docs/operacao-agendamentos.md`, com exatamente estas seções (conteúdo das decisões de 01/09, §A25 e §backup):
 

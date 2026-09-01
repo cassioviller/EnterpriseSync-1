@@ -464,47 +464,17 @@ def nova_obra():
 # ========== SISTEMA DE SERVIÇOS DA OBRA - REFATORADO COMPLETO ==========
 
 def get_admin_id_robusta(obra=None, current_user=None):
-    """Sistema robusto de detecção de admin_id - PRIORIDADE TOTAL AO USUÁRIO LOGADO"""
-    try:
-        # IMPORTAR current_user se não fornecido
-        if current_user is None:
-            from flask_login import current_user as flask_current_user
-            current_user = flask_current_user
-        
-        # [FAST] PRIORIDADE 1: USUÁRIO LOGADO (SEMPRE PRIMEIRO!)
-        if current_user and current_user.is_authenticated:
-            # Se é ADMIN, usar seu próprio ID
-            from models import TipoUsuario
-            if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
-                logger.debug(f"[LOCK] ADMIN LOGADO: admin_id={current_user.id}")
-                return current_user.id
-            
-            # Se é funcionário, usar admin_id
-            elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-                logger.debug(f"[LOCK] FUNCIONÁRIO LOGADO: admin_id={current_user.admin_id}")
-                return current_user.admin_id
-            
-            # Fallback para ID do usuário
-            elif hasattr(current_user, 'id') and current_user.id:
-                logger.debug(f"[LOCK] USUÁRIO GENÉRICO LOGADO: admin_id={current_user.id}")
-                return current_user.id
-        
-        # [FAST] PRIORIDADE 2: Se obra tem admin_id específico
-        if obra and hasattr(obra, 'admin_id') and obra.admin_id:
-            logger.debug(f"[TARGET] Admin_ID da obra: {obra.admin_id}")
-            return obra.admin_id
-        
-        # [WARN] SEM USUÁRIO LOGADO: ERRO CRÍTICO DE SEGURANÇA
-            logger.error("[ERROR] ERRO CRÍTICO: Nenhum usuário autenticado encontrado!")
-            logger.error("[ERROR] Sistema multi-tenant requer usuário logado OBRIGATORIAMENTE")
-            logger.error("[ERROR] Não é permitido detecção automática de admin_id")
-        return None
-        
-    except Exception as e:
-        # Fase 0.5 / 3.5 — devolvia `1` (um tenant CONCRETO) em qualquer
-        # exceção. Erro ao resolver tenant não pode virar acesso à empresa 1.
-        logger.error(f"ERRO CRÍTICO get_admin_id_robusta: {e}")
-        return None  # Fallback de produção
+    """DELEGA para views.helpers.get_admin_id_robusta — a definição única.
+
+    Convergido em 01/09 (Task 11): esta era uma CÓPIA byte-a-byte da de
+    views/helpers.py, e as duas carregavam o mesmo ramo "USUÁRIO GENÉRICO"
+    — um TENANT FANTASMA para usuário sem admin_id. A definição única (em
+    helpers) delega ao canônico quando autenticado e mantém o fallback por
+    obra para contexto sem request. Medido pelo censo de
+    tests/test_isolamento_tenant_bloco1.py.
+    """
+    from views.helpers import get_admin_id_robusta as _robusta_unica
+    return _robusta_unica(obra=obra, current_user=current_user)
 
 def verificar_dados_producao(admin_id):
     """Verifica se admin_id tem dados suficientes para funcionar em produção"""

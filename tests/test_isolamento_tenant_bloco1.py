@@ -81,24 +81,57 @@ pytestmark = pytest.mark.integration
 # Todo módulo do parque que expõe um `get_admin_id()` próprio. A lista é o
 # censo: um módulo novo com resolvedor próprio tem de entrar aqui, e é isso que
 # impede o quarto resolvedor de nascer sem ninguém perguntar nada a ele.
+# Entrada: 'modulo' (símbolo padrão get_admin_id) ou 'modulo:símbolo' —
+# Task 11 de 01/09: o parque tem resolvedor com três nomes (_get_admin_id,
+# _admin_id, get_admin_id_dinamico) e o censo por um nome só deixava
+# dez deles do lado de fora.
 RESOLVEDORES = [
     'alimentacao_views',
     'analytics_preditivos',
     'api_funcionarios',
     'api_servicos_obra_limpa',
+    'cadastros_views:_get_admin_id',
     'categoria_servicos',
     'clientes_views',
+    'compras_views:_admin_id',
     'contabilidade_views',
     'crm_views',
+    'cronograma_views:_admin_id',
     'crud_rdo_completo',
     'dashboards_especificos',
     'equipe_views',
     'exportacao_relatorios',
     'folha_pagamento_views',
+    'medicao_views:_admin_id',
     'multitenant_helper',
     'propostas_consolidated',
+    'subempreiteiros_views:_admin_id',
+    'transporte_views:_get_admin_id',
     'views.almoxarifado',
+    'views.catalogo_views:_admin_id',
+    'views.helpers:get_admin_id_dinamico',
+    'views.helpers:get_admin_id_robusta',
+    'views.metricas_views:_admin_id',
+    'views.obras:get_admin_id_robusta',
+    'views.orcamento_operacional_views:_admin_id',
+    'views.orcamentos_views:_admin_id',
+    'views.quick_create_views:_admin_id',
+    'vinculos_audit_views:_admin_id',
 ]
+
+# Resolvedores com GATE de papel embutido: devolvem None de propósito para
+# papéis sem acesso ao módulo (autorização, não divergência de tenant — o
+# mesmo falso alarme que o censo do B6.7 aprendeu a não contar). Ficam fora
+# da matriz de acordo por papel, mas DENTRO da sonda do tenant fantasma:
+# gate nenhum autoriza inventar tenant.
+RESOLVEDORES_COM_GATE = [
+    'views.catalogos_views:_get_admin_id',  # só ADMIN/SUPER_ADMIN entram no catálogo
+]
+
+
+def _resolvedor(entrada):
+    modulo, _, simbolo = entrada.partition(':')
+    return getattr(importlib.import_module(modulo), simbolo or 'get_admin_id')
 
 PAPEIS = ['ADMIN', 'SUPER_ADMIN', 'GESTOR_EQUIPES', 'ALMOXARIFE', 'FUNCIONARIO']
 
@@ -142,6 +175,19 @@ def parque():
             db.session.add(usuario)
             db.session.commit()
             ids[papel] = usuario.id
+
+        # A sonda do tenant fantasma (Task 11 de 01/09): FUNCIONARIO com
+        # admin_id vazio e sem FK — defeito de dado. O canônico falha
+        # fechado (None); todo resolvedor com `return current_user.id` de
+        # fallback inventa um tenant que não existe. Fora de PAPEIS de
+        # propósito: não é papel, é defeito.
+        orfao = Usuario(
+            username=f'orfao{marca}', email=f'orfao{marca}@t.local',
+            nome='Órfão', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True, admin_id=None)
+        db.session.add(orfao)
+        db.session.commit()
+        ids['FUNCIONARIO_ORFAO'] = orfao.id
         return ids
 
 
@@ -167,25 +213,55 @@ def _canonico(usuario_id):
 # O censo
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize('modulo', RESOLVEDORES)
+@pytest.mark.parametrize('entrada', RESOLVEDORES)
 @pytest.mark.parametrize('papel', PAPEIS)
-def test_o_resolvedor_do_modulo_concorda_com_o_canonico(parque, modulo, papel):
-    """🔬 16 × 5. Um módulo que responda diferente do canônico é o defeito.
+def test_o_resolvedor_do_modulo_concorda_com_o_canonico(parque, entrada, papel):
+    """🔬 23 × 5. Um módulo que responda diferente do canônico é o defeito.
 
     A afirmação é de **acordo**, não de valor: não interessa aqui qual é o
-    admin_id certo — interessa que não haja dois. Onde os dezesseis concordam,
+    admin_id certo — interessa que não haja dois. Onde todos concordam,
     uma mudança no canônico chega a todos; onde um discorda, ele tem um tenant
     particular que nenhum outro teste conhece.
     """
-    resolvedor = getattr(importlib.import_module(modulo), 'get_admin_id')
-
     esperado = _canonico(parque[papel])
-    obtido = _como(parque[papel], resolvedor)
+    obtido = _como(parque[papel], _resolvedor(entrada))
 
     assert obtido == esperado, (
-        f'{modulo}.get_admin_id() devolve {obtido!r} para {papel}, e '
+        f'{entrada} devolve {obtido!r} para {papel}, e '
         f'utils.tenant.get_tenant_admin_id() devolve {esperado!r} — são dois '
         f'resolvedores com respostas diferentes para a mesma pergunta')
+
+
+@pytest.mark.parametrize('entrada', RESOLVEDORES + RESOLVEDORES_COM_GATE)
+def test_nenhum_resolvedor_inventa_tenant_para_o_orfao(parque, entrada):
+    """🔴 A sonda do tenant fantasma (Task 11 de 01/09).
+
+    FUNCIONARIO sem `admin_id` é defeito de dado; o canônico falha fechado.
+    O padrão `admin_id if set else current_user.id`, copiado em vários
+    módulos, devolve aqui o id do PRÓPRIO usuário como tenant — uma
+    empresa que não existe (ou pior: que existe e é de outro). Vale também
+    para os resolvedores com gate: gate nenhum autoriza inventar tenant.
+    """
+    from werkzeug.exceptions import HTTPException
+
+    esperado = _canonico(parque['FUNCIONARIO_ORFAO'])
+    assert esperado is None, (
+        'pré-condição: o canônico falha FECHADO para o órfão — se isso '
+        'mudou, o censo inteiro mudou de premissa')
+
+    try:
+        obtido = _como(parque['FUNCIONARIO_ORFAO'], _resolvedor(entrada))
+    except HTTPException as e:
+        # abortar 401/403 é falhar MAIS fechado que devolver None — é o que
+        # require_tenant faz (vinculos_audit_views) e é aceito
+        assert e.code in (401, 403), (
+            f'{entrada} abortou {e.code} para o órfão — só 401/403 são '
+            f'falha fechada legítima')
+        return
+
+    assert obtido == esperado, (
+        f'{entrada} devolve {obtido!r} para FUNCIONARIO sem admin_id — um '
+        f'tenant fantasma onde o canônico falha fechado (None)')
 
 
 @pytest.mark.parametrize('papel', PAPEIS)
@@ -267,20 +343,71 @@ def test_funcionario_sem_admin_id_falha_fechado_tambem_no_rdo(parque):
         f'dado volta a virar tenant por adivinhação')
 
 
+# Resolvedores medidos e deliberadamente FORA do censo, com o porquê.
+# Task 11 de 01/09 — registrar aqui é o que impede a exclusão silenciosa.
+FORA_DO_CENSO = {
+    # não resolve "de que empresa é este usuário": repara admin_id de LINHAS
+    # de tabela via FK, outra pergunta (get_admin_id_via_relationship/mode)
+    'fix_all_admin_id_universal',
+    # resolvedores ANINHADOS dentro de função (rdo_editar_sistema.py:29,
+    # views/rdo.py:2864) — não importáveis; consolidá-los é refactor das
+    # funções-mãe, registrado para a onda das automações
+    'rdo_editar_sistema',
+    'views.rdo',
+}
+
+_NOMES_DE_RESOLVEDOR = ('get_admin_id', '_get_admin_id', '_admin_id',
+                        'get_admin_id_dinamico', 'get_admin_id_robusta')
+
+
 def test_a_lista_do_censo_cobre_quem_tem_resolvedor_proprio():
-    """O censo não pode envelhecer em silêncio.
+    """O censo não pode envelhecer em silêncio — nas DUAS direções.
 
-    Um módulo novo com `get_admin_id()` próprio precisa entrar em
-    `RESOLVEDORES` — senão o quarto resolvedor nasce fora do alcance deste
-    arquivo, que é a única coisa que ele existe para impedir. A varredura é
-    pelo símbolo importável, não por texto do fonte.
+    (1) Toda entrada da lista ainda expõe o símbolo que diz expor. (2) Todo
+    módulo do parque com um `def` de resolvedor no nível do módulo está no
+    censo ou em FORA_DO_CENSO com razão escrita. A varredura (2) é por
+    texto do fonte de propósito: foi um censo só por `hasattr('get_admin_id')`
+    que deixou dez resolvedores (_get_admin_id, _admin_id, …) fora por dois
+    meses — medido em 01/09.
     """
-    faltando = []
-    for modulo in RESOLVEDORES:
-        if not hasattr(importlib.import_module(modulo), 'get_admin_id'):
-            faltando.append(modulo)
+    import re
 
+    # direção 1: a lista não aponta para símbolo morto
+    faltando = []
+    for entrada in RESOLVEDORES + RESOLVEDORES_COM_GATE:
+        modulo, _, simbolo = entrada.partition(':')
+        if not hasattr(importlib.import_module(modulo), simbolo or 'get_admin_id'):
+            faltando.append(entrada)
     assert not faltando, (
-        f'estes módulos estão no censo mas não expõem mais get_admin_id: '
-        f'{faltando} — ou foram consolidados (tire-os da lista) ou o símbolo '
-        f'mudou de nome (e o censo parou de olhar para ele)')
+        f'estas entradas do censo não expõem mais o símbolo: {faltando} — '
+        f'ou foram consolidadas (tire-as da lista) ou o símbolo mudou de '
+        f'nome (e o censo parou de olhar para ele)')
+
+    # direção 2: nenhum resolvedor do parque fora do censo
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    padrao = re.compile(
+        r'^def (' + '|'.join(_NOMES_DE_RESOLVEDOR) + r')\(', re.MULTILINE)
+    censo = {e.partition(':')[0] for e in RESOLVEDORES + RESOLVEDORES_COM_GATE}
+    fora = []
+    for pasta in ('', 'views'):
+        base = os.path.join(raiz, pasta)
+        for arquivo in sorted(os.listdir(base)):
+            if not arquivo.endswith('.py'):
+                continue
+            caminho = os.path.join(base, arquivo)
+            with open(caminho, encoding='utf-8') as f:
+                if not padrao.search(f.read()):
+                    continue
+            nome = arquivo[:-3]
+            modulo = f'{pasta}.{nome}' if pasta else nome
+            if modulo == 'views.__init__':
+                continue
+            # views/almoxarifado é pacote e já está no censo; utils/tenant
+            # é o próprio canônico
+            if modulo not in censo and modulo not in FORA_DO_CENSO:
+                fora.append(modulo)
+
+    assert not fora, (
+        f'módulos com resolvedor próprio FORA do censo: {fora} — inclua em '
+        f'RESOLVEDORES (ou RESOLVEDORES_COM_GATE, se o None for gate '
+        f'deliberado de papel), ou em FORA_DO_CENSO com a razão escrita')
