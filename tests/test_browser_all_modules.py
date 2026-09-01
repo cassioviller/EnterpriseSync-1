@@ -644,7 +644,9 @@ class TestBloco7Demais:
         _check_page(browser_session, "/metricas/ranking")
 
     def test_relatorios_veiculos(self, browser_session):
-        _check_page(browser_session, "/veiculos/relatorios")
+        # D3 leva 2 (01/09): /veiculos/relatorios saiu com views/vehicles.py;
+        # a capacidade viva equivalente é o dashboard da frota.
+        _check_page(browser_session, "/frota/dashboard")
 
     def test_usuarios(self, browser_session):
         _check_page(browser_session, "/usuarios")

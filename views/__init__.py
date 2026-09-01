@@ -12,7 +12,6 @@ from views import dashboard
 from views import users
 from views import employees
 from views import obras
-from views import vehicles
 from views import rdo
 from views import api
 from views import admin

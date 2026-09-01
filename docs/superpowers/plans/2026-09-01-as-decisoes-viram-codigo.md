@@ -955,16 +955,16 @@ Decisão de 01/09: o ramo de `crud_rdo_completo.get_admin_id` que resolve por FK
 - Consumes: `get_tenant_admin_id()` de `utils/tenant.py`.
 - Produces: censo sem exceções — as Tasks seguintes tratam o censo como cobertura total.
 
-- [ ] **Step 1: Tornar o censo o RED**
+- [x] **Step 1: Tornar o censo o RED**
 
 Em `tests/test_isolamento_tenant_bloco1.py`, localizar a exceção do caso (grep por `crud_rdo_completo` no arquivo; há um desvio/skip documentado para FUNCIONARIO sem `admin_id`) e removê-la, fazendo o caso afirmar o canônico (`None` ⇒ mesmo resultado nos dois).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_isolamento_tenant_bloco1.py -v -k crud_rdo`
 Expected: FAIL — o resolvedor local devolve o id da FK onde o canônico devolve `None`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `crud_rdo_completo.py` — substituir o corpo de `get_admin_id` pela delegação (mesmo shape do diff de `contabilidade_views.py`):
 
@@ -982,7 +982,7 @@ def get_admin_id():
     return get_tenant_admin_id()
 ```
 
-- [ ] **Step 4: Escrever a medição**
+- [x] **Step 4: Escrever a medição**
 
 ```python
 #!/usr/bin/env python3
@@ -1021,12 +1021,12 @@ if __name__ == '__main__':
     main()
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_isolamento_tenant_bloco1.py -v && python scripts/medir_funcionarios_sem_admin_id.py`
 Expected: censo todo PASS; a medição imprime a contagem de dev (~263 — resíduo de suíte; o número que importa é o de produção, e o commit diz isso).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crud_rdo_completo.py tests/test_isolamento_tenant_bloco1.py scripts/medir_funcionarios_sem_admin_id.py
