@@ -7537,6 +7537,32 @@ def _migration_317_chave_acesso_por_tenant():
                 "(admin_id, chave_acesso) — o unique global saiu.")
 
 
+def _migration_318_flag_folha_rateio_encargos():
+    """A24 — flag por tenant do rateio de encargos patronais por obra.
+
+    `configuracao_empresa.folha_rateio_encargos` (default FALSE). Ligada,
+    processar a folha do mês também grava a folha rateada por obra em
+    FolhaProcessada, com encargos. Desligada, comportamento de hoje —
+    nenhum dado é reescrito, então desligar reverte por completo. Liga-se
+    por scripts/flag_folha_rateio_encargos.py, tenant a tenant.
+
+    Espelho da migration 226 (rdo_percentual_livre). Idempotente
+    (`ADD COLUMN IF NOT EXISTS`): numa base onde o modelo já foi importado
+    o `db.create_all()` anterior já criou a coluna e o DDL é no-op —
+    lição N2, as duas formas convergem no mesmo objeto.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+                "folha_rateio_encargos BOOLEAN NOT NULL DEFAULT FALSE"))
+        logger.info("[Migration 318] folha_rateio_encargos criada (default FALSE).")
+    except Exception as e:
+        logger.error(f"[Migration 318] Falha: {e}", exc_info=True)
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7855,6 +7881,7 @@ def executar_migracoes():
             (315, "Onda 5 / Task 8 — uq_contrato_versao_vigente ganha admin_id: o indice era UNIQUE(obra_id) e toda query filtra (obra_id, admin_id); linha com admin_id divergente travava a obra permanentemente", _migration_315_indice_vigencia_com_admin_id),
             (316, "Fix round do code review — uq_contrato_versao_obra_versao ganha admin_id: a 315 escopou a irma e deixou esta, e abrir_versao numera por (obra_id, admin_id)", _migration_316_versao_contrato_por_tenant),
             (317, "A09 — nota_fiscal.chave_acesso unica por (admin_id, chave_acesso), nao global", _migration_317_chave_acesso_por_tenant),
+            (318, "A24 — flag configuracao_empresa.folha_rateio_encargos (default FALSE): rateio de encargos patronais por obra atras de interruptor por tenant", _migration_318_flag_folha_rateio_encargos),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

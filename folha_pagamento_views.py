@@ -288,7 +288,27 @@ def processar_folha_mes(ano, mes):
                     logger.warning(f"[WARN] GestaoCusto folha não registrado para {funcionario.nome}: {_ge}")
             else:
                 erros += 1
-        
+
+        # A24 — com a flag ligada, o mesmo processamento também grava a
+        # folha rateada por obra (encargos incluídos) em FolhaProcessada.
+        # As obras do mês são as com ponto no período — a mesma fonte de
+        # _horas_por_obra_no_mes (services/folha_service.py). Flag OFF
+        # (default) = comportamento de hoje, byte-idêntico.
+        from utils.tenant import folha_rateio_encargos_on
+        if folha_rateio_encargos_on(admin_id):
+            from sqlalchemy import extract
+            from models import RegistroPonto
+            from services.folha_service import processar_e_salvar_folha_obra
+            obras_do_mes = [r[0] for r in db.session.query(
+                RegistroPonto.obra_id).filter(
+                    RegistroPonto.obra_id.isnot(None),
+                    RegistroPonto.admin_id == admin_id,
+                    extract('year', RegistroPonto.data) == ano,
+                    extract('month', RegistroPonto.data) == mes,
+                ).distinct()]
+            for _obra_id in obras_do_mes:
+                processar_e_salvar_folha_obra(_obra_id, ano, mes, admin_id)
+
         # Commit final
         db.session.commit()
 

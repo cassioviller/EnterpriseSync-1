@@ -465,7 +465,7 @@ git commit -m "fix(a18): rota legada do RDO grava subatividade_mestre_id por mat
 - Consumes: `processar_e_salvar_folha_obra(obra_id, ano, mes, admin_id)` (`services/folha_service.py:1699`); `_horas_por_obra_no_mes` (`:1594`) como referência da descoberta de obras.
 - Produces: `folha_rateio_encargos_on(admin_id) -> bool` em `utils/tenant.py`; coluna `configuracao_empresa.folha_rateio_encargos` (default FALSE).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 """A24 — o rateio de encargos por obra liga atrás de flag por tenant.
@@ -556,12 +556,12 @@ def test_flag_on_processar_folha_grava_rateio_com_encargos(cenario_folha):
             'a fatia da obra tem de carregar encargos — é o ~28% que faltava')
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_a24_rateio_encargos_flag.py -v`
 Expected: FAIL — `ImportError` (leitor e script não existem).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 1. `models.py`, em `ConfiguracaoEmpresa`, junto de `rdo_percentual_livre`:
 
@@ -622,12 +622,12 @@ def folha_rateio_encargos_on(admin_id) -> bool:
 
 ⚠️ Confirme em `models.py` que `RegistroPonto` tem `admin_id` direto; se o tenant lá for via `Funcionario`, troque o filtro por `join(Funcionario).filter(Funcionario.admin_id == admin_id)` — a fonte de verdade é a query de `_horas_por_obra_no_mes`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_a24_rateio_encargos_flag.py tests/test_onda3_folha.py -v`
 Expected: PASS em todos (os de onda3 são a regressão do pipeline que agora ganhou chamador).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add models.py migrations.py utils/tenant.py folha_pagamento_views.py scripts/flag_folha_rateio_encargos.py tests/test_a24_rateio_encargos_flag.py

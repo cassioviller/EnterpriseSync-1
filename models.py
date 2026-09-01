@@ -4541,6 +4541,16 @@ class ConfiguracaoEmpresa(db.Model):
     rdo_percentual_livre = db.Column(db.Boolean, nullable=False, default=False,
                                      server_default='false')
 
+    # A24 — liga o rateio de encargos patronais por obra no processamento da
+    # folha: com ela TRUE, processar o mês também grava a folha rateada por
+    # obra em FolhaProcessada (pipeline de services/folha_service.py:1699,
+    # que estava correto e sem chamador). Default FALSE = comportamento
+    # atual byte-idêntico. Liga-se por scripts/flag_folha_rateio_encargos.py,
+    # tenant a tenant. Irmã de rdo_percentual_livre (acima); migração
+    # espelho: 318.
+    folha_rateio_encargos = db.Column(db.Boolean, nullable=False, default=False,
+                                      server_default='false')
+
     # REMOVIDO: Campos transferidos para PropostaTemplate para evitar conflitos
     # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 
     # condicoes_pagamento_padrao, garantias_padrao, observacoes_gerais_padrao
