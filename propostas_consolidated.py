@@ -410,15 +410,24 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def get_admin_id():
-    """Detecção unificada de admin_id para dev/produção (padrão consolidado)"""
-    if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
-        if current_user.tipo_usuario == TipoUsuario.ADMIN:
-            return current_user.id
-        elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-            return current_user.admin_id
-    
-    # Fallback para desenvolvimento
-    return 10
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Onda 6 / Task 5 — o censo de resolvedores
+    (`tests/test_isolamento_tenant_bloco1.py`) mediu os 16 `get_admin_id()` do
+    parque contra `utils.tenant.get_tenant_admin_id` nos 5 papéis, e este era o
+    pior dos quatro divergentes: comparava `== TipoUsuario.ADMIN`, esquecia
+    SUPER_ADMIN (que o canônico trata junto, `utils/tenant.py:29`), e caía num
+    `return 10` de "fallback para desenvolvimento" — um tenant CONCRETO e
+    chumbado. Um SUPER_ADMIN abrindo propostas lia e gravava dentro da empresa
+    10. É o mesmo `return 10` que `categoria_servicos.py` e `api_funcionarios.py`
+    já haviam removido dos seus; sobreviveu aqui porque ninguém tinha perguntado
+    aos dezesseis ao mesmo tempo.
+
+    Sem tenant resolvível o resultado agora é `None`, e as consultas voltam
+    vazias — falha fechada, como no resto do parque.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 def safe_db_operation(operation, default_value=None):
     """Executa operação no banco com tratamento seguro de transação"""

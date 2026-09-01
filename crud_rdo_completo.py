@@ -16,11 +16,20 @@ rdo_crud_bp = Blueprint('rdo_crud', __name__, url_prefix='/rdo')
 def get_admin_id():
     """Obter admin_id correto baseado no usuário atual"""
     from models import TipoUsuario
-    
-    # Para usuários ADMIN, usar o próprio ID
-    if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
+
+    # Para usuários ADMIN e SUPER_ADMIN, usar o próprio ID.
+    #
+    # Onda 6 / Task 5 — SUPER_ADMIN faltava aqui, e caía até o `return None` do
+    # fim: trancado para fora do RDO sem mensagem. `utils/tenant.py:29` trata os
+    # dois papéis juntos, e o censo de `tests/test_isolamento_tenant_bloco1.py`
+    # mediu a discordância. Este arquivo NÃO delega ao canônico como os outros
+    # três corrigidos junto, e de propósito: o ramo de FUNCIONARIO abaixo
+    # resolve por FK quando `current_user.admin_id` é vazio, e o canônico
+    # devolveria None ali. Consolidar isso é decisão de outra onda.
+    if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario in (
+            TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
         return current_user.id
-    
+
     # Para outros usuários, usar admin_id
     if hasattr(current_user, 'admin_id') and current_user.admin_id:
         return current_user.admin_id

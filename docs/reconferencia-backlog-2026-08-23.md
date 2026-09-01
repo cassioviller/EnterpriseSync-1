@@ -398,6 +398,23 @@ tudo-ou-nada). Recusa com flash/erro explícito, nada é gravado.
 `test_nota_fiscal_vazia_nao_e_chave_de_dedup`,
 `test_fornecedor_de_outro_tenant_na_entrada_multipla_responde_404`).
 
+**Riscada em 01/09 (Onda 6, Task 1) — agora com teste, não com leitura de código.**
+🔬 A verificação acima é de *efeito por rota*: nenhum dos 6 testes citava
+`entrada_ja_lancada`, e a chave do dedup nunca foi afirmada diretamente. Foi por
+isso que a varredura de 25/08 achou, no mesmo dedup e depois deste "ENTREGUE",
+um furo de tenant que ninguém guardava: 📖 `almoxarifado_utils.py:257` fazia
+`NotaFiscal.query.filter_by(xml_hash=xml_hash)` **sem `admin_id`** — importado o
+XML por outra empresa, esta ouvia *"nota fiscal já foi importada anteriormente"*
+e nunca conseguia importar. `entrada_ja_lancada`
+(`views/almoxarifado/movimentos.py:16-49`), uma camada abaixo, **já chaveava por
+`(admin_id, nota_fiscal, item_id, tipo_movimento)`**: o código documentava e
+evitava o defeito num lugar e o cometia no outro.
+
+A guarda que faltava está em `tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py`
+(commit `d5bfef01`). **Lição para as próximas linhas desta tabela:** "ENTREGUE
+por leitura de código" e "ENTREGUE com teste que nomeia a regra" não são o mesmo
+estado, e esta linha custou 19 dias para mostrar a diferença.
+
 **O que sobra:** o "de brinde" do doc de 04/08 — `almoxarifado_utils.py:257`
 (`processar_xml_nfe`, consulta `NotaFiscal` por `xml_hash` **sem filtrar
 `admin_id`**) continua sem filtro de tenant. Confirmado com

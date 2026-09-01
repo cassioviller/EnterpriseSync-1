@@ -23,17 +23,20 @@ from auth import admin_required
 
 
 def get_admin_id():
-    """Onda 2 — mesmo defeito de tenant que `contabilidade_views.py` já
-    corrigiu: `current_user.id` só é o admin_id certo para quem É admin.
-    Papel não-admin com `admin_id` próprio processava/estornava a folha do
-    admin errado. Task 8 traz a correção canônica para cá também."""
-    if not current_user.is_authenticated:
-        return None
-    if current_user.tipo_usuario == TipoUsuario.ADMIN:
-        return current_user.id
-    elif hasattr(current_user, 'admin_id'):
-        return current_user.admin_id
-    return None
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Onda 2 — `current_user.id` só é o admin_id certo para quem É admin; papel
+    não-admin com `admin_id` próprio processava/estornava a folha do admin
+    errado.
+
+    Onda 6 / Task 5 — a cópia local que a Onda 2 deixou aqui ainda discordava
+    do canônico num papel: comparava `== TipoUsuario.ADMIN` e esquecia
+    SUPER_ADMIN (`utils/tenant.py:29`), que recebia `None` e ficava trancado
+    para fora da folha. Delegar fecha a família inteira em vez de mais um
+    papel. Medido pelo censo em `tests/test_isolamento_tenant_bloco1.py`.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 # ================================
 # DASHBOARD PRINCIPAL

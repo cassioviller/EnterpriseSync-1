@@ -81,7 +81,7 @@ A medição mecânica listou cinco testes ausentes no `2026-08-04-plano-consolid
 2.7 da Onda 2**. Se a Onda 2 já entrou, ele nasce verde — e aí diga isso no
 commit, em vez de fingir que houve RED.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py`:
 
@@ -218,7 +218,7 @@ e `NotaFiscal.xml_hash`/`numero`:
 `grep -n "class AlmoxarifadoMovimento" -A 25 models.py | grep -i nota`
 `grep -n "class NotaFiscal" -A 25 models.py | grep -iE "xml_hash|numero"`
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails** — feito em 31/08 (`d5bfef01`): 4 passed, e o RED do tenant confirmado.
 
 Run: `python -m pytest tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py -v`
 Expected: os dois primeiros e o último **PASS** (a A09 realmente foi entregue nessa camada); `test_dedup_de_xml_tambem_e_por_tenant` **FAIL** se a Onda 2 ainda não entrou.
@@ -324,7 +324,7 @@ teste nasce junto com o código, não sete meses antes dele.
 > `test_b6_404_propostas.py` (`rodada-b6:593`) escapou do padrão de nome que ela
 > procurava.
 
-- [ ] **Step 1: Read the five sections of the b6 plan**
+- [x] **Step 1: Read the five sections of the b6 plan**
 
 ```bash
 sed -n '585,600p;630,645p;668,680p;703,715p;743,755p' docs/superpowers/plans/2026-08-06-rodada-b6-varredura.md
@@ -335,7 +335,7 @@ Cada seção nomeia as rotas e o comportamento esperado (404 em vez de 500, ou
 `test_b6_estorno_recebimento.py` e `test_b6_familia2_reembolso_import.py` — o
 resto ficou.
 
-- [ ] **Step 2-4:** um arquivo por família, RED, verde, **um commit por arquivo**.
+- [x] **Step 2-4:** um arquivo por família, RED, verde, **um commit por arquivo**. Os cinco entraram: `frota` (`889599cb`), `miscelanea` (`07288f3b`), `cauda` (`0c6590a4`, o único que corrigiu fonte — o oráculo de `admin.py:441`), `obras` (`8366588c`) e `propostas` (`ef15ab70`).
 
 ⚠️ 🔬 Estes testes cobrem o mesmo território que a **Onda 2** (404 em vez de 403
 para recurso de outro tenant). Se a Onda 2 já entrou, alguns nascem verdes — e
@@ -358,11 +358,11 @@ está certo. **Diga quais**, no commit.
 `test_gestao_custo_filho_tenant.py` e `test_arreio_almoxarifado_e_tenant.py` —
 **nenhum cobre `multitenant_helper.get_admin_id`**, que é a raiz.
 
-- [ ] **Step 1:** escrever o arquivo como **censo**, não como caso: para cada
+- [x] **Step 1:** escrever o arquivo como **censo**, não como caso: para cada
   papel de `TipoUsuario`, afirmar que `get_admin_id()`, `get_tenant_admin_id()` e
   `require_tenant()` concordam. É o teste que teria impedido a divergência de
   nascer.
-- [ ] **Step 2-4:** RED (se a Onda 2 não entrou), verde, commit.
+- [x] **Step 2-4:** RED, verde, commit. 🔴 A Onda 2 **não** cobria isto: o censo (16 resolvedores × 5 papéis) nasceu vermelho em **4**, todas em SUPER_ADMIN — e uma delas, `propostas_consolidated.get_admin_id`, caía num `return 10` chumbado.
 
 ⚠️ Se a Onda 2 já entrou, este arquivo nasce verde. **Escreva-o mesmo assim** —
 o valor dele é impedir o quarto resolvedor de nascer, não pegar o defeito de hoje.
