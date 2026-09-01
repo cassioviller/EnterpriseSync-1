@@ -343,7 +343,7 @@ A Decisão 4 (congelar históricas) não trava isto: gravar o **elo** não muda 
 - Consumes: `SubatividadeMestre` (modelo existente; o padrão de uso correto está em `views/rdo.py:4247-4258`).
 - Produces: nada além do conserto.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 """A18 — o RDO salvo pela rota legada nasce com o elo subatividade_mestre_id.
@@ -410,12 +410,12 @@ def test_rota_legada_grava_o_elo_quando_o_nome_casa(cenario):
 
 ⚠️ Antes de rodar: (1) confira os nomes reais dos campos do form legado lendo o parser acima de `views/rdo.py:3295` (a extração de `subatividades_extraidas` diz quais chaves ele lê — `subatividade_N_nome` etc.; ajuste o POST ao formato real); (2) confira os kwargs obrigatórios de `Obra`/`Servico`/`SubatividadeMestre` nos modelos e complete o fixture se o INSERT exigir mais campos; (3) o formato de `data_relatorio` brasileiro é o que a rota espera (`strptime` — ver o gatilho descoberto na onda "A Porta Irmã"). O teste tem de chegar ao construtor de `:3295` — se morrer antes num flash de validação, o assert de `linha is not None` acusa e o gatilho precisa de ajuste, não o alvo.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_a18_elo_rota_legada_rdo.py -v`
 Expected: FAIL no assert final — `subatividade_mestre_id` é `None`. (Se falhar em `linha is not None`, o POST não chegou ao construtor: ajuste o gatilho pelo parser real e rode de novo — esse ajuste faz parte do RED honesto.)
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Em `views/rdo.py`, nos DOIS construtores da rota legada (`:3295` e `:3349`), logo após `rdo_servico_subativ.servico_id` ser resolvido, acrescentar:
 
@@ -435,12 +435,12 @@ Em `views/rdo.py`, nos DOIS construtores da rota legada (`:3295` e `:3349`), log
 
 (Confirme que `SubatividadeMestre` já está importado no módulo — `views/rdo.py:4247` o usa; se o import for local lá, replique-o.)
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/test_a18_elo_rota_legada_rdo.py tests/test_rota_rdo_salvar_unica.py -v`
 Expected: PASS — o novo e os 3 existentes da rota (regressão).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add views/rdo.py tests/test_a18_elo_rota_legada_rdo.py

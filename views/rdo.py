@@ -3316,6 +3316,26 @@ def rdo_salvar_unificado():
                 primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
                 rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
             
+            # A18 — o elo com o catálogo (o mesmo que :4258 grava no fluxo
+            # novo). O id candidato vem da própria chave do form
+            # (subatividade_<servico>_<mestre>_percentual) e só vale
+            # VALIDADO no tenant; fallback por igualdade EXATA de
+            # (admin_id, servico_id, nome). Sem match, None — nunca chutar.
+            _mestre = None
+            _cand = sub_data.get('subatividade_id')
+            try:
+                if _cand is not None:
+                    _mestre = SubatividadeMestre.query.filter_by(
+                        id=int(_cand), admin_id=admin_id_correto).first()
+            except (TypeError, ValueError):
+                _mestre = None
+            if _mestre is None and rdo_servico_subativ.servico_id:
+                _mestre = SubatividadeMestre.query.filter_by(
+                    admin_id=admin_id_correto,
+                    servico_id=rdo_servico_subativ.servico_id,
+                    nome=rdo_servico_subativ.nome_subatividade).first()
+            rdo_servico_subativ.subatividade_mestre_id = _mestre.id if _mestre else None
+
             db.session.add(rdo_servico_subativ)
             subatividades_processadas += 1
             logger.info(f"[OK] SUBATIVIDADE SALVA: {sub_data['nome']}: {sub_data['percentual']}%")
@@ -3355,6 +3375,14 @@ def rdo_salvar_unificado():
                         # Buscar primeiro serviço disponível para este admin
                         primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
                         rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
+                        # A18 — elo por igualdade exata; sem match, None.
+                        _mestre = None
+                        if rdo_servico_subativ.servico_id:
+                            _mestre = SubatividadeMestre.query.filter_by(
+                                admin_id=admin_id_correto,
+                                servico_id=rdo_servico_subativ.servico_id,
+                                nome=rdo_servico_subativ.nome_subatividade).first()
+                        rdo_servico_subativ.subatividade_mestre_id = _mestre.id if _mestre else None
                         db.session.add(rdo_servico_subativ)
                         logger.debug(f"DEBUG: Atividade convertida: {descricao} - {ativ_data.get('percentual', 0)}%")
             except (json.JSONDecodeError, ValueError) as e:
