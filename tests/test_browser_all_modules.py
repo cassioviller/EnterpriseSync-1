@@ -1141,11 +1141,24 @@ class TestIntegracaoAlmoxGestaoCusto:
             nota_fiscal=nf, observacoes="Teste E2E automático",
         )
 
+        # O guard A09 recusa com uma frase que contém a palavra "entrada"
+        # ("já deu entrada deste item") — por isso o OR de sucesso não pode
+        # incluir "entrada" isolado: um teste que aceitasse essa palavra
+        # passaria também quando a submissão fosse RECUSADA, não apenas
+        # quando fosse aceita. Falha alto e cedo, ANTES do assert de sucesso,
+        # se a assinatura da recusa aparecer.
+        assert "já deu entrada" not in flash_text.lower(), (
+            f"A submissão foi RECUSADA pelo guard A09 (nota fiscal duplicada), "
+            f"não processada. Flash capturado: '{flash_text}'. "
+            f"A NF usada neste teste precisa ser única por rodada — "
+            f"veja a variável 'nf' logo acima, que já nasce com timestamp "
+            f"justamente para evitar colisão com uma NF anterior no banco."
+        )
+
         # Verificar flash de sucesso visível na página de redirect
         assert (
             "processada" in flash_text.lower()
             or "sucesso" in flash_text.lower()
-            or "entrada" in flash_text.lower()
         ), (
             f"Flash de sucesso não encontrado após entrada de material. "
             f"Flash capturado: '{flash_text}'. "
