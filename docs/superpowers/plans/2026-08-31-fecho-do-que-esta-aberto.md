@@ -145,9 +145,12 @@ a Onda 5, `a-porta-irma` nem `o-que-nao-persiste`. A Task 10 o substitui.
   ocorreu.
 - **Integração a cada etapa fechada** (decisão do dono, 02/09 — substitui a
   regra de 31/08 de "merge só ao fim"). Gate verde → merge na `main` → push.
-  🔬 O motivo: são **117 commits nunca empurrados** (a `main` 35 à frente do
+  🔬 O motivo era: **117 commits nunca empurrados** (a `main` 35 à frente do
   `origin`, a branch 82 à frente da `main`), incluindo a Fase 6 inteira, e eles
-  só existem nesta máquina. A branch de trabalho segue sendo `sdd/a-porta-irma`
+  só existiam nesta máquina. ✅ **Resolvido em 02/09 pela Task 11:** foram
+  **125** (a rodada de 02/09 somou mais oito), e `origin/main` está em
+  `31da1447`. A partir daqui a cadência vale para o que vier — cada etapa que
+  fecha passa pelo ritual antes de a seguinte começar. A branch de trabalho segue sendo `sdd/a-porta-irma`
   até o primeiro merge; depois, branch nova por etapa a partir da `main`. Não
   use worktree — 📖 precedente de 21/08, worktrees quebraram sensores.
 - ⚠️ **Todo `git push` é confirmado com o dono antes de acontecer.** O plano
@@ -1198,8 +1201,10 @@ git commit -m "docs(issues): as sete issues de arquitetura ganham plano ou adiam
 
 > **Mudou de forma em 02/09.** Antes era "a última task: merge ao fim de tudo".
 > Agora é o **ritual repetido**: toda etapa que fecha passa por aqui antes de a
-> seguinte começar. 🔬 O motivo: são **117 commits nunca empurrados**, e a Fase 6
-> inteira só existe nesta máquina.
+> seguinte começar. 🔬 O motivo era: **117 commits nunca empurrados**, e a Fase 6
+> inteira só existia nesta máquina. ✅ **A primeira execução foi em 02/09**
+> (Task 11): 125 commits empurrados, gate verde na branch e na `main` com os
+> mesmos números.
 >
 > Esta task **não tem checkbox próprio** — ela é executada uma vez por etapa,
 > pelas Tasks 11, 7, 8, 12, 13, 9, 14, 15 e 16.
@@ -1274,7 +1279,7 @@ commits sobem e o que eles contêm.
 ### Task 11: O que está a um passo, e a primeira integração
 
 > **Executa ANTES da Task 7.** Três frentes estão a um ou dois passos do fim, e
-> os 117 commits saem da máquina aqui. Nada nesta task é trabalho novo — é
+> os commits saem da máquina aqui. Nada nesta task é trabalho novo — é
 > fechar o que já está feito.
 
 **Files:**
@@ -1285,8 +1290,8 @@ commits sobem e o que eles contêm.
 
 **Interfaces:**
 - Consumes: nada.
-- Produces: `main` com 117 commits empurrados; o piso do gate confirmado numa
-  rodada única.
+- Produces: `main` com os commits empurrados (foram **125**); o piso do gate
+  confirmado numa rodada única.
 
 - [x] **Step 1: Conferir o que está solto na árvore**
 
@@ -1342,11 +1347,30 @@ git add docs/superpowers/plans/2026-09-01-as-decisoes-viram-codigo.md docs/super
 git commit -m "docs(fecho): a suite browser e as decisoes de 01/09 fecham; a onda 6 cai junto"
 ```
 
-- [ ] **Step 7: O ritual da Task 10 — e o primeiro push**
+- [x] **Step 7: O ritual da Task 10 — e o primeiro push** ✅ **FEITO em 02/09.**
 
 Execute os Steps A a E da Task 10. ⚠️ Este é o **primeiro push**: 🔬 117
 commits, incluindo a Fase 6 inteira e as seis ondas do code review. Diga o
 número ao dono antes de empurrar.
+
+> **Como foi, com os números reais:**
+> - **Step A** — gate na branch: **3247 passed, 8 skipped, 201 deselected, 72
+>   xfailed, 0 failed** (47:43, `gate_browser_2154.log`).
+> - **Step B** — suíte com browser pelo runner retomável: **3435 passed, 1
+>   failed, 8 skipped, 72 xfailed**; o único vermelho é o achado P4, registrado.
+>   🔬 Conferido que o ledger (18:07) é **posterior** ao último commit de código
+>   (`160c7282`, 18:04) — o placar vale para a árvore que subiu, não para uma
+>   anterior.
+> - **Step C** — carimbos: este plano, `2026-09-02-a-suite-browser-volta-a-valer`
+>   (7/7), `2026-09-01-as-decisoes-viram-codigo` (Task 12) e
+>   `2026-08-25-onda-6-os-testes-prometidos` (6/6, estava aberto).
+> - **Step D** — merge `--no-ff` (`83670e76`), 88 commits. Conferido antes que
+>   `main` era ancestral da branch: merge trivial, sem conflito. Gate **na
+>   `main`**: **3247 / 8 / 201 / 72, 0 failed** (44:55,
+>   `gate_pos_merge_2249.log`) — os mesmos números do Step A.
+> - **Step E** — o dono autorizou e o push saiu: **125 commits**, não 117 — a
+>   rodada de 02/09 somou oito. `origin/main` = `main` = `31da1447`, confirmado
+>   por `git fetch` e comparação de refs, não pela saída do `push`.
 
 ---
 
@@ -1790,7 +1814,8 @@ Execute os Steps A a E da Task 10. Este é o push que fecha a rodada.
 ritual de integração) executada ao fim de cada uma.
 
 🔴 **A ordem não é a dos números.** As Tasks 1–6 já fecharam; a T11 é nova e vem
-primeiro porque tira os 117 commits da máquina antes de qualquer trabalho novo.
+primeiro porque tira os commits da máquina antes de qualquer trabalho novo (foram
+125, empurrados em 02/09).
 
 **O critério da ordem é dinheiro errado primeiro.** A Onda 4 (T7) é a única
 frente que está errando **hoje**, com dado real em produção: DRE e balancete que
