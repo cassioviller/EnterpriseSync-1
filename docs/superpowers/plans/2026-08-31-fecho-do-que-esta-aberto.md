@@ -1236,7 +1236,8 @@ número ao dono antes de empurrar.
 
 **Files:**
 - Execute: `docs/superpowers/plans/2026-08-24-fase-8-plano-de-contas-canonico.md` (10 tasks)
-- Modify: o mesmo arquivo — o método da Task 4 (Step 1 abaixo)
+- Modify: o mesmo arquivo — a renumeração das migrations (Step 0) e o método da
+  Task 4 (Step 1)
 
 **Interfaces:**
 - Consumes: nada deste plano.
@@ -1244,6 +1245,38 @@ número ao dono antes de empurrar.
   `AssinaturaDesconhecida` em `contabilidade_utils.py`, mais o plano de contas
   canônico — que a **issue D** consome (ver Task 9, que por isso planeja
   **sete** issues, não oito).
+
+- [ ] **Step 0: Renumerar as migrations da Fase 8, ANTES de tudo**
+
+🔴 **Mesmo defeito da Task 8, e o pre-flight de 02/09 o achou aqui também.** 🔬 O
+plano da Fase 8 escreve `_migration_315_plano_contas_semantica` (Task 2) e
+`_migration_316_depara_contas_5x` (Task 4) — 📖 e **as duas já existem**:
+`migrations.py:7381` (Onda 5, índice de vigência) e `:7415` (fix round do code
+review, versão de contrato por tenant). O número aparece no **título da task**,
+no **nome da função**, na **tupla do registry**, na **mensagem de commit** e num
+**teste que importa a função pelo nome**.
+
+Confira o máximo do dia — a Task 8 rodou antes e levou 319/320/321:
+
+```bash
+grep -n "_migration_3[0-9][0-9]_" migrations.py | tail -3
+```
+
+Renumere no plano da Fase 8, **de trás para frente** (a 316 antes da 315, senão
+a 315→322 recém-criada seria renumerada de novo):
+
+```bash
+F=docs/superpowers/plans/2026-08-24-fase-8-plano-de-contas-canonico.md
+sed -i 's/_migration_316_depara_contas_5x/_migration_323_depara_contas_5x/g; s/migration 316/migration 323/g; s/(316, "Fase 8/(323, "Fase 8/g' "$F"
+sed -i 's/_migration_315_plano_contas_semantica/_migration_322_plano_contas_semantica/g; s/migration 315/migration 322/g; s/(315, "Fase 8/(322, "Fase 8/g' "$F"
+grep -n "31[5-9]\|32[0-3]" "$F"
+```
+
+⚠️ Se o `grep` do primeiro comando mostrar um máximo diferente de 321, **use os
+dois números seguintes ao máximo real** — a lista viva das Global Constraints
+manda sobre este texto. E confira que a linha 214 do plano da Fase 8 ("a spec
+inteira antes de escrever a migration 316") também foi renumerada: ela é prosa,
+não código, e um `sed` que só olhasse `_migration_` a deixaria mentindo.
 
 - [ ] **Step 1: Trocar o método da Task 4, ANTES de executar**
 
