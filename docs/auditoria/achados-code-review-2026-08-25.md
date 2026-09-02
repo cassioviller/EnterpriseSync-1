@@ -1015,3 +1015,42 @@ Daí a regra que esta onda acrescenta, e que o teste da Task 4 já aplica: **um
 teste de guarda tem de reprovar também quando o próprio gatilho para de
 funcionar.** Ele exige status 500 em cada rota antes de olhar o vazamento — se
 o erro injetado deixar de ocorrer, o teste acusa em vez de virar andaime verde.
+
+---
+
+## 02/09 — a suíte browser rodou inteira, e sobrou um achado
+
+A primeira rodada completa da suíte (02/09, 46:08) devolveu **12 failed + 68
+errors**. Eram **um defeito só**: fixture de escopo `session` segurando um
+`with sync_playwright()` aberto envenenava todo teste de browser dos arquivos
+seguintes (corrigido em `a80f1ddc`; guarda no gate em
+`tests/test_contrato_isolamento_playwright.py`). Um segundo defeito, que o
+primeiro escondia, era a jornada E2E criar o Cliente **depois** do GET da
+página (corrigido em `160c7282`).
+
+Depois dos dois, pelo runner retomável (`scripts/suite_resumavel.py`, 30
+chunks, processo isolado por arquivo de browser): **3435 passed, 1 failed,
+8 skipped, 72 xfailed**. Sobrou este:
+
+### 🟡 P4 do RDO unificado espera o botão de equipe interna numa tarefa de subempreitada
+
+- **Onde:** `tests/test_rdo_unificado_playwright.py:275-277` (asserção P4);
+  `templates/rdo/novo.html:1262-1267` (ramo `isSub`) e `:1329` (ramo `else`).
+- **O que acontece:** o teste exige `#btn-equipe-<t_sub_id>` presente numa
+  tarefa cujo responsável é **Subempreitada**. No template, `btn-equipe-` só é
+  emitido no ramo `else` (tarefa interna); o ramo `isSub` renderiza apenas
+  `Total:` e o botão de terceiros. O comentário de `novo.html:1176` chama o
+  `btn-equipe-` de "botão de **efetivo interno**".
+- **Log:** `FAIL: P4 botão #btn-equipe-1887165 presente` — única asserção
+  vermelha das ~20 do arquivo; P1, P2, P3, P5, P5b, P3b, P6 e as seguintes
+  passam, inclusive o `#modalSubempreitada` abrindo com a tarefa
+  pré-selecionada.
+- **Por que NÃO foi corrigido aqui:** decidir isso é decisão de produto — ou o
+  botão de equipe interna deve aparecer também em tarefa subempreitada (e o
+  template regrediu), ou não deve (e a asserção P4 está desatualizada, mesma
+  família das outras desta rodada). A rodada de 02/09 tinha constraint
+  explícita de **não tocar em produção**, e não há evidência no repositório que
+  decida a intenção. Quem souber a intenção fecha em uma linha, dos dois lados.
+- **O que se sabe e o que não se sabe:** sabe-se que a asserção e o template
+  discordam hoje. **Não** se sabe desde quando — a família browser nunca teve
+  placar histórico, então isto não é presumida regressão.
