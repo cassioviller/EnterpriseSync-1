@@ -1099,10 +1099,24 @@ arquivo, que **nenhum dos dois planos lista**, comete os mesmos defeitos.
   teste que as chame (é a razão pela qual sobreviveram) e o repositório não
   registra chamador de produção.
 
-### ✅ Um falso alarme desarmado no mesmo pré-voo
+### 🔴 Correção da própria nota acima — o "falso alarme" era alarme de verdade
 
-O cabeçalho da Onda 4 lista `ativo=True` "numa tabela sem `ativo`" entre os
-defeitos de existência. 🔬 `Veiculo.ativo` **existe** (`models.py:5186`), e
-`AlertaVeiculo.ativo` não é o caso porque a classe inteira não existe. Aquele
-defeito morreu junto com o módulo apagado — quem for executar a Onda 4 não deve
-procurá-lo.
+A primeira versão desta seção dizia que o `ativo=True` "numa tabela sem `ativo`"
+do cabeçalho da Onda 4 era falso alarme, porque `Veiculo.ativo` existe
+(`models.py:5186`). **A conferência estava certa e a conclusão errada:** o plano
+não fala de `Veiculo`. Fala de `AlmoxarifadoEstoque`, e o defeito está **vivo**
+em `views/almoxarifado/relatorios.py:39` —
+`AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id, ativo=True)` contra uma
+classe (`models.py:5562`) que não tem a coluna. Medido por duas vias: `grep` na
+classe devolve zero, e `hasattr(models.AlmoxarifadoEstoque, 'ativo')` é `False`.
+O relatório quebra na primeira linha da rota — é a Task 3 da Onda 4.
+
+📖 O pré-voo registrado no ledger
+(`.superpowers/sdd/2026-08-31-fecho-do-que-esta-aberto/progress.md`) já havia
+medido exatamente isto horas antes, e o classificou como o achado mais grave da
+onda. A nota errada nasceu de refazer um pré-voo sem ler o que a casa já tinha
+medido. Fica a regra: **o ledger se lê antes**.
+
+O que continua valendo da nota original: `AlertaVeiculo.ativo` não é caso porque
+a classe inteira não existe, e `AlocacaoVeiculo` não tem mais nenhuma referência
+no repositório.

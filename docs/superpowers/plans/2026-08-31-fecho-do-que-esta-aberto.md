@@ -1,5 +1,46 @@
 # Fecho do Que Está Aberto — Implementation Plan
 
+> ## 📍 PONTO DE RETOMADA — sessão encerrada em 02/09, ~23:40
+>
+> **Leia estas 12 linhas antes de qualquer coisa. Nada está no meio do caminho:
+> a etapa anterior fechou inteira e está no remoto.**
+>
+> - **Estado do git:** `main` = `origin/main` = `a5ab182b` (mais o commit deste
+>   registro). **Zero commits não empurrados.** Árvore limpa — só
+>   `tests/reports/` fora do git, por regra. A branch `sdd/a-porta-irma` está
+>   mergeada e **não foi apagada**.
+> - **Progresso:** **7 de 16 tasks.** A Task 11 fechou os 7 Steps, incluindo o
+>   ritual da Task 10 e o **primeiro push: 125 commits**, a Fase 6 entre eles.
+> - **Pisos vigentes** (não use nenhum anterior): gate **3247 passed / 8
+>   skipped / 201 deselected / 72 xfailed / 0 failed**; suíte com browser
+>   **3435 passed / 1 failed** — o `1 failed` é o achado **P4** do RDO
+>   unificado, registrado na auditoria, e é o **único vermelho conhecido**.
+> - **A PRÓXIMA É A TASK 7 (Onda 4).** Ela já nasce destravada: o **Step 0**
+>   (pré-voo, com a correção 🔴 do item (d) — leia-o) e o **Step 0-b** (a D7,
+>   respondida "apagar" em 02/09) estão escritos com sítio e linha.
+> - **Comece assim** (o ritual manda branch nova por etapa, a partir da `main`):
+>
+> ```bash
+> git checkout main && git pull origin main
+> git checkout -b sdd/onda-4-relatorio
+> cat .superpowers/sdd/2026-08-31-fecho-do-que-esta-aberto/progress.md   # o ledger PRIMEIRO
+> ```
+>
+> - ⚠️ **O ledger não está no remoto.** `.superpowers/sdd/.gitignore` ignora
+>   tudo — ele existe **só nesta máquina**. Se você retomar daqui, leia-o. Se
+>   retomar de outra máquina, o que estava nele desta sessão está resumido neste
+>   bloco e no Step 0 da Task 7, mas o histórico das rulings de 31/08 e 02/09
+>   fica para trás.
+> - ⚠️ **A lição que custou caro nesta sessão:** um pré-voo foi refeito sem ler
+>   o ledger, e a nota resultante mandava **não procurar um defeito vivo**
+>   (`AlmoxarifadoEstoque.ativo`, `views/almoxarifado/relatorios.py:39`). Está
+>   corrigida no Step 0 (d) e na auditoria. **O ledger se lê antes.**
+> - **Nada espera decisão humana para a Task 7.** Seguem pendentes, mas de
+>   outras tasks: **FASE8-T1** (sem acesso a produção — vira premissa declarada
+>   na Task 12) e o `RATIFICAR` da **VIGA-I** (Task 8).
+> - **Sessão anterior:** https://claude.ai/code/session_01FPYxL6k71Ji3b2FqeqJ3ox
+
+
 > **Estado em 2026-09-02:** 🟡 **EM EXECUÇÃO — 7 de 16 tasks fechadas**, e a
 > primeira integração aconteceu: a `main` recebeu a etapa por merge `--no-ff`.
 >
@@ -877,11 +918,21 @@ o que o plano diz** — o arquivo foi tocado em 01/09 (`bef17c33`), e
 por linha: `calcular_dre_mensal:557`, `obter_dados_balancete:789`,
 `gerar_balancete_mensal:352`, `gerar_balanco_patrimonial:406`.
 
-**(d) Um falso alarme desarmado antes de custar tempo.** O cabeçalho da Onda 4
-lista `ativo=True` "numa tabela sem `ativo`" entre os defeitos de existência. 🔬
-`Veiculo.ativo` **existe** (`models.py:5186`) — aquele defeito morreu junto com
-o módulo apagado. Não o procure. `AlocacaoVeiculo` também não tem mais nenhuma
-referência no repo.
+**(d) 🔴 CORREÇÃO — a primeira versão deste Step 0 errou aqui, e o erro mandava
+não procurar um defeito vivo.** Ela dizia que o `ativo=True` "numa tabela sem
+`ativo`" do cabeçalho da Onda 4 era falso alarme, porque `Veiculo.ativo`
+**existe** (`models.py:5186`). 🔬 `Veiculo.ativo` existe mesmo — mas **não é
+dele que o plano fala**. A afirmação aponta para `AlmoxarifadoEstoque`, e o
+defeito está **VIVO**: `views/almoxarifado/relatorios.py:39` faz
+`AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id, ativo=True)` e a classe
+(`models.py:5562`) **não tem a coluna** — conferido por duas vias independentes,
+`grep` na classe (zero ocorrências) e `hasattr(models.AlmoxarifadoEstoque,
+'ativo') == False`. O relatório quebra na primeira linha da rota. 📖 O pré-voo
+anterior, no ledger da casa
+(`.superpowers/sdd/2026-08-31-fecho-do-que-esta-aberto/progress.md`), já tinha
+medido isto e marcado como o **mais grave** da Onda 4 — quem escreveu o Step 0
+não o leu antes. **Leia o ledger antes do pré-voo da próxima etapa.**
+`AlocacaoVeiculo`, esse sim, não tem mais nenhuma referência no repo.
 
 **(e) Alvos íntegros — as linhas do plano valem.** Intocados desde antes de a
 Onda 4 ser escrita: `views/almoxarifado/relatorios.py` (22/07, `b30923b5`),
