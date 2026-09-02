@@ -137,7 +137,15 @@ def _resolver_paginas():
 PAGINAS = _resolver_paginas()
 
 
-@pytest.fixture(scope="session")
+# ⚠️ scope="module", NÃO "session". Fixture de sessão só é desmontada no fim da
+# sessão inteira do pytest, e esta segura um `with sync_playwright()` aberto —
+# o event loop do Playwright ficaria RODANDO enquanto todos os outros arquivos
+# de teste rodam, derrubando todo `sync_playwright()` seguinte com "Playwright
+# Sync API inside the asyncio loop". Medido em 02/09 na primeira rodada
+# completa da suíte: 80 baixas de uma vez, e a jornada E2E errando 100% das
+# vezes por isso. Com "module" o browser segue compartilhado dentro deste
+# arquivo e o loop é liberado ao fim dele. Guarda: tests/test_contrato_isolamento_playwright.py
+@pytest.fixture(scope="module")
 def page():
     with sync_playwright() as pw:
         browser = pw.chromium.launch(
