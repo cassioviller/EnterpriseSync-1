@@ -1,0 +1,188 @@
+# Decisões pendentes — o que trava a Fase 8 e o Resgate da Espinha
+
+> ✅ **As três primeiras foram RESPONDIDAS em 01/09** — ver
+> `2026-09-01-decisoes-respondidas.md`. D6: assinatura estrutural (≥4 seeders,
+> não 2). FASE8-T1: segue aguardando acesso a produção. VIGA-I: opção B; a C foi
+> declarada morta.
+>
+> ✅ **Uma quarta abriu e foi respondida no mesmo dia (02/09): a D7**, no fim
+> desta página — achada pelo pré-voo da Task 7 (Onda 4) e respondida
+> **APAGAR**, como a D4.
+
+> **Para quem decide.** Quatro perguntas. As três primeiras travam, cada uma, um
+> plano inteiro que já está escrito e pronto para executar; nenhuma delas é
+> técnica — são o significado de uma conta contábil, uma medição de produção, e
+> uma regra de rateio de lucro. A quarta é a repetição de uma que você já
+> respondeu, noutro arquivo.
+
+## D6 — o de-para do plano de contas não pode ser chaveado só por código
+
+**O que trava:** `docs/superpowers/plans/2026-08-24-fase-8-plano-de-contas-canonico.md`,
+Task 4 em diante (10 tasks, 3 de 21 arquivos existem).
+
+**O problema:** os dois seeders aposentados trocam entre si o significado de
+`5.1.01` e `5.1.02`. Um de-para chaveado só pelo código da conta aplicaria o
+significado errado à metade do parque, silenciosamente — e um lançamento
+contábil mal classificado não se anuncia.
+
+**A tabela que expõe a colisão**, extraída dos dois seeders concorrentes:
+
+| Código | `contabilidade_utils.criar_plano_contas_padrao` | `financeiro_seeds.PLANO_CONTAS_CONSTRUCAO` |
+|---|---|---|
+| `5` | CUSTOS | DESPESAS |
+| `5.1` | CUSTO DOS SERVIÇOS PRESTADOS | DESPESAS OPERACIONAIS |
+| **`5.1.01`** | **Materiais Diretos** | **MÃO DE OBRA** |
+| **`5.1.02`** | **Mão de Obra Direta** | **MATERIAIS** |
+
+**O aperto:** a spec manda escrever o de-para conta a conta, **não** derivado
+por heurística de nome, "porque os nomes são justamente o que está
+inconsistente". Mas 🔬 **a única evidência sobrevivente de qual seeder rodou é
+`plano_contas.nome`.** A spec proíbe usar o nome, e sem o nome a Task 4 não é
+executável corretamente.
+
+**As saídas:**
+
+- **(a) Chavear em `(codigo, nome)` com igualdade exata** contra os dois
+  conjuntos fechados que estão no repositório — *recomendada pelo plano*. Não é
+  heurística: é reconhecer a assinatura de um dos dois seeders conhecidos.
+  Qualquer par fora dos dois conjuntos **faz a migration falhar e nomear o
+  par**. Preserva o "nunca chutar"; derivar por semelhança de string
+  (`'MÃO DE OBRA' ≈ 'Mão de Obra Direta'`) segue proibido.
+- **(b) Manter a regra literal da spec** (só `codigo`) — mandaria material para
+  pessoal em metade do parque, **em silêncio**, porque a partida migra sem
+  falhar.
+- **(c) Adiar a Fase 8** até haver outra evidência de proveniência além do nome.
+
+**O que muda em cada uma:** (a) destrava as 10 tasks e assume que os dois
+conjuntos do repositório cobrem todo o parque — se algum tenant tiver um plano
+de contas de terceira origem, a migration para e mostra qual. (b) é a única que
+corrompe dado. (c) mantém o status quo: dois significados para o mesmo código,
+e relatórios que não se comparam entre tenants.
+
+## FASE8-T1 — medir o plano de contas em produção
+
+**O que trava:** a mesma Fase 8, na raiz. A Task 4 estaria sendo decidida com
+número de banco de **dev**, que é majoritariamente resíduo de suíte de teste.
+
+**A pergunta:** se produção mostrar `5.x` dominante, a spec da Fase 8 está
+errada e o canônico volta à mesa. Ninguém mediu.
+
+**As saídas** (fonte: `docs/superpowers/plans/2026-08-24-fase-8-plano-de-contas-canonico.md`,
+linhas 51 e 196-197 — o comentário de `q8_planos_de_contas`, a função que a
+Task 1 daquele plano acrescenta a `scripts/medir_producao.py`):
+
+- **(a) Produção mostra `5.x` residual** (o padrão esperado — dev é "99,9%
+  resíduo de suíte"): a Task 4 segue como um de-para de algumas centenas de
+  linhas, do tamanho que o plano já previu. A Fase 8 segue como está escrita.
+- **(b) Produção mostra `5.x` dominante**: "a spec da Fase 8 está errada e o
+  canônico tem de ser reavaliado ANTES de qualquer código" (citação literal do
+  comentário da q8). A Task 4 deixa de ser um de-para e vira projeto próprio —
+  o plano inteiro volta à mesa antes de a Task 4 começar.
+
+**O que muda em cada uma:** (a) libera a Task 4 para rodar do jeito que está
+escrita — nenhuma mudança de escopo. (b) para a Fase 8 na Task 4: o de-para
+que a Task 4 assume (algumas centenas de linhas, revisável à mão) deixa de
+valer, e antes de escrever a migration 316 é preciso redesenhar quantas
+contas `5.x` têm de virar `6.x` em produção — que pode ser ordens de grandeza
+maior do que o de-para pequeno que a spec assume. **Ninguém rodou
+`python scripts/medir_producao.py` contra produção ainda — por isso a
+pergunta segue aberta.**
+
+## VIGA-I — a regra de verba/lucro do telhado viga I
+
+**O que trava:** `docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md`
+(10 tasks, 7 de 20 arquivos existem, porte de 2.542 linhas do PR #6).
+
+**O que trava exatamente:** apenas a **Task 8 de 10** (migration 319: `verba`,
+`lucro` e `pai` em `rdo_subempreitada_apontamento`). 🔬 As outras nove são porte
+de código já escrito e testado, e estão sendo entregues pela Task 8 do plano de
+fecho de 31/08 — **esta decisão não segura o resto.**
+
+**A pergunta:** o "telhado viga I" precisa de **verba**, **lucro %** e a escolha
+entre as **opções A/B/C**, mantendo a **venda total travada** em
+**R$ 1.720.796,75**, no orçamento **ORC-BAIA-REV10 (id 98)** (fonte:
+`docs/superpowers/plans/2026-06-15-fatia-2-custos-nao-mo-por-atividade-plan.md:482`).
+
+**O que são A e B** (mesma fonte, linhas 478-480):
+
+- **Opção A** — "reduzir margens dos demais proporcionalmente": os outros
+  itens do orçamento absorvem o item novo do telhado, cada um cedendo margem
+  na proporção do que já tem.
+- **Opção B** — "markup uniforme": ajustar `orcamento.margem_pct_global` até
+  `venda_total == 1720796.75` — um único percentual global se move até a
+  venda total fechar de novo no valor travado.
+- **Opção C** — 🔴 **referenciada mas nunca definida.** A fonte
+  (`docs/superpowers/plans/2026-06-15-fatia-2-custos-nao-mo-por-atividade-plan.md:471`)
+  cita "opção A/B/C de absorção" e aponta para um arquivo
+  `ESPACO_telhado_viga_i_baia_rev10.md` como o lugar onde a decisão — inclusive
+  o que é a opção C — seria registrada. 🔬 **esse arquivo não existe na
+  árvore** (`find . -name "ESPACO_telhado_viga_i*"` não devolve nada; outros
+  três documentos citam o mesmo arquivo faltante, nenhum o define). Definir o
+  que é a opção C, ou descartá-la, faz parte desta decisão — não é um detalhe
+  técnico a preencher depois.
+
+**O que muda:** com a resposta, a migration 319 entra, o ramo de subempreitada
+volta a `custo_nao_mo_atividade`, e os testes da Fatia 2
+(`tests/test_resultado_fatia2_custo_nao_mo.py`) saem de `xfail`. Sem ela, o
+resultado por atividade fica **sem o custo de subempreitada** — não erra, mas
+mede menos do que promete, e o `xfail` é o registro disso.
+
+---
+
+## D7 — `exportacao_relatorios.py`: apagar ou consertar? (aberta e RESPONDIDA em 02/09)
+
+> ✅ **RESPONDIDA em 02/09 pelo dono: APAGAR** — mesma resposta da D4, pelo
+> mesmo argumento. A execução entra na **Task 7** de
+> `2026-08-31-fecho-do-que-esta-aberto.md` (Step 0-b), no padrão das Tasks 2 e
+> 3 daquele plano: a extinção é **congelada** em
+> `tests/test_fecho_rotas_extintas.py`, provada pelo `url_map` e não por
+> comentário.
+
+> É a **mesma pergunta da D4**, noutro arquivo. A D4 foi respondida "apagar"
+> pelo dono em 31/08 e executada na Task 2 do plano de fecho (`3d0873a4`). O
+> pré-voo da Task 7 (Onda 4), feito em 02/09, achou que o defeito não morreu
+> com o módulo: ele tem um gêmeo vivo que nenhum plano lista.
+
+**O que trava:** nada, ainda. É a diferença para as outras desta página. A Onda 4
+pode executar sem esta resposta — mas se ela executar sem ela, entrega "o
+relatório passa a funcionar" com três rotas de relatório continuando a devolver
+vazio com `success: true`, que é precisamente o que a onda promete acabar.
+
+**A evidência** (medida em 02/09, provada por execução — registro completo em
+`docs/auditoria/achados-code-review-2026-08-25.md`):
+
+- Blueprint **registrado e vivo**: `main.py:157`, `/relatorios/exportacao`;
+  consta de `app.py:1108`.
+- `_obter_dados_resumo_executivo` (`:373-418`) quebra em três lugares
+  independentes: `UsoVeiculo.km_rodado` (`:380`) não existe — a coluna é
+  `km_percorrido` (`models.py:5265`); `ManutencaoVeiculo` (`:396`) e
+  `AlertaVeiculo` (`:404`, `:480-483`) **não estão importados** (`:36-38` traz
+  só `db, Veiculo, CustoVeiculo, UsoVeiculo`); e `AlertaVeiculo` **não existe
+  no repositório** — só o `AlertaVeiculoForm` (`forms.py:475`).
+- O erro é engolido em `:416-418` (`except Exception: return {}`) e
+  `/api/preview-dados` (`:731-757`) responde `{'success': True, 'resumo': {}}`.
+- Alcançável por `/gerar-pdf` (via `:97`), `/gerar-excel` (via `:245`) e
+  `/api/preview-dados` (`:746`).
+
+**As saídas:**
+
+- **(a) Apagar**, como a D4 — *é a recomendação, pelo mesmo argumento que valeu
+  em 31/08*: consertar um módulo que nenhuma tela chama e nenhum teste toca é
+  criar manutenção para funcionalidade que ninguém pediu. 🔬 O que se sabe: as
+  rotas quebram na primeira requisição que chegue ao resumo executivo. O que
+  **não** se sabe: se alguém as usa — não há teste que as chame, e o
+  repositório não registra chamador de produção. Se houver uso real, apagar é
+  visível na hora (404), enquanto hoje o usuário recebe um PDF vazio e acha que
+  não há dados.
+- **(b) Consertar**: são três correções independentes (`km_percorrido`, os dois
+  imports, e criar ou remover o `AlertaVeiculo`), mais trocar o `return {}` por
+  erro honesto. Vira task própria dentro da Onda 4, com teste que **chama** cada
+  rota — a regra que a própria onda escreveu.
+- **(c) Nem uma nem outra agora**: fica registrado como achado e a Onda 4 executa
+  sem tocá-lo. ⚠️ Custo declarado: a onda fecha dizendo que o relatório passa a
+  funcionar, com este ainda mentindo.
+
+**O que muda:** com **(a)**, a Task 7 do plano de fecho ganha uma remoção pequena
+e o `dashboards_especificos.py` segue sendo o único alvo de `km_rodado`. Com
+**(b)**, a Onda 4 ganha uma task e o gate ganha três testes de rota. Com **(c)**,
+nada muda no código e a dívida fica nomeada.

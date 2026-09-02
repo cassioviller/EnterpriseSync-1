@@ -110,12 +110,38 @@ def _js_erros_stop(page: Page, erros: list[str]):
 
 
 def _flash_em_pagina(page: Page) -> str:
-    """Extrai o texto do primeiro alert de flash do Bootstrap, se existir."""
+    """Texto de TODOS os flashes visíveis da página, unidos por ' | '.
+
+    ⚠️ Três defeitos da versão anterior, e os três atuaram juntos na rodada de
+    01/09, deixando a recusa do A09 sem diagnóstico:
+
+    1. casava `.alert-info` genérico — e /almoxarifado/entrada tem um cartão
+       ESTÁTICO com essa classe (`entrada.html:45`), que não é flash;
+    2. não conferia visibilidade — `innerText` de elemento `display:none` cai
+       para `textContent` por especificação, então o cartão OCULTO devolveu
+       texto como se fosse mensagem do sistema;
+    3. nunca olhava `.alert-danger` — metade das recusas do sistema é `danger`,
+       e um teste que falhasse por recusa recebia '' e reportava "flash não
+       encontrado", escondendo a mensagem que diria por quê.
+
+    O flash real tem assinatura própria: `base.html:992` e
+    `base_completo.html:1170` renderizam todo flash como
+    `alert alert-<cat> alert-dismissible fade show` com `role="alert"`.
+    Nenhum painel estático das páginas que esta suíte visita usa
+    `alert-dismissible` — guardado por
+    `tests/test_contrato_formularios_e2e.py::test_painel_estatico_da_entrada_nao_se_parece_com_flash`.
+
+    Devolve TODOS (não o primeiro): quando a rota flasha aviso E erro, ler só um
+    esconde o outro.
+    """
     try:
-        el = (page.query_selector(".alert-success")
-              or page.query_selector(".alert-info")
-              or page.query_selector(".alert-warning"))
-        return el.inner_text().strip() if el else ""
+        els = page.query_selector_all('.alert-dismissible[role="alert"]')
+        textos = [
+            el.inner_text().strip()
+            for el in els
+            if el.is_visible() and el.inner_text().strip()
+        ]
+        return " | ".join(textos)
     except Exception:
         return ""
 
@@ -153,8 +179,8 @@ def _garantir_dados_e2e(admin_id: int) -> None:
     import datetime as _dt
     from app import db
     from models import (
-        Fornecedor, AlmoxarifadoCategoria, AlmoxarifadoItem, Funcionario,
-        PlanoContas, ParametrosLegais,
+        Cliente, Fornecedor, AlmoxarifadoCategoria, AlmoxarifadoItem,
+        Funcionario, PlanoContas, ParametrosLegais,
     )
 
     # -1) Parâmetros legais (tabela INSS/IRRF/FGTS) — sem eles a folha mensal
@@ -212,6 +238,19 @@ def _garantir_dados_e2e(admin_id: int) -> None:
             tipo_fornecedor="MATERIAL", ativo=True,
         ))
 
+    # 1b) Cliente do tenant — A22/B3.3: o formulário de nova proposta deixou de
+    #     aceitar nome digitado (commit 1394d907, 05/08) e passou a ser um
+    #     <select> de Cliente JÁ CADASTRADO, que é o ponto do A22: digitar nome
+    #     livre duplicava Cliente a cada proposta, com a obra amarrada no
+    #     duplicado. `_criar_proposta` precisa de um cadastro para selecionar.
+    #     Mesma solução da jornada E2E (test_e2e_jornada_...:91).
+    if Cliente.query.filter_by(
+            admin_id=admin_id, nome="__E2E Cliente").first() is None:
+        db.session.add(Cliente(
+            admin_id=admin_id, nome="__E2E Cliente",
+            email="cliente.e2e@example.com",
+        ))
+
     # 2) AlmoxarifadoItem CONSUMIVEL (+ categoria, FK obrigatória)
     if AlmoxarifadoItem.query.filter_by(
             admin_id=admin_id, tipo_controle="CONSUMIVEL").first() is None:
@@ -265,7 +304,15 @@ def _garantir_dados_e2e(admin_id: int) -> None:
 # Fixture de sessão — login único, compartilhado em todos os testes
 # ─────────────────────────────────────────────────────────────────────────────
 
-@pytest.fixture(scope="session")
+# ⚠️ scope="module", NÃO "session". Fixture de sessão só é desmontada no fim da
+# sessão inteira do pytest, e esta segura um `with sync_playwright()` aberto —
+# o event loop do Playwright ficaria RODANDO enquanto todos os outros arquivos
+# de teste rodam, derrubando todo `sync_playwright()` seguinte com "Playwright
+# Sync API inside the asyncio loop". Medido em 02/09 na primeira rodada
+# completa da suíte: 80 baixas de uma vez, e a jornada E2E errando 100% das
+# vezes por isso. Com "module" o browser segue compartilhado dentro deste
+# arquivo e o loop é liberado ao fim dele. Guarda: tests/test_contrato_isolamento_playwright.py
+@pytest.fixture(scope="module")
 def browser_session():
     """Abre Chromium, faz login uma vez e compartilha a página em toda a sessão."""
     with sync_playwright() as pw:
@@ -644,7 +691,9 @@ class TestBloco7Demais:
         _check_page(browser_session, "/metricas/ranking")
 
     def test_relatorios_veiculos(self, browser_session):
-        _check_page(browser_session, "/veiculos/relatorios")
+        # D3 leva 2 (01/09): /veiculos/relatorios saiu com views/vehicles.py;
+        # a capacidade viva equivalente é o dashboard da frota.
+        _check_page(browser_session, "/frota/dashboard")
 
     def test_usuarios(self, browser_session):
         _check_page(browser_session, "/usuarios")
@@ -694,8 +743,21 @@ class TestIntegracaoPropostaObra:
         Retorna o ID da proposta criada.
         """
         ts = datetime.datetime.now().strftime("%H%M%S%f")
-        cliente = f"Cliente E2E {ts}"
         assunto = f"Proposta E2E {ts}"
+
+        # A22/B3.3 — o cliente vem do CADASTRO, não de nome digitado. O
+        # <select name="cliente_id"> é `required` (nova_proposta.html:84-85):
+        # sem ele o formulário nem submete. O cadastro é provisionado de forma
+        # idempotente por _garantir_dados_e2e (bloco 1b), chamado pela fixture.
+        from app import app as _app_cliente
+        from models import Cliente as _Cliente
+        admin_id = _get_admin_id()   # já abre e fecha o próprio app_context
+        with _app_cliente.app_context():
+            _c = _Cliente.query.filter_by(
+                admin_id=admin_id, nome="__E2E Cliente").first()
+            assert _c is not None, \
+                "__E2E Cliente não provisionado — _garantir_dados_e2e não rodou"
+            cliente_id = _c.id
 
         # Navegar ao formulário de nova proposta
         page.goto(f"{BASE_URL}/propostas/nova", timeout=TIMEOUT_MS,
@@ -705,7 +767,7 @@ class TestIntegracaoPropostaObra:
         # Preencher campos principais (todos presentes no HTML estático).
         # NOTA: numero_proposta também tem required — deve ser preenchido.
         page.fill('input[name="numero_proposta"]', f"E2E-{ts}")
-        page.fill('input[name="cliente_nome"]', cliente)
+        page.select_option('[data-testid=proposta-cliente-id]', value=str(cliente_id))
         page.fill('input[name="assunto"]', assunto)
         page.fill('textarea[name="objeto"]', "Objeto do contrato de teste automatizado")
 
@@ -720,11 +782,11 @@ class TestIntegracaoPropostaObra:
         # dispara eventos confiáveis (trusted) que o Chrome aceita para form submit.
         # O formulário real é #formNovaProposta em nova_proposta.html (não nova.html).
         page.evaluate(
-            "document.querySelector('#formNovaProposta button[type=\"submit\"]')"
+            "document.querySelector('[data-testid=\"proposta-salvar\"]')"
             ".scrollIntoView({block:'center', behavior:'instant'})"
         )
         page.wait_for_timeout(400)
-        page.locator('#formNovaProposta button[type="submit"]').click(timeout=TIMEOUT_MS)
+        page.locator('[data-testid=proposta-salvar]').click(timeout=TIMEOUT_MS)
         page.wait_for_load_state("domcontentloaded", timeout=TIMEOUT_MS)
 
         assert "/login" not in page.url, "Sessão expirou após submit da proposta"
@@ -1071,19 +1133,40 @@ class TestIntegracaoAlmoxGestaoCusto:
         if not item_id:
             pytest.skip("Nenhum AlmoxarifadoItem CONSUMIVEL encontrado nos dados demo")
 
+        # A09 — a NF é chave de dedup (admin_id, nota_fiscal, item_id) desde
+        # bbe74f00 (04/08), e o guard é CORRETO: F5 numa tela de entrada é
+        # rotina e duplicava estoque em silêncio. Com NF fixa este teste passa
+        # UMA vez contra um banco persistente e é recusado para sempre depois —
+        # foi o que aconteceu (movimentos 9415/9416, gravados em 01/09 19:37).
+        # A NF nasce única por rodada, mesmo padrão do ts de _criar_proposta.
+        nf = f"NF-E2E-001-{datetime.datetime.now():%H%M%S%f}"
+
         # Preencher e submeter via browser; rota redireciona para /almoxarifado/entrada
         # com flash 'Entrada processada com sucesso! ... cadastrados.'
         flash_text = self._preencher_entrada_almoxarifado(
             browser_session, item_id, forn_id,
             quantidade="5", valor_unitario="50.00",
-            nota_fiscal="NF-E2E-001", observacoes="Teste E2E automático",
+            nota_fiscal=nf, observacoes="Teste E2E automático",
+        )
+
+        # O guard A09 recusa com uma frase que contém a palavra "entrada"
+        # ("já deu entrada deste item") — por isso o OR de sucesso não pode
+        # incluir "entrada" isolado: um teste que aceitasse essa palavra
+        # passaria também quando a submissão fosse RECUSADA, não apenas
+        # quando fosse aceita. Falha alto e cedo, ANTES do assert de sucesso,
+        # se a assinatura da recusa aparecer.
+        assert "já deu entrada" not in flash_text.lower(), (
+            f"A submissão foi RECUSADA pelo guard A09 (nota fiscal duplicada), "
+            f"não processada. Flash capturado: '{flash_text}'. "
+            f"A NF usada neste teste precisa ser única por rodada — "
+            f"veja a variável 'nf' logo acima, que já nasce com timestamp "
+            f"justamente para evitar colisão com uma NF anterior no banco."
         )
 
         # Verificar flash de sucesso visível na página de redirect
         assert (
             "processada" in flash_text.lower()
             or "sucesso" in flash_text.lower()
-            or "entrada" in flash_text.lower()
         ), (
             f"Flash de sucesso não encontrado após entrada de material. "
             f"Flash capturado: '{flash_text}'. "
@@ -1101,11 +1184,11 @@ class TestIntegracaoAlmoxGestaoCusto:
                 item_id=item_id,
                 tipo_movimento="ENTRADA",
                 admin_id=admin_id,
-                nota_fiscal="NF-E2E-001",
+                nota_fiscal=nf,
             ).first()
 
         assert movimento is not None, \
-            "AlmoxarifadoMovimento com nota_fiscal='NF-E2E-001' não encontrado no banco"
+            f"AlmoxarifadoMovimento com nota_fiscal={nf!r} não encontrado no banco"
         assert estoque_count > 0, \
             f"AlmoxarifadoEstoque não criado para item_id={item_id}"
 
@@ -1119,6 +1202,9 @@ class TestIntegracaoAlmoxGestaoCusto:
             pytest.skip("Nenhum AlmoxarifadoItem CONSUMIVEL encontrado")
         if not forn_id:
             pytest.skip("Nenhum Fornecedor encontrado nos dados demo")
+
+        # A09 — ver a nota em test_entrada_material_flash_sucesso.
+        nf = f"NF-E2E-GCP-{datetime.datetime.now():%H%M%S%f}"
 
         from app import app as flask_app
         from models import (
@@ -1135,7 +1221,7 @@ class TestIntegracaoAlmoxGestaoCusto:
         self._preencher_entrada_almoxarifado(
             browser_session, item_id, forn_id,
             quantidade="3", valor_unitario="75.00",
-            nota_fiscal="NF-E2E-GCP", observacoes="Teste integração GestaoCusto",
+            nota_fiscal=nf, observacoes="Teste integração GestaoCusto",
         )
 
         # Verificar no banco que o GestaoCusto MATERIAL foi gerado
@@ -1145,12 +1231,12 @@ class TestIntegracaoAlmoxGestaoCusto:
             ).count()
             movimento = AlmoxarifadoMovimento.query.filter_by(
                 admin_id=admin_id,
-                nota_fiscal="NF-E2E-GCP",
+                nota_fiscal=nf,
                 tipo_movimento="ENTRADA",
             ).first()
 
         assert movimento is not None, \
-            "Movimento NF-E2E-GCP não encontrado no banco"
+            f"Movimento {nf!r} não encontrado no banco"
 
         assert gcp_depois > gcp_antes, (
             f"GestaoCustoPai tipo_categoria='MATERIAL' não foi criado pelo EventManager "

@@ -32,7 +32,7 @@ reembolso_bp = Blueprint('reembolso', __name__, url_prefix='/reembolsos')
 def _guard():
     if not is_v2_active():
         flash('Este módulo está disponível apenas no plano V2.', 'warning')
-        return redirect(url_for('main_bp.dashboard'))
+        return redirect(url_for('main.dashboard'))
     return None
 
 

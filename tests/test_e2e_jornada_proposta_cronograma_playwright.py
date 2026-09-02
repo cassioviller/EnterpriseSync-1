@@ -114,10 +114,13 @@ def _garantir_cliente(nome):
 def _nova_proposta_via_ui(pg, numero, cliente):
     """Cria uma proposta via UI usando o template e o serviço já criados na
     jornada (CTX.template_id / CTX.servico_id). Retorna (proposta_id, token)."""
+    # ⚠️ Mesma armadilha do test_05: o `<select>` de cliente é renderizado no
+    # servidor, então o cliente tem de existir ANTES do GET. Criá-lo dentro do
+    # select_option (depois do goto) garante que a opção não está na página.
+    cliente_id = _garantir_cliente(cliente)
     pg.goto(f"{BASE_URL}/propostas/nova")
     pg.wait_for_load_state("networkidle")
-    pg.select_option("[data-testid=proposta-cliente-id]",
-                     value=str(_garantir_cliente(cliente)))
+    pg.select_option("[data-testid=proposta-cliente-id]", value=str(cliente_id))
     pg.fill("[data-testid=proposta-numero]", numero)
     pg.fill("[data-testid=proposta-assunto]", f"Obra {numero}")
     pg.select_option("[data-testid=proposta-template]", value=str(CTX.template_id))
@@ -306,9 +309,17 @@ class TestJornadaPropostaCronograma:
         assert CTX.template_id, "template de proposta não foi persistido"
 
     def test_05_criar_proposta(self, page: Page):
+        # ⚠️ O cliente tem de existir ANTES do GET. O `<select>` de cliente é
+        # renderizado no servidor: cliente criado depois do goto não está entre
+        # as opções, e o select_option estoura com "did not find some options"
+        # depois de 30 s de timeout. Como SUF é único por corrida
+        # (time.strftime, linha 47), o cliente é SEMPRE novo — então este teste
+        # nunca passou desde que o A22 trocou o input livre pelo select
+        # (1394d907, 05/08). Medido em 02/09: 13 failed / 6 passed rodando a
+        # jornada sozinha, com a cascata inteira pendurada nesta linha.
+        CTX.cliente_id = _garantir_cliente(CTX.cliente_nome)
         page.goto(f"{BASE_URL}/propostas/nova")
         page.wait_for_load_state("networkidle")
-        CTX.cliente_id = _garantir_cliente(CTX.cliente_nome)
         page.select_option("[data-testid=proposta-cliente-id]",
                            value=str(CTX.cliente_id))
         page.fill("[data-testid=proposta-cliente-email]", "cliente.e2e@example.com")

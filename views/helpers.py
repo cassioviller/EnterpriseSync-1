@@ -374,33 +374,32 @@ def _calcular_serie_temporal_custos(admin_id, data_inicio, data_fim, obras_ids=N
 
 
 def get_admin_id_robusta(obra=None, current_user=None):
-    """Sistema robusto de detecção de admin_id - PRIORIDADE TOTAL AO USUÁRIO LOGADO"""
+    """Tenant do usuário autenticado (DELEGA ao canônico); sem usuário,
+    fallback pela obra — contexto sem request (jobs, importador).
+
+    Convergido em 01/09 (Task 11): o ramo "USUÁRIO GENÉRICO LOGADO"
+    devolvia current_user.id — um TENANT FANTASMA para usuário sem
+    admin_id, onde o canônico falha fechado. Medido pelo censo de
+    tests/test_isolamento_tenant_bloco1.py. O parâmetro current_user é
+    honrado só para o teste de autenticação (compatibilidade de
+    assinatura); autenticado, quem resolve é o canônico.
+    """
     try:
         if current_user is None:
             from flask_login import current_user as flask_current_user
             current_user = flask_current_user
-        
-        if current_user and current_user.is_authenticated:
-            from models import TipoUsuario
-            if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
-                logger.debug(f"[LOCK] ADMIN LOGADO: admin_id={current_user.id}")
-                return current_user.id
-            
-            elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-                logger.debug(f"[LOCK] FUNCIONÁRIO LOGADO: admin_id={current_user.admin_id}")
-                return current_user.admin_id
-            
-            elif hasattr(current_user, 'id') and current_user.id:
-                logger.debug(f"[LOCK] USUÁRIO GENÉRICO LOGADO: admin_id={current_user.id}")
-                return current_user.id
-        
+
+        if current_user and getattr(current_user, 'is_authenticated', False):
+            from utils.tenant import get_tenant_admin_id
+            return get_tenant_admin_id()
+
         if obra and hasattr(obra, 'admin_id') and obra.admin_id:
             logger.debug(f"[TARGET] Admin_ID da obra: {obra.admin_id}")
             return obra.admin_id
-        
+
         logger.error("[ERROR] ERRO CRÍTICO: Nenhum usuário autenticado encontrado!")
         return None
-        
+
     except Exception as e:
         # Fase 0.5 / 3.5 — devolvia `1` (um tenant CONCRETO) em qualquer
         # exceção. Erro ao resolver tenant não pode virar acesso à empresa 1.

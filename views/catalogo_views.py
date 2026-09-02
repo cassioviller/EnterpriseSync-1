@@ -37,13 +37,16 @@ catalogo_bp = Blueprint('catalogo', __name__, url_prefix='/catalogo')
 
 
 def _admin_id():
-    """Resolve admin_id do request (fallback robusto)."""
-    try:
-        if current_user and current_user.is_authenticated:
-            return getattr(current_user, 'admin_id', None) or current_user.id
-    except Exception:
-        pass
-    abort(401)
+    """Tenant do usuário, ou abort. DELEGA para require_tenant().
+
+    Convergido em 01/09 (Task 11): o "fallback robusto" devolvia
+    current_user.id — um TENANT FANTASMA para usuário sem admin_id.
+    require_tenant mantém o abort(401) para anônimo e falha FECHADO com
+    403 para o órfão, em vez de inventar tenant. Medido pelo censo de
+    tests/test_isolamento_tenant_bloco1.py.
+    """
+    from utils.tenant import require_tenant
+    return require_tenant()
 
 
 def _to_decimal(value, default='0'):

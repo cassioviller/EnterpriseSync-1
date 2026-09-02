@@ -23,17 +23,20 @@ from auth import admin_required
 
 
 def get_admin_id():
-    """Onda 2 — mesmo defeito de tenant que `contabilidade_views.py` já
-    corrigiu: `current_user.id` só é o admin_id certo para quem É admin.
-    Papel não-admin com `admin_id` próprio processava/estornava a folha do
-    admin errado. Task 8 traz a correção canônica para cá também."""
-    if not current_user.is_authenticated:
-        return None
-    if current_user.tipo_usuario == TipoUsuario.ADMIN:
-        return current_user.id
-    elif hasattr(current_user, 'admin_id'):
-        return current_user.admin_id
-    return None
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Onda 2 — `current_user.id` só é o admin_id certo para quem É admin; papel
+    não-admin com `admin_id` próprio processava/estornava a folha do admin
+    errado.
+
+    Onda 6 / Task 5 — a cópia local que a Onda 2 deixou aqui ainda discordava
+    do canônico num papel: comparava `== TipoUsuario.ADMIN` e esquecia
+    SUPER_ADMIN (`utils/tenant.py:29`), que recebia `None` e ficava trancado
+    para fora da folha. Delegar fecha a família inteira em vez de mais um
+    papel. Medido pelo censo em `tests/test_isolamento_tenant_bloco1.py`.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 # ================================
 # DASHBOARD PRINCIPAL
@@ -285,7 +288,27 @@ def processar_folha_mes(ano, mes):
                     logger.warning(f"[WARN] GestaoCusto folha não registrado para {funcionario.nome}: {_ge}")
             else:
                 erros += 1
-        
+
+        # A24 — com a flag ligada, o mesmo processamento também grava a
+        # folha rateada por obra (encargos incluídos) em FolhaProcessada.
+        # As obras do mês são as com ponto no período — a mesma fonte de
+        # _horas_por_obra_no_mes (services/folha_service.py). Flag OFF
+        # (default) = comportamento de hoje, byte-idêntico.
+        from utils.tenant import folha_rateio_encargos_on
+        if folha_rateio_encargos_on(admin_id):
+            from sqlalchemy import extract
+            from models import RegistroPonto
+            from services.folha_service import processar_e_salvar_folha_obra
+            obras_do_mes = [r[0] for r in db.session.query(
+                RegistroPonto.obra_id).filter(
+                    RegistroPonto.obra_id.isnot(None),
+                    RegistroPonto.admin_id == admin_id,
+                    extract('year', RegistroPonto.data) == ano,
+                    extract('month', RegistroPonto.data) == mes,
+                ).distinct()]
+            for _obra_id in obras_do_mes:
+                processar_e_salvar_folha_obra(_obra_id, ano, mes, admin_id)
+
         # Commit final
         db.session.commit()
 

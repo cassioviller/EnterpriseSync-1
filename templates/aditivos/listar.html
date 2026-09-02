@@ -47,7 +47,13 @@
             {% for v in versoes %}
               <tr class="{% if v.vigente_ate is none %}table-primary{% endif %}">
                 <td><span class="badge bg-dark">v{{ v.versao }}</span></td>
-                <td>{{ {'proposta': 'Proposta', 'aditivo': 'Aditivo', 'manual': 'Ajuste manual'}.get(v.origem_tipo, v.origem_tipo) }}</td>
+                {# Vocabulário REAL de ORIGEM_TIPO (services/contrato_obra.py:95-105) — o mapa antigo usava 'proposta'/'manual' e só 'aditivo' casava #}
+                <td>{{ {'proposta_aprovada': 'Proposta',
+                        'aditivo': 'Aditivo',
+                        'cadastro_manual': 'Ajuste manual',
+                        'edicao_manual': 'Edição manual',
+                        'importacao_fisico_financeiro': 'Importação',
+                        'contrato_original': 'Contrato original'}.get(v.origem_tipo, v.origem_tipo) }}</td>
                 <td class="text-end">R$ {{ '%.2f'|format(v.valor)|replace('.', ',') }}</td>
                 <td class="small">
                   {{ v.vigente_de.strftime('%d/%m/%Y') }} —

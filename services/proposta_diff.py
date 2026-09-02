@@ -21,13 +21,32 @@ lados têm `origem_id` NULL e cada item seria raiz de si mesmo.
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 logger = logging.getLogger(__name__)
+
+CENTAVO = Decimal('0.01')
 
 
 def _dec(v) -> Decimal:
     return Decimal(str(v or 0))
+
+
+def _em_centavos(v) -> Decimal:
+    """Dinheiro se compara em centavos.
+
+    `subtotal_calculado` devolve `Numeric(15,2)` quando há snapshot
+    persistido e o produto `quantidade × preco_unitario` (até 5 casas,
+    `Numeric(10,3) × Numeric(10,2)`) quando não há. Sem normalizar, o caso
+    misto — item sem snapshot ao lado de item com snapshot — fazia linha
+    INTOCADA dar diferença de arredondamento (ex.: 0.00315) e sair como
+    'alterado'. `subtotal_calculado` nunca tem mais de 2 casas com
+    significado monetário real neste sistema: o snapshot persistido já é
+    `Numeric(15,2)`, e o próprio total é sempre exibido e conferido em
+    centavos — então uma diferença abaixo de um centavo não é "real" em
+    nenhum contexto que este diff alimenta.
+    """
+    return _dec(v).quantize(CENTAVO, rounding=ROUND_HALF_UP)
 
 
 def _chaves(item) -> list:
@@ -85,8 +104,33 @@ def diff_versoes(origem, destino) -> list[dict]:
             continue
         usados.add(anterior.id)
         dq = _dec(it.quantidade) - _dec(anterior.quantidade)
-        dv = _dec(it.subtotal) - _dec(anterior.subtotal)
-        mudou = (dq != 0 or dv != 0
+        # `subtotal_calculado`, nunca `subtotal` cru: o snapshot é NULL para
+        # todo item fora do caminho de explosão da Task #89, e NULL − NULL = 0
+        # fazia revisão que muda só o preço sair como "mantido" com impacto
+        # R$ 0,00.
+        #
+        # Duas responsabilidades, dois números — de propósito:
+        #
+        # `dv_centavos` decide SÓ a classificação (mantido vs alterado), em
+        # centavos: `subtotal_calculado` mistura snapshot de 2 casas com
+        # produto cru de até 5, e uma linha intocada cujo lado sem snapshot
+        # cai no fallback dava diferença de arredondamento — não zero — e
+        # saía como "alterado".
+        #
+        # `dv` (bruto, sem arredondar) é o que entra em `delta_valor` e,
+        # dali, no somatório de `total_do_diff`. Arredondar CADA linha antes
+        # de somar esconderia um efeito sistêmico: um reajuste de preço
+        # espalhado por muitos itens, cada delta abaixo do centavo, somaria
+        # zero linha a linha mesmo que o impacto real, agregado, seja
+        # material — `total_do_diff` arredonda uma vez só, no fim.
+        # `delta_quantidade` (`dq`, acima) já era bruto e continua: uma
+        # edição real de quantidade, por menor que seja, tem que continuar
+        # acusando "alterado" mesmo que o impacto em reais fique abaixo do
+        # centavo.
+        dv = _dec(it.subtotal_calculado) - _dec(anterior.subtotal_calculado)
+        dv_centavos = _em_centavos(it.subtotal_calculado) - _em_centavos(
+            anterior.subtotal_calculado)
+        mudou = (dq != 0 or dv_centavos != 0
                  or (it.descricao or '') != (anterior.descricao or '')
                  or (it.unidade or '') != (anterior.unidade or ''))
         linhas.append({'situacao': 'alterado' if mudou else 'mantido',
@@ -108,13 +152,21 @@ def total_do_diff(linhas) -> Decimal:
     menos o dos suprimidos. É o número que o extrato de contrato mostra como
     "impacto do aditivo" — e ele tem de bater com a diferença dos totais das
     duas versões, senão o diff perdeu ou duplicou linha.
+
+    A soma acumula em precisão BRUTA (o mesmo `subtotal_calculado`, sem
+    arredondar por linha) e só arredonda para centavos no final. Rodar
+    `_em_centavos` por parcela — inclusive nos ramos `incluido`/`suprimido`,
+    que somam `subtotal_calculado` direto — misturaria termos de 2 casas com
+    termos de até 5 na mesma soma, e arredondar cada termo individualmente
+    apagaria um efeito sistêmico real (muitos deltas abaixo do centavo que,
+    somados, são materiais).
     """
     total = Decimal('0')
     for l in linhas:
         if l['delta_valor'] is not None:
             total += l['delta_valor']
         elif l['situacao'] == 'incluido':
-            total += _dec(l['destino'].subtotal)
+            total += _dec(l['destino'].subtotal_calculado)
         elif l['situacao'] == 'suprimido':
-            total -= _dec(l['origem'].subtotal)
-    return total
+            total -= _dec(l['origem'].subtotal_calculado)
+    return _em_centavos(total)

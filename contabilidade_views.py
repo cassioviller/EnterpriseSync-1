@@ -22,18 +22,16 @@ from contabilidade_utils import (
 contabilidade_bp = Blueprint('contabilidade', __name__)
 
 def get_admin_id():
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Onda 6 / Task 5 — a cópia local aqui era igual ao canônico em quatro dos
+    cinco papéis e discordava no quinto: comparava `== TipoUsuario.ADMIN` e
+    esquecia SUPER_ADMIN, que `utils/tenant.py:29` trata junto. O SUPER_ADMIN
+    recebia `None` e ficava trancado para fora da contabilidade sem mensagem.
+    Medido pelo censo em `tests/test_isolamento_tenant_bloco1.py`.
     """
-    Retorna admin_id correto independente do tipo de usuário
-    """
-    if not current_user.is_authenticated:
-        return None
-    
-    if current_user.tipo_usuario == TipoUsuario.ADMIN:
-        return current_user.id
-    elif hasattr(current_user, 'admin_id'):
-        return current_user.admin_id
-    
-    return None
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 # Fase 1 — usa a definição canônica. Havia uma cópia local idêntica aqui,
 # uma em folha_pagamento_views.py e um shim em decorators.py.

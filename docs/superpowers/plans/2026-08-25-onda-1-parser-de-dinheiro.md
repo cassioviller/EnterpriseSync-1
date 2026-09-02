@@ -1,6 +1,31 @@
 # Onda 1 — O Dinheiro Entra Certo: Um Parser Só Implementation Plan
 
-> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — pronto para executar** — 6 tasks. 🔬 O código do próprio plano foi extraído e executado antes da entrega: **32 passed**. A Task 2 **destrava o push dos 25 commits**.
+> **Estado em 2026-08-28:** ✅ **EXECUTADA** — 6/6 tasks entregues. O cabeçalho
+> dizia "ABERTO — pronto para executar" até hoje, com **0 de 36 checkboxes**
+> marcados, enquanto o código estava todo no lugar há dias. Corrigido na
+> conferência de 28/08.
+>
+> 🔬 **Como foi conferido** (doc contra código, não contra memória):
+>
+> | Alvo do plano | Estado |
+> |---|---|
+> | `utils/decimal_br.py` (criar) | ✅ existe, 121 linhas |
+> | `tests/test_decimal_br.py` (criar) | ✅ existe — **43 passed** no gate de 28/08 |
+> | `tests/test_onda1_dinheiro_entra_certo.py` (criar) | ✅ existe — **24 passed** no mesmo gate |
+> | Task 2 — `views/aditivos_views.py` | ✅ `parse_decimal_br` + `ValorAmbiguo` (commit `169ddd68`) |
+> | Task 3 — `compras_views.py` | ✅ importa e trata as duas exceções |
+> | Task 4 — `services/faixa_alcada_admin.py` | ✅ `_para_teto` delega |
+> | Task 5 — `financeiro_views.py` + `financeiro_service.py` | ✅ ambos, com `minimo=Decimal('0.01')` |
+> | Task 6 — `views/orcamentos_views.py` | ✅ delega, com docstring citando a Onda 1 |
+>
+> ⚠️ **Os checkboxes seguem desmarcados de propósito.** A conferência de 28/08
+> olhou os RESULTADOS (arquivo existe, chamador delega, teste verde), não o
+> caminho — não há como afirmar em retrospecto que cada RED foi conferido antes
+> de cada correção. Marcar os 36 seria inventar procedimento. O que está
+> provado é o estado final, e é isso que a tabela acima diz.
+>
+> 🔴 **A Task 2 destravava o push, e já destravou.** `169ddd68` está na `main`.
+> A D1 do plano-mestre está **vencida** — ver lá.
 >
 > Escrito na varredura de 25/08. Índice de estado de todos os planos e specs em
 > `docs/planos-em-aberto-2026-08-25.md`.

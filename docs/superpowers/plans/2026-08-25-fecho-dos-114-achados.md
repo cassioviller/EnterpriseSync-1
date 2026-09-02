@@ -17,11 +17,11 @@
 >
 > | Onda | Plano de execução | Tasks | Estado |
 > |---|---|---|---|
-> | 1 — o dinheiro entra errado (5 achados) | `2026-08-25-onda-1-parser-de-dinheiro.md` | 6 | ✅ escrito. 🔬 O código do plano foi **extraído e executado**: 32 passed |
+> | 1 — o dinheiro entra errado (5 achados) | `2026-08-25-onda-1-parser-de-dinheiro.md` | 6 | ✅ **EXECUTADA** — 6/6 tasks. Conferido doc-contra-código em 28/08: os 5 chamadores delegam ao parser único, 67 testes verdes no gate. A linha anterior dizia só "escrito" |
 > | 2 — o tenant vaza (14) | `2026-08-25-onda-2-o-tenant-para-de-vazar.md` | 8 | ✅ **FECHADA 26/08** — 8/8 tasks, 7 fix rounds, gate verde. 15 achados marcados |
 > | 3 — o valor duplica ou some (16) | `2026-08-25-onda-3-o-valor-para-de-duplicar.md` | 10 | ✅ **FECHADA 27/08** — 10/10 tasks + D2/3.6, gate 2798/6/201/2, 16 achados marcados |
 > | 4 — o relatório que nunca funcionou (11) | `2026-08-25-onda-4-o-relatorio-passa-a-funcionar.md` | 7 | ✅ escrito. Duas tasks bloqueadas por D3/D4 |
-> | 5 — grava o que foi recusado (10) | `2026-08-25-onda-5-o-recusado-para-de-ser-gravado.md` | 8 | ✅ escrito |
+> | 5 — grava o que foi recusado (10) | `2026-08-25-onda-5-o-recusado-para-de-ser-gravado.md` | 8 | ✅ **FECHADA 28/08** — 8/8 tasks + 1 fecho-fix + 1 correção de gate, 13 commits, gate 2839/6/201/2 (a 1ª rodada reprovou: 6 failed de guarda própria). 10 achados marcados. 🔴 **Reaberta e re-fechada no mesmo dia**: o `/code-review max` achou 3 defeitos que o gate verde não via, 2 deles introduzidos pela correção de fecho — ver "O fix round de 28/08" no plano da onda. Gate final **2840/10/201/2** |
 > | 6 — os testes prometidos | `2026-08-25-onda-6-os-testes-prometidos.md` | 6 | ✅ escrito. Derrubou **dois** resíduos que eram falso alarme |
 >
 > 🔬 **Profundidade, medida — não é uniforme, e é de propósito.** Das **45 tasks**,
@@ -52,12 +52,26 @@
 
 ## 🔴 Bloqueios e decisões antes de começar
 
-### D1 — o push dos 25 commits está bloqueado por um defeito de dinheiro
+### ✅ D1 — VENCIDA em 25/08, registrado só em 28/08
 
-🔬 `main` está **25 commits à frente do `origin`**, e a Fase 6 inteira está só nesta
-máquina. Mas 📖 `views/aditivos_views.py:102` infla contrato em **100×** e lança a
-diferença no razão. **Empurrar antes de corrigir é publicar o defeito.** A Task 1.1
-existe para destravar exatamente isto, e é a primeira coisa a fazer.
+> ⚠️ **Este bloqueio não existe mais, e ficou três dias no documento como se
+> existisse.** Quem lesse o plano-mestre nesse intervalo concluiria que a `main`
+> não podia subir. Podia.
+
+🔬 O texto original: `main` está **25 commits à frente do `origin`**, e a Fase 6
+inteira está só nesta máquina; mas 📖 `views/aditivos_views.py:102` infla contrato
+em **100×** e lança a diferença no razão, então **empurrar antes de corrigir é
+publicar o defeito**.
+
+**O que aconteceu:** a Task 2 da Onda 1 (o plano dizia "1.1") corrigiu o defeito em
+`169ddd68 fix(aditivo): o contrato para de ser inflado em 100x`, de 25/08, **já na
+`main`**. 🔬 Conferido em 28/08: `views/aditivos_views.py` importa
+`parse_decimal_br` e trata `ValorAmbiguo`, e `tests/test_onda1_dinheiro_entra_certo.py`
+passa verde no gate.
+
+O push segue **destravado por este motivo**. Se a `main` ainda não subiu — e em
+28/08 estava 35 commits à frente do `origin` — é decisão de quando empurrar, não
+bloqueio técnico desta D1.
 
 ### 🔴 D2 (DECISÃO SUA) — o teste que afirma o defeito como intencional
 
@@ -473,6 +487,54 @@ manutenção. A Task 4.5 assume apagar; diga se prefere o contrário.
 ---
 
 ## Onda 5 — o estado que grava o que foi recusado (10 achados)
+
+> **✅ FECHADA em 28/08.** Branch `sdd/onda-5-o-recusado-para-de-ser-gravado`, 8/8
+> tasks + 1 fecho-fix, 12 commits, executada solo, task a task, via
+> superpowers:executing-plans, TDD com o RED citado em todos. Os 10 achados estão
+> marcados inline em `docs/auditoria/achados-code-review-2026-08-25.md` com o
+> commit que fechou cada um. Teste desta onda:
+> `tests/test_onda5_recusado_nao_grava.py` (38 testes). Gate:
+> **2839 passed, 6 skipped, 201 deselected, 2 xfailed**.
+>
+> 🔴 **A 1ª rodada do gate reprovou a própria onda — 6 failed —, e o achado é
+> bom.** Causa-raiz única: a guarda de obra+data que a Task 6 pôs em
+> `salvar_rdo_flexivel` bania um estado **legal** do domínio (dois RDOs na mesma
+> obra e mesmo dia, cuja diária `custo_funcionario_dia.py` rateia — caso que a
+> **Onda 3 / Task 9 desta mesma auditoria aprofundou**), e recusava com `302` +
+> `flash`: sucesso aos olhos de quem confere status. Matou o toggle reverso de
+> terceiros em silêncio — a classe de defeito que esta onda existia para matar.
+> O achado `views/rdo.py:4002` tinha duas metades e a corrigida foi a errada;
+> `ed85d117` removeu a guarda e corrigiu a real (`rdo_id` passa a editar em vez
+> de criar). Detalhe no plano da onda, seção "A guarda da Task 6 que o gate
+> derrubou".
+>
+> ⚠️ **Três achados novos, descobertos durante a própria execução da Onda 5 — não
+> estavam na varredura de 25/08 e não têm task de correção própria ainda.**
+> Registrados em "Achados novos da execução da Onda 5 (28/08)", no fim de
+> `docs/auditoria/achados-code-review-2026-08-25.md`: (a) `/api/registrar-facial`
+> não faz geofencing nenhum — a rota irmã valida, esta nem chama o validador; (b)
+> o defeito descrito para `services/contrato_obra.py:407` (versão encerrada em
+> memória volta como vigente) **não reproduziu** no cenário direto — pino de
+> regressão guardando, não corrigido; (c) `crud_rdo_completo.salvar_rdo` segue
+> **sem rota** (reservada ao Módulo 07), agora consertada em vez de quebrada.
+>
+> ⚠️ **Fecho-fix fora do escopo original dos 10 achados.** O grep de fecho
+> (constraint global de `format_exc`) achou a MESMA classe de vazamento da Task 1
+> viva em **todo `500` do app inteiro**: `error_handlers.py` (handler global) e
+> `production_routes.py` mandavam traceback para `error.html`, não só
+> `ponto_views.py`/`equipe_views.py`. Corrigido e env-gated como `main.py`, em
+> commit próprio: `356c2cf9`.
+>
+> **Duas decisões explícitas registradas nesta onda:**
+> - **Geofencing consultivo vira impositivo** (Task 1, commit `7ec18fe0`): obra
+>   cercada e sem coordenada agora **RECUSA** o ponto — a semântica que
+>   `utils_geofencing` já implementava e a rota pulava; obra sem geofence
+>   configurado segue aceitando.
+> - **O índice `uq_contrato_versao_vigente` ganha `admin_id`**, em vez de as
+>   queries o perderem (Task 8, commit `ae4e4191`, migration 315 — máximo real do
+>   repo no dia do commit era 314, dupla execução provada no banco de dev com o
+>   `INDEXDEF` conferido). É a opção mais segura das duas: mantém o escopo por
+>   tenant em toda parte, contra enfraquecer a query.
 
 - [ ] **Task 5.1 — 🔴 `ponto_views.py:611` para de vazar traceback.** `/ponto/` e
   `/equipe/alocacao-principal` renderizam `traceback.format_exc()` **no HTML**,

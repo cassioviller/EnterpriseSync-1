@@ -1,9 +1,28 @@
 # Onda 6 — Os Testes Que os Planos Prometeram Implementation Plan
 
-> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — pronto para executar** — 6 tasks. Derrubou **dois** resíduos que a medição mecânica apontara e eram falso alarme, e confirmou um real: 🔬 zero testes citam `entrada_ja_lancada`.
+> **Estado em 2026-09-02:** ✅ **FECHADA — 6/6 tasks.** A última (a jornada
+> E2E, aberta desde a Fase 0.5) foi entregue pelo plano
+> `2026-09-02-a-suite-browser-volta-a-valer.md`, que a nomeia como sua Task 6.
+>
+> | Task | Estado |
+> |---|---|
+> | 1 — a guarda do A09 | ✅ `d5bfef01` (31/08): 4 passed, com o RED do tenant confirmado |
+> | 2 — A10, conferir antes de escrever | ✅ decidido em 31/08 — **já coberto** por `tests/test_arreio_presenca_rotas.py:123`; nenhum arquivo criado, decisão registrada aqui e no `2026-08-04-plano-consolidado.md` |
+> | 3 — `test_b5_curva_baseline.py` | ❌ **não criado**, de propósito: a promessa estava revogada |
+> | 4 — os cinco `test_b6_404_*` | ✅ `889599cb` `07288f3b` `0c6590a4` `8366588c` `ef15ab70` |
+> | 5 — `test_isolamento_tenant_bloco1.py` | ✅ censo de 16 resolvedores × 5 papéis; nasceu vermelho em **4**, todas em SUPER_ADMIN |
+> | 6 — a jornada E2E | ✅ **02/09 — 19 passed, 0 failed em 50.4s**, a primeira vez que ela rodou |
+>
+> 🔬 A jornada não passou de primeira: rodando sozinha deu **13 failed / 6
+> passed** em 221s, e o defeito era dela, não da onda — `test_05_criar_proposta`
+> criava o Cliente **depois** do `page.goto("/propostas/nova")`, e o `<select>`
+> é renderizado no servidor. Corrigido em `160c7282`; o placar verde acima é do
+> chunk isolado do runner retomável
+> (`tests/reports/ledger/done/test_e2e_jornada_proposta_cronograma_playwright.json`).
 >
 > Escrito na varredura de 25/08. Índice de estado de todos os planos e specs em
-> `docs/planos-em-aberto-2026-08-25.md`.
+> `docs/planos-em-aberto-2026-08-25.md` — 🔬 desatualizado desde 31/08; quem o
+> substitui é a Task 16 de `2026-08-31-fecho-do-que-esta-aberto.md`.
 
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) ou superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -36,7 +55,8 @@ A medição mecânica listou cinco testes ausentes no `2026-08-04-plano-consolid
 | `test_a05_custo_mensalista_por_rota.py` | ❌ **Não é resíduo.** 📖 A nota da Task B1.5 (`:812`) diz que o arquivo **não será criado**, e por quê: o arreio B0.3 `tests/test_arreio_custo_rdo_rotas.py` já posta nas rotas com mensalista (🔬 11 ocorrências) e afirma sobre `GestaoCustoFilho`/`CustoObra`/`RDOCustoDiario`. Um arquivo separado seria segunda cópia da mesma prova |
 | *"nada desta Task foi feito"* (B1.5) | ❌ **A nota envelheceu.** 📖 `views/rdo.py:2175` registra a saída da chamada direta a `gerar_custos_mao_obra_rdo`. A nota é de 04/08; o trabalho veio depois |
 | `test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py` | 🔴 **Resíduo real.** 🔬 **Zero** testes citam `entrada_ja_lancada` |
-| `test_a10_ponto_manual_nao_perde_custo.py` | 🟡 **A verificar.** 🔬 `tests/test_arreio_presenca_rotas.py` menciona `novo_ponto` — pode já cobrir. **Task 2 confere antes de escrever** |
+| `tests/test_b5_curva_baseline.py` | ❌ **Não é resíduo** (conferido em 31/08, Task 3). 🔬 O arquivo era da **Task B5.5, CORTADA em 06/08 por decisão do Cássio** (`rodada-b5:681-696`): sem medição de produção, a série de baseline não foi construída. Escrever o teste de uma feature deliberadamente não construída seria escrever um teste vermelho para sempre |
+| `test_a10_ponto_manual_nao_perde_custo.py` | ❌ **Não é resíduo** (conferido em 31/08, Task 2). 🔬 `tests/test_arreio_presenca_rotas.py:123` já lança dois pontos no mesmo dia pela rota `POST /novo_ponto` e afirma as duas coisas que o arquivo faria: **um** `RegistroPonto` e custo do dia = 2× o da primeira metade (a sobrescrita). Decisão registrada no `2026-08-04-plano-consolidado.md`, no formato da nota do A05 |
 | `test_b6_404_*` | 🔴 **Cinco, não quatro:** `obras`, `frota`, `cauda`, `miscelanea` **e `propostas`** (`rodada-b6:593`) |
 
 ---
@@ -47,7 +67,7 @@ A medição mecânica listou cinco testes ausentes no `2026-08-04-plano-consolid
 |---|---|---|
 | `tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py` | **Criar** | Task 1 — a guarda que faltava, e que teria pego o furo de tenant |
 | `tests/test_arreio_presenca_rotas.py` | Modificar **ou** nada | Task 2 — só se a cobertura do A10 não estiver lá |
-| `tests/test_b5_curva_baseline.py` | **Criar** | Task 3 |
+| ~~`tests/test_b5_curva_baseline.py`~~ | ❌ **Não criar** | Task 3 — a Task-mãe (B5.5) foi cortada em 06/08 |
 | `tests/test_b6_404_{obras,frota,cauda,miscelanea,propostas}.py` | **Criar** (5) | Task 4 |
 | `tests/test_isolamento_tenant_bloco1.py` | **Criar** | Task 5 |
 | — | Rodar | Task 6 — a jornada E2E |
@@ -80,7 +100,7 @@ A medição mecânica listou cinco testes ausentes no `2026-08-04-plano-consolid
 2.7 da Onda 2**. Se a Onda 2 já entrou, ele nasce verde — e aí diga isso no
 commit, em vez de fingir que houve RED.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py`:
 
@@ -217,12 +237,12 @@ e `NotaFiscal.xml_hash`/`numero`:
 `grep -n "class AlmoxarifadoMovimento" -A 25 models.py | grep -i nota`
 `grep -n "class NotaFiscal" -A 25 models.py | grep -iE "xml_hash|numero"`
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails** — feito em 31/08 (`d5bfef01`): 4 passed, e o RED do tenant confirmado.
 
 Run: `python -m pytest tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py -v`
 Expected: os dois primeiros e o último **PASS** (a A09 realmente foi entregue nessa camada); `test_dedup_de_xml_tambem_e_por_tenant` **FAIL** se a Onda 2 ainda não entrou.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit** — feito em 31/08: `d5bfef01`.
 
 ```bash
 git add tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py
@@ -245,7 +265,7 @@ num lugar e o comete no outro."
 **Files:**
 - Modify: `tests/test_arreio_presenca_rotas.py` **ou** nada
 
-- [ ] **Step 1: Check whether the coverage already exists**
+- [x] **Step 1: Check whether the coverage already exists**
 
 ```bash
 grep -n "novo_ponto" tests/test_arreio_presenca_rotas.py
@@ -257,7 +277,7 @@ grep -rn "dois lançamentos\|mesmo dia\|reusar\|reuso" tests/test_arreio_presenc
 custo do primeiro"* (`reconferencia-backlog-2026-08-23.md:404`). A correção foi
 `views/admin.py:100-290` passar a **reusar** o `RegistroPonto` do dia.
 
-- [ ] **Step 2: Decide, and say which**
+- [x] **Step 2: Decide, and say which**
   - **Se o arreio já cobre:** não crie arquivo. Registre a decisão neste plano e
     no `2026-08-04-plano-consolidado.md`, no mesmo formato da nota do A05 — que é
     o precedente da casa.
@@ -265,26 +285,52 @@ custo do primeiro"* (`reconferencia-backlog-2026-08-23.md:404`). A correção fo
     **não** em arquivo novo. Dois POSTs no mesmo dia, e a afirmação é sobre
     `RegistroPonto` (um só) e sobre o custo (não sobrescrito).
 
-- [ ] **Step 3: Commit**
+✅ **Decidido em 31/08: JÁ COBRE — nenhum arquivo criado.**
+`test_dois_lancamentos_no_mesmo_dia_custeiam_as_horas_das_duas_metades`
+(`tests/test_arreio_presenca_rotas.py:123`) posta 08:00-12:00 e 13:00-17:00 em
+`POST /novo_ponto` e afirma `len(registros) == 1` **e** `custo_do_dia ==
+custo_da_manha * 2` — o `RegistroPonto.count() == 1` que a Task pedia, mais a
+prova de que a segunda metade não sobrescreveu a primeira. Os dois vizinhos
+(trocar a obra do dia, `:168`; corrigir o horário, `:237`) também estão lá.
+Registrado no `2026-08-04-plano-consolidado.md`, na Task A10, no formato da
+nota do A05.
+
+- [x] **Step 3: Commit**
 
 ---
 
-### Task 3: `test_b5_curva_baseline.py`
+### Task 3: `test_b5_curva_baseline.py` — ❌ **não será criado**
 
-**Files:**
-- Create: `tests/test_b5_curva_baseline.py`
+✅ **Decidido em 31/08, no Step 1: o arquivo não é resíduo.** Ler o que o plano
+prometeu (que é o que este Step manda fazer) mostrou que a promessa foi
+**revogada**: a Task B5.5, dona do arquivo, foi **CORTADA em 06/08** —
 
-- [ ] **Step 1: Read what the plan promised**
+> **Status: ⛔ CORTADA em 06/08 — decisão do Cássio** [...] "O Cássio decidiu
+> não rodar as consultas de produção; sem a medição, decide a evidência
+> disponível: 🔬⚠️ dev, **uma** obra no banco inteiro onde a série seria
+> calculável e diferente, com Δ máx **1,1 p.p. na direção contrária** à do
+> risco 6, e 🔬 o SPI/SV não é exibido a ninguém."
+> — `docs/superpowers/plans/2026-08-06-rodada-b5-varredura.md:683-688`
 
-```bash
-sed -n '680,710p' docs/superpowers/plans/2026-08-06-rodada-b5-varredura.md
-```
+A terceira série da curva **não existe no código**, por decisão. Um teste
+escrito contra ela nasceria vermelho e ficaria vermelho — não é RED de defeito,
+é RED de feature ausente, e a diferença importa: o primeiro é dívida, o segundo
+é ruído no gate.
 
-O plano nomeia o dataset e o comportamento. Escreva o teste **contra o que ele
-descreve**, não contra o que o código faz hoje — se os dois divergirem, é achado,
-e ele entra em `docs/auditoria/achados-code-review-2026-08-25.md`.
+🔬 **A medição mecânica de 25/08 contou o arquivo como dívida porque olhou a
+lista de arquivos prometidos, não o Status da Task que os prometia.** É o mesmo
+erro de método que já derrubou dois itens desta onda (o A05 e a nota da B1.5) e
+que a Task 2 acabou de derrubar no A10 — três de cinco itens da lista original
+eram falso alarme.
 
-- [ ] **Step 2-4:** RED (ou verde com justificativa), verde, commit.
+**Se o SE mudar** (uma medição de produção, ou usuário reclamando de curva que
+não mostra atraso), o recorte da B5.5 continua no plano como o COMO — e aí o
+teste nasce junto com o código, não sete meses antes dele.
+
+- [x] **Step 1: Read what the plan promised** — feito; a promessa estava revogada.
+- [x] **Step 2-4:** não se aplicam. Registrado no cabeçalho do
+      `2026-08-06-rodada-b5-varredura.md` (que dizia "resíduo nomeado" e agora
+      diz "sem resíduo") e na linha do b5 em `docs/planos-em-aberto-2026-08-25.md`.
 
 ---
 
@@ -297,7 +343,7 @@ e ele entra em `docs/auditoria/achados-code-review-2026-08-25.md`.
 > `test_b6_404_propostas.py` (`rodada-b6:593`) escapou do padrão de nome que ela
 > procurava.
 
-- [ ] **Step 1: Read the five sections of the b6 plan**
+- [x] **Step 1: Read the five sections of the b6 plan**
 
 ```bash
 sed -n '585,600p;630,645p;668,680p;703,715p;743,755p' docs/superpowers/plans/2026-08-06-rodada-b6-varredura.md
@@ -308,7 +354,7 @@ Cada seção nomeia as rotas e o comportamento esperado (404 em vez de 500, ou
 `test_b6_estorno_recebimento.py` e `test_b6_familia2_reembolso_import.py` — o
 resto ficou.
 
-- [ ] **Step 2-4:** um arquivo por família, RED, verde, **um commit por arquivo**.
+- [x] **Step 2-4:** um arquivo por família, RED, verde, **um commit por arquivo**. Os cinco entraram: `frota` (`889599cb`), `miscelanea` (`07288f3b`), `cauda` (`0c6590a4`, o único que corrigiu fonte — o oráculo de `admin.py:441`), `obras` (`8366588c`) e `propostas` (`ef15ab70`).
 
 ⚠️ 🔬 Estes testes cobrem o mesmo território que a **Onda 2** (404 em vez de 403
 para recurso de outro tenant). Se a Onda 2 já entrou, alguns nascem verdes — e
@@ -331,11 +377,11 @@ está certo. **Diga quais**, no commit.
 `test_gestao_custo_filho_tenant.py` e `test_arreio_almoxarifado_e_tenant.py` —
 **nenhum cobre `multitenant_helper.get_admin_id`**, que é a raiz.
 
-- [ ] **Step 1:** escrever o arquivo como **censo**, não como caso: para cada
+- [x] **Step 1:** escrever o arquivo como **censo**, não como caso: para cada
   papel de `TipoUsuario`, afirmar que `get_admin_id()`, `get_tenant_admin_id()` e
   `require_tenant()` concordam. É o teste que teria impedido a divergência de
   nascer.
-- [ ] **Step 2-4:** RED (se a Onda 2 não entrou), verde, commit.
+- [x] **Step 2-4:** RED, verde, commit. 🔴 A Onda 2 **não** cobria isto: o censo (16 resolvedores × 5 papéis) nasceu vermelho em **4**, todas em SUPER_ADMIN — e uma delas, `propostas_consolidated.get_admin_id`, caía num `return 10` chumbado.
 
 ⚠️ Se a Onda 2 já entrou, este arquivo nasce verde. **Escreva-o mesmo assim** —
 o valor dele é impedir o quarto resolvedor de nascer, não pegar o defeito de hoje.
@@ -344,14 +390,26 @@ o valor dele é impedir o quarto resolvedor de nascer, não pegar o defeito de h
 
 ### Task 6: A jornada E2E, que nunca rodou
 
-- [ ] **Step 1: Run it**
+- [x] **Step 1: Run it** — rodada em 02/09, destacada do terminal.
 
 Run: `bash run_tests.sh --jornada`
 
 🔬 Os 7 blocos (59 passed) e a varredura de páginas (48/48) rodaram depois que o
 Chromium voltou. **A jornada, não** — está em aberto desde a Fase 0.5.
 
-- [ ] **Step 2: Report honestly**
+- [x] **Step 2: Report honestly** — 🔬 **falhou na primeira vez: 13 failed / 6
+passed em 221s.** A falha era da própria jornada e foi diagnosticada, não
+contornada: `test_05_criar_proposta` criava o Cliente **depois** do
+`page.goto("/propostas/nova")`, e o `<select>` de cliente é renderizado no
+servidor — o Playwright batia 30s em "did not find some options" e os testes
+06–18 caíam em cascata atrás dele (a jornada é sequencial). Não é flake: este
+teste **nunca** passou desde que o A22 trocou o input livre pelo select
+(`1394d907`, 05/08). Conserto em `160c7282` (o cliente nasce antes do GET, no
+teste e no helper `_nova_proposta_via_ui`) — **só teste, nenhum código de
+produção**. Depois dele: **19 passed, 0 failed, 0 errors em 50.4s**, medido em
+chunk isolado
+(`tests/reports/ledger/done/test_e2e_jornada_proposta_cronograma_playwright.json`).
+Nenhum achado de produção saiu da jornada.
 
 Se falhar, **cada falha é achado**, e vai para
 `docs/auditoria/achados-code-review-2026-08-25.md` com `arquivo:linha`. **Não
@@ -360,18 +418,30 @@ mascarar defeito de outra onda.
 
 Se passar, registre a contagem no fecho — é a primeira vez que ela roda.
 
-- [ ] **Step 3: Commit** (só o registro; a jornada não muda código)
+- [x] **Step 3: Commit** (só o registro; a jornada não muda código) — o conserto
+saiu em `160c7282` e este registro fecha a onda.
 
 ---
 
 ## Fecho da onda
 
-- [ ] `bash run_tests.sh --gate` verde, com a contagem registrada — ela **sobe**
-      nesta onda, e é para subir. Diga em quanto.
-- [ ] `bash run_tests.sh --jornada` rodado, com resultado registrado.
-- [ ] A decisão da Task 2 (A10 já coberto ou não) registrada **aqui e no
-      `2026-08-04-plano-consolidado.md`**, no formato da nota do A05.
+- [x] `bash run_tests.sh --gate` verde, com a contagem registrada — ela **sobe**
+      nesta onda, e é para subir. Diga em quanto. **02/09: 3247 passed, 8
+      skipped, 201 deselected, 72 xfailed, 0 failed** (47:43,
+      `tests/reports/gate_browser_2154.log`). Subiu **54** sobre o piso de
+      01/09 — 19 da guarda de seletor, 15 do runner retomável, 20 do contrato
+      de isolamento. Os testes desta onda já estavam no piso de 01/09.
+- [x] `bash run_tests.sh --jornada` rodado, com resultado registrado — **19
+      passed, 0 failed em 50.4s** (02/09), depois do conserto `160c7282`. Antes
+      dele: 13 failed / 6 passed.
+- [x] A decisão da Task 2 (A10 já coberto ou não) registrada **aqui e no
+      `2026-08-04-plano-consolidado.md`** (Task A10, no formato da nota do A05):
+      **já coberto** por `tests/test_arreio_presenca_rotas.py:123`.
 - [ ] `docs/planos-em-aberto-2026-08-25.md` — a coluna "Resíduo" dos sete planos
-      atualizada com o que sobrou de verdade.
-- [ ] **A09 riscada** de `docs/reconferencia-backlog-2026-08-23.md` — agora com
-      teste, não com leitura de código.
+      atualizada com o que sobrou de verdade. ➡️ **Não se faz aqui.** 🔬 O índice
+      está desatualizado desde 31/08 (escrito contra `main` em `657326c4`, sem
+      Onda 5, `a-porta-irma` nem `o-que-nao-persiste`) — remendá-lo por uma onda
+      só seria dar validade a um documento que já não vale. Quem o **substitui**
+      é a **Task 16** de `2026-08-31-fecho-do-que-esta-aberto.md`.
+- [x] **A09 riscada** de `docs/reconferencia-backlog-2026-08-23.md` — agora com
+      teste, não com leitura de código: o arquivo está citado em `:413`.

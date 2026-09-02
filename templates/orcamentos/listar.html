@@ -39,6 +39,11 @@
               {% else %}—{% endif %}
             </td>
             <td class="text-end">
+              {% if o.revisao_de_id %}
+              <a href="{{ url_for('orcamentos.comparar', id=o.revisao_de_id, outro_id=o.id) }}" class="btn btn-sm btn-outline-info" title="Comparar com a revisão anterior">
+                <i class="fas fa-code-compare"></i>
+              </a>
+              {% endif %}
               <a href="{{ url_for('orcamentos.editar', id=o.id) }}" class="btn btn-sm btn-outline-primary" title="Editar">
                 <i class="fas fa-edit"></i>
               </a>

@@ -15,18 +15,15 @@ import logging
 equipe_bp = Blueprint('equipe', __name__, url_prefix='/equipe')
 
 def get_admin_id():
-    """Admin ID seguro - sem fallback perigoso"""
-    if not current_user.is_authenticated:
-        raise ValueError("Usuário não autenticado")
-    
-    if hasattr(current_user, 'tipo_usuario'):
-        if current_user.tipo_usuario == TipoUsuario.ADMIN:
-            return current_user.id
-        elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-            return current_user.admin_id
-    
-    # Fallback seguro baseado no ID do usuário atual
-    return current_user.id
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Convergido em 01/09 (Task 11): o "fallback seguro baseado no ID do
+    usuário atual" era um TENANT FANTASMA para usuário sem admin_id, onde
+    o canônico falha fechado. Medido pelo censo de
+    tests/test_isolamento_tenant_bloco1.py.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 def get_sunday_of_week(target_date):
     """Retorna domingo da semana (início da semana de 7 dias)"""
@@ -77,23 +74,14 @@ def alocacao_principal():
                              debug_info=user_info,
                              obras_count=obras_count)
         
-    except Exception as e:
-        logging.error(f"Erro na alocação teste fase 1: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Retorna erro detalhado
-        return f"""
-        <div class="container mt-5">
-            <div class="alert alert-danger">
-                <h3>❌ ERRO NA FASE 2</h3>
-                <p><strong>Erro:</strong> {e}</p>
-                <pre>{traceback.format_exc()}</pre>
-                <hr>
-                <a href="/equipe" class="btn btn-primary">← Voltar ao dashboard</a>
-            </div>
-        </div>
-        """
+    except Exception:
+        # O traceback ia para o HTML: caminhos, frames e SQL com os
+        # parâmetros vinculados, visíveis a qualquer usuário autenticado.
+        # Erro vai para o log; o usuário vê mensagem.
+        logging.exception('falha ao montar a alocação principal')
+        flash('Não foi possível carregar a alocação de equipe. '
+              'A equipe técnica foi notificada.', 'danger')
+        return redirect(url_for('main.dashboard'))
 
 @equipe_bp.route('/funcionarios/<int:allocation_id>')
 @login_required

@@ -429,6 +429,7 @@ def novo_massa_post():
         categoria = CategoriaTransporte.query.get(categoria_id)
         total_criados = 0
 
+        lancamentos_criados = []
         for func_id in funcionario_ids:
             for d in datas:
                 lancamento = LancamentoTransporte(
@@ -441,27 +442,36 @@ def novo_massa_post():
                     admin_id=admin_id,
                 )
                 db.session.add(lancamento)
+                lancamentos_criados.append(lancamento)
                 total_criados += 1
 
         db.session.commit()
 
-        # Integração com Gestão de Custos (por funcionário)
+        # Integração com Gestão de Custos — UM custo POR LANÇAMENTO, com
+        # `origem_id`, como o fluxo singular (:298). O lote registrava um
+        # agregado por funcionário SEM origem_id, e
+        # `_limpar_gestao_custo_filho` filtra por origem_id: excluir um
+        # lançamento de lote deixava o valor vivo em Contas a Pagar dizendo
+        # "Gestão de Custos atualizada".
         try:
             from utils.financeiro_integration import registrar_custo_automatico
-            for func_id in funcionario_ids:
-                func = Funcionario.query.get(func_id)
-                nome_func = func.nome if func else f'Funcionário {func_id}'
-                total_func = valor * len(datas)
+            nomes = {}
+            for lancamento in lancamentos_criados:
+                func_id = lancamento.funcionario_id
+                if func_id not in nomes:
+                    func = Funcionario.query.get(func_id)
+                    nomes[func_id] = func.nome if func else f'Funcionário {func_id}'
                 registrar_custo_automatico(
                     admin_id=admin_id,
                     tipo_categoria='TRANSPORTE',
-                    entidade_nome=nome_func,
+                    entidade_nome=nomes[func_id],
                     entidade_id=func_id,
-                    data=date.today(),
-                    descricao=f"{categoria.nome if categoria else 'Transporte'} — {len(datas)} dias",
-                    valor=total_func,
+                    data=lancamento.data_lancamento,
+                    descricao=lancamento.descricao,
+                    valor=lancamento.valor,
                     obra_id=obra_id,
                     origem_tabela='lancamento_transporte',
+                    origem_id=lancamento.id,
                 )
             db.session.commit()
         except Exception as _e:

@@ -33,7 +33,7 @@ from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException
 
 from models import AditivoContrato, Obra, ObraContratoVersao, PapelObra, db
-from utils.autorizacao import obra_required
+from utils.autorizacao import exige_admin_sem_escopo, obra_required
 from utils.decimal_br import parse_decimal_br
 from utils.tenant import get_tenant_admin_id
 
@@ -71,13 +71,33 @@ def listar(obra_id: int):
                 .filter_by(obra_id=obra_id, admin_id=admin_id)
                 .order_by(AditivoContrato.criado_em.asc()).all())
     vigente = next((v for v in versoes if v.vigente_ate is None), None)
+    # pode_editar por papel: fixo em True, usuário só-leitura via "Aprovar"
+    # e levava 404 opaco. Botão que aparece e nega é pior que botão que não
+    # aparece.
+    from models import TipoUsuario
+    pode_editar = (current_user.is_authenticated
+                   and current_user.tipo_usuario in (TipoUsuario.ADMIN,
+                                                     TipoUsuario.SUPER_ADMIN))
     return render_template('aditivos/listar.html', obra=obra, versoes=versoes,
                            aditivos=aditivos, vigente=vigente,
-                           pode_editar=True)
+                           pode_editar=pode_editar)
 
 
 @aditivos_bp.route('/<int:obra_id>/aditivos/novo', methods=['GET', 'POST'])
 @login_required
+# D5 (fix round 1, ruling R5) — `@obra_required(PapelObra.GESTOR)` sozinho
+# NÃO restringe quando `escopo_obra_ativo` está desligada (default de todo
+# tenant existente): `papel_de_usuario_na_obra` devolve GESTOR para
+# qualquer usuário do tenant, e isso é deliberado
+# (utils/autorizacao.py:147-160). Aprovar aditivo é irreversível — não
+# pode depender de uma flag que quase ninguém ligou. Mas um
+# `@admin_required` incondicional é largo demais: com a flag LIGADA,
+# `obra_required` já é guarda de verdade (Fase 1) e um GESTOR não-admin
+# da obra tem de continuar aprovando — ver
+# `utils/autorizacao.exige_admin_sem_escopo`, que só age quando a flag
+# está desligada e devolve 404 (não 302) para não vazar existência de
+# obra fora de alcance, igual a `obra_required`.
+@exige_admin_sem_escopo
 @obra_required(PapelObra.GESTOR)
 def novo(obra_id: int):
     """Abre um aditivo em rascunho. NÃO toca no baseline — quem toca é aprovar.
@@ -134,6 +154,9 @@ def novo(obra_id: int):
 @aditivos_bp.route('/<int:obra_id>/aditivos/<int:aid>/aprovar',
                    methods=['POST'])
 @login_required
+# D5 (fix round 1, ruling R5) — ver comentário em `novo`, acima: mesmo
+# furo, mesma correção.
+@exige_admin_sem_escopo
 @obra_required(PapelObra.GESTOR)
 def aprovar(obra_id: int, aid: int):
     """`rascunho` → `aprovado`: o único ponto em que o aditivo vale.
@@ -149,10 +172,20 @@ def aprovar(obra_id: int, aid: int):
     try:
         versao = aprovar_aditivo(
             aditivo, aprovado_por_id=getattr(current_user, 'id', None))
+        if versao is None:
+            # O serviço pode devolver None — fazer float(versao.valor)
+            # DEPOIS do commit estourava AttributeError com o commit já feito.
+            db.session.rollback()
+            flash('A aprovação não abriu versão de contrato — nada foi '
+                  'gravado. Verifique o estado do aditivo.', 'error')
+            return redirect(url_for('aditivos.listar', obra_id=obra_id))
         db.session.commit()
+        # Só o NÚMERO passa pelo troca-troca de separadores: aplicado à frase
+        # inteira, o ponto final virava vírgula.
+        valor_fmt = (f'{float(versao.valor):,.2f}'
+                     .replace(',', 'X').replace('.', ',').replace('X', '.'))
         flash(f'Aditivo {aditivo.numero} aprovado. O contrato passou a valer '
-              f'R$ {float(versao.valor):,.2f} (versão {versao.versao}).'
-              .replace(',', 'X').replace('.', ',').replace('X', '.'),
+              f'R$ {valor_fmt} (versão {versao.versao}).',
               'success')
     except HTTPException:
         raise
@@ -169,6 +202,9 @@ def aprovar(obra_id: int, aid: int):
 @aditivos_bp.route('/<int:obra_id>/aditivos/<int:aid>/cancelar',
                    methods=['POST'])
 @login_required
+# D5 (fix round 1, ruling R5) — ver comentário em `novo`, acima: mesmo
+# furo, mesma correção.
+@exige_admin_sem_escopo
 @obra_required(PapelObra.GESTOR)
 def cancelar(obra_id: int, aid: int):
     """`rascunho` → `cancelado`. Não toca no baseline.

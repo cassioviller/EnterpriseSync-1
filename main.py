@@ -160,13 +160,10 @@ try:
 except Exception as e:
     logger.error(f"[ERROR] Erro ao registrar Exportação de Relatórios: {e}", exc_info=True)
 
-# Registrar Relatórios Financeiros Avançados
-try:
-    from relatorios_financeiros_avancados import financeiros_bp
-    app.register_blueprint(financeiros_bp)
-    logger.info("[OK] Relatórios Financeiros Avançados registrado")
-except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar Relatórios Financeiros: {e}", exc_info=True)
+# Relatórios Financeiros Avançados removido em 31/08 (decisão D4): módulo
+# inoperante por seis defeitos, renderizando templates que nunca existiram
+# (`templates/relatorios/`). Extinção congelada em
+# tests/test_fecho_rotas_extintas.py.
 
 # Relatórios de uso detalhado removido (código obsoleto limpo)
 

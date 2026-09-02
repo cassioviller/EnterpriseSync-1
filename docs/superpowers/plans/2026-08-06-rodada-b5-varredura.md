@@ -1,6 +1,17 @@
 # Rodada B5 — varredura das cinco dívidas sem Task — 2026-08-06
 
-> **Estado em 2026-08-25 (varredura de fecho):** ✅ **FECHADO, com resíduo nomeado** — 🔬 18/19. Resíduo: `tests/test_b5_curva_baseline.py` nunca foi escrito. 🔬 18/19 dos arquivos prometidos existem na árvore.
+> **Estado em 2026-08-31 (Onda 6, Task 3):** ✅ **FECHADO, SEM resíduo.** 🔬 O
+> "resíduo" de 25/08 era falso alarme da medição mecânica:
+> `tests/test_b5_curva_baseline.py` não foi esquecido — a **Task B5.5 inteira
+> foi CORTADA em 06/08**, por decisão do Cássio, e o arquivo era dela
+> (`:681-696`). Contar arquivo prometido por Task cortada como dívida é contar
+> duas vezes a mesma decisão. O recorte da B5.5 continua no plano como o COMO,
+> se o SE um dia mudar — e, se mudar, o teste nasce junto com o código, não
+> antes dele.
+>
+> ~~**Estado em 2026-08-25 (varredura de fecho):** ✅ FECHADO, com resíduo
+> nomeado — 🔬 18/19. Resíduo: `tests/test_b5_curva_baseline.py` nunca foi
+> escrito.~~
 >
 > A entrega aconteceu; sobrou algo pequeno e nomeado abaixo. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
 > rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,

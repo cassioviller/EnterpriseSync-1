@@ -688,7 +688,7 @@ def test_emitir_pedido_cria_pedido_vinculado_com_obra():
     r = _cliente_de(c['comprador']).post(
         f"/compras/requisicoes/{c['req']}/emitir-pedido",
         data={'fornecedor_id': str(c['fornecedor']),
-              'data_compra': '2026-08-01',
+              'data_compra': date.today().isoformat(),
               'condicao_pagamento': 'a_vista', 'parcelas': '1'},
         follow_redirects=False)
     assert r.status_code == 302
@@ -721,7 +721,7 @@ def test_requisicao_nao_aprovada_nao_vira_pedido():
 
     _cliente_de(cid).post(
         f"/compras/requisicoes/{c['req']}/emitir-pedido",
-        data={'fornecedor_id': str(forn_id), 'data_compra': '2026-08-01'},
+        data={'fornecedor_id': str(forn_id), 'data_compra': date.today().isoformat()},
         follow_redirects=False)
     with app.app_context():
         assert PedidoCompra.query.filter_by(requisicao_id=c['req']).count() == 0
@@ -736,7 +736,7 @@ def test_gestor_que_aprovou_nao_emite_o_pedido():
     _cliente_de(c['gestor']).post(
         f"/compras/requisicoes/{c['req']}/emitir-pedido",
         data={'fornecedor_id': str(c['fornecedor']),
-              'data_compra': '2026-08-01'},
+              'data_compra': date.today().isoformat()},
         follow_redirects=False)
     with app.app_context():
         assert PedidoCompra.query.filter_by(requisicao_id=c['req']).count() == 0
@@ -747,7 +747,7 @@ def test_nao_se_emite_duas_vezes_a_mesma_requisicao():
 
     c = _cenario_aprovado()
     dados = {'fornecedor_id': str(c['fornecedor']),
-             'data_compra': '2026-08-01', 'condicao_pagamento': 'a_vista'}
+             'data_compra': date.today().isoformat(), 'condicao_pagamento': 'a_vista'}
     cliente = _cliente_de(c['comprador'])
     cliente.post(f"/compras/requisicoes/{c['req']}/emitir-pedido", data=dados)
     cliente.post(f"/compras/requisicoes/{c['req']}/emitir-pedido", data=dados)
@@ -763,7 +763,7 @@ def test_pedido_acima_do_valor_aprovado_e_recusado():
     _cliente_de(c['comprador']).post(
         f"/compras/requisicoes/{c['req']}/emitir-pedido",
         data={'fornecedor_id': str(c['fornecedor']),
-              'data_compra': '2026-08-01',
+              'data_compra': date.today().isoformat(),
               'item_preco_real[]': ['500.00']},  # 10 x 500 = 5000
         follow_redirects=False)
     with app.app_context():
@@ -779,7 +779,7 @@ def test_emissao_gera_custo_na_obra():
     _cliente_de(c['comprador']).post(
         f"/compras/requisicoes/{c['req']}/emitir-pedido",
         data={'fornecedor_id': str(c['fornecedor']),
-              'data_compra': '2026-08-01', 'condicao_pagamento': 'a_vista'},
+              'data_compra': date.today().isoformat(), 'condicao_pagamento': 'a_vista'},
         follow_redirects=False)
     with app.app_context():
         pedido = PedidoCompra.query.filter_by(requisicao_id=c['req']).one()
@@ -796,7 +796,7 @@ def test_emissao_gera_custo_na_obra():
 def _post_compra_direta(cliente, obra_id, fornecedor_id):
     return cliente.post('/compras/nova', data={
         'fornecedor_id': str(fornecedor_id),
-        'data_compra': '2026-08-01',
+        'data_compra': date.today().isoformat(),
         'condicao_pagamento': 'a_vista',
         'parcelas': '1',
         'obra_id': str(obra_id),
@@ -858,7 +858,7 @@ def test_com_flag_ligada_a_emissao_pela_requisicao_continua_funcionando():
     _cliente_de(c['comprador']).post(
         f"/compras/requisicoes/{c['req']}/emitir-pedido",
         data={'fornecedor_id': str(c['fornecedor']),
-              'data_compra': '2026-08-01', 'condicao_pagamento': 'a_vista'},
+              'data_compra': date.today().isoformat(), 'condicao_pagamento': 'a_vista'},
         follow_redirects=False)
     with app.app_context():
         assert PedidoCompra.query.filter_by(requisicao_id=c['req']).count() == 1

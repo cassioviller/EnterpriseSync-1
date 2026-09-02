@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + '/..'))
 
 from app import app, db
 from models import (
-    Usuario, Obra, Servico,
+    Obra, Servico,
     Proposta, PropostaItem,
     ItemMedicaoComercial, ObraServicoCusto,
 )
@@ -30,17 +30,31 @@ from handlers.propostas_handlers import _propagar_proposta_para_obra
 
 @pytest.fixture(scope='function')
 def setup_obra_proposta():
-    """Cria obra + proposta + itens em transação revertida."""
-    with app.app_context():
-        u = Usuario.query.filter_by(tipo_usuario='ADMIN').first() or Usuario.query.first()
-        if u is None:
-            pytest.skip('Sem usuário admin no banco')
-        aid = u.id
-        try:
-            obra = Obra.query.filter_by(admin_id=aid).first()
-            if not obra:
-                pytest.skip('Sem obra para tenant — teste pula')
+    """Cria obra + proposta + itens em transação revertida.
 
+    Antes, escolhia o tenant com
+    `Usuario.query.filter_by(tipo_usuario='ADMIN').first()` — um `.first()`
+    SEM `ORDER BY` num banco com 185.784 ADMINs — e pulava quando o sorteado
+    não tinha obra. Em 28/08 isso tirou 6 testes do gate em silêncio, e o
+    gate não tem como avisar: skip não é falha.
+
+    `um_tenant` semeia admin + obra próprios. O teste deixa de depender do
+    que já estava no banco, e não pula mais. O `assert obra is not None`
+    logo abaixo É a guarda de regressão: se algum dia a fixture voltar a
+    depender do que já estava no banco (ou `um_tenant` quebrar), o teste
+    FALHA alto em vez de sumir do gate como skip silencioso.
+    """
+    from helpers_tenant import um_tenant
+
+    with app.app_context():
+        t = um_tenant('propagacao', com_fatos=False)
+        aid = t.admin_id
+        obra = Obra.query.filter_by(admin_id=aid).first()
+        assert obra is not None, (
+            'um_tenant não semeou obra para o admin recém-criado — '
+            'cenário mal montado, não é o defeito do sorteio')
+
+        try:
             svc1 = Servico(admin_id=aid, nome='__t82_svc_a', categoria='Teste', unidade_medida='un')
             svc2 = Servico(admin_id=aid, nome='__t82_svc_b', categoria='Teste', unidade_medida='un')
             db.session.add_all([svc1, svc2])
@@ -125,18 +139,26 @@ def test_propagacao_cria_itens_e_custos(setup_obra_proposta):
 
 def test_handle_proposta_aprovada_propagacao_falha_aborta_tudo(monkeypatch):
     """Garantia: se propagação falhar, handle_proposta_aprovada faz rollback
-    completo (não cria ContaReceber órfã)."""
+    completo (não cria ContaReceber órfã).
+
+    Segunda cópia do mesmo defeito da Task 7: escolhia o tenant com
+    `Usuario.query.filter_by(tipo_usuario='ADMIN').first()` sem `ORDER BY` e
+    pulava quando o sorteado não tinha obra. `um_tenant` semeia o próprio
+    tenant — não pula mais. O `assert obra is not None` abaixo É a guarda de
+    regressão: se a escolha do tenant voltar a depender do que já estava no
+    banco, o teste FALHA alto em vez de sumir do gate como skip silencioso.
+    """
     from handlers import propostas_handlers as ph
     from models import ContaReceber
+    from helpers_tenant import um_tenant
 
     with app.app_context():
-        u = Usuario.query.filter_by(tipo_usuario='ADMIN').first() or Usuario.query.first()
-        if u is None:
-            pytest.skip('Sem usuário admin no banco')
-        aid = u.id
+        t = um_tenant('propagacao-falha', com_fatos=False)
+        aid = t.admin_id
         obra = Obra.query.filter_by(admin_id=aid).first()
-        if not obra:
-            pytest.skip('Sem obra para tenant — teste pula')
+        assert obra is not None, (
+            'um_tenant não semeou obra para o admin recém-criado — '
+            'cenário mal montado, não é o defeito do sorteio')
 
         proposta = Proposta(
             admin_id=aid,

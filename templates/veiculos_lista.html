@@ -758,7 +758,7 @@ function confirmarExclusao(veiculoId, placa) {
         // Criar form dinamicamente para enviar POST
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = `/veiculos/${veiculoId}/excluir`;
+        form.action = `/frota/${veiculoId}/deletar`;  // aponta direto na rota viva (frota.deletar_veiculo) — o shim /veiculos/<id>/excluir saiu na D3 leva 2
         document.body.appendChild(form);
         form.submit();
     }

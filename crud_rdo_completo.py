@@ -14,31 +14,19 @@ logger = logging.getLogger(__name__)
 rdo_crud_bp = Blueprint('rdo_crud', __name__, url_prefix='/rdo')
 
 def get_admin_id():
-    """Obter admin_id correto baseado no usuário atual"""
-    from models import TipoUsuario
-    
-    # Para usuários ADMIN, usar o próprio ID
-    if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
-        return current_user.id
-    
-    # Para outros usuários, usar admin_id
-    if hasattr(current_user, 'admin_id') and current_user.admin_id:
-        return current_user.admin_id
-    
-    # Fase 1 — a identidade vem da FK, não de e-mail chumbado. O bloco
-    # anterior traduzia um e-mail de login específico para o e-mail de um
-    # funcionário específico, ambos literais no código, e buscava
-    # Funcionario por e-mail SEM admin_id — casando pessoa de outro
-    # tenant. Ver utils/identidade.py. Os literais não são reproduzidos
-    # aqui de propósito: `tests/test_fase1_identidade.py` proíbe a string
-    # no arquivo, e é essa proibição que impede a heurística de voltar.
-    if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.name == 'FUNCIONARIO':
-        from utils.identidade import funcionario_do_usuario
-        funcionario = funcionario_do_usuario()
-        if funcionario:
-            return funcionario.admin_id
-    
-    return None
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Decisão de 01/09 (decisoes-respondidas.md §admin_id): o ramo que
+    resolvia FUNCIONARIO sem admin_id por FK
+    (utils.identidade.funcionario_do_usuario) saiu — usuário nesse estado é
+    DEFEITO DE DADO e falha FECHADO (None ⇒ 403 nas guardas), como
+    utils/tenant.py documenta. Era a última exceção do censo de
+    tests/test_isolamento_tenant_bloco1.py; a medição do tamanho do reparo
+    em produção é scripts/medir_funcionarios_sem_admin_id.py — rodar ANTES
+    do deploy que contém esta mudança.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 @rdo_crud_bp.route('/')
 @login_required
@@ -319,16 +307,16 @@ def salvar_rdo():
                 flash(f'Já existe um RDO para a obra "{obra.nome}" na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
                 return redirect(url_for('rdo_crud.editar_rdo', rdo_id=rdo_existente.id))
             
-            # Gerar número do RDO
-            ano_atual = data_relatorio.year
-            ultimo_numero = db.session.query(func.max(RDO.sequencial_ano)).filter(
-                RDO.ano == ano_atual
-            ).scalar() or 0
-            
+            # Gerar número do RDO pelo helper único (globalmente único, com
+            # retry). O bloco anterior usava um `func` que nunca foi importado
+            # (NameError) e passava ao construtor kwargs de colunas que RDO
+            # não tem (TypeError): quebrado desde sempre, garantido no
+            # primeiro uso quando o Módulo 07 religar a rota.
+            from views.rdo import _gerar_numero_rdo_unico
+
             rdo = RDO(
-                numero_rdo=f'RDO-{ano_atual}-{ultimo_numero + 1:03d}',
-                sequencial_ano=ultimo_numero + 1,
-                ano=ano_atual,
+                numero_rdo=_gerar_numero_rdo_unico(
+                    obra_id, data_relatorio, admin_id),
                 obra_id=obra_id,
                 data_relatorio=data_relatorio,
                 admin_id=admin_id,
@@ -599,8 +587,10 @@ def finalizar_rdo(rdo_id):
             return redirect(url_for('rdo_crud.editar_rdo', rdo_id=rdo_id))
         
         rdo.status = 'Finalizado'
-        rdo.finalizado_em = datetime.utcnow()
-        rdo.finalizado_por_id = current_user.id
+        # `finalizado_em`/`finalizado_por_id` NÃO são colunas de RDO: as
+        # escritas eram perdidas em silêncio. A autoria e o instante da
+        # finalização são capturados pela trilha `RDOTransicaoEstado`
+        # (usuario_id + criado_em) na transição logo abaixo.
         # 21/08 — esta rota marcava `status` e emitia custo sem mexer em `estado`:
         # o RDO seguia rascunho para o ciclo de vida e, com o guarda
         # `publica_custos`, deixaria de lançar. Finalizar É submeter — a mesma

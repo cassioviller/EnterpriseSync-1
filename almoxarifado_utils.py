@@ -293,8 +293,13 @@ def processar_xml_nfe(xml_content, admin_id):
             razao_social = emit.find('nfe:xNome', ns)
             nome_fantasia = emit.find('nfe:xFant', ns)
             
+            _razao = razao_social.text if razao_social is not None else 'Não informado'
             fornecedor = Fornecedor(
-                razao_social=razao_social.text if razao_social is not None else 'Não informado',
+                # A09 — `nome` é NOT NULL (models.py, "Campo legado
+                # obrigatório"); sem ele TODO emitente novo estourava o
+                # INSERT e a importação do XML morria.
+                nome=_razao,
+                razao_social=_razao,
                 nome_fantasia=nome_fantasia.text if nome_fantasia is not None else None,
                 cnpj=cnpj,
                 admin_id=admin_id

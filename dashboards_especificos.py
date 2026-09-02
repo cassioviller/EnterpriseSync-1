@@ -30,13 +30,15 @@ logger = logging.getLogger(__name__)
 dashboards_bp = Blueprint('dashboards_especificos', __name__, url_prefix='/dashboards/especificos')
 
 def get_admin_id():
-    """Obtém admin_id do usuário atual"""
-    if hasattr(current_user, 'tipo_usuario'):
-        if current_user.tipo_usuario.value == 'admin':
-            return current_user.id
-        elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-            return current_user.admin_id
-    return current_user.id
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Convergido em 01/09 (Task 11): a cópia local devolvia current_user.id
+    como fallback — um TENANT FANTASMA para usuário sem admin_id, onde o
+    canônico falha fechado. Medido pelo censo de
+    tests/test_isolamento_tenant_bloco1.py.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 def safe_db_operation(operation, default_value=None):
     """Executa operação no banco com tratamento seguro"""

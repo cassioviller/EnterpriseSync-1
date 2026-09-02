@@ -1313,7 +1313,11 @@
             {% if obra.valor_contrato and obra.valor_contrato > 0 %}
             {# Fase 6 / Task 13 — o card do contrato vira a porta do extrato:
                é dali que se responde "por que este valor é este hoje". #}
-            <a href="{{ url_for('aditivos.listar', obra_id=obra.id) }}"
+            {# href literal, não url_for: app.py engole DE PROPÓSITO a falha de
+               registro do aditivos_bp, e o url_for sem guarda dava BuildError
+               500 em toda obra com contrato exatamente no cenário que o app.py
+               foi escrito para sobreviver. Mesmo idioma de obra_form.html. #}
+            <a href="/obras/{{ obra.id }}/aditivos"
                class="kpi-card text-decoration-none text-reset"
                style="--kpi-color: #06b6d4; --kpi-color-light: #22d3ee;"
                title="Ver contrato, aditivos e o histórico de versões">
@@ -1474,6 +1478,8 @@
                         {% else %}
                         <span class="badge bg-secondary">Inativo</span>
                         {% endif %}
+                        {# Só admin liga/desliga o portal (a rota exige o papel; botão que aparece e nega é pior que botão que não aparece) #}
+                        {% if current_user.is_authenticated and current_user.tipo_usuario.name in ('ADMIN', 'SUPER_ADMIN') %}
                         <form method="POST" action="{{ url_for('portal_obras.toggle_portal', obra_id=obra.id) }}" class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm {% if obra.portal_ativo %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
@@ -1482,6 +1488,7 @@
                                 {% if obra.portal_ativo %}Desativar{% else %}Ativar{% endif %}
                             </button>
                         </form>
+                        {% endif %}
                     </div>
                 </div>
                 {% if obra.token_cliente %}
@@ -1652,7 +1659,7 @@ Ela vale 72 horas e será trocada por uma senha só sua no primeiro acesso.</tex
                     Gere um token ao editar a obra com portal ativo e e-mail do cliente preenchido.
                 </div>
                 {% endif %}
-                {% if obra.portal_ativo and obra.token_cliente %}
+                {% if obra.portal_ativo and obra.token_cliente and current_user.is_authenticated and current_user.tipo_usuario.name in ('ADMIN', 'SUPER_ADMIN') %}
                 <div style="margin-top: 0.75rem;">
                     <form method="POST" action="{{ url_for('portal_obras.gerar_medicao', obra_id=obra.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

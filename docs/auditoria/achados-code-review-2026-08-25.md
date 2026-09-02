@@ -75,6 +75,38 @@
 > "Achados novos da execução da Onda 3 (27/08)", no fim deste documento.
 
 
+> **28/08 — a Onda 5 fechou os 10 achados de estado recusado que ainda era gravado.**
+> Marcados inline com o commit que fechou cada um: o traceback saiu da resposta HTML
+> em `/ponto/` e `/equipe/alocacao-principal` (Task 1), a garantia de rollback em
+> `4xx` passou a morar no decorador `_com_undo` em vez de em cada `return`
+> (Task 2), o portal do cliente deixou de ser administrável por qualquer
+> FUNCIONARIO (Task 3), as duas entregas da Fase 6 chegaram à tela (Task 4), quatro
+> defeitos de progresso apagado/retrocesso foram cada um para seu próprio commit
+> (Task 5), os RDOs pararam de quebrar, duplicar ou perder dado (Task 6), frota,
+> transporte e reembolso pararam de regredir odômetro, perder passageiro e vazar
+> `main_bp` (Task 7), e o índice `uq_contrato_versao_vigente` passou a concordar
+> com as queries (Task 8). Executada solo, task a task, via
+> superpowers:executing-plans, 27-28/08, TDD com o RED citado em todos os 8/8
+> tasks + 1 fecho-fix, 12 commits. Teste desta onda:
+> `tests/test_onda5_recusado_nao_grava.py` (38 testes).
+>
+> Duas decisões explícitas: **o geofencing consultivo vira impositivo** (obra
+> cercada e sem coordenada agora recusa o ponto; commit `7ec18fe0`) e **o índice
+> `uq_contrato_versao_vigente` ganha `admin_id`** em vez de as queries o perderem
+> (migration 315, commit `ae4e4191`) — ambas em
+> `docs/superpowers/plans/2026-08-25-onda-5-o-recusado-para-de-ser-gravado.md`,
+> seção "Fecho da onda".
+>
+> ⚠️ **Três achados novos, descobertos durante a própria execução da Onda 5 — não
+> estavam na varredura de 25/08.** Registrados em
+> "Achados novos da execução da Onda 5 (28/08)", no fim deste documento.
+>
+> ⚠️ **Fecho-fix fora do escopo original das 10:** o grep de fecho achou a mesma
+> classe de vazamento de traceback da Task 1 viva em `error_handlers.py` (handler
+> global) e `production_routes.py`, para todo `500` do app inteiro — não só
+> `/ponto/`. Corrigido e env-gated como `main.py`, commit próprio `356c2cf9`.
+
+
 ## Placar
 
 | Módulo | 🔴 | 🟡 | ⚪ | Passada |
@@ -113,25 +145,30 @@ rollback e mostra *"Tente novamente em instantes"*. Tentar de novo **nunca** pod
 dar certo. A mensagem útil ("estorne a medição antes do aditivo") só vai para o
 log. Mesma forma na rota interna (`propostas_consolidated.py:1138`).
 
-🟡 **`templates/obras/detalhes_obra_profissional.html:1316` — 500 onde havia degradação.**
+🟡 **`templates/obras/detalhes_obra_profissional.html:1316` ✅ **CORRIGIDO** (Onda 5, Task 8 — commit `ae4e4191`) — 500 onde havia degradação.**
 `app.py:940-953` engole de propósito a falha de registro do `aditivos_bp` (loga e
 segue de pé). Mas a página de detalhe faz `url_for('aditivos.listar', ...)` sem
 guarda: se o blueprint não registrar — o cenário que o `app.py` foi escrito para
 sobreviver — toda obra com `valor_contrato > 0` dá `BuildError` 500.
 `templates/obra_form.html` usa href literal e está safe.
 
-⚪ `views/aditivos_views.py:147` — o reformat de moeda é aplicado à frase inteira:
+⚪ `views/aditivos_views.py:147` ✅ **CORRIGIDO** (Onda 5, Task 8 — commit `ae4e4191`) — o reformat de moeda é aplicado à frase inteira:
 o ponto final vira vírgula.
-⚪ `views/aditivos_views.py:74` — `pode_editar=True` fixo; usuário só-leitura vê
+⚪ `views/aditivos_views.py:74` ✅ **CORRIGIDO** (Onda 5, Task 8 — commit `ae4e4191`) — `pode_editar=True` fixo; usuário só-leitura vê
 "Aprovar"/"Cancelar" e leva 404 opaco. Só UI, não é furo de authz.
-⚪ `templates/aditivos/listar.html:50` — o mapa de rótulos usa `'proposta'`,
+⚪ `templates/aditivos/listar.html:50` ✅ **CORRIGIDO** (Onda 5, Task 8 — commit `ae4e4191`) — o mapa de rótulos usa `'proposta'`,
 `'aditivo'`, `'manual'`, mas `ORIGEM_TIPO` grava `proposta_aprovada`,
 `cadastro_manual`, `contrato_original`, `backfill`… Só `aditivo` casa; o resto da
 linha do tempo mostra o token cru.
-⚪ `services/contrato_obra.py:407` — `_versao_vigente_da_obra` pode devolver versão
+⚪ `services/contrato_obra.py:407` 🔬 **TESTADO, NÃO REPRODUZIDO** (Onda 5, Task 8 — commit `ae4e4191`) — `_versao_vigente_da_obra` pode devolver versão
 já encerrada em memória. Latente hoje (uma entrada por request), mas a guarda não
-faz o que o docstring promete.
-⚪ `views/aditivos_views.py:143` — `aprovar_aditivo` pode devolver `None` e a view
+faz o que o docstring promete. No cenário direto o defeito **não reproduziu**: a
+query em `no_autoflush` e o identity map devolvem o objeto já mutado, e o
+teste-pino nasceu verde. Pino de regressão
+`test_versao_encerrada_em_memoria_nao_e_vigente` adicionado — se houver caminho
+real, ele passa pelo fallback de `db.session.new`. Ver achado novo (b), no fim
+deste documento.
+⚪ `views/aditivos_views.py:143` ✅ **CORRIGIDO** (Onda 5, Task 8 — commit `ae4e4191`) — `aprovar_aditivo` pode devolver `None` e a view
 faz `float(versao.valor)` **depois** do commit: diz "Erro ao aprovar" quando nada
 deu errado.
 ⚪ `services/orcamento_versao.py:117` — `criar_revisao` copia `criado_por` da v1.
@@ -290,10 +327,10 @@ agregado de `GestaoCustoFilho` nas views de custo é escopado a um `pai_id`, e
 
 ## 3. RDO — 4 🔴
 
-🔴 **`views/rdo.py:2127` — `atualizar_rdo` está morta.** Lê `rdo.tempo_manha`, que
+🔴 **`views/rdo.py:2127` ✅ **CORRIGIDO** (Onda 5, Task 6 — commit `ce331094`) — `atualizar_rdo` está morta.** Lê `rdo.tempo_manha`, que
 não é atributo de `RDO`; todo POST em `/rdo/<id>/atualizar` levanta
 `AttributeError` e faz rollback. **Verificado em runtime.**
-🔴 **`views/rdo.py:3070` — `obra_id` não vinculada** no ramo de edição de
+🔴 **`views/rdo.py:3070` ✅ **CORRIGIDO** (Onda 5, Task 6 — commit `ce331094`) — `obra_id` não vinculada** no ramo de edição de
 `rdo_salvar_unificado`; o `NameError` escapa do `except (ValueError, IndexError)`
 local e aborta a edição inteira.
 🔴 **`rdo_editar_sistema.py:218` ✅ **CORRIGIDO** (Onda 2, Task 6 — commit `af913fce`) — RDO muda de tenant.** `rdo.obra_id` é atribuído
@@ -307,21 +344,36 @@ sem `remover_custos_rdo`/`remover_custo_diario_rdo`: o trabalhador removido segu
 sendo cobrado.
 🟡 `views/rdo.py:1888` ✅ **CORRIGIDO** (Onda 3, Task 10 — commits `6be3b790`+`ed17ab7f`+`297ac8fe`+`d585a399`, fix rounds `02882e5d`+`cead7569`+`aa657b9f`) — `reabrir_rdo` desfaz o percentual do cronograma mas deixa
 o custo de mão de obra já lançado no razão enquanto o RDO está em `rascunho`.
-🟡 `views/rdo.py:4002` — `salvar_rdo_flexivel` ignora `rdo_id` e não tem guarda de
+🟡 `views/rdo.py:4002` ✅ **CORRIGIDO** (Onda 5, Task 6 — commits `ce331094`
++ `ed85d117`) — `salvar_rdo_flexivel` ignora `rdo_id` e não tem guarda de
 obra+data: é o produtor dos RDOs duplicados na mesma data que os serviços de
 exportação e atualização contornam.
-🟡 `views/rdo.py:3969` — a checagem de colisão de `numero_rdo` é escopada por
+⚠️ **O achado tinha duas metades, e a 1ª correção pegou a errada.** A `ce331094`
+pôs a guarda de obra+data e deixou `rdo_id` intocado. **O gate de fecho
+reprovou**: 6 testes caíram, a guarda disparou 12 vezes. Dois RDOs na mesma
+obra e mesmo dia são estado **legal** — `services/custo_funcionario_dia.py`
+rateia a diária entre os RDOs do dia, e a 🔬 **Onda 3 / Task 9 desta mesma
+auditoria aprofundou exatamente esse caso**. A guarda ainda recusava com
+`302` + `flash` (sucesso para quem confere status), matando o toggle reverso de
+terceiros em silêncio — a classe de defeito que a própria onda existia para
+matar. `ed85d117` removeu a guarda e corrigiu a metade real: `rdo_id` de um RDO
+da obra/tenant agora **edita** em vez de criar. Detalhe em
+`docs/superpowers/plans/2026-08-25-onda-5-o-recusado-para-de-ser-gravado.md`,
+seção "A guarda da Task 6 que o gate derrubou".
+🟡 `views/rdo.py:3969` ✅ **CORRIGIDO** (Onda 5, Task 6 — commit `ce331094`) — a checagem de colisão de `numero_rdo` é escopada por
 `admin_id` embora a coluna seja `UNIQUE` global; uma linha com `admin_id` NULL
 causa `IntegrityError` em laço permanente.
 🟡 `services/custo_funcionario_dia.py:97` ✅ **CORRIGIDO** (Onda 3, Task 9 — commits `a174e8b1`+`171043d7`+`9caa8ce9`+`0e78e1cb`+`e2e69035`) — para diaristas o `componente_folha` é
 rateado mas `custo_hora_normal` não, então a tela mostra o dobro do que foi
 efetivamente lançado.
 
-⚪ `crud_rdo_completo.py:602` — `finalizado_em`/`finalizado_por_id` não são colunas
+⚪ `crud_rdo_completo.py:602` ✅ **CORRIGIDO** (Onda 5, Task 6 — commit `ce331094`) — `finalizado_em`/`finalizado_por_id` não são colunas
 mapeadas: a autoria da finalização é descartada em silêncio numa rota viva.
-⚪ `crud_rdo_completo.py:324` — `salvar_rdo` (sem rota, mas marcada para revival) usa
+⚪ `crud_rdo_completo.py:324` ✅ **CORRIGIDO** (Onda 5, Task 6 — commit `ce331094`) — `salvar_rdo` (sem rota, mas marcada para revival) usa
 `func` não importado e passa kwargs `sequencial_ano`/`ano` que `RDO` não aceita.
-⚪ `views/rdo.py:2969` — campos de clima legados (`tempo_manha`, `temperatura`,
+Segue sem rota (reservada ao Módulo 07) — ver achado novo (c), no fim deste
+documento.
+⚪ `views/rdo.py:2969` ✅ **CORRIGIDO** (Onda 5, Task 6 — commit `ce331094`) — campos de clima legados (`tempo_manha`, `temperatura`,
 `condicoes_climaticas`, `observacoes_meteorologicas`) são gravados em atributos não
 mapeados em duas rotas e perdidos em silêncio.
 
@@ -341,7 +393,7 @@ cronograma) mas omite o fallback `percentual_do_servico_na_obra` que
 (`perc_periodo = max(0, 0 - 60) = 0` a cada ciclo), com extrato PDF em 0%, mesmo
 que `recalcular_medicao_obra` restaure o IMC depois.
 
-🔴 **`cronograma_views.py:1017` — a edição rejeitada é persistida.**
+🔴 **`cronograma_views.py:1017` ✅ **CORRIGIDO** (Onda 5, Task 2 — commit `6ac1566b`) — a edição rejeitada é persistida.**
 Três `return 400` em `atualizar_tarefa` (:1017 `modo_apontamento`, :1058
 subatividade×serviço, :1168 hierarquia circular) pulam o
 `db.session.rollback()`, ao contrário dos vizinhos em :1000/:1010/:1130. O
@@ -355,7 +407,7 @@ decorador. Mesma forma em `cronograma_views.py:1618` (`atualizar_vinculo` atribu
 `MedicaoObraItem`, cuja FK é `nullable=False` sem `ondelete` nem cascade
 (`models.py:7501`). Apagar item já medido dá `ForeignKeyViolation` → 500 com sessão
 suja.
-🟡 `services/cronograma_apontamento_service.py:397` — `registrar_apontamento` lê
+🟡 `services/cronograma_apontamento_service.py:397` ✅ **CORRIGIDO** (Onda 5, Task 5 — commit `a2ab9b81`) — `registrar_apontamento` lê
 `pct_ant` só de `percentual_realizado` (travado em 100) enquanto
 `recomputar_cadeia:246` e o preview do RDO preferem `percentual_acumulado`. Depois
 de uma superexecução (120% guardado como acumulado=120/realizado=100), uma
@@ -435,12 +487,12 @@ quando há vírgula. `"30.000"` vira `Decimal('30.000')` → R$ 30,00. A escada 
 monotônica, `_violacoes` não levanta nada, e a primeira faixa do tenant passa a
 cobrir só compras abaixo de R$ 30. Mesma ambiguidade de 1000× que
 `compras_views._quantidade_do_form` foi escrito para recusar.
-🟡 `services/entregas_terceiros.py:340` — o toggle reverso põe
+🟡 `services/entregas_terceiros.py:340` ✅ **CORRIGIDO** (Onda 5, Task 5 — commit `22bea5a8`) — o toggle reverso põe
 `percentual_concluido = 0.0` em toda tarefa de `terceiros_tarefa_ids_lista[]` não
 marcada em `entrega_tarefa_ids[]`. Tarefa de subempreitada em 45% é zerada no
 próximo salvamento de RDO que não a marque. O docstring só promete reverter "para
 pendente" — progresso parcial é dado real.
-🟡 `services/entregas_terceiros.py:357` — o `except` pelado devolve `(0, 0)` depois
+🟡 `services/entregas_terceiros.py:357` ✅ **CORRIGIDO** (Onda 5, Task 5 — commit `40024db8`) — o `except` pelado devolve `(0, 0)` depois
 de os laços já terem mutado `TarefaCronograma` na sessão. O chamador commita
 assim mesmo: falha no meio persiste escrita parcial reportando que nada foi
 aplicado.
@@ -474,7 +526,7 @@ listagens deste via `item.categoria.nome`.
 
 ## 6. Obras, propostas e orçamento
 
-🔴 **`services/proposta_diff.py:88` — o comparador de versões relata impacto R$ 0,00.**
+🔴 **`services/proposta_diff.py:88` ✅ **CORRIGIDO** (Onda 5, Task 4 — commit `a8f4ff44`) — o comparador de versões relata impacto R$ 0,00.**
 `diff_versoes`/`total_do_diff` leem `PropostaItem.subtotal`, que é NULL para todo
 item não construído pelo caminho de explosão da Task #89
 (`subtotal_snap = None` em `propostas_consolidated.py:899`). Uma revisão que muda
@@ -483,7 +535,7 @@ item não construído pelo caminho de explosão da Task #89
 `PropostaItem.subtotal_calculado` existe exatamente para isso e não é usado em
 lugar nenhum.
 
-🟡 **`services/cronograma_proposta.py:602` — item ressuscitado não volta ao cronograma.**
+🟡 **`services/cronograma_proposta.py:602` ✅ **CORRIGIDO** (Onda 5, Task 5 — commit `a80973e8`) — item ressuscitado não volta ao cronograma.**
 O fluxo novo de supressão arquiva tarefas (`ativa=False`), mas os ramos de reúso
 por chave natural de `materializar_cronograma` (:602-606, :675-686) reaproveitam a
 tarefa casada **sem restaurar `ativa`**. Uma "Alvenaria" suprimida e re-adicionada
@@ -493,7 +545,7 @@ tarefa viva. `natural_key_index` não filtra `ativa`.
 🟡 `views/orcamentos_views.py:566` — `_bloqueio_por_trava` no `excluir` torna
 permanentemente indeletável todo orçamento que um dia gerou proposta (nada limpa
 `travado_em`), e a mensagem fala em "mudar valores".
-⚪ `views/orcamentos_views.py:617` — nem `orcamentos.comparar` nem
+⚪ `views/orcamentos_views.py:617` ✅ **CORRIGIDO** (Onda 5, Task 4 — commit `a8f4ff44`) — nem `orcamentos.comparar` nem
 `propostas.comparar` são linkados de template nenhum: **a entrega inteira da Task
 12 está inalcançável pela interface.**
 
@@ -537,12 +589,12 @@ interna, sobrescrevendo `comprovante_pagamento_url`.
 então faz `send_file`. A rota criada para **substituir** o `/persistent-uploads`
 removido entrega a visitante anônimo o comprovante de compra interna que o portal
 nunca ofereceu.
-🟡 `portal_obras_views.py:663` — o fallback de `5 * 1024 * 1024` é morto:
+🟡 `portal_obras_views.py:663` ✅ **CORRIGIDO** (Onda 5, Task 3 — commit `31889d24`) — o fallback de `5 * 1024 * 1024` é morto:
 `app.py:159` põe `MAX_CONTENT_LENGTH = 64 * 1024 * 1024`, então `max_bytes` é
 sempre 64 MB. O teto de 5 MB do portal nunca se aplica — sobra rota anônima, sem
 autenticação e sem rate limit gravando blobs de 64 MB no volume persistente a cada
 requisição.
-🟡 `portal_obras_views.py:768` e `:798` — `toggle_portal` e `gerar_medicao` têm só
+🟡 `portal_obras_views.py:768` e `:798` ✅ **CORRIGIDO** (Onda 5, Task 3 — commit `31889d24`) — `toggle_portal` e `gerar_medicao` têm só
 `@login_required`. Qualquer FUNCIONARIO do tenant liga/desliga o portal do cliente
 (recarimbando `token_cliente_expira_em` +180 dias **sem rotacionar o token**) ou
 cria `MedicaoObra` cujo `valor_medido` é percentual de `obra.valor_contrato`. Rotas
@@ -562,14 +614,14 @@ difuso por nome/e-mail e depois cria um `Cliente` novo, sem log. O chamador
 (`event_manager.py:1244`) acredita que a regra 1 "vence sempre": uma FK velha produz
 cliente duplicado com a obra presa a ele.
 
-⚪ `portal_obras_views.py:534` — o evento de trilha entra na sessão **antes** das
+⚪ `portal_obras_views.py:534` ✅ **CORRIGIDO** (Onda 5, Task 3 — commit `31889d24`) — o evento de trilha entra na sessão **antes** das
 guardas de idempotência, e os ramos de retorno antecipado não commitam. A sessão é
 descartada no teardown, então o evento `compra_aprovar`/`compra_recusar` some —
 contradizendo o comentário `# Persistida no commit adiante`.
-⚪ `portal_obras_views.py:576` — no ramo de governança um **segundo** evento
+⚪ `portal_obras_views.py:576` ✅ **CORRIGIDO** (Onda 5, Task 3 — commit `31889d24`) — no ramo de governança um **segundo** evento
 `compra_aprovar` é gravado para o mesmo `alvo_id`, e esse caminho commita: toda
 aprovação sob governança deixa duas linhas na trilha.
-⚪ `portal_obras_views.py:958` — `os.path.join(static_root, rel.arquivo_path)` sem
+⚪ `portal_obras_views.py:958` ✅ **CORRIGIDO** (Onda 5, Task 3 — commit `31889d24`) — `os.path.join(static_root, rel.arquivo_path)` sem
 checar que o resultado fica sob `static/`. Latente hoje
 (`services/mapa_relatorio_pdf.py:333` grava caminho relativo), mas um valor
 absoluto ou com `../` naquela coluna de 500 chars transforma rota anônima em
@@ -597,10 +649,14 @@ internamente únicos).
 
 ## 8. Pessoas, ponto e folha — 4 🔴
 
-🔴 **`ponto_views.py:611` — traceback na resposta HTML.** `/ponto/` e
+🔴 **`ponto_views.py:611` ✅ **CORRIGIDO** (Onda 5, Task 1 — commit `7ec18fe0`) — traceback na resposta HTML.** `/ponto/` e
 `/equipe/alocacao-principal` renderizam `traceback.format_exc()` no HTML em caso de
 erro, expondo caminhos, frames e **SQL com parâmetros vinculados** a qualquer
-usuário autenticado.
+usuário autenticado. Nota: a segunda rota vive em `equipe_views.py`, não em
+`ponto_views.py` como o plano original listava — a spec de achados já nomeava as
+duas. ✅ **28/08 — o mesmo padrão (traceback em `error.html`) apareceu em
+`error_handlers.py` e `production_routes.py`, para todo `500` do app**; fechado à
+parte, commit `356c2cf9`.
 🔴 **`ponto_views.py:777` ✅ **CORRIGIDO** (Onda 2, Task 6 — commits `af913fce`+`4b55a2d3`) — ponto batido no funcionário de outro tenant.**
 `api_bater_ponto` repassa `funcionario_id`/`obra_id` do corpo do request sem
 checagem; o serviço cria `RegistroPonto` para o funcionário alheio **e devolve o
@@ -646,8 +702,12 @@ constrange.)
 ⚪ `ponto_views.py:919` — o delete em cascata recalcula `pai.valor_total` mas deixa
 `saldo` velho, quebrando `saldo = valor_total - valor_pago`; a rota de DELETE simples
 (:794) deixa `GestaoCustoFilho` órfão.
-⚪ `ponto_views.py:2338` — o geofencing é **pulado inteiro** quando o cliente omite
-latitude/longitude: o controle é consultivo, não impositivo.
+⚪ `ponto_views.py:2338` ✅ **DECISÃO REGISTRADA** (Onda 5, Task 1 — commit `7ec18fe0`) — obra cercada e sem coordenada agora **RECUSA**
+o ponto (a semântica que `utils_geofencing` já implementava e a rota pulava); obra
+sem geofence configurado segue aceitando. Antes, o geofencing era **pulado
+inteiro** quando o cliente omitia latitude/longitude: o controle era consultivo,
+não impositivo. ⚠️ Achado novo relacionado: `/api/registrar-facial` não faz
+geofencing **nenhum** — ver achado novo (a), no fim deste documento.
 
 ---
 
@@ -669,19 +729,20 @@ tenant.
 🟡 `transporte_views.py:204` ✅ **CORRIGIDO** (Onda 2, Task 5 — commit `42f48247`) — `obra_id`, `categoria_id`, `funcionario_id`,
 `veiculo_id` e `centro_custo_id` entram sem checagem de tenant (só `osc_id` é
 validado): POST forjado prende o lançamento e o `CustoObra` à obra de outro tenant.
-🟡 `transporte_views.py:442` — o lote grava o custo sem `origem_id`, e
+🟡 `transporte_views.py:442` ✅ **CORRIGIDO** (Onda 5, Task 7 — commit `808bd0bb`) — o lote grava o custo sem `origem_id`, e
 `_limpar_gestao_custo_filho` filtra por `origem_id`: excluir lançamento em lote
 deixa o valor vivo em Contas a Pagar dizendo *"Gestão de Custos atualizada"*.
-🟡 `frota_views.py:1063` — `.join(FrotaVeiculo)` duplicado (tipo + status).
+🟡 `frota_views.py:1063` ✅ **CORRIGIDO** (Onda 5, Task 7 — commit `808bd0bb`) — `.join(FrotaVeiculo)` duplicado (tipo + status).
 Confirmado no SA 2.0.41 que o segundo join **não** é deduplicado → o filtro por
-tipo do dashboard TCO sempre erra.
-🟡 `frota_views.py:741` — a edição lê passageiros de `to_dict()` (só o primeiro
+tipo do dashboard TCO sempre erra. 🔬 O mesmo `.join(FrotaVeiculo)` duplicado
+existia em **seis** builders — o achado citava um, a família saiu junto.
+🟡 `frota_views.py:741` ✅ **CORRIGIDO** (Onda 5, Task 7 — commit `808bd0bb`) — a edição lê passageiros de `to_dict()` (só o primeiro
 valor do multi-select) enquanto a criação usa `getlist`+CSV; e apaga
 `responsavel_veiculo`/`observacoes` quando o campo não vem no form.
-🟡 `frota_views.py:499` — `veiculo.km_atual = km_final` sem comparação: um uso
+🟡 `frota_views.py:499` ✅ **CORRIGIDO** (Onda 5, Task 7 — commit `808bd0bb`) — `veiculo.km_atual = km_final` sem comparação: um uso
 retroativo faz o odômetro **andar para trás** e cala o alerta de manutenção. As três
 rotas irmãs têm a guarda.
-🟡 `reembolso_views.py:34` — `url_for('main_bp.dashboard')`; o blueprint chama-se
+🟡 `reembolso_views.py:34` ✅ **CORRIGIDO** (Onda 5, Task 7 — commit `808bd0bb`) — `url_for('main_bp.dashboard')`; o blueprint chama-se
 `main` (`views/__init__.py:6`). Tenant sem V2 clicando em Reembolsos recebe
 BuildError 500 em vez do aviso.
 
@@ -711,7 +772,7 @@ obra e cada funcionário); o limite `MAX_QTD_POR_ITEM` com 422; o agrupamento de
 
 ## 10. Núcleo — app, models, event_manager
 
-🟡 **`models.py:7608` — o índice e as queries discordam sobre `admin_id`.**
+🟡 **`models.py:7608` ✅ **CORRIGIDO** (Onda 5, Task 8 — commit `ae4e4191`; migration 315, índice ganha `admin_id`) — o índice e as queries discordam sobre `admin_id`.**
 `uq_contrato_versao_vigente` é `UNIQUE (obra_id) WHERE vigente_ate IS NULL`, mas
 todo leitor/escritor filtra por `(obra_id, admin_id)`. Se uma linha aterrissar com
 `admin_id` divergente — o comentário da migration 273 cita *"precedente real:
@@ -721,14 +782,14 @@ migration 266"* para exatamente isso — a obra fica **permanentemente travada**
 daquela obra, enquanto `abrir_aditivo` reporta "obra não tem contrato vigente".
 `uq_contrato_versao_obra_versao` tem a mesma assimetria contra `max(versao)`.
 
-⚪ `models.py:8648` × `_migration_274_orcamento_cadeia_revisao` — a migration cria
+⚪ `models.py:8648` ✅ **CORRIGIDO** (Onda 5, Task 8 — commit `ae4e4191`) × `_migration_274_orcamento_cadeia_revisao` — a migration cria
 `versao INTEGER NOT NULL DEFAULT 1`; o modelo declara `nullable=False, default=1`
 **sem `server_default`**. Um schema criado por `db.create_all()` (tenant novo, CI via
 `pre_start.py`) fica sem default no banco, enquanto produção migrada tem. INSERT em
 `orcamento` fora do ORM funciona em produção e falha com `NotNullViolation` em
 schema novo — **os dois schemas discordam em silêncio.** Falta
 `server_default=db.text('1')`.
-⚪ `models.py:7698` — o backref de `AditivoContrato.obra` usa `passive_deletes=True`
+⚪ `models.py:7698` ✅ **CORRIGIDO** (Onda 5, Task 8 — commit `ae4e4191`) — o backref de `AditivoContrato.obra` usa `passive_deletes=True`
 mas, ao contrário do irmão `ObraContratoVersao.obra` criado no mesmo hunk, omite
 `cascade='all, delete-orphan'`. Se a coleção já estiver carregada quando
 `db.session.delete(obra)` rodar, o SQLAlchemy toma o caminho de nulificação e emite
@@ -793,3 +854,255 @@ mesmos filtros e a mesma guarda `anterior <= 0`, e roda antes do ramo antecipado
    `utils.py:315` usa `Funcionario` sem importar — todo chamador levanta
    `NameError`. Zero chamadores de produção além do próprio re-export. Apagar.
    (Descoberto no fix round da Task 10.)
+
+---
+
+## Achados novos da execução da Onda 5 (28/08)
+
+> Nenhum destes estava na varredura de 25/08 — surgiram do próprio trabalho de
+> corrigir os 10 achados desta onda. Não têm task nem commit de correção
+> própria ainda (fora o (c), já consertado sem ligar rota nenhuma); são insumo
+> para a próxima rodada.
+
+(a) **`/api/registrar-facial` (`ponto_views.py`) não faz geofencing NENHUM.** A
+    Task 1 tornou o geofencing impositivo em vez de consultivo — mas só na rota
+    irmã. Esta rota nem chama o validador: um dispositivo fora do perímetro da
+    obra bate ponto facial sem nenhuma checagem de posição, cercada ou não.
+    (Observação da Task 1, 28/08.)
+
+(b) **`services/contrato_obra.py:407` — o defeito descrito não reproduziu no
+    cenário direto.** A varredura de 25/08 descrevia `_versao_vigente_da_obra`
+    devolvendo, em memória, uma versão já encerrada como se ainda fosse
+    vigente. No cenário direto isso **não** aconteceu: a query roda em
+    `no_autoflush` e o identity map devolve o objeto já mutado, então o
+    teste-pino nasceu verde. Pino de regressão
+    `test_versao_encerrada_em_memoria_nao_e_vigente` adicionado; se houver um
+    caminho real para o defeito, ele passa pelo fallback de `db.session.new`
+    que o pino não exercita. Registrado como **não reproduzido, pino
+    guardando** — não como corrigido. (Task 8, 28/08.)
+
+(c) **`crud_rdo_completo.salvar_rdo` segue SEM rota — reservada ao Módulo 07.**
+    O `func` não importado e os kwargs que `RDO` não aceita (`sequencial_ano`,
+    `ano`) foram consertados no commit `ce331094`, junto com o resto da Task 6
+    — a função agora está **consertada em vez de quebrada**, mas continua sem
+    nenhum chamador de produção. Decisão pendente para o Módulo 07: ligar uma
+    rota, ou apagar a função. (Task 6, 28/08.)
+
+
+## Achados do `/code-review max` sobre a branch da Onda 5 (28/08)
+
+> 🔴 **Passada nova, escopo novo: os 14 commits da branch
+> `sdd/onda-5-o-recusado-para-de-ser-gravado`, DEPOIS de a onda ter fechado com
+> gate verde de 2839.** Não são achados da varredura de 25/08 — são defeitos
+> introduzidos ou deixados passar pela execução das ondas.
+>
+> **Por que existiram apesar do gate verde:** três dos testes centrais da Onda 5
+> provam por `inspect.getsource()`. Um teste que lê o texto do código não vê o
+> que o código faz.
+
+### ✅ Corrigidos no fix round (`938cc92d`, `2d736fc0`)
+
+| # | Arquivo:linha | Defeito |
+|---|---|---|
+| R1 | `services/entregas_terceiros.py:366` | O `db.session.rollback()` do `except` é da sessão INTEIRA e apagava a transação do chamador. Como a falha vira `(0, 0)`, o `except` do chamador nunca dispara: o RDO sumia, o commit persistia sessão vazia, a tela dizia sucesso. **Perda silenciosa.** → SAVEPOINT |
+| R2 | `views/rdo.py:4116` | O ramo de edição de `ed85d117` nunca apagava os filhos: `custo_funcionario_dia.py:223-230` soma horas sobre todas as linhas do `rdo_id`, e o dia do trabalhador dobrava na 1ª edição. → delete igual ao de `rdo_salvar_unificado:2916-2941` |
+| R3 | `views/rdo.py:4117` | `data_relatorio` parseada e nunca atribuída no ramo de edição; `x or rdo.x` não distinguia campo ausente de campo esvaziado |
+| R4 | `views/rdo.py:4050` | `_rdo_alvo` filtrava `RDO.admin_id`, que é `nullable=True`: RDO legado caía na criação e produzia a duplicata que a correção existia para impedir. → `join(Obra)`, como `:2891` |
+
+### ✅ Corrigidos pela onda "A Porta Irmã" (31/08)
+
+> Plano: `docs/superpowers/plans/2026-08-28-a-porta-irma.md`. TDD com RED
+> citado em todas as tasks. **Gate de fecho: 2854 passed, 6 skipped, 2
+> xfailed, 0 failed** (43min55s) — o skipped caiu de 10 para 6, que é a Task 7
+> devolvendo `tests/test_propagacao_proposta_obra.py` ao gate (os 6 testes do
+> arquivo aparecem PASSED na saída).
+
+| # | Arquivo:linha | Defeito | Commit |
+|---|---|---|---|
+| A1 | `views/aditivos_views.py:144` | Ação financeira irreversível pendurada em `PapelObra.GESTOR`, cujo predicado devolve GESTOR para todo usuário do tenant enquanto `escopo_obra_ativo` está desligado — o default. **Decisão D5: garantia própria na rota**, não ligar a flag; o fallback permissivo de `utils/autorizacao.py` fica como está, porque é escolha consciente e documentada | `da778eba` `5fa775e7` `959fca86` |
+| A2 | `medicao_views.py:449` | O `@admin_required` do portal contornável trocando a URL: a mesma view responde em `/medicao/obra/<id>/gerar` e `/obras/<id>/medicao/fechar`. Decorator entra uma vez e cobre as duas | `d966b34a` |
+| A3 | `views/rdo.py:3581` | `flash()` com 500 caracteres de `format_exc()` mais e-mail e admin_id. **A varredura achou um segundo site que o review não tinha visto:** `views/obras.py:2279`, mesma forma, com um comentário dizendo "modo desenvolvimento" que não checava nada | `d8ebbd61` |
+| A4 | `production_routes.py:124,201,279,336,387` | `error_message=f"...{str(e)}"` sem gate, com `error.html:17` renderizando cru. O `:387` (safe-alimentacao) não passava `error_details` nenhum — a mensagem era o único vazamento da rota | `39fe3a85` |
+| A5 | `ponto_views.py:2454` | Omitir `obra_id` (ou mandar um irresolvível) pulava o geofencing inteiro. A tela veio junto: dizia "Obra (opcional)" e mandava `obra_id: obraId \|\| null`, então o caminho padrão passaria a tomar 400 | `b3af3549` |
+| A6 | `services/cronograma_apontamento_service.py:398` | Janela de `pct_ant` com `<` estrito não via o RDO irmão do mesmo dia. **A porta irmã estava dentro do próprio achado:** `acum_ant` (`:378`) tinha a janela idêntica no modo quantitativo — RDO B lia acumulado 40 onde o recompute lê 70 | `7d494cb9` |
+
+### ✅ Corrigidos pelo plano "O Que Não Persiste" (31/08)
+
+> Plano: `docs/superpowers/plans/2026-08-28-o-que-nao-persiste.md`. TDD com RED
+> citado em todas as tasks. **Gate de fecho: 2872 passed, 6 skipped, 201
+> deselected, 2 xfailed, 0 failed** (46min44s) — 18 verdes acima do piso de
+> 2854 deixado pela onda "A Porta Irmã", e o skipped ficou nos mesmos 6.
+
+| # | Arquivo:linha | Defeito | Commit |
+|---|---|---|---|
+| N1 | `portal_obras_views.py:647` | `db.session.commit()` sem guarda dentro do `except`, e a linha 648 relaiando a exceção crua para visitante **anônimo**. O commit da trilha de erro ganhou guarda própria, e a exceção parou de subir para o anônimo | `42c17ddb` |
+| N2 | `models.py:7616` | A migration 315 alargou `uq_contrato_versao_vigente` para `(obra_id, admin_id)` e deixou a irmã `uq_contrato_versao_obra_versao` como `UNIQUE(obra_id, versao)`, enquanto `abrir_versao` numera por tenant: a obra travada continuava travada. Migration 316 dá o `admin_id` à irmã. **A porta irmã apareceu dentro do próprio fix:** `create_all()` roda ANTES das migrações em todo boot, então em banco novo o modelo criava a irmã como CONSTRAINT genuína enquanto a 316 sempre a tratou como ÍNDICE solto — `DROP INDEX` estourava `DependentObjectsStillExist`, e `IF EXISTS` não salvava | `416967b9` `f906e20f` |
+| N3 | `services/cronograma_proposta.py:609,685` | `if not tarefa.ativa: tarefa.ativa = True` reimplementava, incompleto, o `reativar_tarefas_de_itens_reincluidos` do mesmo módulo: não limpava `arquivada_em` nem cascateava para as filhas arquivadas. Os dois ramos de reúso passam a delegar ao restaurador | `e404a5e8` `22fa7e4e` `915462d0` |
+| N4 | `services/proposta_diff.py:92` | Comparava o snapshot `Numeric(15,2)` com o produto `quantidade × preco_unitario` não arredondado (até 5 casas): linha intocada virava "alterado", e `templates/propostas/comparar.html:78-79` imprimia um valor diferente do que o diff usava. A classificação passou a comparar em centavos e a tela mostra o mesmo número. **Fix round:** `total_do_diff` misturava centavos com valor cru e arredondava linha a linha — um reajuste distribuído por muitos itens, cada delta abaixo de meio centavo, somaria zero apesar do impacto agregado; agora soma bruto e arredonda uma vez só, no fim | `6ce5c90a` `aba6df97` |
+| N5 | `portal_obras_views.py:774,696,786,939` | O redesenho "um evento commitado por tentativa" tinha sido aplicado a 2 das 6 rotas que registram trilha; `ver_comprovante` registrava e devolvia `send_file` sem commit algum, e **toda visualização de comprovante pelo cliente sumia no `session.remove()`**. As seis rotas commitam, e a tentativa recusada também deixa rastro | `b581da0d` |
+
+⚠️ **O padrão do teste que nasce verde reapareceu aqui**, agora dentro do
+próprio fix round: `test_reuso_por_chave_natural_restaura_a_tarefa_arquivada`
+contava ocorrências de `.ativa = True` no fonte com `inspect.getsource()` — o
+padrão que estes planos existem para eliminar — e **reprovava a melhora de
+comportamento** do N3, porque delegar ao restaurador derrubava a contagem de 3
+para 1. Reescrito em `915462d0` para provar pelo banco, via
+`materializar_cronograma`, que o ramo de reúso em nível inferior restaura
+`ativa`, limpa `arquivada_em` e cascateia para a neta arquivada.
+
+### ✅ Um achado sobre o próprio gate — fechado pela Task 7 (`dd8ff183`)
+
+📖 `tests/test_propagacao_proposta_obra.py:35` — a fixture faz
+`Usuario.query.filter_by(tipo_usuario='ADMIN').first()`, um `.first()` **sem
+`ORDER BY`** num banco com **185.784 ADMINs**, e `pytest.skip()` quando o
+sorteado não tem obra. Qualquer escrita reembaralha o sorteio: no gate de
+28/08 **4 testes pararam de rodar** sem que nada sinalizasse, e isso não havia
+acontecido em nenhum dos oito gates anteriores. Não é regressão de código — é
+uma verificação que parece cobrir mais do que cobre.
+
+✅ **Fechado em `dd8ff183`:** a fixture semeia o próprio tenant em vez de
+sortear entre os 185.784 ADMINs. No gate de fecho da onda (31/08) os **6**
+testes do arquivo aparecem PASSED e o skipped total caiu de 10 para 6 — os 4
+que a Task 7 devolveu. 🔬 A contagem "4" é a do ruling R7: o plano dizia 6, e 6
+estava errado.
+
+
+## Achados novos da execução da onda "A Porta Irmã" (31/08)
+
+> Registrados no mesmo formato das Ondas 3 e 5: o que a execução revelou e o
+> review não tinha visto.
+
+1. **`views/obras.py:2279` — o gêmeo do vazamento do RDO.** Mesmo `flash` com
+   `format_exc()` inteiro, e o comentário dizia "exibir traceback completo em
+   modo desenvolvimento" quando não havia checagem nenhuma: ia para a tela em
+   produção também. Só apareceu porque o guarda da Task 3 deixou de nomear
+   módulos e passou a varrer o app. (Task 3, corrigido em `d8ebbd61`.)
+
+2. **`services/cronograma_apontamento_service.py:378` — a porta irmã dentro do
+   próprio achado.** O review nomeou o `pct_ant` (`:398`); o `acum_ant`
+   (`:378`), que alimenta o modo quantitativo, tinha a janela estrita idêntica,
+   e o `recomputar_cadeia` soma o irmão do mesmo dia nos DOIS modos. RED
+   medido: RDO A executa 30 un, RDO B no mesmo dia executa 40, e o acumulado de
+   B lia 40 em vez de 70. (Task 6, corrigido em `7d494cb9`.)
+
+3. **A correção do geofencing quebrava a própria tela.** `ponto_views` passou a
+   exigir `obra_id`, mas `templates/ponto/ponto_facial_automatico.html:131`
+   dizia "Obra (opcional)" e o JS mandava `obra_id: obraId || null` — o caminho
+   PADRÃO da interface passaria a tomar 400. Achado só porque se foi olhar quem
+   chamava a rota. Backend e tela têm de mudar no mesmo commit. (Task 5,
+   `b3af3549`.)
+
+### 🔴 O padrão que se repetiu: o teste que nasce verde
+
+**Em três das seis tasks, o teste escrito NO PLANO teria passado sem tocar no
+defeito** — e teria sido commitado como prova.
+
+| Task | O teste do plano | Por que não podia falhar |
+|---|---|---|
+| 3 | POST em `/rdo/salvar` com `obra_id` inexistente | Cai em `flash('Obra não encontrada')` + redirect (`:2951`), caminho validado que nunca chega ao `except`. Gatilho trocado por data em formato brasileiro, que estoura o `strptime` de `:2948` |
+| 4 | GET nas cinco rotas `/prod/safe-*` | Só falharia se alguma rota errasse por conta própria no ambiente. O plano mandava forçar o erro à mão e desfazer; o erro passou a ser injetado pelo teste (monkeypatch em `get_safe_admin_id`, chamada dentro do `try` das cinco), para o teste seguir sendo guarda |
+| 5 | POST facial sem `obra_id` | Morre em 404 "nenhum funcionário com foto cadastrada" antes do geofencing — e 404 estava na lista de status aceitos. Passou a semear foto e grampear os dois pontos que barram foto sintética |
+
+**A leitura que importa:** esta onda nasceu porque três testes da Onda 5
+provavam por `inspect.getsource()` — liam o texto do código e não viam o que
+ele fazia. O plano proibiu `getsource()` explicitamente, e mesmo assim três dos
+seus próprios testes traziam a versão seguinte do mesmo vício: **não ler o
+texto, mas também nunca chegar ao código sob teste.** Proibir a técnica não
+basta; o RED tem de ser medido e a mensagem do RED tem de citar o defeito, não
+só um status aceitável.
+
+Daí a regra que esta onda acrescenta, e que o teste da Task 4 já aplica: **um
+teste de guarda tem de reprovar também quando o próprio gatilho para de
+funcionar.** Ele exige status 500 em cada rota antes de olhar o vazamento — se
+o erro injetado deixar de ocorrer, o teste acusa em vez de virar andaime verde.
+
+---
+
+## 02/09 — a suíte browser rodou inteira, e sobrou um achado
+
+A primeira rodada completa da suíte (02/09, 46:08) devolveu **12 failed + 68
+errors**. Eram **um defeito só**: fixture de escopo `session` segurando um
+`with sync_playwright()` aberto envenenava todo teste de browser dos arquivos
+seguintes (corrigido em `a80f1ddc`; guarda no gate em
+`tests/test_contrato_isolamento_playwright.py`). Um segundo defeito, que o
+primeiro escondia, era a jornada E2E criar o Cliente **depois** do GET da
+página (corrigido em `160c7282`).
+
+Depois dos dois, pelo runner retomável (`scripts/suite_resumavel.py`, 30
+chunks, processo isolado por arquivo de browser): **3435 passed, 1 failed,
+8 skipped, 72 xfailed**. Sobrou este:
+
+### 🟡 P4 do RDO unificado espera o botão de equipe interna numa tarefa de subempreitada
+
+- **Onde:** `tests/test_rdo_unificado_playwright.py:275-277` (asserção P4);
+  `templates/rdo/novo.html:1262-1267` (ramo `isSub`) e `:1329` (ramo `else`).
+- **O que acontece:** o teste exige `#btn-equipe-<t_sub_id>` presente numa
+  tarefa cujo responsável é **Subempreitada**. No template, `btn-equipe-` só é
+  emitido no ramo `else` (tarefa interna); o ramo `isSub` renderiza apenas
+  `Total:` e o botão de terceiros. O comentário de `novo.html:1176` chama o
+  `btn-equipe-` de "botão de **efetivo interno**".
+- **Log:** `FAIL: P4 botão #btn-equipe-1887165 presente` — única asserção
+  vermelha das ~20 do arquivo; P1, P2, P3, P5, P5b, P3b, P6 e as seguintes
+  passam, inclusive o `#modalSubempreitada` abrindo com a tarefa
+  pré-selecionada.
+- **Por que NÃO foi corrigido aqui:** decidir isso é decisão de produto — ou o
+  botão de equipe interna deve aparecer também em tarefa subempreitada (e o
+  template regrediu), ou não deve (e a asserção P4 está desatualizada, mesma
+  família das outras desta rodada). A rodada de 02/09 tinha constraint
+  explícita de **não tocar em produção**, e não há evidência no repositório que
+  decida a intenção. Quem souber a intenção fecha em uma linha, dos dois lados.
+- **O que se sabe e o que não se sabe:** sabe-se que a asserção e o template
+  discordam hoje. **Não** se sabe desde quando — a família browser nunca teve
+  placar histórico, então isto não é presumida regressão.
+
+---
+
+## 02/09 — o pré-voo da Onda 4 acha o gêmeo vivo do módulo que a D4 apagou
+
+A varredura de pré-voo da **Task 7** de `2026-08-31-fecho-do-que-esta-aberto.md`
+(a regra da casa: pré-voo abre cada etapa) foi procurar se os alvos da Onda 4
+ainda existiam na árvore de hoje. Dois haviam sido apagados — e um terceiro
+arquivo, que **nenhum dos dois planos lista**, comete os mesmos defeitos.
+
+### 🔴 `exportacao_relatorios.py` — inoperante, registrado, e mentindo `success: true`
+
+- **É módulo vivo, não morto:** blueprint registrado em `main.py:157`
+  (`url_prefix='/relatorios/exportacao'`) e na lista de módulos de
+  `app.py:1108`. 📖 É o mesmo argumento que pôs `dashboards_especificos.py` no
+  adendo de 28/08 da Onda 4.
+- **Onde:** `_obter_dados_resumo_executivo` (`exportacao_relatorios.py:373-418`),
+  alcançável por três rotas — `/gerar-pdf` (via `:97`), `/gerar-excel` (via
+  `:245`) e `/api/preview-dados` (`:746`).
+- **Os três defeitos, provados por execução e não por leitura:**
+  1. `:380` — `UsoVeiculo.km_rodado`: `AttributeError: type object 'UsoVeiculo'
+     has no attribute 'km_rodado'`. A coluna real é `km_percorrido`
+     (`models.py:5265`). É o **terceiro** sítio do mesmo defeito: os outros são
+     `dashboards_especificos.py:396, :448, :463` (o adendo de 28/08 os aponta em
+     `:394, :446, :461` — as linhas andaram).
+  2. `:396` `ManutencaoVeiculo` e `:404`, `:480-483` `AlertaVeiculo`: **nenhum
+     dos dois importado**. O import de `models` (`:36-38`) traz só
+     `db, Veiculo, CustoVeiculo, UsoVeiculo` → `NameError`.
+  3. `AlertaVeiculo` **não existe no repo** — nem em `models.py`, nem em lugar
+     nenhum: só o `AlertaVeiculoForm` (`forms.py:475`). É o mesmo caso do
+     `AlocacaoVeiculo` que a Onda 4 cita para o módulo já apagado.
+- **E o erro é engolido:** `:416-418` faz `except Exception: logger.error(...);
+  return {}`, e `/api/preview-dados` responde `{'success': True, 'resumo': {}}`.
+  🔴 **É exatamente a mentira que motivou a D4** — "responde `success: true` com
+  forma vazia em vez de errar" — viva noutro arquivo, depois de o primeiro ter
+  sido apagado.
+- **Por que NÃO foi corrigido aqui:** é a mesma pergunta da D4 (apagar ou
+  consertar), e a D4 foi respondida pelo **dono**, não pelo executor. Escalada
+  como **D7** em `2026-08-31-decisoes-pendentes.md`.
+- **O que se sabe e o que não se sabe:** sabe-se que as três rotas quebram na
+  primeira requisição que chegue ao resumo executivo, e que o usuário vê PDF/
+  Excel/preview vazios em vez de erro. **Não** se sabe se alguém as usa — não há
+  teste que as chame (é a razão pela qual sobreviveram) e o repositório não
+  registra chamador de produção.
+
+### ✅ Um falso alarme desarmado no mesmo pré-voo
+
+O cabeçalho da Onda 4 lista `ativo=True` "numa tabela sem `ativo`" entre os
+defeitos de existência. 🔬 `Veiculo.ativo` **existe** (`models.py:5186`), e
+`AlertaVeiculo.ativo` não é o caso porque a classe inteira não existe. Aquele
+defeito morreu junto com o módulo apagado — quem for executar a Onda 4 não deve
+procurá-lo.

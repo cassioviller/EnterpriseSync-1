@@ -48,8 +48,8 @@ logger = logging.getLogger(__name__)
 _cache_facial = None
 _cache_loaded = False
 _cache_mtime = 0  # Timestamp de modificação do arquivo quando carregado
-_deepface_model_loaded = False
-_sface_model = None  # Cache do modelo TensorFlow em memória
+_deepface_model_loaded = False  # nome mantido; desde 01/09/2026 o modelo é o SFace nativo (cv2)
+_sface_model = None  # Cache do cv2.FaceRecognizerSF em memória (era DeepFace/TF)
 _face_cascade = None  # Cache do classificador Haar para detecção facial
 
 PIPELINE_VERSION = "4.0-face-detection"
@@ -65,77 +65,53 @@ def get_face_cascade():
     return _face_cascade
 
 def get_sface_model():
-    """Retorna o modelo SFace cacheado em memória usando DeepFace.build_model"""
+    """Retorna o SFace nativo cacheado (cv2.FaceRecognizerSF).
+
+    Trocado em 01/09/2026 (Task 8): era DeepFace.build_model('SFace') —
+    mesmo modelo, agora servido pelo OpenCV puro via utils_facial_sface,
+    sem TensorFlow. Equivalência medida em
+    tests/test_sface_nativo_equivalencia.py."""
     global _sface_model
     if _sface_model is not None:
         logger.debug("✅ Usando modelo SFace já cacheado em memória")
         return _sface_model
-    
+
     try:
         import time
         start = time.time()
-        from deepface import DeepFace
-        
-        logger.info("🔄 Carregando modelo SFace pela primeira vez...")
-        _sface_model = DeepFace.build_model('SFace')
-        
+        from utils_facial_sface import _get_modelo
+
+        logger.info("🔄 Carregando modelo SFace nativo pela primeira vez...")
+        _sface_model = _get_modelo()
+
         elapsed = time.time() - start
-        logger.info(f"✅ Modelo SFace carregado e cacheado em {elapsed:.2f}s")
-        logger.info(f"✅ Tipo do modelo: {type(_sface_model)}")
-        logger.info(f"✅ Input shape: {_sface_model.input_shape if hasattr(_sface_model, 'input_shape') else 'N/A'}")
-        
+        logger.info(f"✅ Modelo SFace nativo carregado e cacheado em {elapsed:.2f}s")
         return _sface_model
     except Exception as e:
         logger.warning(f"⚠️ Erro ao carregar SFace: {e}")
         return None
 
 def preload_deepface_model():
-    """Pré-carrega o modelo DeepFace para evitar delay na primeira requisição"""
+    """Pré-carrega o modelo facial para evitar delay na primeira requisição.
+
+    Nome mantido pelos chamadores (gerar_cache_facial.py, startup); desde
+    01/09/2026 o que se carrega é o SFace nativo — não há mais fallback
+    DeepFace."""
     global _deepface_model_loaded, _sface_model
     if _deepface_model_loaded and _sface_model is not None:
         return True
     try:
         import time
         start = time.time()
-        
-        logger.info("🔄 Pré-carregando modelo SFace diretamente...")
-        
-        # Tentar carregar modelo diretamente (mais rápido)
+
         model = get_sface_model()
         if model is not None:
             _deepface_model_loaded = True
             logger.info(f"✅ Modelo SFace pré-carregado em {time.time() - start:.2f}s")
             return True
-        
-        # Fallback: carregar via DeepFace.represent
-        from deepface import DeepFace
-        import numpy as np
-        
-        logger.info("🔄 Fallback: pré-carregando via DeepFace.represent...")
-        
-        dummy_img = np.zeros((112, 112, 3), dtype=np.uint8)
-        import tempfile
-        import os
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
-            from PIL import Image
-            Image.fromarray(dummy_img).save(tmp.name)
-            tmp_path = tmp.name
-        try:
-            DeepFace.represent(
-                img_path=tmp_path,
-                model_name='SFace',
-                enforce_detection=False,
-                detector_backend='skip',
-                align=False
-            )
-            _deepface_model_loaded = True
-            logger.info(f"✅ Modelo DeepFace SFace pré-carregado em {time.time() - start:.2f}s")
-            return True
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+        return False
     except Exception as e:
-        logger.warning(f"⚠️ Erro ao pré-carregar modelo DeepFace: {e}")
+        logger.warning(f"⚠️ Erro ao pré-carregar modelo facial: {e}")
         return False
 
 
@@ -173,12 +149,11 @@ def validar_formato_embedding(embedding):
 
 def gerar_embedding_otimizado(img_path):
     """
-    Gera embedding usando modelo SFace cacheado em memória.
-    Usa model.forward() do SFaceClient que é MUITO mais rápido que DeepFace.represent().
-    
-    IMPORTANTE: SFace usa OpenCV DNN, não Keras!
-    - Entrada: BGR normalizado para [0, 1]
-    - Shape: (batch, 112, 112, 3)
+    Gera embedding usando o SFace nativo cacheado em memória
+    (cv2.FaceRecognizerSF via utils_facial_sface — Task 8, 01/09/2026).
+    Mesmos 128 floats que o caminho DeepFace produzia: o engine e o ONNX
+    são os mesmos (tests/test_sface_nativo_equivalencia.py), então o
+    formato do cache_facial.pkl não muda.
     """
     import time
     import cv2
@@ -230,51 +205,23 @@ def gerar_embedding_otimizado(img_path):
                 img_resized = cv2.resize(img, (112, 112))
             logger.info(f"⏱️ crop+resize: {time.time()-t0:.3f}s")
             
-            # 4. Normalizar para [0, 1] - SFace espera esse formato
+            # 4. Gerar embedding pelo SFace nativo (recebe o BGR uint8
+            #    recortado; o resize para 112x112 é dele)
             t0 = time.time()
-            img_normalized = img_resized.astype(np.float32) / 255.0
-            img_batch = np.expand_dims(img_normalized, axis=0)
-            logger.info(f"⏱️ normalize+batch: {time.time()-t0:.3f}s")
-            
-            # 5. Gerar embedding usando forward() (OpenCV DNN)
-            t0 = time.time()
-            embedding = model.forward(img_batch)
+            from utils_facial_sface import gerar_embedding_sface
+            embedding = gerar_embedding_sface(img_resized)
             elapsed_forward = time.time() - t0
             elapsed_total = time.time() - start_total
-            logger.info(f"⚡ model.forward(): {elapsed_forward:.3f}s | TOTAL: {elapsed_total:.3f}s")
-            
-            # IMPORTANTE: Remover dimensão do batch
-            # model.forward() retorna shape (1, 128), precisamos de (128,)
-            if isinstance(embedding, np.ndarray):
-                logger.info(f"📊 Embedding shape ANTES: {embedding.shape}")
-                
-                # Remover dimensão do batch se existir
-                if len(embedding.shape) > 1 and embedding.shape[0] == 1:
-                    embedding = embedding[0]  # De (1, 128) para (128,)
-                    logger.info(f"📊 Embedding shape DEPOIS: {embedding.shape}")
-                
-                # Converter para lista simples
-                embedding_list = embedding.tolist()
-                
-                # Validar formato
-                if isinstance(embedding_list, list) and len(embedding_list) == 128:
-                    logger.info(f"✅ Embedding formato correto: lista de {len(embedding_list)} elementos")
-                    logger.info(f"✅ gerar_embedding_otimizado - SUCESSO em {elapsed_total:.3f}s")
-                    return embedding_list
-                else:
-                    logger.error(f"❌ Embedding formato inválido: {type(embedding_list)}, len={len(embedding_list) if isinstance(embedding_list, list) else 'N/A'}")
-                    raise ValueError(f"Embedding com formato inválido")
-            
-            # Se não for numpy array, tentar converter
-            if isinstance(embedding, list):
-                # Se for lista aninhada, pegar primeiro elemento
-                if len(embedding) > 0 and isinstance(embedding[0], list):
-                    logger.warning(f"⚠️ Embedding é lista aninhada, corrigindo...")
-                    embedding = embedding[0]
-                return embedding
-            
-            return list(embedding)
-            
+            logger.info(f"⚡ SFace nativo: {elapsed_forward:.3f}s | TOTAL: {elapsed_total:.3f}s")
+
+            embedding_list = np.asarray(embedding).flatten().tolist()
+            if len(embedding_list) == 128:
+                logger.info(f"✅ gerar_embedding_otimizado - SUCESSO em {elapsed_total:.3f}s")
+                return embedding_list
+
+            logger.error(f"❌ Embedding formato inválido: len={len(embedding_list)}")
+            raise ValueError("Embedding com formato inválido")
+
         except Exception as e:
             elapsed = time.time() - start_total
             logger.warning(f"⚠️ Erro ao usar modelo cacheado após {elapsed:.3f}s: {e}")
@@ -282,29 +229,11 @@ def gerar_embedding_otimizado(img_path):
             import traceback
             logger.warning(f"⚠️ Traceback: {traceback.format_exc()}")
     else:
-        logger.warning("⚠️ Modelo NÃO está em cache! Usando fallback...")
-    
-    # Fallback para DeepFace.represent (lento mas funciona)
-    logger.warning(f"🔄 gerar_embedding_otimizado - Usando FALLBACK (DeepFace.represent)")
-    start_fallback = time.time()
-    try:
-        from deepface import DeepFace
-        result = DeepFace.represent(
-            img_path=img_path,
-            model_name='SFace',
-            enforce_detection=False,
-            detector_backend='skip',
-            align=False
-        )
-        
-        if result and len(result) > 0:
-            elapsed_fallback = time.time() - start_fallback
-            elapsed_total = time.time() - start_total
-            logger.warning(f"🔄 DeepFace.represent: {elapsed_fallback:.2f}s | TOTAL: {elapsed_total:.2f}s")
-            return result[0]['embedding']
-    except Exception as e:
-        logger.error(f"❌ Erro no fallback: {e}")
-    
+        # Sem fallback DeepFace desde 01/09/2026: se o modelo nativo não
+        # carregou, não há outro engine no processo — devolver None é o
+        # mesmo contrato de erro de antes.
+        logger.error("❌ Modelo SFace nativo indisponível — sem embedding")
+
     return None
 
 def redimensionar_imagem_para_reconhecimento(foto_base64, max_width=640, max_height=480):
@@ -414,10 +343,10 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.80):
     
     try:
         t0 = time.time()
-        from deepface import DeepFace
+        from utils_facial_sface import gerar_embedding_sface  # noqa: F401 — só disponibilidade
         timings['import'] = time.time() - t0
     except ImportError:
-        return None, None, "DeepFace não instalado"
+        return None, None, "SFace nativo não disponível"
     
     t0 = time.time()
     cache = carregar_cache_facial()
@@ -552,7 +481,7 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.80):
 
 ponto_bp = Blueprint('ponto', __name__, url_prefix='/ponto')
 
-# Pré-carregar modelo DeepFace e cache facial no import do módulo
+# Pré-carregar modelo SFace nativo e cache facial no import do módulo
 try:
     import threading
     def _async_preload():
@@ -569,7 +498,7 @@ try:
             logger.warning(f"⚠️ Preload async falhou: {e}")
     
     threading.Thread(target=_async_preload, daemon=True).start()
-    logger.info("🚀 Iniciando pré-carregamento assíncrono do modelo DeepFace + cache facial")
+    logger.info("🚀 Iniciando pré-carregamento assíncrono do modelo SFace nativo + cache facial")
 except Exception as e:
     logger.warning(f"⚠️ Não foi possível iniciar preload: {e}")
 
@@ -607,24 +536,14 @@ def index():
                              funcionarios=funcionarios_com_status,
                              hoje=hoje)
         
-    except Exception as e:
-        import traceback
-        erro_completo = traceback.format_exc()
-        logger.error(f"Erro ao listar funcionários: {e}\n{erro_completo}")
-        # Mostrar erro na tela para debug em produção
-        return f"""
-        <html>
-        <head><title>Erro Ponto</title></head>
-        <body style="font-family: monospace; padding: 20px; background: #f8f9fa;">
-            <h1 style="color: red;">Erro ao carregar página de Ponto</h1>
-            <h3>Mensagem: {str(e)}</h3>
-            <pre style="background: #fff; padding: 15px; border: 1px solid #ccc; overflow-x: auto;">
-{erro_completo}
-            </pre>
-            <p><a href="/dashboard">Voltar ao Dashboard</a></p>
-        </body>
-        </html>
-        """, 500
+    except Exception:
+        # O traceback ia para o HTML: caminhos, frames e SQL com os
+        # parâmetros vinculados, visíveis a qualquer usuário autenticado.
+        # Erro vai para o log; o usuário vê mensagem.
+        logger.exception('falha ao montar a tela de ponto')
+        flash('Não foi possível carregar a tela de ponto. '
+              'A equipe técnica foi notificada.', 'danger')
+        return redirect(url_for('main.dashboard'))
 
 
 @ponto_bp.route('/funcionario/<int:funcionario_id>')
@@ -2392,8 +2311,15 @@ def identificar_e_registrar():
                 'detalhes': detalhes
             }), 400
         
-        # Usar threshold mais rigoroso para evitar falsos positivos (era 0.55)
-        THRESHOLD_DISTANCIA = THRESHOLD_CONFIANCA  # 0.40
+        # Dois limiares em escalas DIFERENTES (separados em 01/09/2026 —
+        # antes o mesmo 0.80 alimentava os dois espaços):
+        # - caminho por cache: distância L2 entre embeddings L2-normalizados.
+        #   Mantido o valor efetivo vigente (0.80) para a troca de engine da
+        #   Task 8 não mudar a aceitação aqui.
+        # - fallback multi-fotos: distância de COSSENO — usa
+        #   utils_facial.THRESHOLD_CONFIANCA (recalibrada para 1 - 0.363).
+        THRESHOLD_DISTANCIA_L2 = 0.80
+        THRESHOLD_DISTANCIA = THRESHOLD_CONFIANCA
         melhor_match = None
         menor_distancia = float('inf')
         
@@ -2401,7 +2327,7 @@ def identificar_e_registrar():
         start_cache = time.time()
         logger.info("⏱️ [CACHE] Tentando identificação via cache de embeddings...")
         func_id, distancia_cache, erro_cache = identificar_por_cache(
-            foto_capturada_base64, admin_id, THRESHOLD_DISTANCIA
+            foto_capturada_base64, admin_id, THRESHOLD_DISTANCIA_L2
         )
         cache_elapsed = time.time() - start_cache
         
@@ -2454,23 +2380,45 @@ def identificar_e_registrar():
         funcionario = melhor_match
         logger.info(f"Funcionário identificado: {funcionario.nome} (distância: {menor_distancia:.4f})")
         
-        # GEOFENCING: Validar localização se obra tiver coordenadas
+        # GEOFENCING: o validador decide, inclusive quando o cliente OMITE as
+        # coordenadas. Antes a chamada era pulada nesse caso, tornando o
+        # controle consultivo — bastava não mandar latitude/longitude.
+        # `validar_localizacao_na_obra` já tem a semântica certa: obra com
+        # geofence configurado e sem coordenada RECUSA; obra sem geofence
+        # segue aceitando.
+        # `obra_id` é obrigatório e tem de resolver NO TENANT. Antes,
+        # `if obra_id:` era falso na omissão e `if obra:` era falso para id
+        # alheio — nos dois casos o validador não rodava e o ponto nascia com
+        # obra_id=None. É a mesma frase do defeito anterior descrita acima
+        # ("bastava não mandar latitude/longitude") com outra palavra: bastava
+        # não mandar obra_id.
         distancia_obra = None
-        if obra_id and latitude_func is not None and longitude_func is not None:
-            obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
-            if obra:
-                valido_geo, distancia_obra, msg_geo = validar_localizacao_na_obra(
-                    latitude_func, longitude_func, obra
-                )
-                logger.info(f"Geofencing para {funcionario.nome}: {msg_geo}")
-                
-                if not valido_geo:
-                    return jsonify({
-                        'success': False,
-                        'message': f'Você está fora da área permitida da obra. {msg_geo}',
-                        'funcionario_nome': funcionario.nome,
-                        'distancia_obra': round(distancia_obra, 1) if distancia_obra else None
-                    }), 403
+        if not obra_id:
+            return jsonify({
+                'success': False,
+                'message': 'Obra não informada. Selecione a obra antes de '
+                           'registrar o ponto.'
+            }), 400
+
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if obra is None:
+            return jsonify({
+                'success': False,
+                'message': 'Obra não encontrada para esta empresa.'
+            }), 404
+
+        valido_geo, distancia_obra, msg_geo = validar_localizacao_na_obra(
+            latitude_func, longitude_func, obra
+        )
+        logger.info(f"Geofencing para {funcionario.nome}: {msg_geo}")
+
+        if not valido_geo:
+            return jsonify({
+                'success': False,
+                'message': f'Você está fora da área permitida da obra. {msg_geo}',
+                'funcionario_nome': funcionario.nome,
+                'distancia_obra': round(distancia_obra, 1) if distancia_obra else None
+            }), 403
         
         # Registrar o ponto
         hoje = get_date_brasil()

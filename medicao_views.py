@@ -5,6 +5,8 @@ from decimal import Decimal
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for, make_response
 from flask_login import login_required
 
+from auth import admin_required
+
 from app import db
 from models import (
     Obra, MedicaoObra, ItemMedicaoComercial,
@@ -446,7 +448,14 @@ def config_obra_medicao(obra_id):
 @medicao_bp.route('/obras/<int:obra_id>/medicao/fechar', methods=['POST'])
 @medicao_bp.route('/medicao/obra/<int:obra_id>/gerar', methods=['POST'])
 @login_required
+@admin_required
 def gerar_medicao(obra_id):
+    # `admin_required`: esta view atende DUAS URLs, e é a irmã de
+    # `portal_obras.gerar_medicao` — que a Onda 5 fechou. Fechar lá e deixar
+    # aqui devolvia o privilégio a quem trocasse a URL: o POST criava a
+    # MedicaoObra e a ContaReceber que ela auto-cria. O decorator entra uma vez
+    # e cobre as duas rotas; qualquer terceira rota que aponte para cá já
+    # nasce coberta.
     guard = _check_v2()
     if guard:
         return guard

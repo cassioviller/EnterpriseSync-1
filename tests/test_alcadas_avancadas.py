@@ -849,8 +849,22 @@ def _fornecedor(admin_id):
     return f
 
 
-def _pedido(admin_id, fornecedor_id, obra_id=None, valor='100.00'):
-    p = PedidoCompra(fornecedor_id=fornecedor_id, data_compra=date(2026, 8, 1),
+def _pedido(admin_id, fornecedor_id, obra_id=None, valor='100.00',
+            dias_atras=0):
+    """Pedido emitido há `dias_atras` dias. A data é RELATIVA, de propósito.
+
+    A janela do acumulado é rolante (`acumulado_do_fornecedor`:
+    `data_compra >= date.today() - timedelta(days=janela)`), então data
+    absoluta aqui é bomba-relógio: o fixture sai da janela sozinho quando o
+    calendário anda. Foi o que aconteceu — `date(2026, 8, 1)` era o próprio
+    limite em 31/08/2026 e caiu fora em 01/09, derrubando dois testes com o
+    código de produção intacto.
+
+    `dias_atras` é o mesmo botão de `_req_na_etapa`, pela mesma razão: a borda
+    da janela só se exercita com a distância na mão.
+    """
+    p = PedidoCompra(fornecedor_id=fornecedor_id,
+                     data_compra=date.today() - timedelta(days=dias_atras),
                      obra_id=obra_id, valor_total=Decimal(valor),
                      admin_id=admin_id, tipo_compra='normal')
     db.session.add(p)
@@ -1341,7 +1355,7 @@ def test_emissao_usa_a_faixa_efetiva_e_e_onde_o_fornecedor_novo_pesa():
     # efetiva pede 2 aprovações, e a guarda 2 passa a morder.
     html = _cliente_de(aid).post(
         f'/compras/requisicoes/{rid}/emitir-pedido',
-        data={'fornecedor_id': str(fid), 'data_compra': '2026-08-15'},
+        data={'fornecedor_id': str(fid), 'data_compra': date.today().isoformat()},
         follow_redirects=True).get_data(as_text=True)
 
     assert 'não pode emitir o pedido' in html, (
@@ -1505,6 +1519,59 @@ def test_a_janela_vem_da_configuracao_do_tenant_e_nao_do_codigo():
             'com a janela em 7 dias as irmãs de 10 dias atrás saem da conta — '
             'e ninguém tocou em código para isso')
         assert alvo.degrau_aplicado == ''
+
+
+def test_o_pedido_do_fixture_nasce_dentro_da_janela_do_tenant():
+    """Guarda de calendário: o fixture tem de contar para o acumulado HOJE.
+
+    A janela do acumulado é ROLANTE (`data_compra >= today - janela`), e data
+    absoluta em fixture sai dela sozinha quando o calendário anda. Aconteceu em
+    01/09/2026: `date(2026, 8, 1)` era exatamente o limite em 31/08 (janela
+    padrão de 30 dias, comparação inclusiva) e caiu fora no dia seguinte,
+    derrubando dois testes sem que uma linha de produção mudasse.
+
+    O sintoma aparecia longe da causa — faixa #1 onde se esperava #3 — e essa
+    é a razão desta guarda existir: aqui a mensagem diz "fixture vencido", que
+    é o que de fato aconteceu.
+
+    A janela não é literal: sai do default da coluna, mesma fonte que
+    `janela_de_fracionamento` usa.
+
+    Esta guarda prova "dentro entra" (`dias_atras=0`) e "velho demais sai"
+    (`dias_atras=janela + 1`), mas deliberadamente não prova a borda exata
+    (`dias_atras=janela`, que pela comparação inclusiva `>=` deveria contar).
+    Duas razões: primeiro, depois desta correção nenhum fixture do parque
+    mora nessa borda — todos nascem em `dias_atras=0` — então a
+    inclusividade do `>=` deixou de ser load-bearing para qualquer teste
+    real. Segundo, `dias_atras=janela` seria a única asserção deste arquivo
+    capaz de virar sozinha à meia-noite: `data_compra = hoje₀ - janela`, e se
+    a query rodar depois da virada o corte anda e o pedido cai fora — uma
+    falha vermelha causada pelo relógio, num teste cujo propósito declarado
+    é justamente impedir falhas causadas pelo relógio. As duas asserções
+    acima são imunes por construção; adicionar a terceira trocaria essa
+    imunidade por uma cobertura que não paga o risco.
+    """
+    from services.alcada_compras import (acumulado_do_fornecedor,
+                                         janela_de_fracionamento)
+    with app.app_context():
+        adm = _admin()
+        obra = _obra(adm.id)
+        _cfg_tenant(adm.id)
+        forn = _fornecedor(adm.id)
+        janela = janela_de_fracionamento(adm.id)
+
+        _pedido(adm.id, forn.id, obra_id=obra.id, valor='20000.00')
+        assert acumulado_do_fornecedor(adm.id, obra.id, forn.id) == \
+            Decimal('20000.00'), (
+                f'o pedido do fixture caiu FORA da janela de {janela} dias — '
+                f'data absoluta em `_pedido` vence sozinha com o calendário')
+
+        # E o botão da borda tem de ser real: mais velho que a janela não soma.
+        _pedido(adm.id, forn.id, obra_id=obra.id, valor='700.00',
+                dias_atras=janela + 1)
+        assert acumulado_do_fornecedor(adm.id, obra.id, forn.id) == \
+            Decimal('20000.00'), (
+                'pedido mais velho que a janela nao pode entrar na soma')
 
 
 def test_o_acumulado_por_fornecedor_aparece_so_na_emissao():
@@ -1860,7 +1927,7 @@ def _pedido_da_emergencia(requisicao, fornecedor_id, valor='4900.00'):
 
     p = PedidoCompra(
         numero=f'PC-{uuid.uuid4().hex[:6].upper()}',
-        fornecedor_id=fornecedor_id, data_compra=date(2026, 8, 1),
+        fornecedor_id=fornecedor_id, data_compra=date.today(),
         obra_id=requisicao.obra_id, condicao_pagamento='a_vista', parcelas=1,
         valor_total=Decimal(valor), tipo_compra='normal',
         processada_apos_aprovacao=False, admin_id=requisicao.admin_id,
@@ -1886,11 +1953,11 @@ def _fechar_a_triade(pedido, admin, valor='4900.00'):
     from services.recebimento_pedido import registrar_recebimento
 
     item = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).first()
-    registrar_recebimento(pedido, usuario=admin, data=date(2026, 8, 2),
+    registrar_recebimento(pedido, usuario=admin, data=date.today(),
                           linhas=[(item.id, Decimal('1'))])
     lancar_nota(pedido, numero=uuid.uuid4().hex[:8], serie='1',
-                valor_total=Decimal(valor), data_emissao=date(2026, 8, 2),
-                data_vencimento=date(2026, 9, 2), usuario=admin)
+                valor_total=Decimal(valor), data_emissao=date.today(),
+                data_vencimento=date.today() + timedelta(days=30), usuario=admin)
     db.session.commit()
 
 
@@ -2533,7 +2600,7 @@ def test_ratificar_ainda_e_possivel_depois_de_a_emergencia_virar_pedido():
 
     _cliente_de(cid).post(f'/compras/requisicoes/{rid}/emitir-pedido',
                           data={'fornecedor_id': str(fid),
-                                'data_compra': '2026-08-15'},
+                                'data_compra': date.today().isoformat()},
                           follow_redirects=True)
 
     with app.app_context():

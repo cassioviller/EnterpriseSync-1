@@ -5,12 +5,15 @@ almoxarifado_bp = Blueprint('almoxarifado', __name__, url_prefix='/almoxarifado'
 
 
 def get_admin_id():
-    """Retorna admin_id do usuário atual (padrão consolidado do sistema)"""
-    if current_user.is_authenticated:
-        if hasattr(current_user, 'admin_id') and current_user.admin_id:
-            return current_user.admin_id
-        return current_user.id
-    return None
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Convergido em 01/09 (Task 11): a cópia local devolvia current_user.id
+    como fallback — um TENANT FANTASMA para usuário sem admin_id, onde o
+    canônico falha fechado. Medido pelo censo de
+    tests/test_isolamento_tenant_bloco1.py.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 
 from views.almoxarifado import dashboard   # noqa: E402,F401

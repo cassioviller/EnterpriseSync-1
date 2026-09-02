@@ -45,7 +45,7 @@ a mão de obra continua ~28% subestimada até alguém decidir ligá-lo),
 | A01 | ABERTO → ABERTO | Confirm da importação segue sem ler `payload['transferencias']` |
 | A02 | ABERTO → ✅ | Baixa de ContaReceber grava `FluxoCaixa` ENTRADA (`95912e7c`, 05/08) |
 | A03 | ABERTO → ✅ | CR de medição nasce com `conta_contabil_codigo` (`352719a0`, 05/08) |
-| A04 | ABERTO → ABERTO | `MAPEAMENTO_CONTABIL` segue sem `DESPESA_GERAL` (decisão do contador) |
+| A04 | ABERTO → ✅ ENTREGUE (01/09) | Conta `6.1.02.009` + `MAPEAMENTO_CONTABIL['despesa_geral']` (`bef17c33`); RATIFICAR nome/grupo com o contador |
 | A05 | PARCIAL → ✅ | Os 4 caminhos emitem `rdo_finalizado`; fechado em 21/08 (`ee1c99b5`), 15/15 verdes |
 | A06 | ABERTO → ✅ | `_replanejar_pos_commit` nos 7 pontos de escrita do editor v2 (05/08), 16/16 |
 | A07 | ABERTO → ✅ | `?cliente_id=`/`?lead_id=` pré-preenchem proposta/obra (`1394d907`, 05/08), 13/13 |
@@ -59,14 +59,14 @@ a mão de obra continua ~28% subestimada até alguém decidir ligá-lo),
 | A15 | PARCIAL → 🟡 | Portal ainda gera `MedicaoObra` paralela sem itens/recalculo |
 | A16 | PARCIAL → 🟡 menor | Ausência classificada preservada; sync alocação→ponto segue sem evento |
 | A17 | ABERTO → ABERTO | `novo_rdo` segue carregando todos os funcionários do tenant |
-| A18 | PARCIAL → 🟡 | Travado pela Decisão 4; rota legada segue sem `subatividade_mestre_id` |
+| A18 | PARCIAL → 🟡 elo entregue (01/09) | Decisão 4 = congelar históricas (RATIFICAR); rota legada grava `subatividade_mestre_id` (`9f169c0d`); resta a unificação da vigência em diante |
 | A19 | PARCIAL → ✅ | As 7 variantes V1 convergiram (`progresso_v1_acumulado`/`obra_em_modo_v2`); 25 testes |
 | A20 | ABERTO → ABERTO | Pedido segue lendo `fornecedor_id` cru, sem tocar mapa V2 |
 | A21 | ABERTO → ABERTO | `RDOEquipamento` sem `veiculo_id`; kwargs inválidos em função sem rota |
 | A22 | ABERTO → 🟡 | Select de cliente entregue (05/08); CPF/CNPJ segue sem coluna |
 | A23 | ABERTO → ABERTO | Rotas do portal seguem sem aviso interno (sem canal para plugar) |
-| A24 | ABERTO → 🟡 | Aritmética corrigida (05/08); pipeline segue SEM CHAMADOR — MO ~28% subestimada |
-| A25 | ABERTO → ABERTO | Zero commits; travado por `N8N_WEBHOOK_URL` + `add_job` |
+| A24 | ABERTO → ✅ flag OFF (01/09) | Pipeline ganhou chamador atrás de `folha_rateio_encargos` (migration 318, default FALSE); RATIFICAR liga — custo de obra sobe ~28% na MO |
+| A25 | ABERTO → 🟡 runbook (01/09) | `docs/operacao-agendamentos.md` escrito (job externo, não `add_job`); falta só a credencial `N8N_WEBHOOK_URL` |
 
 ## A lista de trabalho real que sobra (sem decisões humanas)
 
@@ -397,6 +397,23 @@ tudo-ou-nada). Recusa com flash/erro explícito, nada é gravado.
 (inclui `test_reenviar_a_mesma_nota_fiscal_nao_duplica_estoque`,
 `test_nota_fiscal_vazia_nao_e_chave_de_dedup`,
 `test_fornecedor_de_outro_tenant_na_entrada_multipla_responde_404`).
+
+**Riscada em 01/09 (Onda 6, Task 1) — agora com teste, não com leitura de código.**
+🔬 A verificação acima é de *efeito por rota*: nenhum dos 6 testes citava
+`entrada_ja_lancada`, e a chave do dedup nunca foi afirmada diretamente. Foi por
+isso que a varredura de 25/08 achou, no mesmo dedup e depois deste "ENTREGUE",
+um furo de tenant que ninguém guardava: 📖 `almoxarifado_utils.py:257` fazia
+`NotaFiscal.query.filter_by(xml_hash=xml_hash)` **sem `admin_id`** — importado o
+XML por outra empresa, esta ouvia *"nota fiscal já foi importada anteriormente"*
+e nunca conseguia importar. `entrada_ja_lancada`
+(`views/almoxarifado/movimentos.py:16-49`), uma camada abaixo, **já chaveava por
+`(admin_id, nota_fiscal, item_id, tipo_movimento)`**: o código documentava e
+evitava o defeito num lugar e o cometia no outro.
+
+A guarda que faltava está em `tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py`
+(commit `d5bfef01`). **Lição para as próximas linhas desta tabela:** "ENTREGUE
+por leitura de código" e "ENTREGUE com teste que nomeia a regra" não são o mesmo
+estado, e esta linha custou 19 dias para mostrar a diferença.
 
 **O que sobra:** o "de brinde" do doc de 04/08 — `almoxarifado_utils.py:257`
 (`processar_xml_nfe`, consulta `NotaFiscal` por `xml_hash` **sem filtrar

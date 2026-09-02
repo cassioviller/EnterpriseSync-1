@@ -202,6 +202,21 @@ def _com_undo(tipo_acao: str):
 
             resposta = view(obra_id, *args, **kwargs)
 
+            # A invariante que este decorador SEMPRE documentou depender
+            # ("rota que devolveu 400/404 fez rollback ⇒ diff vazio ⇒ nada
+            # empilhado") não era garantida por ninguém: três `return 400`
+            # de `atualizar_tarefa` e os de `atualizar_vinculo` pulavam o
+            # rollback, e o `registrar_acao` abaixo autoflushava e commitava
+            # a edição recusada — gravando-a E empilhando-a no undo. Agora a
+            # garantia mora aqui, e o quarto `return 400` que nascer já vem
+            # certo.
+            codigo = getattr(resposta, 'status_code', None)
+            if codigo is None and isinstance(resposta, tuple) and len(resposta) > 1:
+                codigo = resposta[1]
+            if codigo and int(codigo) >= 400:
+                db.session.rollback()
+                return resposta
+
             try:
                 registrar_acao(obra_id, admin_id, current_user.id, cliente_mode,
                                tipo_acao, antes)
@@ -1014,6 +1029,10 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
         novo_modo, erro_modo = _parse_modo_apontamento(
             data, tarefa_is_marco=bool(getattr(tarefa, 'is_marco', False)))
         if erro_modo:
+            # Recusar é não deixar rastro: campos anteriores do payload já
+            # mutaram a sessão. O `_com_undo` também garante, mas cada rota
+            # fica legível sozinha.
+            db.session.rollback()
             return jsonify({'status': 'error', 'msg': erro_modo}), 400
         tarefa.modo_apontamento = novo_modo or None
 
@@ -1052,6 +1071,7 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
                 id=new_sub_id, admin_id=admin_id
             ).first()
             if sub_check and sub_check.servico_id and sub_check.servico_id != new_svc_id:
+                db.session.rollback()
                 return jsonify({
                     'status': 'error',
                     'msg': (
@@ -1163,6 +1183,7 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
                 anc = TarefaCronograma.query.filter_by(id=cursor_id, admin_id=admin_id).first()
                 cursor_id = anc.tarefa_pai_id if anc else None
             if ciclo:
+                db.session.rollback()
                 return jsonify({
                     'status': 'error',
                     'msg': 'Hierarquia circular: uma tarefa não pode ser pai de seu próprio ancestral.',
@@ -1607,6 +1628,7 @@ def atualizar_vinculo(obra_id: int, vid: int):
     if 'tipo' in data:
         tipo = str(data.get('tipo') or '').strip().upper()
         if tipo not in TIPOS_VINCULO:
+            db.session.rollback()
             return jsonify({'status': 'error',
                             'msg': f"Tipo de vínculo inválido: '{tipo}' "
                                    '(use TI, II, TT ou IT)'}), 400
@@ -1615,6 +1637,9 @@ def atualizar_vinculo(obra_id: int, vid: int):
         try:
             vinculo.lag_dias = int(data.get('lag_dias') or 0)
         except (ValueError, TypeError):
+            # `vinculo.tipo` pode já ter sido atribuído acima: sem o
+            # rollback, TI virava II em silêncio apesar do 400.
+            db.session.rollback()
             return jsonify({'status': 'error', 'msg': 'lag_dias inválido'}), 400
 
     return _recalc_e_resposta_vinculo(obra_id, admin_id, cliente_mode, vinculo)

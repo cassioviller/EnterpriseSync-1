@@ -138,9 +138,9 @@ em aberto.
 | Plano | Resíduo | Julgamento |
 |---|---|---|
 | `2026-08-04-plano-consolidado.md` | 🔬 54/59, mas **dois dos cinco eram falso alarme** (ver o bloco de estado no próprio plano). Resíduo real: `test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py` | 🔴 **Vale corrigir.** 🔬 Zero testes citam `entrada_ja_lancada`: a **A09** foi dada como ENTREGUE por leitura de código, e o furo de tenant do dedup (`almoxarifado_utils.py:257`) é a prova do custo. O do **A05** foi deliberadamente não criado, com razão escrita — o arreio B0.3 cobre |
-| `2026-08-06-rodada-b6-varredura.md` | 🔬 15/20. Os quatro `test_b6_404_{obras,frota,cauda,miscelanea}.py` nunca foram escritos | O recorte entregue foi `test_b6_estorno_recebimento.py` e `test_b6_familia2_reembolso_import.py` |
-| `2026-08-06-rodada-b5-varredura.md` | 🔬 18/19. `test_b5_curva_baseline.py` | — |
-| `2026-06-02-bloco1-blindagem-acesso-plan.md` | `test_isolamento_tenant_bloco1.py` nunca existiu com esse nome | 🔴 **e é mais que resíduo:** o code review de 25/08 achou **furos de tenant vivos** (`multitenant_helper.py:25`, `transporte_views.py:204`, `veiculos_services.py:167`). A blindagem deste bloco **não cobriu o parque** |
+| `2026-08-06-rodada-b6-varredura.md` | ❌ **sem resíduo de teste** (01/09, Onda 6 Task 4). Eram **cinco**, não quatro — `propostas` escapou do padrão de nome da medição mecânica. Os cinco existem | 🔬 As cinco Tasks B6.4–B6.8 **nunca haviam sido executadas** (`grep -c 'except HTTPException'` = 0 em todos os arquivos do lote). O que entrou foram os testes, com `xfail(strict=True)`: o refactor de ~60 sítios em 12 arquivos não cabia na Onda 6, e com `strict` o dia em que a B6 rodar o teste falha por passar. **Uma exceção corrigiu fonte:** `views/admin.py:441`, o único oráculo de enumeração vivo da família |
+| `2026-08-06-rodada-b5-varredura.md` | ❌ **sem resíduo** (31/08): o arquivo era da Task B5.5, **cortada em 06/08** | — |
+| `2026-06-02-bloco1-blindagem-acesso-plan.md` | ❌ **sem resíduo** (01/09, Onda 6 Task 5). `test_isolamento_tenant_bloco1.py` existe, escrito como **censo**: 16 resolvedores × 5 papéis | 🔴 **O julgamento de 25/08 estava certo, e o censo mostrou por quê.** Ele nasceu **vermelho em 4**, todas em `SUPER_ADMIN` e todas pela mesma causa — comparam `== TipoUsuario.ADMIN` e esquecem o papel que `utils/tenant.py:29` trata junto. A pior: 🔴 `propostas_consolidated.get_admin_id` caía num `return 10` **chumbado** — super admin lia e gravava dentro da empresa 10. As outras três (`contabilidade_views`, `folha_pagamento_views`, `crud_rdo_completo`) devolviam `None`, trancando o papel para fora sem dizer por quê. Corrigidas. ⚠️ Fica **uma linha fora do censo**, deliberada: FUNCIONARIO sem `admin_id`, onde `crud_rdo_completo` resolve por FK e o canônico devolveria `None` — decisão de produto que a Onda 6 não tem mandato para tomar |
 | `2026-06-05-bloco3-bdi-plan.md` | `scripts/preflight_migracao.py` nunca existiu | inofensivo |
 | `2026-06-08-remediacao-saude-app-plan.md` | `services/tenant_config.py` nunca existiu | inofensivo |
 | `2026-06-09-cadastro-palavras-chave-plan.md` | 🔬 10/11. `services/leitor_fluxo.py` | inofensivo |
@@ -190,6 +190,16 @@ onda. **As seis ondas têm plano escrito** (25/08), somando **45 tasks**. A Onda
 código do próprio plano extraído e executado (🔬 32 passed) antes da entrega. A
 ordem recomendada é 1 → 2 → 3 → 5 → 4 → 6, e o porquê está no cabeçalho do
 documento de fecho.
+
+> **Atualização de 28/08 — este parágrafo envelheceu.** Quatro das seis ondas já
+> foram executadas: **1, 2, 3 e 5**. Restam a **4** (duas tasks travadas por D3 e
+> D4, e um alvo acrescentado hoje: `dashboards_especificos.py`) e a **6** (4 dos
+> 5 arquivos de teste prometidos não existem). A **D1 está vencida** — o defeito
+> que bloqueava o push foi corrigido em `169ddd68`, já na `main`. A Onda 5 foi
+> reaberta e re-fechada em 28/08 depois de um `/code-review max` achar três
+> defeitos que o gate verde não via; **12 achados dessa passada seguem abertos**,
+> registrados no fim de `docs/auditoria/achados-code-review-2026-08-25.md`.
+> O estado por onda vive na tabela do documento de fecho.
 
 ---
 

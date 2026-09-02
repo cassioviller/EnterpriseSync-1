@@ -2710,7 +2710,11 @@ class NotaFiscal(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero = db.Column(db.String(20), nullable=False)
     serie = db.Column(db.String(5), nullable=False)
-    chave_acesso = db.Column(db.String(44), unique=True, nullable=False)
+    # A09 — chave de acesso é única POR TENANT: NFe é documento público e
+    # duas empresas podem importar a mesma nota. O unique global fazia a
+    # primeira bloquear a segunda (xfail medido em 31/08). Constraint
+    # nomeada para a migration 317 convergir com o create_all (lição N2).
+    chave_acesso = db.Column(db.String(44), nullable=False)
     
     # Fornecedor
     fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=False)
@@ -2751,6 +2755,8 @@ class NotaFiscal(db.Model):
     
     # Índices
     __table_args__ = (
+        db.UniqueConstraint('admin_id', 'chave_acesso',
+                            name='uq_nf_admin_chave_acesso'),
         db.Index('idx_nf_admin_status', 'admin_id', 'status'),
         db.Index('idx_nf_fornecedor_data', 'fornecedor_id', 'data_emissao'),
         db.Index('idx_nf_chave_acesso', 'chave_acesso'),
@@ -4534,6 +4540,16 @@ class ConfiguracaoEmpresa(db.Model):
     # Irmã de cronograma_editor_v2 (acima); migração espelho: 226.
     rdo_percentual_livre = db.Column(db.Boolean, nullable=False, default=False,
                                      server_default='false')
+
+    # A24 — liga o rateio de encargos patronais por obra no processamento da
+    # folha: com ela TRUE, processar o mês também grava a folha rateada por
+    # obra em FolhaProcessada (pipeline de services/folha_service.py:1699,
+    # que estava correto e sem chamador). Default FALSE = comportamento
+    # atual byte-idêntico. Liga-se por scripts/flag_folha_rateio_encargos.py,
+    # tenant a tenant. Irmã de rdo_percentual_livre (acima); migração
+    # espelho: 318.
+    folha_rateio_encargos = db.Column(db.Boolean, nullable=False, default=False,
+                                      server_default='false')
 
     # REMOVIDO: Campos transferidos para PropostaTemplate para evitar conflitos
     # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 
@@ -7605,9 +7621,36 @@ class ObraContratoVersao(db.Model):
     __tablename__ = 'obra_contrato_versao'
     __table_args__ = (
         db.Index('idx_contrato_versao_lookup', 'obra_id', 'vigente_de', 'vigente_ate'),
-        db.Index('uq_contrato_versao_vigente', 'obra_id', unique=True,
+        # (obra_id, admin_id): todo leitor filtra pelo par. Com o índice só em
+        # obra_id, uma linha com admin_id divergente (precedente real:
+        # migration 266) travava a obra permanentemente — abrir_versao não a
+        # via, nunca a fechava, e o INSERT da próxima vigência violava o
+        # índice. Migration 315.
+        db.Index('uq_contrato_versao_vigente', 'obra_id', 'admin_id',
+                 unique=True,
                  postgresql_where=db.text('vigente_ate IS NULL')),
-        db.UniqueConstraint('obra_id', 'versao', name='uq_contrato_versao_obra_versao'),
+        # `admin_id` NÃO é decorativo aqui: `abrir_versao`
+        # (services/contrato_obra.py:196-198) calcula `max(versao)` filtrando
+        # por (obra_id, admin_id). Sem o tenant nesta constraint, a linha de
+        # admin_id divergente que a migration 315 descreve continuava
+        # travando a obra — a 315 consertou a irmã e deixou esta, e o único
+        # efeito foi mudar o NOME da constraint no IntegrityError. Migration
+        # 316.
+        #
+        # Fix round 1/5 da 316: declarado como `db.Index(unique=True)` — NÃO
+        # `db.UniqueConstraint` (a 1ª versão desta correção) — de propósito,
+        # igual à irmã `uq_contrato_versao_vigente` logo acima. `create_all()`
+        # roda ANTES das migrações em todo boot, inclusive em banco NOVO
+        # (`app.py:589-613`); com `UniqueConstraint`, um banco novo ganhava
+        # esse nome como CONSTRAINT genuína (`ALTER TABLE ADD CONSTRAINT`),
+        # enquanto a migration 316 (e a 271 antes dela) sempre mexeram nele
+        # como ÍNDICE solto (`DROP/CREATE INDEX`) — e `DROP INDEX` numa
+        # constraint falha com `DependentObjectsStillExist` (reproduzido ao
+        # vivo: o índice pertence à constraint, `IF EXISTS` não salva). Usar
+        # `db.Index` aqui elimina a dualidade na raiz: `create_all()` e a
+        # migration passam a produzir sempre o MESMO objeto físico.
+        db.Index('uq_contrato_versao_obra_versao', 'obra_id', 'admin_id',
+                 'versao', unique=True),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -7696,6 +7739,7 @@ class AditivoContrato(db.Model):
 
     obra = db.relationship('Obra', foreign_keys=[obra_id],
                            backref=db.backref('aditivos_contrato',
+                                              cascade='all, delete-orphan',
                                               passive_deletes=True,
                                               order_by='AditivoContrato.criado_em.desc()'))
 
@@ -8645,7 +8689,12 @@ class Orcamento(db.Model):
     revisao_de_id = db.Column(db.Integer,
                               db.ForeignKey('orcamento.id', ondelete='SET NULL'),
                               nullable=True, index=True)
-    versao = db.Column(db.Integer, nullable=False, default=1)
+    # server_default: a migration 274 criou a coluna com DEFAULT 1 no banco
+    # migrado; sem o espelho aqui, schema de create_all (tenant novo, CI)
+    # discordava de producao em silencio — INSERT fora do ORM quebrava so
+    # num dos dois.
+    versao = db.Column(db.Integer, nullable=False, default=1,
+                       server_default=db.text('1'))
     motivo_revisao = db.Column(db.Text, nullable=True)
     # Task 11 usa esta coluna (a trava do orçamento convertido); nasce aqui,
     # na mesma migration, para não gastar um número só por ela.

@@ -7378,6 +7378,191 @@ def _migration_314_baseline_revisao_e_motivo():
     logger.info("[Migration 314] Concluída com sucesso")
 
 
+def _migration_315_indice_vigencia_com_admin_id():
+    """Onda 5 / Task 8 — `uq_contrato_versao_vigente` ganha `admin_id`.
+
+    O índice era `UNIQUE (obra_id) WHERE vigente_ate IS NULL`, mas TODO
+    leitor (`_versao_vigente_da_obra`, `abrir_versao`, `abrir_aditivo`)
+    filtra por `(obra_id, admin_id)`. Uma linha com `admin_id` divergente —
+    e a migration 273 cita o precedente real da 266 — travava a obra
+    PERMANENTEMENTE: `abrir_versao` não a via, nunca a fechava, e o INSERT
+    da próxima vigência violava o índice, enquanto `abrir_aditivo`
+    reportava "obra não tem contrato vigente".
+
+    Escolha registrada no plano da onda: o índice ganha `admin_id` (mantém
+    o escopo por tenant em toda parte) — a alternativa, tirar `admin_id`
+    das queries, também resolveria; misturar as duas, não.
+
+    Seguro sobre dados existentes: tudo que satisfazia UNIQUE(obra_id)
+    satisfaz UNIQUE(obra_id, admin_id). Idempotente: DROP IF EXISTS +
+    CREATE — a dupla execução termina no mesmo estado.
+
+    Alocação: 315 (máximo real do repo em 27/08: 314; 300-307 é faixa
+    reservada da Fase 9, 290-295 da Fase 8).
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "DROP INDEX IF EXISTS uq_contrato_versao_vigente"))
+        conn.execute(sa_text(
+            "CREATE UNIQUE INDEX uq_contrato_versao_vigente "
+            "ON obra_contrato_versao (obra_id, admin_id) "
+            "WHERE vigente_ate IS NULL"))
+    logger.info("[Migration 315] uq_contrato_versao_vigente agora cobre "
+                "(obra_id, admin_id) — o par que as queries filtram.")
+
+
+def _migration_316_versao_contrato_por_tenant():
+    """A irmã da 315: UNIQUE(obra_id, versao) → (obra_id, admin_id, versao).
+
+    A 315 escopou `uq_contrato_versao_vigente` por tenant e parou ali. Mas
+    `abrir_versao` (services/contrato_obra.py:196-198) calcula `max(versao)`
+    filtrando por (obra_id, admin_id): com uma linha de `admin_id` divergente
+    — o mesmo precedente da 266 que a 315 cita — o tenant correto renumera do
+    SEU máximo e colide com a linha alheia. A obra travada seguia travada; só
+    mudou o nome da constraint no erro.
+
+    Ao contrário da 315, NÃO é seguro sem olhar os dados. Alargar de
+    (obra_id, versao) para (obra_id, admin_id, versao) é AFROUXAR, então toda
+    linha existente continua válida — mas se já houver duplicata no trio
+    novo, a constraint não nasce. Daí a checagem explícita. Idempotente:
+    detecta o formato físico + checagem + CREATE, sempre nessa ordem — a
+    dupla execução sempre começa derrubando o objeto de antes (qualquer que
+    seja o formato) e termina recriando o mesmo índice, no mesmo estado;
+    nunca tenta criar sobre um objeto que já existe.
+
+    🔬 Fix round 1/5: dois formatos físicos possíveis, não um só.
+    Em produção (banco já existente antes desta migration), o objeto é um
+    ÍNDICE solto — a migration 271 (`migrations.py:5788`) criou
+    `uq_contrato_versao_obra_versao` via `CREATE UNIQUE INDEX`, não
+    `ALTER TABLE ... ADD CONSTRAINT` (confirmado consultando `pg_indexes` /
+    `pg_constraint` no banco real; só aparece no primeiro). Mas
+    `db.create_all()` roda ANTES das migrações em TODO boot, inclusive
+    banco NOVO (`app.py:589-613`) — e antes desta correção o modelo
+    declarava `db.UniqueConstraint(...)`, então um banco nascido do zero
+    ganhava esse nome como CONSTRAINT genuína (`ALTER TABLE ADD
+    CONSTRAINT`). `DROP INDEX` sobre uma constraint falha com
+    `DependentObjectsStillExist` — reproduzido ao vivo numa tabela
+    descartável (`_rev_scratch`) pelo coordenador desta task; `IF EXISTS`
+    não salva porque o erro não é "não existe", é "existe e tem
+    dependente". O modelo (`models.py:7616` em diante) foi corrigido nesta
+    mesma rodada para `db.Index(unique=True)`, igual à irmã
+    `uq_contrato_versao_vigente` — isso fecha a fonte do problema para
+    QUALQUER banco criado a partir de agora. Mas um banco já nascido entre
+    o commit anterior (`UniqueConstraint`) e este (`Index`) — CI, dev,
+    disaster-recovery rodado nesse intervalo — pode já ter a forma
+    CONSTRAINT gravada. Por isso a migration detecta o formato em
+    `pg_constraint` antes de agir, em vez de assumir qual dos dois vai
+    encontrar.
+
+    Verificado sobre os dados reais em 31/08 (leitura, antes de escrever
+    esta migration): 73420 linhas em `obra_contrato_versao`, zero colisão em
+    (obra_id, admin_id, versao) — o alargamento é seguro no ambiente atual.
+
+    Alocação: 316 (máximo real do repo em 31/08: 315).
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        tipo = conn.execute(sa_text(
+            "SELECT c.contype FROM pg_constraint c "
+            "JOIN pg_class t ON t.oid = c.conrelid "
+            "WHERE t.relname = 'obra_contrato_versao' "
+            "AND c.conname = 'uq_contrato_versao_obra_versao'"
+        )).scalar()
+        if tipo is not None:
+            # Existe como CONSTRAINT genuína — DROP INDEX falharia com
+            # DependentObjectsStillExist (o índice pertence à constraint).
+            conn.execute(sa_text(
+                "ALTER TABLE obra_contrato_versao "
+                "DROP CONSTRAINT uq_contrato_versao_obra_versao"))
+        else:
+            # Ausente, ou presente como ÍNDICE solto (forma real de
+            # produção, herdada da migration 271) — IF EXISTS cobre os
+            # dois casos sem erro.
+            conn.execute(sa_text(
+                "DROP INDEX IF EXISTS uq_contrato_versao_obra_versao"))
+        colisoes = conn.execute(sa_text(
+            "SELECT obra_id, admin_id, versao, count(*) "
+            "FROM obra_contrato_versao "
+            "GROUP BY obra_id, admin_id, versao HAVING count(*) > 1"
+        )).fetchall()
+        if colisoes:
+            # Reporta, não mascara: constraint que não sobe em silêncio é
+            # pior que a antiga — some do modelo mental sem sumir do banco.
+            raise RuntimeError(
+                f"obra_contrato_versao tem {len(colisoes)} colisao(oes) em "
+                f"(obra_id, admin_id, versao) — resolva antes: {colisoes[:5]}")
+        # Sempre recria como ÍNDICE — a forma que o modelo agora declara
+        # (`db.Index(unique=True)`) e que `create_all()` produzirá em
+        # qualquer banco novo daqui em diante, eliminando a dualidade.
+        conn.execute(sa_text(
+            "CREATE UNIQUE INDEX uq_contrato_versao_obra_versao "
+            "ON obra_contrato_versao (obra_id, admin_id, versao)"))
+    logger.info("[Migration 316] uq_contrato_versao_obra_versao agora cobre "
+                "(obra_id, admin_id, versao) — o trio que abrir_versao usa.")
+
+
+def _migration_317_chave_acesso_por_tenant():
+    """A09 — nota_fiscal.chave_acesso deixa de ser única GLOBAL.
+
+    O unique global (criado pelo unique=True do modelo antigo, constraint
+    `nota_fiscal_chave_acesso_key`) fazia a nota importada por uma empresa
+    bloquear a mesma nota em outra — NFe é documento público, e duas
+    empresas podem legitimamente importar a mesma. Passa a
+    UNIQUE (admin_id, chave_acesso).
+
+    Lição N2: em banco novo o create_all já cria a constraint nova pelo
+    modelo; aqui os dois passos são condicionais para convergir no mesmo
+    estado — DROP do global se existir, ADD da composta se faltar.
+    """
+    from sqlalchemy import text as sa_text
+    with db.engine.begin() as conn:
+        conn.execute(sa_text("""
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_constraint
+                           WHERE conname = 'nota_fiscal_chave_acesso_key') THEN
+                    ALTER TABLE nota_fiscal
+                        DROP CONSTRAINT nota_fiscal_chave_acesso_key;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                               WHERE conname = 'uq_nf_admin_chave_acesso') THEN
+                    ALTER TABLE nota_fiscal
+                        ADD CONSTRAINT uq_nf_admin_chave_acesso
+                        UNIQUE (admin_id, chave_acesso);
+                END IF;
+            END $$;
+        """))
+    logger.info("[Migration 317] nota_fiscal.chave_acesso única por "
+                "(admin_id, chave_acesso) — o unique global saiu.")
+
+
+def _migration_318_flag_folha_rateio_encargos():
+    """A24 — flag por tenant do rateio de encargos patronais por obra.
+
+    `configuracao_empresa.folha_rateio_encargos` (default FALSE). Ligada,
+    processar a folha do mês também grava a folha rateada por obra em
+    FolhaProcessada, com encargos. Desligada, comportamento de hoje —
+    nenhum dado é reescrito, então desligar reverte por completo. Liga-se
+    por scripts/flag_folha_rateio_encargos.py, tenant a tenant.
+
+    Espelho da migration 226 (rdo_percentual_livre). Idempotente
+    (`ADD COLUMN IF NOT EXISTS`): numa base onde o modelo já foi importado
+    o `db.create_all()` anterior já criou a coluna e o DDL é no-op —
+    lição N2, as duas formas convergem no mesmo objeto.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+                "folha_rateio_encargos BOOLEAN NOT NULL DEFAULT FALSE"))
+        logger.info("[Migration 318] folha_rateio_encargos criada (default FALSE).")
+    except Exception as e:
+        logger.error(f"[Migration 318] Falha: {e}", exc_info=True)
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7693,6 +7878,10 @@ def executar_migracoes():
             (312, "Reuniao 2026-08-20 — funcao.operacional: separa o efetivo de campo do pessoal de escritorio no seletor do RDO. DEFAULT TRUE para ninguem sumir no deploy", _migration_312_funcao_operacional),
             (313, "Reuniao 2026-08-20 — funcionario.cpf DROP NOT NULL: cadastro rapido sem documento em maos. UNIQUE mantido (Postgres aceita N nulos)", _migration_313_funcionario_cpf_nullable),
             (314, "Reuniao 2026-08-20 — cronograma_baseline.revisao (sequencial por obra+modo, com backfill por criada_em) e .motivo: historico de V1/V2 deixa de depender do texto do nome", _migration_314_baseline_revisao_e_motivo),
+            (315, "Onda 5 / Task 8 — uq_contrato_versao_vigente ganha admin_id: o indice era UNIQUE(obra_id) e toda query filtra (obra_id, admin_id); linha com admin_id divergente travava a obra permanentemente", _migration_315_indice_vigencia_com_admin_id),
+            (316, "Fix round do code review — uq_contrato_versao_obra_versao ganha admin_id: a 315 escopou a irma e deixou esta, e abrir_versao numera por (obra_id, admin_id)", _migration_316_versao_contrato_por_tenant),
+            (317, "A09 — nota_fiscal.chave_acesso unica por (admin_id, chave_acesso), nao global", _migration_317_chave_acesso_por_tenant),
+            (318, "A24 — flag configuracao_empresa.folha_rateio_encargos (default FALSE): rateio de encargos patronais por obra atras de interruptor por tenant", _migration_318_flag_folha_rateio_encargos),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

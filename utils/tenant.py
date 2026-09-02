@@ -189,3 +189,28 @@ def rdo_percentual_livre_on(admin_id) -> bool:
     except Exception as e:
         logger.warning(f"Flag rdo_percentual_livre indisponível ({e}) — assumindo desligada")
         return False
+
+
+def folha_rateio_encargos_on(admin_id) -> bool:
+    """Flag do rateio de encargos patronais por obra (migração 318,
+    default FALSE). PONTO ÚNICO de leitura de
+    `configuracao_empresa.folha_rateio_encargos`. Ligada, processar a folha
+    do mês também grava a folha rateada por obra (com encargos) em
+    `FolhaProcessada` — o pipeline de
+    `services/folha_service.py:processar_e_salvar_folha_obra` ganha
+    chamador. Liga-se por `scripts/flag_folha_rateio_encargos.py`.
+
+    Como `rdo_percentual_livre_on` (acima), recebe o `admin_id` EXPLÍCITO.
+    NUNCA levanta: sem admin_id, sem linha de configuração ou com erro de
+    banco, devolve False (comportamento atual).
+    """
+    if not admin_id:
+        return False
+
+    try:
+        from models import ConfiguracaoEmpresa
+        config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+        return bool(config and config.folha_rateio_encargos)
+    except Exception as e:
+        logger.warning(f"Flag folha_rateio_encargos indisponível ({e}) — assumindo desligada")
+        return False
