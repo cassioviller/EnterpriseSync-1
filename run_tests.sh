@@ -152,7 +152,9 @@ if [[ $STANDALONE -eq 1 ]]; then
     EXIT_CODE=$?
 else
     echo "[INFO] Executando via pytest com Playwright browser real..."
-    echo "[INFO] Relatório HTML: ${REPORT_HTML}"
+    if [[ ${#TARGET_LIST[@]} -eq 0 ]]; then
+        echo "[INFO] Relatório HTML: ${REPORT_HTML}"
+    fi
 
     set +e
     if [[ ${#TARGET_LIST[@]} -gt 0 ]]; then
@@ -182,10 +184,15 @@ else
     EXIT_CODE=$?
     set -e
 
-    cp "${REPORT_HTML}" "${REPORT_LATEST}" 2>/dev/null || true
-    echo ""
-    echo "[INFO] Relatório HTML: ${REPORT_HTML}"
-    echo "[INFO] Relatório HTML (latest): ${REPORT_LATEST}"
+    # Em modo --arquivos não há relatório HTML: anunciar um, ou copiar o
+    # "latest" de uma rodada antiga, seria log que engana — que é exatamente o
+    # defeito que o runner retomável existe para não repetir.
+    if [[ ${#TARGET_LIST[@]} -eq 0 ]]; then
+        cp "${REPORT_HTML}" "${REPORT_LATEST}" 2>/dev/null || true
+        echo ""
+        echo "[INFO] Relatório HTML: ${REPORT_HTML}"
+        echo "[INFO] Relatório HTML (latest): ${REPORT_LATEST}"
+    fi
 fi
 
 # Parar servidor background, se foi iniciado por este script
