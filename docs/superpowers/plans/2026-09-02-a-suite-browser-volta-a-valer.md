@@ -212,7 +212,8 @@ teste. **A Task 1 põe essa prova no gate**, em segundos e sem browser.
 >
 > 🔬 **Esta task foi VALIDADA ao escrever o plano (02/09), não só imaginada.**
 > O arquivo abaixo foi escrito, rodado e apagado para a Task 1 recriá-lo. Medido:
-> **19 passed em 2.11s**; as duas rotas respondem **200** para um admin de tenant
+> **19 passed em 2.11s** (com o teste da Task 4 junto; esta task sozinha dá
+> **18**); as duas rotas respondem **200** para um admin de tenant
 > novo; os 10 seletores de proposta e os 7 de almoxarifado estão todos presentes;
 > `name="cliente_nome"` e `alert-dismissible` estão ausentes dos dois templates.
 > Os dois REDs deliberados (Steps 3 e o da Task 4) reprovaram exatamente como
@@ -369,8 +370,9 @@ def test_almoxarifado_entrada_tem_o_seletor(marca, html_por_rota):
 - [ ] **Step 2: Rodar, e dizer a verdade sobre a cor**
 
 Run: `python -m pytest tests/test_contrato_formularios_e2e.py -v`
-Expected: **19 passed** em ~2s (10 seletores de proposta + 1 campo extinto + 7
-de almox + 1 do painel da Task 4). E isso está certo: o template de hoje **cumpre** o
+Expected: **18 passed** em ~2s — 10 seletores de proposta + 1 campo extinto + 7
+de almox. (A Task 4 acrescenta o 19º a este mesmo arquivo; aqui ele ainda não
+existe. Se você vir 19, alguém já rodou a Task 4 — confira antes de seguir.) E isso está certo: o template de hoje **cumpre** o
 contrato; quem não cumpria era o teste browser, e ele é consertado nas Tasks 2
 e 3. Um teste que passa de primeira não prova nada sozinho — é o Step 3 que o
 torna prova.
@@ -384,7 +386,7 @@ sed -i 's/name="cliente_id"/name="cliente_nome"/' templates/propostas/nova_propo
 python -m pytest tests/test_contrato_formularios_e2e.py -v
 ```
 
-Expected: **2 failed, 17 passed** — `test_proposta_nova_tem_o_seletor[name="cliente_id"]`
+Expected: **2 failed, 16 passed** — `test_proposta_nova_tem_o_seletor[name="cliente_id"]`
 e `test_proposta_nova_nao_ressuscita_o_campo_extinto[name="cliente_nome"]`.
 O segundo é o que importa: ele prova que a guarda vê o campo extinto **voltar**,
 que é o defeito real do A22, e não só um seletor sumir.
@@ -826,15 +828,20 @@ Este é o ponto da task: antes, uma recusa do A09 chegava ao relatório como
 `'Tipo de Controle ...'`. Agora tem de chegar como a mensagem real. Force a
 recusa reusando uma NF que já existe no banco:
 
+⚠️ **Sem `git checkout` e sem `git stash` aqui.** O arquivo já carrega as
+edições do Step 3, que ainda não estão commitadas; qualquer comando git que
+restaure o arquivo as destrói. O experimento se desfaz por substituição textual
+inversa — a mesma troca, ao contrário.
+
 ```bash
+# ida: NF volta a ser fixa, só para encenar a recusa do A09
 python - <<'PY'
-import re, pathlib
+import pathlib
 p = pathlib.Path('tests/test_browser_all_modules.py')
 s = p.read_text()
-# NF fixa TEMPORÁRIA, só para encenar a recusa do A09
-s = s.replace('nf = f"NF-E2E-001-{datetime.datetime.now():%H%M%S%f}"',
-              'nf = "NF-E2E-001"  # TEMPORARIO')
-p.write_text(s)
+alvo = 'nf = f"NF-E2E-001-{datetime.datetime.now():%H%M%S%f}"'
+assert alvo in s, 'Step 3 da Task 3 não está aplicado — pare'
+p.write_text(s.replace(alvo, 'nf = "NF-E2E-001"  # TEMPORARIO'))
 PY
 python -m pytest "tests/test_browser_all_modules.py::TestIntegracaoAlmoxGestaoCusto::test_entrada_material_flash_sucesso" -v
 ```
@@ -845,13 +852,21 @@ Expected: **1 FAILED**, e a mensagem do assert agora contém
 que a task compra.
 
 ```bash
-git checkout tests/test_browser_all_modules.py  # descarta SÓ o hack temporário
+# volta: desfaz SÓ o hack, preservando tudo do Step 3
+python - <<'PY'
+import pathlib
+p = pathlib.Path('tests/test_browser_all_modules.py')
+s = p.read_text()
+alvo = 'nf = "NF-E2E-001"  # TEMPORARIO'
+assert alvo in s, 'o hack não está aplicado — nada a desfazer'
+p.write_text(s.replace(alvo, 'nf = f"NF-E2E-001-{datetime.datetime.now():%H%M%S%f}"'))
+PY
+grep -n 'alert-dismissible\[role' tests/test_browser_all_modules.py
 ```
 
-⚠️ `git checkout` aqui apaga também as edições do Step 3 se você ainda não as
-commitou. Faça o Step 3 **em cima do commit da Task 3** e reaplique o Step 3
-depois deste experimento, ou use `git stash` em vez de `checkout`. Confira com
-`git diff` que o helper novo continua no arquivo antes do Step 5.
+Expected do `grep`: **1 linha** — a prova de que o helper novo do Step 3
+continua no arquivo. Se não aparecer, o Step 3 se perdeu: reaplique antes de
+seguir.
 
 - [ ] **Step 5: Rodar a família de integração inteira**
 
