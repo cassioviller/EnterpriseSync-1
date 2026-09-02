@@ -1,6 +1,7 @@
 # Fecho do Que Está Aberto — Implementation Plan
 
-> **Estado em 2026-09-02:** 🟡 **EM EXECUÇÃO — 6 de 16 tasks fechadas.**
+> **Estado em 2026-09-02:** 🟡 **EM EXECUÇÃO — 7 de 16 tasks fechadas**, e a
+> primeira integração aconteceu: a `main` recebeu a etapa por merge `--no-ff`.
 >
 > ⚠️ **ESTENDIDO em 02/09** pelo design
 > `docs/superpowers/specs/2026-09-02-a-lista-vai-a-zero-design.md`, que decidiu
@@ -22,8 +23,8 @@
 > | 4 — Onda 2 (o tenant para de vazar) | ✅ nada a executar: já mergeada em `fed8f19b` (26/08); doc corrigido em `b13e23c9` |
 > | 5 — `o-que-nao-persiste` (os cinco achados restantes) | ✅ 6/6 tasks, gate 2872/6 skipped |
 > | 6 — Onda 6 (os testes prometidos) | ✅ **fechada em 02/09** — a última task dela (a jornada E2E) foi entregue pelo plano `2026-09-02-a-suite-browser-volta-a-valer.md` |
-> | **11 — o que está a um passo, e a primeira integração** | ⬜ **próxima** |
-> | 7 — Onda 4 (o relatório passa a funcionar) | ⬜ |
+> | **11 — o que está a um passo, e a primeira integração** | ✅ `80c3bb31` `acc486ab` `bbc2c56a`, merge `83670e76` — gate **3247/8/201/72, 0 failed** (47:43) |
+> | 7 — Onda 4 (o relatório passa a funcionar) | ⬜ **próxima** — já tem o pré-voo escrito (Step 0) e a D7 respondida (Step 0-b) |
 > | 8 — Resgate da Espinha Financeira (agora **10 de 10**) | ⬜ |
 > | **12 — Fase 8, o plano de contas canônico** | ⬜ |
 > | **13 — família 404 (B6.4–B6.8)** | ⬜ |
