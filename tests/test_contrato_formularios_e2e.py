@@ -126,3 +126,35 @@ def test_almoxarifado_entrada_tem_o_seletor(marca, html_por_rota):
         f'test_browser_all_modules.py::_preencher_entrada_almoxarifado digita '
         f'esse seletor — atualize o teste E ESTA lista na mesma rodada.'
     )
+
+
+# ---------------------------------------------------------------------------
+# O helper de flash da suíte browser não pode confundir painel com mensagem
+# ---------------------------------------------------------------------------
+# `_flash_em_pagina` casava `.alert-info` genérico e devolvia o cartão ESTÁTICO
+# de /almoxarifado/entrada ("Tipo de Controle / Unidade / Estoque Atual") em vez
+# do flash. Pior: o cartão nasce `display:none`, e innerText de elemento não
+# renderizado cai para textContent por especificação — o helper leu texto de um
+# elemento invisível e o reportou como mensagem do sistema. Foi isso que deixou
+# a falha do A09 sem diagnóstico por uma rodada inteira.
+#
+# O flash real tem assinatura própria: base.html:992 e base_completo.html:1170
+# renderizam TODO flash como `alert alert-<cat> alert-dismissible fade show`
+# com `role="alert"`. Conferido: `alert-dismissible` não ocorre em
+# templates/almoxarifado/entrada.html nem em templates/propostas/nova_proposta.html.
+
+def test_painel_estatico_da_entrada_nao_se_parece_com_flash(html_por_rota):
+    """O cartão informativo de /almoxarifado/entrada não pode casar o seletor
+    de flash — se casar, o helper da suíte browser volta a mentir."""
+    html = html_por_rota['/almoxarifado/entrada']
+    assert 'alert-info' in html, (
+        'o cartão estático sumiu de /almoxarifado/entrada — se foi de '
+        'propósito, esta guarda perdeu o objeto e deve ser reescrita, não '
+        'apagada: o ponto é que painel e flash não se confundam'
+    )
+    assert 'alert-dismissible' not in html, (
+        '/almoxarifado/entrada passou a conter alert-dismissible. O seletor de '
+        'flash de test_browser_all_modules.py::_flash_em_pagina se apoia em '
+        'alert-dismissible para separar flash de painel — se um painel estático '
+        'ganhar essa classe, o helper volta a devolver painel como mensagem.'
+    )

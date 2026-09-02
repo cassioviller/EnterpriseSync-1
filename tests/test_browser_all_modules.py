@@ -110,12 +110,38 @@ def _js_erros_stop(page: Page, erros: list[str]):
 
 
 def _flash_em_pagina(page: Page) -> str:
-    """Extrai o texto do primeiro alert de flash do Bootstrap, se existir."""
+    """Texto de TODOS os flashes visíveis da página, unidos por ' | '.
+
+    ⚠️ Três defeitos da versão anterior, e os três atuaram juntos na rodada de
+    01/09, deixando a recusa do A09 sem diagnóstico:
+
+    1. casava `.alert-info` genérico — e /almoxarifado/entrada tem um cartão
+       ESTÁTICO com essa classe (`entrada.html:45`), que não é flash;
+    2. não conferia visibilidade — `innerText` de elemento `display:none` cai
+       para `textContent` por especificação, então o cartão OCULTO devolveu
+       texto como se fosse mensagem do sistema;
+    3. nunca olhava `.alert-danger` — metade das recusas do sistema é `danger`,
+       e um teste que falhasse por recusa recebia '' e reportava "flash não
+       encontrado", escondendo a mensagem que diria por quê.
+
+    O flash real tem assinatura própria: `base.html:992` e
+    `base_completo.html:1170` renderizam todo flash como
+    `alert alert-<cat> alert-dismissible fade show` com `role="alert"`.
+    Nenhum painel estático das páginas que esta suíte visita usa
+    `alert-dismissible` — guardado por
+    `tests/test_contrato_formularios_e2e.py::test_painel_estatico_da_entrada_nao_se_parece_com_flash`.
+
+    Devolve TODOS (não o primeiro): quando a rota flasha aviso E erro, ler só um
+    esconde o outro.
+    """
     try:
-        el = (page.query_selector(".alert-success")
-              or page.query_selector(".alert-info")
-              or page.query_selector(".alert-warning"))
-        return el.inner_text().strip() if el else ""
+        els = page.query_selector_all('.alert-dismissible[role="alert"]')
+        textos = [
+            el.inner_text().strip()
+            for el in els
+            if el.is_visible() and el.inner_text().strip()
+        ]
+        return " | ".join(textos)
     except Exception:
         return ""
 
