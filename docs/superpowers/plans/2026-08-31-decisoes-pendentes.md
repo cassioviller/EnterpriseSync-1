@@ -5,9 +5,9 @@
 > não 2). FASE8-T1: segue aguardando acesso a produção. VIGA-I: opção B; a C foi
 > declarada morta.
 >
-> 🔴 **Uma quarta abriu em 02/09 e está sem resposta: a D7**, no fim desta
-> página — achada pelo pré-voo da Task 7 (Onda 4). Ela não trava plano nenhum;
-> trava a **honestidade** do que a Onda 4 vai poder afirmar ao fechar.
+> ✅ **Uma quarta abriu e foi respondida no mesmo dia (02/09): a D7**, no fim
+> desta página — achada pelo pré-voo da Task 7 (Onda 4) e respondida
+> **APAGAR**, como a D4.
 
 > **Para quem decide.** Quatro perguntas. As três primeiras travam, cada uma, um
 > plano inteiro que já está escrito e pronto para executar; nenhuma delas é
@@ -129,7 +129,14 @@ mede menos do que promete, e o `xfail` é o registro disso.
 
 ---
 
-## D7 — `exportacao_relatorios.py`: apagar ou consertar? (aberta em 02/09)
+## D7 — `exportacao_relatorios.py`: apagar ou consertar? (aberta e RESPONDIDA em 02/09)
+
+> ✅ **RESPONDIDA em 02/09 pelo dono: APAGAR** — mesma resposta da D4, pelo
+> mesmo argumento. A execução entra na **Task 7** de
+> `2026-08-31-fecho-do-que-esta-aberto.md` (Step 0-b), no padrão das Tasks 2 e
+> 3 daquele plano: a extinção é **congelada** em
+> `tests/test_fecho_rotas_extintas.py`, provada pelo `url_map` e não por
+> comentário.
 
 > É a **mesma pergunta da D4**, noutro arquivo. A D4 foi respondida "apagar"
 > pelo dono em 31/08 e executada na Task 2 do plano de fecho (`3d0873a4`). O

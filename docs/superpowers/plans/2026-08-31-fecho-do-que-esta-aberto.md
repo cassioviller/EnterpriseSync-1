@@ -175,7 +175,7 @@ a Onda 5, `a-porta-irma` nem `o-que-nao-persiste`. A Task 10 o substitui.
 | **D6** | O de-para do plano de contas pode ser chaveado só por código? | ✅ **RESPONDIDA (01/09)** — chavear por **assinatura estrutural**, não por `(código, nome)`. 🔴 E a premissa da pergunta estava errada: 📖 `contabilidade_utils.py:514` diz que são **quatro** planos concorrentes, não dois | Destrava a **Task 12** deste plano |
 | **VIGA-I** | A regra de verba/lucro do telhado viga I | ✅ **RESPONDIDA (01/09)** — **opção B** (markup uniforme, move `orcamento.margem_pct_global` até a venda total voltar a R$ 1.720.796,75). A opção **C está morta**: citada em quatro documentos e definida em nenhum. `RATIFICAR` — é escolha comercial | A Task 8 do Resgate deixa de ser resíduo. A **Task 8 deste plano vira 10/10** |
 | **FASE8-T1** | Medir o plano de contas em **produção** (não em dev) | 🟡 **SEM ACESSO — vira premissa declarada** (decisão do dono, 02/09) | A Task 12 executa com **falha fechada e nomeada**; a medição vira ratificação posterior |
-| **D7** | `exportacao_relatorios.py`: apagar ou consertar? | 🔴 **ABERTA (02/09)** — achada pelo pré-voo da Task 7. É a **D4 outra vez**: módulo registrado e vivo (`main.py:157`), inoperante por três defeitos, devolvendo `{'success': True, 'resumo': {}}`. Recomendação: **apagar**, pelo mesmo argumento de 31/08 | Não trava a Task 7 — mas sem resposta a Onda 4 fecha dizendo "o relatório passa a funcionar" com três rotas ainda mentindo |
+| **D7** | `exportacao_relatorios.py`: apagar ou consertar? | ✅ **APAGAR (02/09)** — achada pelo pré-voo da Task 7 e respondida no mesmo dia. É a **D4 outra vez**: módulo registrado e vivo (`main.py:157`), inoperante por três defeitos, devolvendo `{'success': True, 'resumo': {}}` | Vira o **Step 0-b da Task 7**, no padrão das Tasks 2 e 3: remoção + extinção congelada no `url_map` |
 
 ⚠️ **O bloqueio dos dois é PARCIAL — e a primeira versão deste plano errou
 isso.** A conferência na fonte, em 31/08, mostrou:
@@ -894,6 +894,49 @@ Ordem numérica resolve as duas.
 Constraints), não o dela.
 
 **(h) Nada foi começado:** `tests/test_onda4_relatorio_funciona.py` não existe.
+
+- [ ] **Step 0-b: Apagar `exportacao_relatorios.py` (D7), no padrão das Tasks 2 e 3**
+
+✅ **A D7 foi respondida em 02/09: APAGAR** — mesma resposta e mesmo argumento da
+D4. 🔬 O pré-voo confirmou o pressuposto do argumento: **zero referências em
+`templates/` e `static/`** — o módulo está morto pela interface, exatamente como
+os dois que já saíram.
+
+**RED primeiro.** Em `tests/test_fecho_rotas_extintas.py`, acrescente a família
+parametrizada (o arquivo já tem `SEIS_EXTINTAS` e a âncora
+`test_o_url_map_esta_populado`, que impede afirmação vácua):
+
+```python
+EXPORTACAO_EXTINTA = (
+    'exportacao_relatorios.painel_exportacao',
+    'exportacao_relatorios.gerar_pdf',
+    'exportacao_relatorios.gerar_excel',
+    'exportacao_relatorios.enviar_relatorio_email',
+    'exportacao_relatorios.api_preview_dados',
+    'exportacao_relatorios.agendar_relatorio',
+)
+```
+
+Rode antes de apagar: as seis têm de **FALHAR** (hoje estão registradas). RED
+citado no commit.
+
+**Depois, a remoção — cinco sítios, e o quinto é o que morde:**
+
+| Onde | O quê |
+|---|---|
+| `exportacao_relatorios.py` | apagar o arquivo (≈800 linhas) |
+| `main.py:157` | tirar `from exportacao_relatorios import exportacao_bp` e o registro |
+| `main.py:209` e `app.py:1108` | tirar `'exportacao_relatorios'` das listas de módulos |
+| `scripts/rastreio_modulos.py:77` | tirar `'Exportação de relatórios'` da tabela de rastreio |
+| ⚠️ `tests/test_isolamento_tenant_bloco1.py:103` | **tirar `'exportacao_relatorios'` do censo de resolvedores.** 🔬 O censo é o teste da Onda 6/Task 5 (16 resolvedores × 5 papéis); apagar o módulo sem tirá-lo daqui **quebra o gate** — e é a única referência ao módulo fora dele mesmo e das listas |
+
+E o comentário de extinção no `main.py`, no formato que as Tasks 2 e 3 usaram:
+módulo inoperante por três defeitos independentes, blueprint registrado,
+devolvendo `{'success': True, 'resumo': {}}`; evidência em
+`docs/auditoria/achados-code-review-2026-08-25.md` (02/09).
+
+⚠️ **O `km_rodado` NÃO morre com este arquivo.** Sobram `dashboards_especificos.py`
+`:396`, `:448`, `:463` — vivos, registrados, e alvo do adendo de 28/08 da Onda 4.
 
 - [ ] **Step 1: Marcar as duas tasks absorvidas, antes de executar**
 
