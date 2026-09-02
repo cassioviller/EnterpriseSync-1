@@ -1099,12 +1099,20 @@ class TestIntegracaoAlmoxGestaoCusto:
         if not item_id:
             pytest.skip("Nenhum AlmoxarifadoItem CONSUMIVEL encontrado nos dados demo")
 
+        # A09 — a NF é chave de dedup (admin_id, nota_fiscal, item_id) desde
+        # bbe74f00 (04/08), e o guard é CORRETO: F5 numa tela de entrada é
+        # rotina e duplicava estoque em silêncio. Com NF fixa este teste passa
+        # UMA vez contra um banco persistente e é recusado para sempre depois —
+        # foi o que aconteceu (movimentos 9415/9416, gravados em 01/09 19:37).
+        # A NF nasce única por rodada, mesmo padrão do ts de _criar_proposta.
+        nf = f"NF-E2E-001-{datetime.datetime.now():%H%M%S%f}"
+
         # Preencher e submeter via browser; rota redireciona para /almoxarifado/entrada
         # com flash 'Entrada processada com sucesso! ... cadastrados.'
         flash_text = self._preencher_entrada_almoxarifado(
             browser_session, item_id, forn_id,
             quantidade="5", valor_unitario="50.00",
-            nota_fiscal="NF-E2E-001", observacoes="Teste E2E automático",
+            nota_fiscal=nf, observacoes="Teste E2E automático",
         )
 
         # Verificar flash de sucesso visível na página de redirect
@@ -1129,11 +1137,11 @@ class TestIntegracaoAlmoxGestaoCusto:
                 item_id=item_id,
                 tipo_movimento="ENTRADA",
                 admin_id=admin_id,
-                nota_fiscal="NF-E2E-001",
+                nota_fiscal=nf,
             ).first()
 
         assert movimento is not None, \
-            "AlmoxarifadoMovimento com nota_fiscal='NF-E2E-001' não encontrado no banco"
+            f"AlmoxarifadoMovimento com nota_fiscal={nf!r} não encontrado no banco"
         assert estoque_count > 0, \
             f"AlmoxarifadoEstoque não criado para item_id={item_id}"
 
@@ -1147,6 +1155,9 @@ class TestIntegracaoAlmoxGestaoCusto:
             pytest.skip("Nenhum AlmoxarifadoItem CONSUMIVEL encontrado")
         if not forn_id:
             pytest.skip("Nenhum Fornecedor encontrado nos dados demo")
+
+        # A09 — ver a nota em test_entrada_material_flash_sucesso.
+        nf = f"NF-E2E-GCP-{datetime.datetime.now():%H%M%S%f}"
 
         from app import app as flask_app
         from models import (
@@ -1163,7 +1174,7 @@ class TestIntegracaoAlmoxGestaoCusto:
         self._preencher_entrada_almoxarifado(
             browser_session, item_id, forn_id,
             quantidade="3", valor_unitario="75.00",
-            nota_fiscal="NF-E2E-GCP", observacoes="Teste integração GestaoCusto",
+            nota_fiscal=nf, observacoes="Teste integração GestaoCusto",
         )
 
         # Verificar no banco que o GestaoCusto MATERIAL foi gerado
@@ -1173,12 +1184,12 @@ class TestIntegracaoAlmoxGestaoCusto:
             ).count()
             movimento = AlmoxarifadoMovimento.query.filter_by(
                 admin_id=admin_id,
-                nota_fiscal="NF-E2E-GCP",
+                nota_fiscal=nf,
                 tipo_movimento="ENTRADA",
             ).first()
 
         assert movimento is not None, \
-            "Movimento NF-E2E-GCP não encontrado no banco"
+            f"Movimento {nf!r} não encontrado no banco"
 
         assert gcp_depois > gcp_antes, (
             f"GestaoCustoPai tipo_categoria='MATERIAL' não foi criado pelo EventManager "
