@@ -20,6 +20,8 @@
 #   bash run_tests.sh --jornada          # Jornada E2E proposta→cronograma (browser real)
 #   bash run_tests.sh --varredura        # Varredura de todas as páginas do menu (browser real)
 #   bash run_tests.sh --standalone       # Modo standalone (sem pytest)
+#   bash run_tests.sh --arquivos A B ... # Alvos avulsos (usado pelo runner retomável;
+#                                       # consome o resto da linha, sem relatório HTML)
 #
 # Dependências de sistema do Chromium (nspr, nss, libgbm, libxkbcommon, libudev,
 # alsa): NÃO vêm do .replit. Este script as resolve sozinho via nix-build e
@@ -32,6 +34,7 @@ BLOCO_FILTER=""
 MARKER_ARGS=()
 STANDALONE=0
 TARGET_FILE="tests/test_browser_all_modules.py"
+TARGET_LIST=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -52,6 +55,11 @@ while [[ $# -gt 0 ]]; do
         --jornada)      TARGET_FILE="tests/test_e2e_jornada_proposta_cronograma_playwright.py"; BLOCO_FILTER=""; shift ;;
         --varredura)    TARGET_FILE="tests/test_e2e_varredura_paginas_playwright.py"; BLOCO_FILTER=""; shift ;;
         --standalone)   STANDALONE=1; shift ;;
+        # Consome TODO o resto da linha como alvos do pytest. Existe para o
+        # runner retomável (scripts/suite_resumavel.py) reusar a preparação de
+        # ambiente deste script — libs do Chromium e servidor de pé — em vez de
+        # duplicá-la. Sem relatório HTML: são dezenas de chunks por rodada.
+        --arquivos)     shift; TARGET_LIST=("$@"); break ;;
         *)              echo "Opção desconhecida: $1"; exit 1 ;;
     esac
 done
@@ -147,7 +155,12 @@ else
     echo "[INFO] Relatório HTML: ${REPORT_HTML}"
 
     set +e
-    if [[ -n "$BLOCO_FILTER" && "$BLOCO_FILTER" == "-k integra" ]]; then
+    if [[ ${#TARGET_LIST[@]} -gt 0 ]]; then
+        .pythonlibs/bin/pytest \
+            "${TARGET_LIST[@]}" \
+            --tb=short \
+            -v
+    elif [[ -n "$BLOCO_FILTER" && "$BLOCO_FILTER" == "-k integra" ]]; then
         .pythonlibs/bin/pytest \
             "tests/test_browser_all_modules.py" \
             -k "integra" \
