@@ -1,9 +1,28 @@
 # Onda 6 — Os Testes Que os Planos Prometeram Implementation Plan
 
-> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — pronto para executar** — 6 tasks. Derrubou **dois** resíduos que a medição mecânica apontara e eram falso alarme, e confirmou um real: 🔬 zero testes citam `entrada_ja_lancada`.
+> **Estado em 2026-09-02:** ✅ **FECHADA — 6/6 tasks.** A última (a jornada
+> E2E, aberta desde a Fase 0.5) foi entregue pelo plano
+> `2026-09-02-a-suite-browser-volta-a-valer.md`, que a nomeia como sua Task 6.
+>
+> | Task | Estado |
+> |---|---|
+> | 1 — a guarda do A09 | ✅ `d5bfef01` (31/08): 4 passed, com o RED do tenant confirmado |
+> | 2 — A10, conferir antes de escrever | ✅ decidido em 31/08 — **já coberto** por `tests/test_arreio_presenca_rotas.py:123`; nenhum arquivo criado, decisão registrada aqui e no `2026-08-04-plano-consolidado.md` |
+> | 3 — `test_b5_curva_baseline.py` | ❌ **não criado**, de propósito: a promessa estava revogada |
+> | 4 — os cinco `test_b6_404_*` | ✅ `889599cb` `07288f3b` `0c6590a4` `8366588c` `ef15ab70` |
+> | 5 — `test_isolamento_tenant_bloco1.py` | ✅ censo de 16 resolvedores × 5 papéis; nasceu vermelho em **4**, todas em SUPER_ADMIN |
+> | 6 — a jornada E2E | ✅ **02/09 — 19 passed, 0 failed em 50.4s**, a primeira vez que ela rodou |
+>
+> 🔬 A jornada não passou de primeira: rodando sozinha deu **13 failed / 6
+> passed** em 221s, e o defeito era dela, não da onda — `test_05_criar_proposta`
+> criava o Cliente **depois** do `page.goto("/propostas/nova")`, e o `<select>`
+> é renderizado no servidor. Corrigido em `160c7282`; o placar verde acima é do
+> chunk isolado do runner retomável
+> (`tests/reports/ledger/done/test_e2e_jornada_proposta_cronograma_playwright.json`).
 >
 > Escrito na varredura de 25/08. Índice de estado de todos os planos e specs em
-> `docs/planos-em-aberto-2026-08-25.md`.
+> `docs/planos-em-aberto-2026-08-25.md` — 🔬 desatualizado desde 31/08; quem o
+> substitui é a Task 16 de `2026-08-31-fecho-do-que-esta-aberto.md`.
 
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) ou superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -223,7 +242,7 @@ e `NotaFiscal.xml_hash`/`numero`:
 Run: `python -m pytest tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py -v`
 Expected: os dois primeiros e o último **PASS** (a A09 realmente foi entregue nessa camada); `test_dedup_de_xml_tambem_e_por_tenant` **FAIL** se a Onda 2 ainda não entrou.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit** — feito em 31/08: `d5bfef01`.
 
 ```bash
 git add tests/test_a09_dedup_nf_entrada_e_tenant_almoxarifado.py
@@ -371,14 +390,26 @@ o valor dele é impedir o quarto resolvedor de nascer, não pegar o defeito de h
 
 ### Task 6: A jornada E2E, que nunca rodou
 
-- [ ] **Step 1: Run it**
+- [x] **Step 1: Run it** — rodada em 02/09, destacada do terminal.
 
 Run: `bash run_tests.sh --jornada`
 
 🔬 Os 7 blocos (59 passed) e a varredura de páginas (48/48) rodaram depois que o
 Chromium voltou. **A jornada, não** — está em aberto desde a Fase 0.5.
 
-- [ ] **Step 2: Report honestly**
+- [x] **Step 2: Report honestly** — 🔬 **falhou na primeira vez: 13 failed / 6
+passed em 221s.** A falha era da própria jornada e foi diagnosticada, não
+contornada: `test_05_criar_proposta` criava o Cliente **depois** do
+`page.goto("/propostas/nova")`, e o `<select>` de cliente é renderizado no
+servidor — o Playwright batia 30s em "did not find some options" e os testes
+06–18 caíam em cascata atrás dele (a jornada é sequencial). Não é flake: este
+teste **nunca** passou desde que o A22 trocou o input livre pelo select
+(`1394d907`, 05/08). Conserto em `160c7282` (o cliente nasce antes do GET, no
+teste e no helper `_nova_proposta_via_ui`) — **só teste, nenhum código de
+produção**. Depois dele: **19 passed, 0 failed, 0 errors em 50.4s**, medido em
+chunk isolado
+(`tests/reports/ledger/done/test_e2e_jornada_proposta_cronograma_playwright.json`).
+Nenhum achado de produção saiu da jornada.
 
 Se falhar, **cada falha é achado**, e vai para
 `docs/auditoria/achados-code-review-2026-08-25.md` com `arquivo:linha`. **Não
@@ -387,18 +418,30 @@ mascarar defeito de outra onda.
 
 Se passar, registre a contagem no fecho — é a primeira vez que ela roda.
 
-- [ ] **Step 3: Commit** (só o registro; a jornada não muda código)
+- [x] **Step 3: Commit** (só o registro; a jornada não muda código) — o conserto
+saiu em `160c7282` e este registro fecha a onda.
 
 ---
 
 ## Fecho da onda
 
-- [ ] `bash run_tests.sh --gate` verde, com a contagem registrada — ela **sobe**
-      nesta onda, e é para subir. Diga em quanto.
-- [ ] `bash run_tests.sh --jornada` rodado, com resultado registrado.
-- [ ] A decisão da Task 2 (A10 já coberto ou não) registrada **aqui e no
-      `2026-08-04-plano-consolidado.md`**, no formato da nota do A05.
+- [x] `bash run_tests.sh --gate` verde, com a contagem registrada — ela **sobe**
+      nesta onda, e é para subir. Diga em quanto. **02/09: 3247 passed, 8
+      skipped, 201 deselected, 72 xfailed, 0 failed** (47:43,
+      `tests/reports/gate_browser_2154.log`). Subiu **54** sobre o piso de
+      01/09 — 19 da guarda de seletor, 15 do runner retomável, 20 do contrato
+      de isolamento. Os testes desta onda já estavam no piso de 01/09.
+- [x] `bash run_tests.sh --jornada` rodado, com resultado registrado — **19
+      passed, 0 failed em 50.4s** (02/09), depois do conserto `160c7282`. Antes
+      dele: 13 failed / 6 passed.
+- [x] A decisão da Task 2 (A10 já coberto ou não) registrada **aqui e no
+      `2026-08-04-plano-consolidado.md`** (Task A10, no formato da nota do A05):
+      **já coberto** por `tests/test_arreio_presenca_rotas.py:123`.
 - [ ] `docs/planos-em-aberto-2026-08-25.md` — a coluna "Resíduo" dos sete planos
-      atualizada com o que sobrou de verdade.
-- [ ] **A09 riscada** de `docs/reconferencia-backlog-2026-08-23.md` — agora com
-      teste, não com leitura de código.
+      atualizada com o que sobrou de verdade. ➡️ **Não se faz aqui.** 🔬 O índice
+      está desatualizado desde 31/08 (escrito contra `main` em `657326c4`, sem
+      Onda 5, `a-porta-irma` nem `o-que-nao-persiste`) — remendá-lo por uma onda
+      só seria dar validade a um documento que já não vale. Quem o **substitui**
+      é a **Task 16** de `2026-08-31-fecho-do-que-esta-aberto.md`.
+- [x] **A09 riscada** de `docs/reconferencia-backlog-2026-08-23.md` — agora com
+      teste, não com leitura de código: o arquivo está citado em `:413`.

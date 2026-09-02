@@ -1054,3 +1054,55 @@ chunks, processo isolado por arquivo de browser): **3435 passed, 1 failed,
 - **O que se sabe e o que não se sabe:** sabe-se que a asserção e o template
   discordam hoje. **Não** se sabe desde quando — a família browser nunca teve
   placar histórico, então isto não é presumida regressão.
+
+---
+
+## 02/09 — o pré-voo da Onda 4 acha o gêmeo vivo do módulo que a D4 apagou
+
+A varredura de pré-voo da **Task 7** de `2026-08-31-fecho-do-que-esta-aberto.md`
+(a regra da casa: pré-voo abre cada etapa) foi procurar se os alvos da Onda 4
+ainda existiam na árvore de hoje. Dois haviam sido apagados — e um terceiro
+arquivo, que **nenhum dos dois planos lista**, comete os mesmos defeitos.
+
+### 🔴 `exportacao_relatorios.py` — inoperante, registrado, e mentindo `success: true`
+
+- **É módulo vivo, não morto:** blueprint registrado em `main.py:157`
+  (`url_prefix='/relatorios/exportacao'`) e na lista de módulos de
+  `app.py:1108`. 📖 É o mesmo argumento que pôs `dashboards_especificos.py` no
+  adendo de 28/08 da Onda 4.
+- **Onde:** `_obter_dados_resumo_executivo` (`exportacao_relatorios.py:373-418`),
+  alcançável por três rotas — `/gerar-pdf` (via `:97`), `/gerar-excel` (via
+  `:245`) e `/api/preview-dados` (`:746`).
+- **Os três defeitos, provados por execução e não por leitura:**
+  1. `:380` — `UsoVeiculo.km_rodado`: `AttributeError: type object 'UsoVeiculo'
+     has no attribute 'km_rodado'`. A coluna real é `km_percorrido`
+     (`models.py:5265`). É o **terceiro** sítio do mesmo defeito: os outros são
+     `dashboards_especificos.py:396, :448, :463` (o adendo de 28/08 os aponta em
+     `:394, :446, :461` — as linhas andaram).
+  2. `:396` `ManutencaoVeiculo` e `:404`, `:480-483` `AlertaVeiculo`: **nenhum
+     dos dois importado**. O import de `models` (`:36-38`) traz só
+     `db, Veiculo, CustoVeiculo, UsoVeiculo` → `NameError`.
+  3. `AlertaVeiculo` **não existe no repo** — nem em `models.py`, nem em lugar
+     nenhum: só o `AlertaVeiculoForm` (`forms.py:475`). É o mesmo caso do
+     `AlocacaoVeiculo` que a Onda 4 cita para o módulo já apagado.
+- **E o erro é engolido:** `:416-418` faz `except Exception: logger.error(...);
+  return {}`, e `/api/preview-dados` responde `{'success': True, 'resumo': {}}`.
+  🔴 **É exatamente a mentira que motivou a D4** — "responde `success: true` com
+  forma vazia em vez de errar" — viva noutro arquivo, depois de o primeiro ter
+  sido apagado.
+- **Por que NÃO foi corrigido aqui:** é a mesma pergunta da D4 (apagar ou
+  consertar), e a D4 foi respondida pelo **dono**, não pelo executor. Escalada
+  como **D7** em `2026-08-31-decisoes-pendentes.md`.
+- **O que se sabe e o que não se sabe:** sabe-se que as três rotas quebram na
+  primeira requisição que chegue ao resumo executivo, e que o usuário vê PDF/
+  Excel/preview vazios em vez de erro. **Não** se sabe se alguém as usa — não há
+  teste que as chame (é a razão pela qual sobreviveram) e o repositório não
+  registra chamador de produção.
+
+### ✅ Um falso alarme desarmado no mesmo pré-voo
+
+O cabeçalho da Onda 4 lista `ativo=True` "numa tabela sem `ativo`" entre os
+defeitos de existência. 🔬 `Veiculo.ativo` **existe** (`models.py:5186`), e
+`AlertaVeiculo.ativo` não é o caso porque a classe inteira não existe. Aquele
+defeito morreu junto com o módulo apagado — quem for executar a Onda 4 não deve
+procurá-lo.

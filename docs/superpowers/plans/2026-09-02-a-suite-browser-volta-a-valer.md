@@ -1,5 +1,30 @@
 # A suíte browser volta a valer — Implementation Plan
 
+> **Estado em 2026-09-02:** ✅ **FECHADO — 7/7 tasks.**
+>
+> | Task | Estado |
+> |---|---|
+> | 1 — a guarda de seletor entra no gate | ✅ `5416d581` — 19 testes novos, com RED provado quebrando o template de propósito |
+> | 2 — o helper de proposta usa o `<select>` | ✅ `f62de068` |
+> | 3 — a NF do teste de almoxarifado nasce única | ✅ `cc5e3ad2`, e `8f2a4694` (o teste parava de aceitar a recusa A09 como sucesso) |
+> | 4 — `_flash_em_pagina` para de devolver painel estático | ✅ `92840194` |
+> | 5 — a suíte inteira, destacada | ✅ **3435 passed, 1 failed, 8 skipped, 72 xfailed**. 🔬 A primeira rodada deu 12 failed + 68 errors, e era **um defeito só**: fixture de sessão segurando `sync_playwright()` (`a80f1ddc`, guarda em `tests/test_contrato_isolamento_playwright.py`). Dela nasceu o runner retomável (`1573f348`) |
+> | 6 — a jornada E2E, que nunca rodou | ✅ **19 passed, 0 failed em 50.4s** (`160c7282`) — com ela a **Onda 6 fecha inteira** |
+> | 7 — o gate consolida e os três registros fecham | ✅ **gate 3247 passed, 8 skipped, 201 deselected, 72 xfailed, 0 failed** (47:43) — 54 acima do piso de 01/09, com dono para cada um |
+>
+> **O único vermelho da suíte é o achado P4 do RDO unificado**, registrado em
+> `docs/auditoria/achados-code-review-2026-08-25.md` — decisão de produto, não
+> conserto desta rodada.
+>
+> 🔬 **Nenhum código de produção mudou nesta rodada**, como a constraint mandava.
+> As 4 falhas eram teste desatualizado: `1394d907` (05/08) trocou o input de
+> cliente por `<select>` e o helper do browser nunca soube; `bbe74f00` (04/08)
+> pôs dedup de NF e os testes gravavam NF fixa contra banco persistente.
+>
+> 📖 Os checkboxes de Step das Tasks 1–6 ficam como estavam: o registro de
+> execução desta casa é a tabela acima com o commit de cada task — mesmo
+> formato de `2026-08-28-o-que-nao-persiste.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) ou superpowers:executing-plans para executar este plano task a task. Os passos usam checkbox (`- [ ]`) para acompanhamento.
 
 **Goal:** Devolver a `tests/test_browser_all_modules.py` a capacidade de provar
@@ -401,7 +426,7 @@ Expected: PASS de novo, e `git status` limpo em `templates/`.
 ⚠️ **Não commite com o template quebrado.** Confira `git diff --stat` antes do
 Step 4: só `tests/test_contrato_formularios_e2e.py` pode aparecer.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/test_contrato_formularios_e2e.py
@@ -1006,7 +1031,7 @@ em mensagem de commit é pior que placar ausente.
 - Modify: `docs/superpowers/plans/2026-09-01-as-decisoes-viram-codigo.md`
 - Modify: `docs/superpowers/plans/2026-08-31-fecho-do-que-esta-aberto.md`
 
-- [ ] **Step 1: Gate único, destacado**
+- [x] **Step 1: Gate único, destacado** — 02/09, `gate_browser_2154.log`: **3247 passed, 8 skipped, 201 deselected, 72 xfailed, 0 failed** (47:43). 🔬 O previsto era 3212 e **o número divergiu — eis o porquê, sem arredondar**: o Step só contava os 19 da Task 1, mas entraram no gate também os 15 de `test_suite_resumavel.py` (`1573f348`) e os 20 de `test_contrato_isolamento_playwright.py` (`a80f1ddc`), escritos depois deste plano. 19+15+20 = 54, e 3193+54 = 3247.
 
 ```bash
 setsid nohup bash run_tests.sh --gate > tests/reports/gate_browser_$(date +%H%M).log 2>&1 &
@@ -1016,7 +1041,7 @@ Expected: **0 failed**, `skipped = 8`, `xfailed = 72`, passed = 3193 + os testes
 da Task 1 (parametrizados: 10 + 1 + 7 + 1 = **19**), ou seja **3212**. Se o
 número divergir, diga qual é e por quê — não arredonde.
 
-- [ ] **Step 2: Fechar a Task 12 do plano de 01/09**
+- [x] **Step 2: Fechar a Task 12 do plano de 01/09**
 
 Em `2026-09-01-as-decisoes-viram-codigo.md`, marque `- [x] **Step 2: Rodar a
 suíte com browser**` e substitua o bloco `> **Estado em 01/09 ~19:45...**` pelo
@@ -1025,7 +1050,7 @@ desfecho: as 4 falhas eram teste desatualizado, não regressão — `1394d907`
 `2026-09-02-a-suite-browser-volta-a-valer.md`, com o placar da suíte. Marque
 também o Step 6.
 
-- [ ] **Step 3: Derrubar a Task 6 do plano mestre**
+- [x] **Step 3: Derrubar a Task 6 do plano mestre** — a Onda 6 foi carimbada no próprio plano dela (`2026-08-25-onda-6-*.md`), que estava aberto: cabeçalho ✅ 6/6, os três Steps da Task 6 com o placar real da jornada, e o "Fecho da onda" resolvido item a item.
 
 Em `2026-08-31-fecho-do-que-esta-aberto.md`, na tabela de estado do cabeçalho,
 troque a linha da Task 6 por `✅` com os commits desta rodada, e atualize o

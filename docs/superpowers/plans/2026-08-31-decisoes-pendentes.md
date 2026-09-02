@@ -1,13 +1,19 @@
 # Decisões pendentes — o que trava a Fase 8 e o Resgate da Espinha
 
-> ✅ **RESPONDIDAS em 01/09** — ver `2026-09-01-decisoes-respondidas.md`.
-> D6: assinatura estrutural (≥4 seeders, não 2). FASE8-T1: segue aguardando
-> acesso a produção. VIGA-I: opção B; a C foi declarada morta.
+> ✅ **As três primeiras foram RESPONDIDAS em 01/09** — ver
+> `2026-09-01-decisoes-respondidas.md`. D6: assinatura estrutural (≥4 seeders,
+> não 2). FASE8-T1: segue aguardando acesso a produção. VIGA-I: opção B; a C foi
+> declarada morta.
+>
+> 🔴 **Uma quarta abriu em 02/09 e está sem resposta: a D7**, no fim desta
+> página — achada pelo pré-voo da Task 7 (Onda 4). Ela não trava plano nenhum;
+> trava a **honestidade** do que a Onda 4 vai poder afirmar ao fechar.
 
-> **Para quem decide.** Três perguntas. Cada uma trava um plano inteiro que já
-> está escrito e pronto para executar. Nenhuma delas é técnica: são o
-> significado de uma conta contábil, uma medição de produção, e uma regra de
-> rateio de lucro.
+> **Para quem decide.** Quatro perguntas. As três primeiras travam, cada uma, um
+> plano inteiro que já está escrito e pronto para executar; nenhuma delas é
+> técnica — são o significado de uma conta contábil, uma medição de produção, e
+> uma regra de rateio de lucro. A quarta é a repetição de uma que você já
+> respondeu, noutro arquivo.
 
 ## D6 — o de-para do plano de contas não pode ser chaveado só por código
 
@@ -120,3 +126,56 @@ volta a `custo_nao_mo_atividade`, e os testes da Fatia 2
 (`tests/test_resultado_fatia2_custo_nao_mo.py`) saem de `xfail`. Sem ela, o
 resultado por atividade fica **sem o custo de subempreitada** — não erra, mas
 mede menos do que promete, e o `xfail` é o registro disso.
+
+---
+
+## D7 — `exportacao_relatorios.py`: apagar ou consertar? (aberta em 02/09)
+
+> É a **mesma pergunta da D4**, noutro arquivo. A D4 foi respondida "apagar"
+> pelo dono em 31/08 e executada na Task 2 do plano de fecho (`3d0873a4`). O
+> pré-voo da Task 7 (Onda 4), feito em 02/09, achou que o defeito não morreu
+> com o módulo: ele tem um gêmeo vivo que nenhum plano lista.
+
+**O que trava:** nada, ainda. É a diferença para as outras desta página. A Onda 4
+pode executar sem esta resposta — mas se ela executar sem ela, entrega "o
+relatório passa a funcionar" com três rotas de relatório continuando a devolver
+vazio com `success: true`, que é precisamente o que a onda promete acabar.
+
+**A evidência** (medida em 02/09, provada por execução — registro completo em
+`docs/auditoria/achados-code-review-2026-08-25.md`):
+
+- Blueprint **registrado e vivo**: `main.py:157`, `/relatorios/exportacao`;
+  consta de `app.py:1108`.
+- `_obter_dados_resumo_executivo` (`:373-418`) quebra em três lugares
+  independentes: `UsoVeiculo.km_rodado` (`:380`) não existe — a coluna é
+  `km_percorrido` (`models.py:5265`); `ManutencaoVeiculo` (`:396`) e
+  `AlertaVeiculo` (`:404`, `:480-483`) **não estão importados** (`:36-38` traz
+  só `db, Veiculo, CustoVeiculo, UsoVeiculo`); e `AlertaVeiculo` **não existe
+  no repositório** — só o `AlertaVeiculoForm` (`forms.py:475`).
+- O erro é engolido em `:416-418` (`except Exception: return {}`) e
+  `/api/preview-dados` (`:731-757`) responde `{'success': True, 'resumo': {}}`.
+- Alcançável por `/gerar-pdf` (via `:97`), `/gerar-excel` (via `:245`) e
+  `/api/preview-dados` (`:746`).
+
+**As saídas:**
+
+- **(a) Apagar**, como a D4 — *é a recomendação, pelo mesmo argumento que valeu
+  em 31/08*: consertar um módulo que nenhuma tela chama e nenhum teste toca é
+  criar manutenção para funcionalidade que ninguém pediu. 🔬 O que se sabe: as
+  rotas quebram na primeira requisição que chegue ao resumo executivo. O que
+  **não** se sabe: se alguém as usa — não há teste que as chame, e o
+  repositório não registra chamador de produção. Se houver uso real, apagar é
+  visível na hora (404), enquanto hoje o usuário recebe um PDF vazio e acha que
+  não há dados.
+- **(b) Consertar**: são três correções independentes (`km_percorrido`, os dois
+  imports, e criar ou remover o `AlertaVeiculo`), mais trocar o `return {}` por
+  erro honesto. Vira task própria dentro da Onda 4, com teste que **chama** cada
+  rota — a regra que a própria onda escreveu.
+- **(c) Nem uma nem outra agora**: fica registrado como achado e a Onda 4 executa
+  sem tocá-lo. ⚠️ Custo declarado: a onda fecha dizendo que o relatório passa a
+  funcionar, com este ainda mentindo.
+
+**O que muda:** com **(a)**, a Task 7 do plano de fecho ganha uma remoção pequena
+e o `dashboards_especificos.py` segue sendo o único alvo de `km_rodado`. Com
+**(b)**, a Onda 4 ganha uma task e o gate ganha três testes de rota. Com **(c)**,
+nada muda no código e a dívida fica nomeada.

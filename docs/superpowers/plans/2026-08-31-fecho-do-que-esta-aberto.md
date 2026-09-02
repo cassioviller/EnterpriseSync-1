@@ -107,10 +107,17 @@ a Onda 5, `a-porta-irma` nem `o-que-nao-persiste`. A Task 10 o substitui.
 ## Global Constraints
 
 - **Gate:** `bash run_tests.sh --gate` (= `pytest tests/ -m "not browser"`).
-- **Piso vigente, medido em 01/09** (`tests/reports/gate_decisoes_1901.log`):
-  **3193 passed, 8 skipped, 201 deselected, 72 xfailed, 0 failed** (42:24).
+- **Piso vigente, medido em 02/09** (`tests/reports/gate_browser_2154.log`):
+  **3247 passed, 8 skipped, 201 deselected, 72 xfailed, 0 failed** (47:43).
   Toda task que fecha uma etapa roda o gate e compara contra este piso. (Pisos
-  anteriores: 2872/6 em 31/08, 2854/6 em 28/08 — não use nenhum deles.)
+  anteriores: 3193/8 em 01/09, 2872/6 em 31/08, 2854/6 em 28/08 — não use
+  nenhum deles.)
+  🔬 Os **54** verdes acima de 01/09 têm dono, um a um, e a conta fecha:
+  `test_contrato_formularios_e2e.py` (19, a guarda de seletor da Task 11),
+  `test_suite_resumavel.py` (15, o runner retomável) e
+  `test_contrato_isolamento_playwright.py` (20, o contrato de isolamento). O
+  plano de 02/09 previa 3212 porque só contava o primeiro — os outros dois
+  nasceram depois de ele ser escrito.
 - **Piso da suíte com browser, medido em 02/09** pelo runner retomável:
   **3435 passed, 8 skipped, 72 xfailed** e **1 failed** — o achado P4, que a
   Task 11 registra. Fora esse, **0 failed**.
@@ -168,6 +175,7 @@ a Onda 5, `a-porta-irma` nem `o-que-nao-persiste`. A Task 10 o substitui.
 | **D6** | O de-para do plano de contas pode ser chaveado só por código? | ✅ **RESPONDIDA (01/09)** — chavear por **assinatura estrutural**, não por `(código, nome)`. 🔴 E a premissa da pergunta estava errada: 📖 `contabilidade_utils.py:514` diz que são **quatro** planos concorrentes, não dois | Destrava a **Task 12** deste plano |
 | **VIGA-I** | A regra de verba/lucro do telhado viga I | ✅ **RESPONDIDA (01/09)** — **opção B** (markup uniforme, move `orcamento.margem_pct_global` até a venda total voltar a R$ 1.720.796,75). A opção **C está morta**: citada em quatro documentos e definida em nenhum. `RATIFICAR` — é escolha comercial | A Task 8 do Resgate deixa de ser resíduo. A **Task 8 deste plano vira 10/10** |
 | **FASE8-T1** | Medir o plano de contas em **produção** (não em dev) | 🟡 **SEM ACESSO — vira premissa declarada** (decisão do dono, 02/09) | A Task 12 executa com **falha fechada e nomeada**; a medição vira ratificação posterior |
+| **D7** | `exportacao_relatorios.py`: apagar ou consertar? | 🔴 **ABERTA (02/09)** — achada pelo pré-voo da Task 7. É a **D4 outra vez**: módulo registrado e vivo (`main.py:157`), inoperante por três defeitos, devolvendo `{'success': True, 'resumo': {}}`. Recomendação: **apagar**, pelo mesmo argumento de 31/08 | Não trava a Task 7 — mas sem resposta a Onda 4 fecha dizendo "o relatório passa a funcionar" com três rotas ainda mentindo |
 
 ⚠️ **O bloqueio dos dois é PARCIAL — e a primeira versão deste plano errou
 isso.** A conferência na fonte, em 31/08, mostrou:
@@ -817,6 +825,76 @@ git commit -m "docs(onda-6): a onda fecha, com os testes prometidos entregues"
 - Consumes: o resolvedor de tenant corrigido pela Task 4 deste plano.
 - Produces: nada.
 
+- [ ] **Step 0: O pré-voo desta etapa — a árvore de hoje já mudou o plano**
+
+🔬 **Varredura feita em 02/09** (com o gate da Task 11 rodando; só leitura e
+execução de checagem). A Onda 4 foi escrita em 25/08 e o adendo dela é de 28/08;
+desde então as Tasks 2 e 3 deste plano e a onda de 01/09 passaram por cima dos
+mesmos arquivos. O que mudou, e o que isso obriga:
+
+**(a) Duas tasks ficaram vazias — e o Step 1 abaixo descreve a segunda errado.**
+`relatorios_financeiros_avancados.py` não existe mais (`3d0873a4`). E
+`views/vehicles.py` **também não existe**: as 18 rotas saíram inteiras em
+`12703381` (01/09, "segunda leva"), não só as seis. ⚠️ O texto do Step 1 ainda
+diz que as outras 18 "estão mortas pela interface mas funcionam, e a remoção
+delas é decisão que ninguém tomou" — **está desatualizado**; corrija ao marcar.
+
+**(b) 🔴 O defeito que motivou a D4 tem um gêmeo VIVO, e a Onda 4 não o lista.**
+📖 `exportacao_relatorios.py` é blueprint registrado (`main.py:157`,
+`url_prefix='/relatorios/exportacao'`) e consta da lista de módulos de
+`app.py:1108` — o mesmo argumento que pôs `dashboards_especificos.py` no adendo
+de 28/08. Em `_obter_dados_resumo_executivo` (`:373-418`):
+
+- `:380` — `UsoVeiculo.km_rodado`. 🔬 Provado por execução, não por leitura:
+  `AttributeError: type object 'UsoVeiculo' has no attribute 'km_rodado'`. A
+  coluna real é `km_percorrido` (`models.py:5265`).
+- `:396` — `ManutencaoVeiculo` e `:404`, `:480-483` — `AlertaVeiculo`: **nenhum
+  dos dois está importado**. 📖 O import de `models` (`:36-38`) traz apenas
+  `db, Veiculo, CustoVeiculo, UsoVeiculo` → `NameError`. E `AlertaVeiculo`
+  **não existe em parte alguma do repo**: só o `AlertaVeiculoForm`
+  (`forms.py:475`) — é o mesmo caso do `AlocacaoVeiculo` que o cabeçalho da
+  Onda 4 cita para o módulo apagado.
+- `:416-418` — `except Exception: logger.error(...); return {}`, e a rota
+  `/api/preview-dados` (`:731-757`) devolve `{'success': True, 'resumo': {}}`.
+  **É literalmente a mentira que a D4 mandou apagar**, viva noutro arquivo.
+- Alcançável por três rotas: `/gerar-pdf` (via `:97`), `/gerar-excel` (via
+  `:245`) e `/api/preview-dados` (`:746`).
+
+⚠️ **Não conserte no meio.** Isto é achado, não task: registrado em
+`docs/auditoria/achados-code-review-2026-08-25.md` e escalado como **D7** em
+`2026-08-31-decisoes-pendentes.md` — apagar ou consertar é a mesma pergunta da
+D4, e quem a respondeu foi o dono, não o executor.
+
+**(c) Linhas que andaram.** O adendo de 28/08 aponta `dashboards_especificos.py`
+`:394, :446, :461`; hoje são **`:396, :448, :463`**. Na Task 1, `:621` (DRE),
+`:871` (balancete) e `:457` (Balanço) de `contabilidade_utils.py` **não são mais
+o que o plano diz** — o arquivo foi tocado em 01/09 (`bef17c33`), e
+`contabilidade_views.py` também (`a6afcb8e`). Ancore por **nome de função**, não
+por linha: `calcular_dre_mensal:557`, `obter_dados_balancete:789`,
+`gerar_balancete_mensal:352`, `gerar_balanco_patrimonial:406`.
+
+**(d) Um falso alarme desarmado antes de custar tempo.** O cabeçalho da Onda 4
+lista `ativo=True` "numa tabela sem `ativo`" entre os defeitos de existência. 🔬
+`Veiculo.ativo` **existe** (`models.py:5186`) — aquele defeito morreu junto com
+o módulo apagado. Não o procure. `AlocacaoVeiculo` também não tem mais nenhuma
+referência no repo.
+
+**(e) Alvos íntegros — as linhas do plano valem.** Intocados desde antes de a
+Onda 4 ser escrita: `views/almoxarifado/relatorios.py` (22/07, `b30923b5`),
+`services/evm.py` (03/08, `3612db6b`), `services/custo_orcado.py` (05/08),
+`services/medicao_service.py` (24/08) e `views/almoxarifado/movimentos.py`
+(27/08).
+
+**(f) Pares que compartilham arquivo** (a regra de pré-voo da casa): Tasks 1 e 2
+em `contabilidade_utils.py`; Tasks 3 e 6 em `views/almoxarifado/movimentos.py`.
+Ordem numérica resolve as duas.
+
+**(g) A régua da Onda 4 está morta.** Ela manda comparar contra **2560 passed,
+6 skipped, 2 xfailed** — três pisos atrás. Vale o piso deste plano (Global
+Constraints), não o dela.
+
+**(h) Nada foi começado:** `tests/test_onda4_relatorio_funciona.py` não existe.
+
 - [ ] **Step 1: Marcar as duas tasks absorvidas, antes de executar**
 
 Em `2026-08-25-onda-4-o-relatorio-passa-a-funcionar.md`, marque as Tasks 4 e 5
@@ -1166,7 +1244,7 @@ commits sobem e o que eles contêm.
 - Produces: `main` com 117 commits empurrados; o piso do gate confirmado numa
   rodada única.
 
-- [ ] **Step 1: Conferir o que está solto na árvore**
+- [x] **Step 1: Conferir o que está solto na árvore**
 
 Run: `git status --short`
 Expected: exatamente `M docs/auditoria/achados-code-review-2026-08-25.md` e
@@ -1174,7 +1252,7 @@ Expected: exatamente `M docs/auditoria/achados-code-review-2026-08-25.md` e
 commitar — 📖 é a lição da Ruling P5 de 01/09, quando um `git add tests/` teria
 varrido trabalho em curso de outra sessão para dentro de um commit alheio.
 
-- [ ] **Step 2: Commitar o achado P4**
+- [x] **Step 2: Commitar o achado P4** — `80c3bb31`.
 
 🔬 As 39 linhas descrevem o único vermelho da suíte de 02/09: o teste
 (`tests/test_rdo_unificado_playwright.py:275-277`) exige `#btn-equipe-<id>` numa
@@ -1187,13 +1265,13 @@ git add docs/auditoria/achados-code-review-2026-08-25.md
 git commit -m "docs(achados): a suite browser rodou inteira e sobrou um achado — P4 do RDO unificado"
 ```
 
-- [ ] **Step 3: Executar a Task 7 do plano de 02/09**
+- [x] **Step 3: Executar a Task 7 do plano de 02/09** — gate **3247/8/201/72, 0 failed**; o plano de 02/09 fecha 7/7.
 
 Use `superpowers:subagent-driven-development`. Ela é a última daquele plano:
 gate consolidado e os três registros de fecho. `tests/reports/` fica **fora** do
 commit (📖 `*.log` já é ignorado; o diretório inteiro é artefato de rodada).
 
-- [ ] **Step 4: Fechar a Task 12 do plano de 01/09**
+- [x] **Step 4: Fechar a Task 12 do plano de 01/09**
 
 Os Steps 2 e 6 dela ficaram abertos quando a sessão caiu. O Step 2 (suíte com
 browser) foi **cumprido pelo plano de 02/09** — a suíte rodou inteira pela
@@ -1209,11 +1287,11 @@ primeira vez. Marque os dois `[x]` e substitua a nota de estado da task por:
 > idempotente, ambas diagnosticadas e corrigidas.
 ```
 
-- [ ] **Step 5: Carimbar a Task 6 deste plano como fechada**
+- [x] **Step 5: Carimbar a Task 6 deste plano como fechada** — conferido: cabeçalho e corpo batem, e o plano da Onda 6 também foi fechado (estava aberto).
 
 Já está escrito no cabeçalho e no corpo da Task 6. Confira que os dois batem.
 
-- [ ] **Step 6: Commit dos registros**
+- [x] **Step 6: Commit dos registros**
 
 ```bash
 git add docs/superpowers/plans/2026-09-01-as-decisoes-viram-codigo.md docs/superpowers/plans/2026-09-02-a-suite-browser-volta-a-valer.md docs/superpowers/plans/2026-08-31-fecho-do-que-esta-aberto.md
