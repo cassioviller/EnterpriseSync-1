@@ -1,19 +1,37 @@
 # Fecho do Que Está Aberto — Implementation Plan
 
-> **Estado em 2026-08-31:** 🟡 **EM EXECUÇÃO — 5 de 10 tasks fechadas.**
+> **Estado em 2026-09-02:** 🟡 **EM EXECUÇÃO — 6 de 16 tasks fechadas.**
+>
+> ⚠️ **ESTENDIDO em 02/09** pelo design
+> `docs/superpowers/specs/2026-09-02-a-lista-vai-a-zero-design.md`, que decidiu
+> levar a lista a **zero** — inclusive a funcionalidade nova que este plano
+> antes deixava de fora (Fase 8, automações, Fase 9a/9b). As Tasks **11–16** são
+> novas. A numeração cresce **por acréscimo, não por renumeração**: 📖 o ledger
+> em `.superpowers/sdd/2026-08-31-fecho-do-que-esta-aberto/progress.md`
+> referencia T1–T10, e renumerar quebraria o rastro.
+>
+> 🔴 **A ordem de execução NÃO é a ordem dos números:**
+>
+> **T11 → T7 → T8 → T12 → T13 → T9 → T14 → T15 → T16**
 >
 > | Task | Estado |
 > |---|---|
-> | 1 — as três decisões sobem para quem decide | ✅ `0b7abc49` `556f1bc3` — **aguardando decisão humana** (D6, VIGA-I, FASE8-T1) |
+> | 1 — as três decisões sobem para quem decide | ✅ `0b7abc49` `556f1bc3` — **respondidas em 01/09** (`2026-09-01-decisoes-respondidas.md`) |
 > | 2 — apagar `relatorios_financeiros_avancados.py` (D4) | ✅ `3d0873a4` `41b605d0` |
 > | 3 — apagar as seis rotas mortas de veículos (D3) | ✅ `0b3f932c` `0d1a7c6d` |
 > | 4 — Onda 2 (o tenant para de vazar) | ✅ nada a executar: já mergeada em `fed8f19b` (26/08); doc corrigido em `b13e23c9` |
 > | 5 — `o-que-nao-persiste` (os cinco achados restantes) | ✅ 6/6 tasks, gate 2872/6 skipped |
-> | 6 — Onda 6 (os testes prometidos) | ⬜ próxima |
+> | 6 — Onda 6 (os testes prometidos) | ✅ **fechada em 02/09** — a última task dela (a jornada E2E) foi entregue pelo plano `2026-09-02-a-suite-browser-volta-a-valer.md` |
+> | **11 — o que está a um passo, e a primeira integração** | ⬜ **próxima** |
 > | 7 — Onda 4 (o relatório passa a funcionar) | ⬜ |
-> | 8 — Resgate da Espinha Financeira (9 de 10 tasks) | ⬜ |
-> | 9 — as oito issues de arquitetura viram plano | ⬜ |
-> | 10 — o índice volta a valer, gate consolidado, merge da branch | ⬜ |
+> | 8 — Resgate da Espinha Financeira (agora **10 de 10**) | ⬜ |
+> | **12 — Fase 8, o plano de contas canônico** | ⬜ |
+> | **13 — família 404 (B6.4–B6.8)** | ⬜ |
+> | 9 — as sete issues de arquitetura viram plano | ⬜ |
+> | **14 — reconferência das automações → spec → planos** | ⬜ |
+> | **15 — reconferência de premissas da Fase 9a/9b → plano novo** | ⬜ |
+> | 10 — **muda de forma:** o ritual de integração entre etapas | ⬜ repetido |
+> | **16 — o índice volta a valer, gate final, push** | ⬜ |
 >
 > ⚠️ **Este é um plano de SEQUENCIAMENTO.** Ele não reescreve as 47 tasks que
 > já existem nos seis planos abertos — elas já estão escritas com TDD e RED
@@ -58,8 +76,8 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recomendado) ou superpowers:executing-plans para executar este plano task a task. Os passos usam checkbox (`- [ ]`) para acompanhamento.
 
 **Goal:** Levar a zero a lista de trabalho em aberto do repositório — seis
-planos, oito issues de arquitetura, quatro decisões humanas e uma branch de 30
-commits não integrada — fechando cada item pela ordem que respeita suas
+planos, oito issues de arquitetura, quatro decisões humanas e uma branch não
+integrada — fechando cada item pela ordem que respeita suas
 dependências, ou marcando explicitamente o que só uma pessoa pode destravar.
 
 **Architecture:** O trabalho aberto não é uma fila; é um grafo com três
@@ -89,13 +107,25 @@ a Onda 5, `a-porta-irma` nem `o-que-nao-persiste`. A Task 10 o substitui.
 ## Global Constraints
 
 - **Gate:** `bash run_tests.sh --gate` (= `pytest tests/ -m "not browser"`).
-- **Piso vigente, medido em 31/08 ao fim da Task 5 (`o-que-nao-persiste`):**
-  **2872 passed, 6 skipped, 201 deselected, 2 xfailed, 0 failed** (46min44s).
-  Toda task que fecha uma etapa roda o gate e compara contra este piso. (O piso
-  anterior, da onda "A Porta Irmã", era 2854 passed / 6 skipped em 43min55s.)
-- **O skipped nunca sobe.** 🔬 Em 28/08, 4 testes saíram do gate sem que nada
-  sinalizasse, e isso só foi descoberto por acaso. Skip subindo é cobertura
-  saindo sem aviso — se subir, pare e descubra por quê antes de seguir.
+- **Piso vigente, medido em 01/09** (`tests/reports/gate_decisoes_1901.log`):
+  **3193 passed, 8 skipped, 201 deselected, 72 xfailed, 0 failed** (42:24).
+  Toda task que fecha uma etapa roda o gate e compara contra este piso. (Pisos
+  anteriores: 2872/6 em 31/08, 2854/6 em 28/08 — não use nenhum deles.)
+- **Piso da suíte com browser, medido em 02/09** pelo runner retomável:
+  **3435 passed, 8 skipped, 72 xfailed** e **1 failed** — o achado P4, que a
+  Task 11 registra. Fora esse, **0 failed**.
+- **O skipped nunca sobe. Piso: 8.** 🔬 Em 28/08, 4 testes saíram do gate sem
+  que nada sinalizasse, e isso só foi descoberto por acaso. Skip subindo é
+  cobertura saindo sem aviso — se subir, pare e descubra por quê antes de
+  seguir.
+- **Os xfailed são `strict=True` e só DESCEM.** Piso: 72. Consertar o código
+  que um `xfail` mede **exige remover o marcador no mesmo commit** — com
+  `strict`, o conserto sem remoção falha o gate por XPASS.
+- **Numeração de migrations — a lista viva.** 📖 A última é a **318**
+  (`migrations.py:7540`, registro em `:7884`). Nunca reserve faixa: confira o
+  máximo do repo **no momento de escrever** e numere em sequência real. 🔬
+  Precedente: a Fase 6 queimou a 270 e renumerou 271→277. Quem governa a ordem
+  de execução é a **tupla do registry**, não o maior número.
 - **TDD sem exceção.** Teste primeiro, RED conferido e **citado no commit**,
   depois o código.
 - **Nenhum teste prova por `inspect.getsource()`.** O que se afirma é olhado no
@@ -105,12 +135,26 @@ a Onda 5, `a-porta-irma` nem `o-que-nao-persiste`. A Task 10 o substitui.
   testes propostos pelo plano passariam verdes sem nunca chegar ao código sob
   teste. Se o teste depende de um erro injetado, ele afirma primeiro que o erro
   ocorreu.
-- **A branch de trabalho é `sdd/a-porta-irma`.** Decisão registrada: **merge só
-  ao fim de tudo**, com gate consolidado (Task 10). Não abra branch por plano.
+- **Integração a cada etapa fechada** (decisão do dono, 02/09 — substitui a
+  regra de 31/08 de "merge só ao fim"). Gate verde → merge na `main` → push.
+  🔬 O motivo: são **117 commits nunca empurrados** (a `main` 35 à frente do
+  `origin`, a branch 82 à frente da `main`), incluindo a Fase 6 inteira, e eles
+  só existem nesta máquina. A branch de trabalho segue sendo `sdd/a-porta-irma`
+  até o primeiro merge; depois, branch nova por etapa a partir da `main`. Não
+  use worktree — 📖 precedente de 21/08, worktrees quebraram sensores.
+- ⚠️ **Todo `git push` é confirmado com o dono antes de acontecer.** O plano
+  autoriza a cadência, não o gesto.
 - **Recusar é não deixar rastro.** Todo `return 4xx` faz
   `db.session.rollback()` antes.
 - **Arreio antes de arquivo novo.** 🔬 `tests/helpers_tenant.py` (`um_tenant`,
   `dois_tenants`, `cliente_de`) já existe. Use.
+- **Varredura de pré-voo abre cada etapa.** Antes da primeira task de um plano
+  portado, confira pares de tasks que compartilham arquivo, e cada task contra
+  a árvore de hoje. 🔬 Foi ela que achou a colisão de migration da Task 8 — e
+  vários destes planos foram escritos em 25/08, contra uma árvore que já não
+  existe.
+- **`2026-09-XX` em nome de arquivo** significa *a data do dia em que a task
+  roda*. Substitua ao criar; não crie arquivo com `XX` no nome.
 
 ---
 
@@ -121,9 +165,9 @@ a Onda 5, `a-porta-irma` nem `o-que-nao-persiste`. A Task 10 o substitui.
 | **D3** | `views/vehicles.py`: apagar ou consertar as rotas mortas? | ✅ **APAGAR** (31/08) | Task 3 deste plano. Absorve a Task 5 da Onda 4 |
 | **D4** | `relatorios_financeiros_avancados.py` tem dono? | ✅ **APAGAR** (31/08) | Task 2 deste plano. Absorve a Task 4 da Onda 4 |
 | **D5** | O aditivo: garantia própria ou ligar `escopo_obra_ativo`? | ✅ **GARANTIA PRÓPRIA** (28/08) | Já executada na onda "A Porta Irmã" (`da778eba`) |
-| **D6** | O de-para do plano de contas pode ser chaveado só por código? | 🔴 **ABERTA — bloqueia a Task 4 da Fase 8** | Task 1: escalar. 🔬 E a Task 3 não pode ir sem a 4 — o plano avisa que cortar ali deixa o parque em dois estados |
-| **VIGA-I** | A regra de verba/lucro do telhado viga I (verba, lucro %, opção A/B/C, com a venda total travada) | 🔴 **ABERTA — bloqueia SÓ a Task 8 de 10** do Resgate da Espinha | Task 1: escalar. As outras nove tasks entram na Task 8 deste plano |
-| **FASE8-T1** | Medir o plano de contas em **produção** (não em dev) | 🔴 **ABERTA — é trabalho humano** | Task 1: escalar |
+| **D6** | O de-para do plano de contas pode ser chaveado só por código? | ✅ **RESPONDIDA (01/09)** — chavear por **assinatura estrutural**, não por `(código, nome)`. 🔴 E a premissa da pergunta estava errada: 📖 `contabilidade_utils.py:514` diz que são **quatro** planos concorrentes, não dois | Destrava a **Task 12** deste plano |
+| **VIGA-I** | A regra de verba/lucro do telhado viga I | ✅ **RESPONDIDA (01/09)** — **opção B** (markup uniforme, move `orcamento.margem_pct_global` até a venda total voltar a R$ 1.720.796,75). A opção **C está morta**: citada em quatro documentos e definida em nenhum. `RATIFICAR` — é escolha comercial | A Task 8 do Resgate deixa de ser resíduo. A **Task 8 deste plano vira 10/10** |
+| **FASE8-T1** | Medir o plano de contas em **produção** (não em dev) | 🟡 **SEM ACESSO — vira premissa declarada** (decisão do dono, 02/09) | A Task 12 executa com **falha fechada e nomeada**; a medição vira ratificação posterior |
 
 ⚠️ **O bloqueio dos dois é PARCIAL — e a primeira versão deste plano errou
 isso.** A conferência na fonte, em 31/08, mostrou:
@@ -137,14 +181,15 @@ isso.** A conferência na fonte, em 31/08, mostrou:
   mas a seção "Onde a fase pode ser cortada em duas" diz o contrário sobre a 3:
   *"Não corte no meio da 3–4: aposentar o semeador sem migrar as `5.x` deixa o
   parque em dois estados."* **O plano se contradiz**, e a metade insegura é a
-  que age sobre dados de todos os tenants. **A Fase 8 fica fora da fila** até a
-  D6 ser respondida — executar só a metade segura exigiria arbitrar essa
-  contradição, e o custo do erro é partida contábil migrada em silêncio para a
-  conta errada.
+  que age sobre dados de todos os tenants.
 
-Executar o que está travado significaria decidir por conta própria o
-significado contábil de `5.1.01` e a regra de rateio de lucro de um produto —
-decisões de negócio, não de código. A Task 1 escala as três.
+> **Atualização de 02/09 — a contradição deixou de importar.** Com a D6
+> respondida, a fase **não é mais cortada**: as dez tasks entram juntas na
+> **Task 12** deste plano, e o parque nunca fica em dois estados. O que
+> substitui o bloqueio é a **premissa declarada com falha fechada** — a
+> migration para e **nomeia o tenant** cuja assinatura não for uma das
+> conhecidas. 🔬 Os 71 tenants indeterminados do banco de dev são a prova de
+> que esse ramo será exercitado, não decoração.
 
 ---
 
@@ -164,7 +209,15 @@ decisões de negócio, não de código. A Task 1 escala as três.
 | `docs/superpowers/plans/2026-08-25-onda-4-*.md` | Executar + marcar | Task 7 |
 | `docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md` | Executar 9/10 + marcar | Task 8 |
 | `docs/superpowers/plans/2026-08-31-issues-de-arquitetura.md` | **Criar** | Task 9 |
-| `docs/planos-em-aberto-2026-08-31.md` | **Criar** | Task 10 — o índice que volta a valer |
+| `docs/superpowers/plans/2026-09-02-a-suite-browser-volta-a-valer.md` | Executar T7 + marcar | Task 11 |
+| `docs/superpowers/plans/2026-09-01-as-decisoes-viram-codigo.md` | Fechar T12 Steps 2 e 6 | Task 11 |
+| `docs/auditoria/achados-code-review-2026-08-25.md` | Commitar (39 linhas soltas) | Task 11 — o achado P4 |
+| `docs/superpowers/plans/2026-08-24-fase-8-plano-de-contas-canonico.md` | Executar 10/10 + marcar | Task 12 |
+| `docs/superpowers/plans/2026-08-06-rodada-b6-varredura.md` | Executar B6.4–B6.8 + marcar | Task 13 |
+| `docs/reconferencia-backlog-2026-09-XX.md` | **Criar** | Task 14 — a reconferência das automações |
+| `docs/superpowers/specs/2026-09-XX-automacoes-design.md` | **Criar** | Task 14 — a spec que sai da reconferência |
+| `docs/superpowers/specs/2026-09-XX-fase-9-premissas.md` | **Criar** | Task 15 — o veredito das premissas da 9a/9b |
+| `docs/planos-em-aberto-2026-09-XX.md` | **Criar** | Task 16 — o índice que volta a valer |
 
 ---
 
@@ -704,6 +757,13 @@ git commit -m "docs(nao-persiste): a onda fecha, e os cinco achados restantes sa
 
 ### Task 6: Onda 6 — os testes que os planos prometeram
 
+> ✅ **FECHADA em 02/09.** As Tasks 1–5 entraram nas ondas de 31/08 e 01/09; a
+> Task 6 (a jornada E2E, que nunca havia rodado) foi entregue pelo plano
+> `2026-09-02-a-suite-browser-volta-a-valer.md`, que a nomeia explicitamente
+> como sua Task 6. 🔬 A jornada rodou pela primeira vez em 02/09 e ficou verde
+> depois do `160c7282` (o cliente nascia depois do GET). **Nada a executar
+> aqui** — os Steps abaixo ficam como registro do que foi pedido.
+
 > A menor das ondas abertas (377 linhas, 6 tasks). 🔬 Ela já derrubou dois
 > resíduos que a medição mecânica apontara e eram falso alarme, e confirmou um
 > real: zero testes citam `entrada_ja_lancada`.
@@ -785,7 +845,7 @@ deste plano fechou antes de tocá-la.
 - [ ] **Step 3: Gate**
 
 Run: `bash run_tests.sh --gate`
-Expected: **0 failed**, **skipped ≤ 6**.
+Expected: **0 failed**, **skipped = 8**, **xfailed ≤ 72**.
 
 - [ ] **Step 4: Marcar o plano como fechado**
 
@@ -798,7 +858,7 @@ git commit -m "docs(onda-4): a onda fecha, com as duas tasks absorvidas pelo pla
 
 ---
 
-### Task 8: Resgate da Espinha Financeira — as nove tasks que não dependem do viga I
+### Task 8: Resgate da Espinha Financeira — as dez tasks
 
 > 🔬 **O bloqueio deste plano é de UMA task, não do plano.** O cabeçalho diz
 > "uma única task presa a decisão de negócio", e a própria Task 8 dele instrui:
@@ -810,10 +870,14 @@ git commit -m "docs(onda-4): a onda fecha, com as duas tasks absorvidas pelo pla
 > commits em paralelo, do outro lado da fratura de linhagem de 22/07.
 > 🔬 7 de 20 arquivos prometidos já existem na árvore.
 
+> **Atualização de 02/09:** a VIGA-I foi respondida (**opção B**, markup
+> uniforme) e a Task 8 daquele plano **deixa de ser resíduo**. São **10 de 10**.
+> O Step 2 abaixo mudou de "marcar como resíduo" para "renumerar as migrations".
+
 **Files:**
 - Execute: `docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md`,
-  Tasks **1–7 e 9–10**. A **Task 8** fica de fora (migration 319: `verba`,
-  `lucro`, `pai` em `rdo_subempreitada_apontamento`)
+  Tasks **1–10**
+- Modify: o mesmo arquivo — a renumeração das migrations (Step 2)
 
 **Interfaces:**
 - Consumes: nada deste plano.
@@ -834,17 +898,49 @@ o contrato cross-cutting em
 (DC1–DC11), `docs/adr/0004-*` (granularidade serviço→N atividades) e
 `docs/adr/0005-*` (orçado = baseline congelado da Proposta).
 
-- [ ] **Step 2: Marcar a Task 8 daquele plano como resíduo, ANTES de executar**
+- [ ] **Step 2: Renumerar as migrations do plano portado, ANTES de executar**
 
-Para que o executor não pare no meio nem tente adivinhar a regra:
+🔴 **O plano da Espinha escreve as migrations 317, 318 e 319 — e a 317 e a 318
+já foram gastas.** 📖 `migrations.py:7505` (`_migration_317_chave_acesso_por_tenant`,
+A09) e `:7540` (`_migration_318_flag_folha_rateio_encargos`, A24), ambas de
+01/09. 📖 O plano avisa genericamente (`:46`) para conferir o máximo no dia,
+mas os números literais estão nos **títulos das Tasks 3, 4 e 8**, nos **corpos
+das funções**, nas **tuplas do registry** e nas **mensagens de commit**.
+
+Confirme o máximo primeiro:
+
+```bash
+grep -n "_migration_3[0-9][0-9]_" migrations.py | tail -3
+```
+
+Expected: a última é a `318`. Se for maior, use o número real — a lista viva
+das Global Constraints manda sobre este texto.
+
+Agora renumere no plano da Espinha, **por conteúdo, nunca por número de linha**:
+
+```bash
+sed -i 's/migration 317/migration 319/g; s/_migration_317_template_item_peso_medicao/_migration_319_template_item_peso_medicao/g; s/\[Migration 317\]/[Migration 319]/g' docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md
+sed -i 's/migration 318/migration 320/g; s/migration 319/migration 321/g' docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md
+grep -n "31[7-9]\|32[01]" docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md
+```
+
+⚠️ **A segunda linha do `sed` roda DEPOIS da primeira de propósito** — se
+rodasse antes, a `317→319` recém-criada seria renumerada de novo para `321`.
+Confira a saída do `grep`: o esperado é `peso_medicao` na **319**, `origem` na
+**320**, e `verba/lucro/pai` na **321**. A tupla `(317, "Resgate Espinha — ...`
+do registry também tem de virar `(319, ...`.
+
+- [ ] **Step 2b: A Task 8 daquele plano ENTRA — a VIGA-I foi respondida**
+
+Substitua o aviso de bloqueio no cabeçalho da Task 8 dele por:
 
 ```markdown
-### Task 8 — Fatia 2 §D: verba, lucro e pai na subempreitada (migration 319)
-
-> ⏸️ **RESÍDUO NOMEADO — não executar.** Bloqueada pela decisão VIGA-I (verba,
-> lucro %, opção A/B/C, com a venda total travada), escalada em
-> `docs/superpowers/plans/2026-08-31-decisoes-pendentes.md`. As Tasks 1–7 e
-> 9–10 foram entregues pelo plano de fecho de 31/08, Task 8.
+> ✅ **DESTRAVADA em 01/09 — opção B (markup uniforme).** O ajuste move um
+> único parâmetro declarado (`orcamento.margem_pct_global`) até a venda total
+> voltar a R$ 1.720.796,75. Não reduza margens item a item (opção A): isso
+> muda a margem de itens que ninguém tocou e contamina a própria medida que
+> esta fase entrega. A **opção C está morta** — citada em quatro documentos,
+> definida em nenhum. `RATIFICAR` com o dono: é escolha comercial.
 ```
 
 - [ ] **Step 3: Executar as nove tasks pela sub-skill**
@@ -858,38 +954,50 @@ RED**."* Um teste que veio pronto do PR #6 e passa na primeira execução contra
 a árvore de hoje não provou que o porte funcionou; provou que o teste existe.
 Rode-o contra a árvore **antes** do módulo entrar e veja o RED.
 
-⚠️ **A Task 5 remove um ramo que a Task 8 devolveria.** Como a Task 8 não vai
-rodar, esse ramo fica removido — é o resíduo esperado, não um erro. Os testes
-da Fatia 2 (`tests/test_resultado_fatia2_custo_nao_mo.py`) **continuam com
-`xfail`**; não os tire.
+⚠️ **A Task 5 remove um ramo que a Task 8 devolve.** Agora que a Task 8 roda, o
+ramo volta — e os testes da Fatia 2
+(`tests/test_resultado_fatia2_custo_nao_mo.py`) **saem do `xfail` na Task 8, no
+mesmo commit que os faz passar**. Com `strict=True`, deixar o marcador depois
+do conserto falha o gate por XPASS. Entre a Task 5 e a Task 8 eles ficam
+`xfail` e o `xfailed` do gate sobe; ao fim da Task 8 ele volta ao piso.
 
 - [ ] **Step 4: Gate**
 
 Run: `bash run_tests.sh --gate`
-Expected: **0 failed**, **skipped ≤ 6**, e os `xfailed` sobem (os da Fatia 2
+Expected: **0 failed**, **skipped = 8**, e os `xfailed` sobem (os da Fatia 2
 entram como esperados-a-falhar). Passed sobe pelo porte.
 
-- [ ] **Step 5: Marcar o plano como parcialmente fechado**
-
-⚠️ **Não marque como `✅ FECHADO`** — nove de dez não é dez. Use:
+- [ ] **Step 5: Marcar o plano como fechado**
 
 ```markdown
-> **Estado em [data]:** 🟢 **9/10 TASKS ENTREGUES** — Tasks 1–7 e 9–10 pelo
-> plano de fecho de 31/08. A **Task 8 continua aberta**, bloqueada por VIGA-I.
-> Gate: [números reais].
+> **Estado em [data]:** ✅ **FECHADO — 10/10 tasks**, entregues pelo plano de
+> fecho de 31/08, Task 8. A Task 8 destravou com a VIGA-I respondida em 01/09
+> (opção B). Migrations **319, 320 e 321** (renumeradas: as 317 e 318 do texto
+> original já haviam sido gastas em 01/09). Gate: [números reais].
 ```
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md
-git commit -m "docs(espinha): 9 das 10 tasks entregues; a task 8 fica como residuo do viga I"
+git commit -m "docs(espinha): as 10 tasks entregues, migrations renumeradas para 319-321"
 ```
+
+- [ ] **Step 7: Integrar (o ritual da Task 10)**
+
+Execute a Task 10 deste plano. Ela é o ritual repetido: gate → suíte → merge →
+push.
 
 ---
 
-### Task 9: As oito issues de arquitetura viram plano, ou ficam adiadas por escrito
+### Task 9: As sete issues de arquitetura viram plano, ou ficam adiadas por escrito
 
+> **Atualização de 02/09:** são **sete**, não oito. A issue **D (fonte única do
+> plano de contas)** é absorvida pela **Task 12** deste plano — a Fase 8 entrega
+> exatamente a fonte única que ela pede. Por isso esta task **executa depois da
+> T12**, e o Step 1 abaixo confirma a absorção em vez de "resolver a
+> sobreposição".
+>
 > 🔬 `docs/superpowers/issues/` tem **8 issues** derivadas do plano de
 > remediação de saúde de 08/06 (A a H), e **nenhum plano aberto as endereça**.
 > Elas não são achados de review — são dívida de arquitetura: cache de
@@ -927,9 +1035,16 @@ cat docs/superpowers/issues/README.md
 | H | Infra de testes + migrações | P8 | C |
 
 ⚠️ **As issues são de 08/06 — quase três meses.** Antes de planejar qualquer
-uma, confirme que o defeito ainda existe. 🔬 A issue **D (fonte única do plano
-de contas)** tem sobreposição direta com a **Fase 8**, que está travada por D6
-— não planeje as duas em paralelo sem resolver a sobreposição.
+uma, confirme que o defeito ainda existe.
+
+🔬 **A issue D sai da lista: a Task 12 a entregou.** Confirme, não presuma —
+abra `D-fonte-unica-plano-contas.md`, leia o que ela pede, e compare com o que a
+Fase 8 entregou. Se sobrar recorte, ele entra no plano desta task **nomeando o
+que a Fase 8 não cobriu**; se não sobrar, marque D como fechada pela Task 12,
+com o commit. Sobram **sete** de qualquer modo — ou seis mais um recorte.
+
+⚠️ A issue **B** depende de "parte de D" e a **G** depende de B: se D fechou,
+confira se o pré-requisito de B foi junto antes de planejá-la.
 
 - [ ] **Step 2: Escrever o plano das que sobreviverem à reconferência**
 
@@ -952,109 +1067,611 @@ estado apontando para o plano novo ou para a seção de adiadas.
 
 ```bash
 git add docs/superpowers/plans/2026-08-31-issues-de-arquitetura.md docs/superpowers/issues/README.md
-git commit -m "docs(issues): as oito issues de arquitetura ganham plano ou adiamento por escrito"
+git commit -m "docs(issues): as sete issues de arquitetura ganham plano ou adiamento por escrito"
 ```
 
 ---
 
-### Task 10: O índice volta a valer, o gate consolida, a branch entra
+### Task 10: O ritual de integração — repetido ao fim de CADA etapa
 
-> A última. Só aqui a branch integra — decisão registrada em 31/08: **merge ao
-> fim de tudo**, não por onda.
+> **Mudou de forma em 02/09.** Antes era "a última task: merge ao fim de tudo".
+> Agora é o **ritual repetido**: toda etapa que fecha passa por aqui antes de a
+> seguinte começar. 🔬 O motivo: são **117 commits nunca empurrados**, e a Fase 6
+> inteira só existe nesta máquina.
+>
+> Esta task **não tem checkbox próprio** — ela é executada uma vez por etapa,
+> pelas Tasks 11, 7, 8, 12, 13, 9, 14, 15 e 16.
 
 **Files:**
-- Create: `docs/planos-em-aberto-2026-08-31.md`
-- Modify: `docs/planos-em-aberto-2026-08-25.md` (marcar como substituído)
+- Modify: o plano da etapa que fechou (o carimbo de estado)
 
 **Interfaces:**
-- Consumes: o estado final de todas as tasks anteriores.
-- Produces: o índice de estado que passa a valer.
+- Consumes: uma etapa com o gate verde.
+- Produces: `main` atualizada e empurrada.
 
-- [ ] **Step 1: Rodar o gate consolidado**
-
-Run: `bash run_tests.sh --gate`
-Expected: **0 failed**, **skipped ≤ 6**, passed ≥ 2854.
-
-⚠️ **Se o skipped subiu em qualquer ponto desde o piso de 31/08, pare aqui e
-descubra por quê.** 🔬 Foi exatamente assim que 4 testes saíram do gate em
-28/08 sem que nada sinalizasse.
-
-- [ ] **Step 2: Rodar a suíte inteira, incluindo browser**
-
-Run: `bash run_tests.sh --suite`
-Expected: verde. ⚠️ O gate deseleciona 201 testes de browser; a Task 3 mexeu
-em rotas de veículo e `tests/test_browser_all_modules.py:647` exercita
-`/veiculos/relatorios`. **Esta é a única etapa que prova que ele sobreviveu.**
-
-- [ ] **Step 3: Escrever o índice de estado novo**
-
-Crie `docs/planos-em-aberto-2026-08-31.md`, no formato do de 25/08 (que ele
-substitui), com o veredito de cada plano **provado por existência de arquivo na
-árvore e por git, nunca por contagem de checkbox** — a regra que o próprio
-índice antigo estabelece.
-
-Ele tem de registrar, no mínimo:
-- os planos fechados por esta rodada (Tasks 4, 5, 6, 7) com commit e gate;
-- **Fase 8 e Resgate da Espinha Financeira como ABERTOS**, travados por D6,
-  FASE8-T1 e VIGA-I, apontando para `2026-08-31-decisoes-pendentes.md`;
-- as 18 rotas restantes de `views/vehicles.py` como **pendência conhecida** —
-  mortas pela interface, funcionando, sem decisão tomada;
-- o estado das oito issues de arquitetura, conforme a Task 9.
-
-No topo de `docs/planos-em-aberto-2026-08-25.md`, acrescente:
-
-```markdown
-> ⛔ **SUBSTITUÍDO por `docs/planos-em-aberto-2026-08-31.md`.** Este documento
-> foi escrito contra `main` em `657326c4` e não conhece a Onda 5, a onda "A
-> Porta Irmã" nem os planos de 28/08. Continua válido como registro histórico.
-```
-
-- [ ] **Step 4: Commit do índice**
+**Step A: Gate, destacado do terminal**
 
 ```bash
-git add docs/planos-em-aberto-2026-08-31.md docs/planos-em-aberto-2026-08-25.md
-git commit -m "docs(indice): o estado de todos os planos volta a valer, medido contra a arvore"
+setsid nohup bash run_tests.sh --gate > tests/reports/gate_$(date +%m%d_%H%M).log 2>&1 &
 ```
 
-- [ ] **Step 5: Integrar a branch**
+⚠️ **Nunca rode o gate preso ao terminal.** 🔬 Três gates morreram com a sessão
+em 01/09, e o registro escrito a partir de um log truncado disse "18% com 2
+FAILED" quando o log real dizia 62% e 7 FAILED — um placar parcial virou placar
+e uma decisão foi tomada em cima dele.
+
+Expected: **0 failed**, **skipped = 8**, **xfailed ≤ 72**, passed ≥ 3193 mais os
+testes da etapa.
+
+**Step B: Suíte com browser, pelo runner retomável**
+
+```bash
+setsid nohup python3 scripts/suite_resumavel.py > tests/reports/runner_$(date +%H%M).log 2>&1 &
+```
+
+Morreu? Rode o **mesmo comando**: retoma de onde parou. Expected: **3435 passed
+ou mais, 0 failed** (o P4 já corrigido ou registrado pela Task 11).
+
+📖 O runner isola processo por arquivo de browser e por isso **esconde bugs de
+ordem**. A rodada monolítica (`bash run_tests.sh --suite`) é a checagem de
+ordem — rode-a nas etapas que mexem em fixture ou em conftest, não em todas.
+
+**Step C: Carimbar o plano da etapa**
+
+O plano de origem recebe, no cabeçalho, o veredito com **commit e números
+reais** do gate. Veredito provado por **existência de arquivo na árvore e por
+git, nunca por contagem de checkbox** — 📖 a regra do índice de 25/08, que
+mostrou que somar checkbox fazia o repositório parecer ter ~2.900 itens abertos
+quando o número real era três.
+
+**Step D: Merge na `main`**
 
 ```bash
 git checkout main
-git merge --no-ff sdd/a-porta-irma
-bash run_tests.sh --gate
+git merge --no-ff <branch-da-etapa>
+setsid nohup bash run_tests.sh --gate > tests/reports/gate_pos_merge_$(date +%H%M).log 2>&1 &
 ```
 
-Expected: gate verde **em `main`**, com os mesmos números do Step 1.
+Expected: gate verde **em `main`**, com os mesmos números do Step A.
 
-⚠️ **Só faça o merge com o gate verde no Step 1 e a suíte verde no Step 2.** Se
-qualquer um falhou, o merge não acontece — a branch continua sendo o lugar do
-trabalho.
+⚠️ **Merge só com o Step A verde e o Step B verde.** Se qualquer um falhou, o
+merge não acontece — a branch continua sendo o lugar do trabalho.
 
-⚠️ 🔬 `main` estava **25 commits à frente do `origin`** em 25/08, e a branch
-soma mais 30. **Confirme com o usuário antes de empurrar** — este plano não
-autoriza `git push`.
+**Step E: Push — confirmando com o dono**
+
+```bash
+git log --oneline origin/main..main | wc -l   # quantos commits vão subir
+git push origin main
+```
+
+⚠️ **Pergunte antes.** O plano autoriza a cadência, não o gesto. Diga quantos
+commits sobem e o que eles contêm.
+
+---
+
+### Task 11: O que está a um passo, e a primeira integração
+
+> **Executa ANTES da Task 7.** Três frentes estão a um ou dois passos do fim, e
+> os 117 commits saem da máquina aqui. Nada nesta task é trabalho novo — é
+> fechar o que já está feito.
+
+**Files:**
+- Execute: `docs/superpowers/plans/2026-09-02-a-suite-browser-volta-a-valer.md`, **Task 7**
+- Modify: `docs/superpowers/plans/2026-09-01-as-decisoes-viram-codigo.md` (Task 12, Steps 2 e 6)
+- Modify: `docs/auditoria/achados-code-review-2026-08-25.md` (39 linhas já escritas, **não commitadas**)
+- Modify: este plano (o carimbo da Task 6)
+
+**Interfaces:**
+- Consumes: nada.
+- Produces: `main` com 117 commits empurrados; o piso do gate confirmado numa
+  rodada única.
+
+- [ ] **Step 1: Conferir o que está solto na árvore**
+
+Run: `git status --short`
+Expected: exatamente `M docs/auditoria/achados-code-review-2026-08-25.md` e
+`?? tests/reports/`. Qualquer outra coisa: pare e pergunte ao dono antes de
+commitar — 📖 é a lição da Ruling P5 de 01/09, quando um `git add tests/` teria
+varrido trabalho em curso de outra sessão para dentro de um commit alheio.
+
+- [ ] **Step 2: Commitar o achado P4**
+
+🔬 As 39 linhas descrevem o único vermelho da suíte de 02/09: o teste
+(`tests/test_rdo_unificado_playwright.py:275-277`) exige `#btn-equipe-<id>` numa
+tarefa de **subempreitada**, e 📖 `templates/rdo/novo.html:1262-1267` só emite
+esse botão no ramo `else` (tarefa interna). Decisão de produto — não conserte
+aqui.
+
+```bash
+git add docs/auditoria/achados-code-review-2026-08-25.md
+git commit -m "docs(achados): a suite browser rodou inteira e sobrou um achado — P4 do RDO unificado"
+```
+
+- [ ] **Step 3: Executar a Task 7 do plano de 02/09**
+
+Use `superpowers:subagent-driven-development`. Ela é a última daquele plano:
+gate consolidado e os três registros de fecho. `tests/reports/` fica **fora** do
+commit (📖 `*.log` já é ignorado; o diretório inteiro é artefato de rodada).
+
+- [ ] **Step 4: Fechar a Task 12 do plano de 01/09**
+
+Os Steps 2 e 6 dela ficaram abertos quando a sessão caiu. O Step 2 (suíte com
+browser) foi **cumprido pelo plano de 02/09** — a suíte rodou inteira pela
+primeira vez. Marque os dois `[x]` e substitua a nota de estado da task por:
+
+```markdown
+> **Estado em 02/09:** ✅ **FECHADA.** Step 1 (gate único) verde em 01/09:
+> 3193 passed / 8 skipped / 201 deselected / 72 xfailed / 0 failed. Step 2
+> (suíte com browser) cumprido pelo plano `2026-09-02-a-suite-browser-volta-a-valer.md`:
+> 3435 passed / 1 failed / 8 skipped / 72 xfailed, o único vermelho sendo o
+> achado P4, registrado na auditoria. As 2 FAILED que interromperam a rodada de
+> 01/09 eram podridão de teste, não regressão — deriva de seletor e teste não
+> idempotente, ambas diagnosticadas e corrigidas.
+```
+
+- [ ] **Step 5: Carimbar a Task 6 deste plano como fechada**
+
+Já está escrito no cabeçalho e no corpo da Task 6. Confira que os dois batem.
+
+- [ ] **Step 6: Commit dos registros**
+
+```bash
+git add docs/superpowers/plans/2026-09-01-as-decisoes-viram-codigo.md docs/superpowers/plans/2026-09-02-a-suite-browser-volta-a-valer.md docs/superpowers/plans/2026-08-31-fecho-do-que-esta-aberto.md
+git commit -m "docs(fecho): a suite browser e as decisoes de 01/09 fecham; a onda 6 cai junto"
+```
+
+- [ ] **Step 7: O ritual da Task 10 — e o primeiro push**
+
+Execute os Steps A a E da Task 10. ⚠️ Este é o **primeiro push**: 🔬 117
+commits, incluindo a Fase 6 inteira e as seis ondas do code review. Diga o
+número ao dono antes de empurrar.
+
+---
+
+### Task 12: Fase 8 — o plano de contas canônico, as dez tasks
+
+> 🔬 10 tasks, 3 de 21 arquivos existem. A D6 foi respondida em 01/09 e a fase
+> **deixa de ser cortada em duas**: as dez entram juntas, e o parque nunca fica
+> em dois estados.
+
+**Files:**
+- Execute: `docs/superpowers/plans/2026-08-24-fase-8-plano-de-contas-canonico.md` (10 tasks)
+- Modify: o mesmo arquivo — o método da Task 4 (Step 1 abaixo)
+
+**Interfaces:**
+- Consumes: nada deste plano.
+- Produces: `classificar_assinatura(admin_id)` e a exceção
+  `AssinaturaDesconhecida` em `contabilidade_utils.py`, mais o plano de contas
+  canônico — que a **issue D** consome (ver Task 9, que por isso planeja
+  **sete** issues, não oito).
+
+- [ ] **Step 1: Trocar o método da Task 4, ANTES de executar**
+
+O plano manda chavear o de-para por `codigo`. 🔬 Isso mandaria material para
+pessoal em metade do parque, **em silêncio**. Substitua o método da Task 4 por
+**assinatura estrutural** — a resposta D6 de 01/09, cuja evidência é:
+
+| Sinal | Prova |
+|---|---|
+| existe grupo `6` | seeder `contabilidade_utils` (o `financeiro_seeds` não tem grupo 6) |
+| existe `5.1.01.%` | seeder `financeiro_seeds` (o `contabilidade_utils` não tem filhos nível 4 sob `5.1.01`) |
+| `2.1.03.001–003` × `2.1.03.007–009` | mutuamente exclusivos entre os dois |
+| `4.1.01.%` × `4.1.02.%` | mutuamente exclusivos entre os dois |
+| `aceita_lancamento` de `5.1.01` | **True** num, **False** no outro (lá é sintética) |
+
+Nenhum deles lê `nome` — a proibição da spec é preservada. 🔬 E a premissa da
+pergunta original estava errada: 📖 `contabilidade_utils.py:514` diz que o
+sistema tem **QUATRO** planos concorrentes, não dois.
+
+- [ ] **Step 2: Medir a distribuição no banco de dev antes de escrever a migration**
+
+```bash
+python3 -c "
+from app import app
+from models import db
+with app.app_context():
+    for sql, rot in [
+      (\"SELECT count(DISTINCT admin_id) FROM plano_contas WHERE codigo LIKE '6%'\", 'tem grupo 6'),
+      (\"SELECT count(DISTINCT admin_id) FROM plano_contas WHERE codigo LIKE '5.1.01.%'\", 'tem 5.1.01.%'),
+      (\"SELECT count(DISTINCT admin_id) FROM plano_contas\", 'total com plano'),
+    ]:
+        print(rot, db.session.execute(db.text(sql)).scalar())
+"
+```
+
+🔬 A medição de 01/09 deu: 6.941 tenants só com grupo 6, 95 com `5.1.01.%` (e
+esses 95 têm **as duas** assinaturas — dois seeders rodaram no mesmo tenant), 86
+com `5.2.01.001`, e **71 que não casam com nenhuma**. Se os seus números
+divergirem muito disso, **pare e reconfira** antes de escrever a migration: o
+banco de dev mudou desde a medição, e o de-para depende dela.
+
+- [ ] **Step 3: Escrever a falha fechada no teste, antes da migration (RED)**
+
+O ramo que importa é o do tenant **indeterminado**. Ele tem de **parar a
+migration e nomear o tenant** — não escolher um default:
+
+```python
+import pytest
+from models import db, PlanoContas
+from tests.helpers_tenant import um_tenant
+
+
+@pytest.mark.integration
+def test_tenant_de_assinatura_desconhecida_para_a_migracao_e_nomeia_o_tenant(app):
+    """Um plano de contas de terceira origem NAO pode ser migrado por chute.
+
+    RED antes da migration: classificar_assinatura nao existe ainda.
+    """
+    from contabilidade_utils import AssinaturaDesconhecida, classificar_assinatura
+
+    with app.app_context():
+        # `um_tenant` devolve um Tenant com .admin_id (tests/helpers_tenant.py:148)
+        admin_id = um_tenant('fase8-assinatura').admin_id
+        # Terceira origem: nem grupo 6 (contabilidade_utils) nem 5.1.01.%
+        # (financeiro_seeds) — as duas assinaturas conhecidas ficam de fora.
+        db.session.add(PlanoContas(
+            admin_id=admin_id, codigo='7.9.99', nome='Conta de origem desconhecida',
+            tipo_conta='DESPESA', aceita_lancamento=True,
+        ))
+        db.session.commit()
+
+        with pytest.raises(AssinaturaDesconhecida) as exc:
+            classificar_assinatura(admin_id)
+        assert str(admin_id) in str(exc.value), 'a excecao tem de NOMEAR o tenant'
+```
+
+⚠️ 📖 A PK de `plano_contas` é **`(admin_id, codigo)`** (`models.py:3271-3273`,
+migration 218) e o campo do tipo chama-se **`tipo_conta`**, não `tipo`
+(`:3275`). Confira os demais `NOT NULL` antes de colar
+(`grep -n "class PlanoContas" -A 25 models.py`) — um campo faltando faz o teste
+falhar por `IntegrityError`, e não pelo motivo certo.
+`AssinaturaDesconhecida` e `classificar_assinatura` nascem na Task 4 da Fase 8;
+o import dentro da função é o que produz o RED como `ImportError`.
+
+⚠️ **Este teste é a guarda principal da task.** 🔬 Os 71 tenants indeterminados
+de dev garantem que o ramo será exercitado — ele não é defensivo, é o caminho
+de metade do trabalho.
+
+- [ ] **Step 4: Rodar o teste e ver o RED**
+
+Run: `python -m pytest tests/test_fase8_plano_contas_canonico.py -k assinatura_desconhecida -v`
+Expected: FAIL — `NameError`/`ImportError` em `classificar_assinatura`.
+
+- [ ] **Step 5: Executar as dez tasks pela sub-skill**
+
+Use `superpowers:subagent-driven-development`, task a task.
+
+⚠️ **A migration desta fase age sobre dados de TODOS os tenants.** Ela tem de
+ser provada **idempotente por dupla execução** no banco de dev, como as 271–275
+da Fase 6. E 📖 a lição N2: `create_all()` roda ANTES das migrações em todo
+boot — o objeto que o modelo cria e o que a migration cria têm de convergir
+(mesmo nome, mesmo tipo constraint-vs-índice), senão um `DROP` futuro estoura
+`DependentObjectsStillExist`.
+
+- [ ] **Step 6: Registrar a premissa e o que a ratifica**
+
+No cabeçalho do plano da Fase 8:
+
+```markdown
+> ⚠️ **PREMISSA DECLARADA (decisão do dono, 02/09):** os conjuntos de códigos
+> conhecidos cobrem o parque de produção. Não foi medido — não há acesso ao
+> banco de produção. **O que a ratifica:** rodar `scripts/medir_producao.py`
+> quando houver acesso. **O que acontece se a premissa for falsa:** a migration
+> PARA e nomeia o tenant; nenhuma partida é migrada para conta errada. O custo
+> é uma rodada manual por tenant de terceira origem, não dado corrompido.
+```
+
+- [ ] **Step 7: Gate, carimbo e ritual**
+
+Execute os Steps A a E da Task 10.
+
+```bash
+git add docs/superpowers/plans/2026-08-24-fase-8-plano-de-contas-canonico.md
+git commit -m "docs(fase-8): a fase fecha 10/10 com de-para por assinatura estrutural e falha nomeada"
+```
+
+---
+
+### Task 13: A família 404 — B6.4 a B6.8
+
+> 🔬 **70 `xfail(strict=True)`** esperando o refactor de ~60 sítios em 12
+> arquivos. As tasks **já existem** — `docs/superpowers/plans/2026-08-06-rodada-b6-varredura.md`,
+> seções **B6.4 a B6.8**. Nenhum plano novo.
+
+**Files:**
+- Execute: `docs/superpowers/plans/2026-08-06-rodada-b6-varredura.md`, seções B6.4–B6.8
+
+**Interfaces:**
+- Consumes: nada.
+- Produces: o `xfailed` do gate **desce** de 72 para perto de 2.
+
+- [ ] **Step 1: Medir o tamanho real antes de começar**
+
+```bash
+grep -rn "xfail" tests/test_b6_404_*.py | wc -l
+grep -rlc "except HTTPException" --include=*.py . | head
+```
+
+Expected: ~70 marcadores. 🔬 `grep -c 'except HTTPException'` deu **0** em todos
+os arquivos do lote quando a Onda 6 mediu — o refactor nunca foi feito, e os
+testes entraram com `xfail` de propósito, para que o dia em que ele rodar o
+teste **falhe por passar**.
+
+- [ ] **Step 2: Executar seção a seção, removendo os marcadores no mesmo commit**
+
+Use `superpowers:subagent-driven-development`.
+
+⚠️ 🔴 **Com `strict=True`, corrigir sem remover o marcador FALHA o gate por
+XPASS.** Cada commit que conserta um sítio remove o `xfail` correspondente. Não
+acumule remoções para o fim.
+
+- [ ] **Step 3: Gate após cada seção**
+
+Run: `bash run_tests.sh --gate`
+Expected: **0 failed**, **skipped = 8**, e o **xfailed desce** pelo número de
+marcadores removidos. Se o xfailed não desceu, ou nada foi corrigido, ou os
+marcadores ficaram — as duas coisas são defeito.
+
+- [ ] **Step 4: Carimbar o plano e integrar**
+
+```bash
+git add docs/superpowers/plans/2026-08-06-rodada-b6-varredura.md
+git commit -m "docs(b6): as secoes B6.4-B6.8 fecham e os xfail da familia 404 saem"
+```
+
+Execute os Steps A a E da Task 10.
+
+---
+
+### Task 14: As automações — a reconferência vem antes do plano
+
+> ~13 itens: **A01, A08, A17, A20, A21, A23** abertos; **A11, A13, A15, A16,
+> A18, A22, A24** parciais; e **A25** (`N8N_WEBHOOK_URL` + cron), que segura
+> toda notificação.
+>
+> ⚠️ **Não escreva plano a partir do documento de 23/08.** 🔬 Ele já envelheceu:
+> A04, A18 e A24 mudaram de estado em 01/09 (`bef17c33`, `9f169c0d`,
+> `9aead796`). Planejar sobre ele seria descrever um estado que não é o de hoje
+> — o mesmo defeito que a varredura de 25/08 diagnosticou noutro lugar
+> ("ENTREGUE por leitura de código" não é "ENTREGUE com teste que nomeia a
+> regra").
+
+**Files:**
+- Create: `docs/reconferencia-backlog-2026-09-XX.md` (a data do dia)
+- Create: `docs/superpowers/specs/2026-09-XX-automacoes-design.md`
+- Modify: `docs/reconferencia-backlog-2026-08-23.md` (marcar como substituído)
+
+**Interfaces:**
+- Consumes: nada.
+- Produces: 2–3 planos por família, que as etapas seguintes executam.
+
+- [ ] **Step 1: Reconferir item a item, contra a árvore de hoje**
+
+Para cada um dos ~13, três perguntas — e a resposta de cada uma **medida**, não
+lembrada:
+
+1. O defeito/lacuna ainda existe? (📖 `arquivo:linha`)
+2. Existe teste que o nomeia? (`grep -rln "<símbolo>" tests/`)
+3. O que mudou desde 23/08? (`git log --oneline --since=2026-08-23 -- <arquivo>`)
+
+⚠️ **"ENTREGUE por leitura de código" não conta.** 🔬 O A09 foi dado como
+entregue assim em 23/08, e a varredura de 25/08 achou um furo de tenant no
+mesmo dedup (`almoxarifado_utils.py:257`). Item sem teste que o nomeie volta
+como **PARCIAL**, não ENTREGUE.
+
+- [ ] **Step 2: Escrever a reconferência**
+
+`docs/reconferencia-backlog-2026-09-XX.md`, no formato do de 23/08: uma seção
+por item, com veredito anterior → veredito de hoje, a evidência, e o recorte do
+que sobra. No topo do de 23/08, o banner de substituição.
+
+- [ ] **Step 3: Agrupar em famílias e escrever a spec**
+
+`docs/superpowers/specs/2026-09-XX-automacoes-design.md`, agrupando o que
+sobreviveu por **família**, não por número:
+
+| Família | Itens candidatos |
+|---|---|
+| RDO × ponto | A11 (guarda cruzada no ramo horista), A16 (evento no sync alocação→ponto), A17 (pré-carregar mão de obra) |
+| Portal × medição | A15 (`MedicaoObra` paralela sem itens nem recálculo), A23 (aviso de comprovante) |
+| Compras | A20 (pré-preencher pedido com o vencedor), A21 (FK de frota + TypeError de kwargs), A22b (persistir CPF/CNPJ) |
+| Notificações e operação | A25 (`N8N_WEBHOOK_URL` + cron — 📖 o runbook já existe em `docs/operacao-agendamentos.md`) |
+| Resíduos de origem | A13 (a origem, decisão adiada), A18 (unificação da vigência em diante), A08, A01 |
+
+⚠️ **Um plano por família, não um de 13 tasks.** Cada família tem superfície,
+risco e teste diferentes; um plano único obrigaria o executor a trocar de
+domínio a cada task.
+
+- [ ] **Step 4: Escrever os planos e executá-los**
+
+Use `superpowers:writing-plans` para cada família, depois
+`superpowers:subagent-driven-development` para executar.
+
+- [ ] **Step 5: Commit e ritual**
+
+```bash
+git add docs/reconferencia-backlog-2026-09-XX.md docs/reconferencia-backlog-2026-08-23.md docs/superpowers/specs/2026-09-XX-automacoes-design.md
+git commit -m "docs(automacoes): a reconferencia mede o estado de hoje e agrupa em familias"
+```
+
+Execute os Steps A a E da Task 10 ao fim de cada família.
+
+---
+
+### Task 15: Fase 9a/9b — as premissas antes do código
+
+> 🔬 19 de 35 arquivos prometidos existem, e o que existe veio por **outros
+> caminhos** (portal do cliente, medição, ciência do RDO). Faltam
+> `services/assinatura_documento.py`, `services/contrato_service.py`,
+> `services/drive_client.py`, `scripts/portal_acessos.py`.
+>
+> ⚠️ O plano foi escrito sobre o schema de **antes das Fases 1–5**, tem seção
+> própria de *"Premissas a reconfirmar antes de executar"*, e uma de suas
+> decisões **já caiu**: o dono do `valor_contrato` é a Fase 6, o que reduz a 9b
+> a camada documental.
+
+**Files:**
+- Create: `docs/superpowers/specs/2026-09-XX-fase-9-premissas.md`
+- Modify: `docs/superpowers/plans/2026-07-21-fase-9-portal-assinatura-contratos.md` (o veredito no cabeçalho)
+
+**Interfaces:**
+- Consumes: nada.
+- Produces: ou um plano novo, ou um veredito de morte por escrito. **Os dois
+  levam a lista a zero.**
+
+- [ ] **Step 1: Abrir o plano pela seção de premissas, não pelo começo**
+
+```bash
+grep -n "Premissas a reconfirmar" -A 60 docs/superpowers/plans/2026-07-21-fase-9-portal-assinatura-contratos.md
+```
+
+- [ ] **Step 2: Medir cada premissa contra a árvore de hoje**
+
+Para cada uma: 📖 o `arquivo:linha` que a confirma **hoje**, ou a prova de que
+ela caiu. A decisão nº 2 já se sabe caída (o `valor_contrato` é da Fase 6) —
+trate-a como o exemplo do formato, não como a única.
+
+- [ ] **Step 3: Escrever o veredito**
+
+`docs/superpowers/specs/2026-09-XX-fase-9-premissas.md`, com uma das duas
+conclusões, **explicitamente**:
+
+- **(a) As premissas sobrevivem** (ou sobrevivem em recorte menor): escreva o
+  que resta e siga para o Step 4.
+- **(b) Não sobrevivem:** risque a fase, no formato dos oito planos obsoletos
+  do índice de 25/08 — **por que não executar**, e o que precisaria mudar para
+  ela voltar. 🔴 Isto é resultado **válido e final**, não fracasso: construir
+  sobre um schema que não existe mais não leva a lista a zero, leva a
+  retrabalho.
+
+No cabeçalho do plano de 21/07, o carimbo correspondente.
+
+- [ ] **Step 4: Se (a) — escrever o plano novo e executá-lo**
+
+Use `superpowers:writing-plans` sobre a spec do Step 3. O plano de 21/07 vira
+**histórico**; não o execute ao pé da letra.
+
+- [ ] **Step 5: Commit e ritual**
+
+```bash
+git add docs/superpowers/specs/2026-09-XX-fase-9-premissas.md docs/superpowers/plans/2026-07-21-fase-9-portal-assinatura-contratos.md
+git commit -m "docs(fase-9): as premissas medidas contra a arvore de hoje, e o veredito"
+```
+
+Execute os Steps A a E da Task 10.
+
+---
+
+### Task 16: O índice volta a valer, o gate final, o push
+
+> A última de verdade. Aqui a lista chega a zero — ou o que sobrar está
+> nomeado, com motivo escrito e o que precisaria mudar.
+
+**Files:**
+- Create: `docs/planos-em-aberto-2026-09-XX.md`
+- Modify: `docs/planos-em-aberto-2026-08-25.md` (banner de substituição)
+
+**Interfaces:**
+- Consumes: o estado final de todas as tasks.
+- Produces: o índice de estado que passa a valer.
+
+- [ ] **Step 1: Gate consolidado e suíte, os dois destacados**
+
+```bash
+setsid nohup bash run_tests.sh --gate > tests/reports/gate_final_$(date +%m%d).log 2>&1 &
+setsid nohup python3 scripts/suite_resumavel.py > tests/reports/runner_final_$(date +%H%M).log 2>&1 &
+```
+
+Expected: **0 failed** nos dois. **skipped = 8** (nunca 9). **xfailed próximo de
+2** — os 70 da família 404 saíram na Task 13.
+
+⚠️ Rode também a monolítica uma vez: `bash run_tests.sh --suite`. 📖 O runner
+isola processo e por isso esconde bugs de ordem; as duas dizem coisas
+diferentes de propósito.
+
+- [ ] **Step 2: Escrever o índice novo**
+
+`docs/planos-em-aberto-2026-09-XX.md`, no formato do de 25/08 (que ele
+substitui), com o veredito de cada plano **provado por existência de arquivo na
+árvore e por git, nunca por contagem de checkbox**.
+
+Tem de registrar, no mínimo:
+- cada plano fechado por esta rodada, com **commit e números de gate**;
+- o que sobrou aberto e **por quê** — com o que precisaria mudar para fechar;
+- as três `RATIFICAR` pendentes (conta `6.1.02.009` com o contador, congelar as
+  históricas do A18, a flag do rateio A24) e a premissa declarada da Fase 8;
+- o **P4** do RDO unificado, se ainda não tiver decisão de produto;
+- as 18 rotas de `views/vehicles.py` que a Task 9 de 01/09 removeu (`12703381`),
+  para o índice não repetir a pendência antiga;
+- o capítulo 23a do manual do RDO, esperando Alan e Abel.
+
+No topo do de 25/08:
+
+```markdown
+> ⛔ **SUBSTITUÍDO por `docs/planos-em-aberto-2026-09-XX.md`.** Escrito contra
+> `main` em `657326c4`, não conhece a Onda 5, "A Porta Irmã", "O Que Não
+> Persiste", as decisões de 01/09 nem a rodada de fecho. Vale como registro
+> histórico.
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add docs/planos-em-aberto-2026-09-XX.md docs/planos-em-aberto-2026-08-25.md
+git commit -m "docs(indice): a lista chega a zero, e o que sobra esta nomeado com motivo"
+```
+
+- [ ] **Step 4: O ritual final**
+
+Execute os Steps A a E da Task 10. Este é o push que fecha a rodada.
 
 ---
 
 ## Notas de execução
 
-**Ordem obrigatória:** 1 (escala, e NÃO bloqueia as demais) → 2, 3
-(independentes entre si) → **4 (Onda 2)** → 5, 6, 8 (independentes entre si) →
-**7 (Onda 4 — depende da Task 4)** → 9 → 10.
+**Ordem obrigatória (atualizada em 02/09):**
 
-**A Task 8 (Espinha) é a maior desta rodada** — porte de 2.542 linhas. Ela não
-depende de nenhuma outra e pode correr em paralelo com 5 e 6, mas some o gate
-dela ao consolidado da Task 10.
+**T11 → T7 → T8 → T12 → T13 → T9 → T14 → T15 → T16**, com a **Task 10** (o
+ritual de integração) executada ao fim de cada uma.
 
-**O que este plano NÃO fecha, e por quê:**
+🔴 **A ordem não é a dos números.** As Tasks 1–6 já fecharam; a T11 é nova e vem
+primeiro porque tira os 117 commits da máquina antes de qualquer trabalho novo.
+
+**O critério da ordem é dinheiro errado primeiro.** A Onda 4 (T7) é a única
+frente que está errando **hoje**, com dado real em produção: DRE e balancete que
+não fecham entre si, e quatro relatórios que nunca funcionaram. Tudo o mais é
+dívida que espera bem.
+
+**As dependências duras que sobraram são duas:**
+- **T7 → Task 4** (Onda 2): satisfeita, `fed8f19b` (26/08).
+- **T9 → T12**: a issue **D** (fonte única do plano de contas) é absorvida pela
+  Fase 8. Por isso a Task 9 planeja **sete** issues, não oito — e por isso vem
+  depois da T12.
+
+**Nada roda em paralelo.** 📖 A skill proíbe paralelizar implementadores, e a
+razão é conflito de índice do git — 🔬 arriscado em 31/08 com duas tasks de
+arquivos disjuntos, e a nota do ledger registra que o risco era real mesmo não
+tendo se materializado.
+
+**A Task 8 (Espinha) é a maior desta rodada** — porte de 2.542 linhas, agora
+10/10 com a VIGA-I respondida.
+
+**O que este plano NÃO fecha, e por quê** (revisto em 02/09 — quatro linhas da
+tabela original saíram porque deixaram de valer):
 
 | Item | Motivo |
 |---|---|
-| Fase 8 — plano de contas canônico (10 tasks) | Travado por **D6** e **FASE8-T1**. 🔬 O plano se contradiz sobre poder cortar na Task 3, e a metade insegura age sobre dados de todos os tenants |
-| Resgate da Espinha — **só a Task 8 de 10** | Travada por **VIGA-I**. As outras nove são entregues pela Task 8 deste plano |
-| As 18 rotas restantes de `views/vehicles.py` | Mortas pela interface mas **funcionando**. A D3 decidiu sobre as seis quebradas; ninguém decidiu sobre estas |
+| **O P4 do RDO unificado** | 🔬 `tests/test_rdo_unificado_playwright.py:275-277` exige `#btn-equipe-<id>` numa tarefa de subempreitada; 📖 `templates/rdo/novo.html:1262-1267` só o emite no ramo interno. **Decisão de produto** — não há evidência no repositório que decida a intenção. Fecha em uma linha, dos dois lados. A Task 11 o registra; a Task 16 o lista se ainda estiver aberto |
+| **As três `RATIFICAR` de 01/09** | Nome e grupo da conta `6.1.02.009` (pergunta do contador), congelar as históricas do A18, e ligar a flag do rateio A24. Nenhuma bloqueia uma etapa — o código está escrito e atrás de interruptor |
+| **A medição de produção da Fase 8** | Sem acesso ao banco. Vira **premissa declarada com falha fechada** (Task 12, Step 6), e a medição fica como ratificação posterior |
+| **O capítulo 23a do manual do RDO** | 📖 Espera Alan e Abel lerem antes de virar cobrança. Nenhuma linha de código destrava |
 | `templates/medicao/gestao_itens.html:510` | O form aponta para a rota que a onda "A Porta Irmã" fechou com `@admin_required`. Se GESTOR alcança a página, o botão virou beco. Decisão de produto |
-| `git push` | Fora do escopo. `main` já estava 25 commits à frente do `origin` antes desta rodada |
+
+🔬 **Saíram da tabela, e por quê:** a **Fase 8** entrou (Task 12, D6
+respondida); a **Task 8 da Espinha** entrou (VIGA-I respondida); as **18 rotas
+de `views/vehicles.py`** foram removidas em 01/09 (`12703381`); e o **`git
+push`** deixou de estar fora de escopo — passou a ser o Step E do ritual, uma
+vez por etapa, sempre confirmado com o dono.
 
 **A regra que esta rodada herda, e que vale mais que qualquer task:** 🔬 na onda
 "A Porta Irmã", **três** dos testes propostos pelo plano teriam passado verdes
