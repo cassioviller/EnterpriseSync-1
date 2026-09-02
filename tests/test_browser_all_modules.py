@@ -153,8 +153,8 @@ def _garantir_dados_e2e(admin_id: int) -> None:
     import datetime as _dt
     from app import db
     from models import (
-        Fornecedor, AlmoxarifadoCategoria, AlmoxarifadoItem, Funcionario,
-        PlanoContas, ParametrosLegais,
+        Cliente, Fornecedor, AlmoxarifadoCategoria, AlmoxarifadoItem,
+        Funcionario, PlanoContas, ParametrosLegais,
     )
 
     # -1) Parâmetros legais (tabela INSS/IRRF/FGTS) — sem eles a folha mensal
@@ -210,6 +210,19 @@ def _garantir_dados_e2e(admin_id: int) -> None:
         db.session.add(Fornecedor(
             admin_id=admin_id, nome="__E2E Fornecedor", cnpj="00.000.000/0001-99",
             tipo_fornecedor="MATERIAL", ativo=True,
+        ))
+
+    # 1b) Cliente do tenant — A22/B3.3: o formulário de nova proposta deixou de
+    #     aceitar nome digitado (commit 1394d907, 05/08) e passou a ser um
+    #     <select> de Cliente JÁ CADASTRADO, que é o ponto do A22: digitar nome
+    #     livre duplicava Cliente a cada proposta, com a obra amarrada no
+    #     duplicado. `_criar_proposta` precisa de um cadastro para selecionar.
+    #     Mesma solução da jornada E2E (test_e2e_jornada_...:91).
+    if Cliente.query.filter_by(
+            admin_id=admin_id, nome="__E2E Cliente").first() is None:
+        db.session.add(Cliente(
+            admin_id=admin_id, nome="__E2E Cliente",
+            email="cliente.e2e@example.com",
         ))
 
     # 2) AlmoxarifadoItem CONSUMIVEL (+ categoria, FK obrigatória)
@@ -696,8 +709,21 @@ class TestIntegracaoPropostaObra:
         Retorna o ID da proposta criada.
         """
         ts = datetime.datetime.now().strftime("%H%M%S%f")
-        cliente = f"Cliente E2E {ts}"
         assunto = f"Proposta E2E {ts}"
+
+        # A22/B3.3 — o cliente vem do CADASTRO, não de nome digitado. O
+        # <select name="cliente_id"> é `required` (nova_proposta.html:84-85):
+        # sem ele o formulário nem submete. O cadastro é provisionado de forma
+        # idempotente por _garantir_dados_e2e (bloco 1b), chamado pela fixture.
+        from app import app as _app_cliente
+        from models import Cliente as _Cliente
+        admin_id = _get_admin_id()   # já abre e fecha o próprio app_context
+        with _app_cliente.app_context():
+            _c = _Cliente.query.filter_by(
+                admin_id=admin_id, nome="__E2E Cliente").first()
+            assert _c is not None, \
+                "__E2E Cliente não provisionado — _garantir_dados_e2e não rodou"
+            cliente_id = _c.id
 
         # Navegar ao formulário de nova proposta
         page.goto(f"{BASE_URL}/propostas/nova", timeout=TIMEOUT_MS,
@@ -707,7 +733,7 @@ class TestIntegracaoPropostaObra:
         # Preencher campos principais (todos presentes no HTML estático).
         # NOTA: numero_proposta também tem required — deve ser preenchido.
         page.fill('input[name="numero_proposta"]', f"E2E-{ts}")
-        page.fill('input[name="cliente_nome"]', cliente)
+        page.select_option('[data-testid=proposta-cliente-id]', value=str(cliente_id))
         page.fill('input[name="assunto"]', assunto)
         page.fill('textarea[name="objeto"]', "Objeto do contrato de teste automatizado")
 
@@ -722,11 +748,11 @@ class TestIntegracaoPropostaObra:
         # dispara eventos confiáveis (trusted) que o Chrome aceita para form submit.
         # O formulário real é #formNovaProposta em nova_proposta.html (não nova.html).
         page.evaluate(
-            "document.querySelector('#formNovaProposta button[type=\"submit\"]')"
+            "document.querySelector('[data-testid=\"proposta-salvar\"]')"
             ".scrollIntoView({block:'center', behavior:'instant'})"
         )
         page.wait_for_timeout(400)
-        page.locator('#formNovaProposta button[type="submit"]').click(timeout=TIMEOUT_MS)
+        page.locator('[data-testid=proposta-salvar]').click(timeout=TIMEOUT_MS)
         page.wait_for_load_state("domcontentloaded", timeout=TIMEOUT_MS)
 
         assert "/login" not in page.url, "Sessão expirou após submit da proposta"
