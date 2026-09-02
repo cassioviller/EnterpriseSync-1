@@ -7,8 +7,11 @@
 >
 > - **Estado do git:** `main` = `origin/main` = `a5ab182b` (mais o commit deste
 >   registro). **Zero commits não empurrados.** Árvore limpa — só
->   `tests/reports/` fora do git, por regra. A branch `sdd/a-porta-irma` está
->   mergeada e **não foi apagada**.
+>   `tests/reports/` fora do git, por regra. A branch `sdd/a-porta-irma` foi
+>   mergeada e **apagada** em 02/09 (a ponta era `bbc2c56a`, contida na `main`
+>   pelo merge `83670e76` — nada se perdeu). Ela nunca existiu no `origin`.
+>   🔬 Sobraram duas branches locais antigas, **de outras frentes e fora deste
+>   plano**: `sdd/onda-5-o-recusado-para-de-ser-gravado` e `sdd/reuniao-20-08`.
 > - **Progresso:** **7 de 16 tasks.** A Task 11 fechou os 7 Steps, incluindo o
 >   ritual da Task 10 e o **primeiro push: 125 commits**, a Fase 6 entre eles.
 > - **Pisos vigentes** (não use nenhum anterior): gate **3247 passed / 8
