@@ -1348,9 +1348,13 @@ def processar_devolucao_multipla():
                 if condicao_item in ['Perfeito', 'Bom', 'Regular']:
                     estoque.status = 'DISPONIVEL'
                 elif condicao_item == 'Danificado':
-                    estoque.status = 'EM_MANUTENCAO'
+                    # 🔴 Onda 4: era 'EM_MANUTENCAO', fora do vocabulário da
+                    # definição (models.py:5576). Quem lê nos templates de
+                    # perfil e de detalhes testava 'MANUTENCAO' e nunca via.
+                    estoque.status = 'MANUTENCAO'
                 elif condicao_item == 'Inutilizado':
-                    estoque.status = 'INUTILIZADO'
+                    # 🔴 Onda 4: era 'INUTILIZADO'; a definição diz 'DESCARTADO'.
+                    estoque.status = 'DESCARTADO'
 
                 obra_id_movimento = estoque.obra_id
                 estoque.funcionario_atual_id = None

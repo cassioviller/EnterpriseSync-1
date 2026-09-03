@@ -302,7 +302,7 @@ def relatorios():
 
         manutencao = AlmoxarifadoEstoque.query.filter_by(
             admin_id=admin_id,
-            status='EM_MANUTENCAO'
+            status='MANUTENCAO'  # 🔴 Onda 4: alinhado ao vocabulário de models.py
         ).join(AlmoxarifadoItem).all()
 
         data_limite = datetime.now() - timedelta(days=30)

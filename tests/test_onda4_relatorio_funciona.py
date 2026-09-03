@@ -579,3 +579,105 @@ def test_devolucao_multipla_encontra_o_item_em_uso():
         depois = AE.query.get(eid)
         assert depois.status == 'DISPONIVEL', (
             f'a rota disse sucesso e o item ficou em {depois.status}')
+
+
+# ---------------------------------------------------------------------------
+# Task 6 — o vocabulário partido do almoxarifado
+# ---------------------------------------------------------------------------
+
+VOCABULARIO_DE_ESTOQUE = {'DISPONIVEL', 'EM_USO', 'MANUTENCAO', 'DESCARTADO',
+                          'CONSUMIDO'}
+
+
+def _devolver_serializado(condicao):
+    """Devolve um item serializado na condição pedida e devolve o status final.
+
+    Vai pela rota, não pelo modelo: o vocabulário é partido entre quem ESCREVE
+    (a rota de devolução) e quem LÊ (dashboard e relatório), e só a rota prova
+    qual palavra é gravada de verdade.
+    """
+    from models import (AlmoxarifadoEstoque, AlmoxarifadoItem, Funcionario)
+
+    with app.app_context():
+        t = um_tenant(f'onda4_vocab_{condicao.lower()}', com_fatos=False)
+        func = Funcionario.query.filter_by(admin_id=t.admin_id).first()
+        assert func is not None, 'tenant sem funcionário — teste vácuo'
+        suf = uuid.uuid4().hex[:8]
+        item = AlmoxarifadoItem(
+            admin_id=t.admin_id, nome=f'Vocab {suf}', codigo=f'VC{suf}',
+            tipo_controle='SERIALIZADO', unidade='UN',
+            categoria_id=_categoria_de(t.admin_id))
+        db.session.add(item)
+        db.session.flush()
+        est = AlmoxarifadoEstoque(
+            admin_id=t.admin_id, item_id=item.id, numero_serie=f'NS{suf}',
+            quantidade=1, status='EM_USO', funcionario_atual_id=func.id)
+        db.session.add(est)
+        db.session.commit()
+        admin_id, fid, eid, iid = t.admin_id, func.id, est.id, item.id
+        serie = est.numero_serie
+
+    resp = cliente_de(admin_id).post(
+        '/almoxarifado/processar-devolucao-multipla',
+        json={'itens': [{
+            'funcionario_id': fid, 'item_id': iid, 'estoque_id': eid,
+            'numero_serie': serie, 'quantidade': 1,
+            'tipo_controle': 'SERIALIZADO', 'condicao_item': condicao}]})
+    assert resp.status_code == 200, (
+        f'a devolução em {condicao} falhou: {resp.status_code} {resp.get_json()}')
+
+    with app.app_context():
+        from models import AlmoxarifadoEstoque as AE
+        return admin_id, AE.query.get(eid).status
+
+
+@pytest.mark.parametrize('condicao', ['Danificado', 'Inutilizado'])
+def test_devolucao_grava_o_vocabulario_da_definicao(condicao):
+    """🔴 A rota gravava `EM_MANUTENCAO` e `INUTILIZADO`, e a definição
+    (`models.py:5576`) diz `MANUTENCAO` e `DESCARTADO`.
+
+    📖 O vocabulário estava partido no meio: `funcionario_perfil.html` e
+    `itens_detalhes.html` testam `MANUTENCAO`, enquanto `dashboard.py` e
+    `relatorios.py` casavam `EM_MANUTENCAO`. Item devolvido avariado não
+    aparecia com selo em duas telas.
+    """
+    _, status = _devolver_serializado(condicao)
+    assert status in VOCABULARIO_DE_ESTOQUE, (
+        f'status {status!r} está fora do vocabulário da definição '
+        f'{sorted(VOCABULARIO_DE_ESTOQUE)}')
+
+
+def test_item_avariado_aparece_para_quem_le():
+    """A prova de que escrita e leitura falam a MESMA palavra.
+
+    ⚠️ Um teste que só olhasse o status gravado passaria mesmo com os leitores
+    apontando para a palavra antiga — e o item continuaria invisível na tela.
+    Este vai pela rota do relatório e exige o item lá dentro.
+    """
+    from flask import template_rendered
+
+    admin_id, status = _devolver_serializado('Danificado')
+    assert status == 'MANUTENCAO', f'gravou {status!r}'
+
+    capturado = []
+
+    def _registrar(sender, template, context, **extra):
+        capturado.append(context)
+
+    # ⚠️ Não existe `tipo=manutencao`: o bloco de manutenção é montado DENTRO
+    # do ramo `alertas` (`relatorios.py:303`). Pedir um tipo que não existe cai
+    # no ramo vazio e o teste passaria sem ler nada.
+    template_rendered.connect(_registrar, app)
+    try:
+        resp = cliente_de(admin_id).get(
+            '/almoxarifado/relatorios?tipo=alertas')
+    finally:
+        template_rendered.disconnect(_registrar, app)
+
+    assert resp.status_code == 200, f'o relatório devolveu {resp.status_code}'
+    assert capturado, 'nenhum template renderizado — teste vácuo'
+    dados = capturado[-1].get('dados_relatorio') or {}
+    manutencao = dados.get('manutencao') or []
+    assert len(manutencao) >= 1, (
+        'o item avariado não apareceu para quem lê — o vocabulário continua '
+        'partido entre escrita e leitura')

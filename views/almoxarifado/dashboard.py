@@ -90,7 +90,7 @@ def dashboard():
 
     itens_manutencao = AlmoxarifadoEstoque.query.filter_by(
         admin_id=admin_id,
-        status='EM_MANUTENCAO'
+        status='MANUTENCAO'  # 🔴 Onda 4: alinhado ao vocabulário de models.py
     ).join(AlmoxarifadoItem).all()
     # ÚLTIMAS 10 MOVIMENTAÇÕES
     # ========================================
