@@ -7379,6 +7379,12 @@ class CronogramaTemplateItem(db.Model):
     quantidade_prevista = db.Column(db.Float)          # unidade vem da SubatividadeMestre
     responsavel = db.Column(db.String(20), default='empresa')  # empresa | terceiros
 
+    # Espinha financeira (ADR 0004/DC8) — peso EXPLÍCITO da atividade dentro
+    # do serviço. Nullable: template antigo não tem peso e cai no fallback
+    # 1:1 do importador; um default numérico fingiria um peso que ninguém
+    # definiu. Era a migration 193 da linhagem velha, que nunca chegou aqui.
+    peso_medicao = db.Column(db.Numeric(5, 2), nullable=True)
+
     admin_id = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

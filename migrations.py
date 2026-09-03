@@ -7563,6 +7563,30 @@ def _migration_318_flag_folha_rateio_encargos():
         raise
 
 
+def _migration_319_template_item_peso_medicao():
+    """Resgate da Espinha Financeira — cronograma_template_item.peso_medicao.
+
+    Reposicao da migration 193 da linhagem velha (o repo foi recomecado em
+    22/07 e ela nunca chegou). Idempotente. Nullable de proposito: NULL
+    significa "template sem peso definido" e o importador cai no 1:1.
+
+    E' o coracao do importador de obra (services/importar_obra_completa.py):
+    o peso EXPLICITO de cada atividade dentro do servico (DC8/ADR 0004).
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                ALTER TABLE cronograma_template_item
+                    ADD COLUMN IF NOT EXISTS peso_medicao NUMERIC(5,2)
+            """))
+        logger.info('[Migration 319] cronograma_template_item.peso_medicao criada.')
+        return True
+    except Exception as e:
+        logger.error(f'[Migration 319] Falha: {e}', exc_info=True)
+        return False
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7882,6 +7906,7 @@ def executar_migracoes():
             (316, "Fix round do code review — uq_contrato_versao_obra_versao ganha admin_id: a 315 escopou a irma e deixou esta, e abrir_versao numera por (obra_id, admin_id)", _migration_316_versao_contrato_por_tenant),
             (317, "A09 — nota_fiscal.chave_acesso unica por (admin_id, chave_acesso), nao global", _migration_317_chave_acesso_por_tenant),
             (318, "A24 — flag configuracao_empresa.folha_rateio_encargos (default FALSE): rateio de encargos patronais por obra atras de interruptor por tenant", _migration_318_flag_folha_rateio_encargos),
+            (319, "Resgate Espinha — cronograma_template_item.peso_medicao (repoe a 193 da linhagem velha)", _migration_319_template_item_peso_medicao),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
