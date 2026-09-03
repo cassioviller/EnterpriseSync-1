@@ -7587,6 +7587,34 @@ def _migration_319_template_item_peso_medicao():
         return False
 
 
+def _migration_320_proposta_origem():
+    """Resgate da Espinha Financeira — propostas_comerciais.origem.
+
+    Reposicao da migration 194 da linhagem velha. DE ONDE o documento veio: o
+    importador de obra grava 'importacao_obra' e mantem a Proposta FORA do
+    funil comercial (ADR 0005).
+
+    ⚠️ Nao confundir com `proposta_origem_id`, que ja existe e e' o elo de
+    LINHAGEM entre revisoes (Task #31 / Fase 6). Sao coisas diferentes e
+    coexistem.
+
+    Nullable e SEM default de proposito: proposta que nasce pelo funil nao tem
+    origem especial, e NULL diz isso melhor que 'funil'. Idempotente.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                ALTER TABLE propostas_comerciais
+                    ADD COLUMN IF NOT EXISTS origem VARCHAR(30)
+            """))
+        logger.info('[Migration 320] propostas_comerciais.origem criada.')
+        return True
+    except Exception as e:
+        logger.error(f'[Migration 320] Falha: {e}', exc_info=True)
+        return False
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7907,6 +7935,7 @@ def executar_migracoes():
             (317, "A09 — nota_fiscal.chave_acesso unica por (admin_id, chave_acesso), nao global", _migration_317_chave_acesso_por_tenant),
             (318, "A24 — flag configuracao_empresa.folha_rateio_encargos (default FALSE): rateio de encargos patronais por obra atras de interruptor por tenant", _migration_318_flag_folha_rateio_encargos),
             (319, "Resgate Espinha — cronograma_template_item.peso_medicao (repoe a 193 da linhagem velha)", _migration_319_template_item_peso_medicao),
+            (320, "Resgate Espinha — propostas_comerciais.origem (repoe a 194): proposta de importacao fora do funil comercial", _migration_320_proposta_origem),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

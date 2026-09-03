@@ -3826,6 +3826,19 @@ class Proposta(db.Model):
     )
     substituida_em = db.Column(db.DateTime, nullable=True)
 
+    # Espinha financeira (ADR 0005) — DE ONDE o documento veio. A Proposta
+    # criada pelo importador de obra grava 'importacao_obra' e fica FORA do
+    # funil comercial. Era a migration 194 da linhagem velha.
+    #
+    # ⚠️ NÃO confundir com `proposta_origem_id`, logo acima: aquele é o elo de
+    # LINHAGEM (de qual proposta esta é revisão, Task #31 / Fase 6); este é a
+    # PROCEDÊNCIA do documento. Reaproveitar um pelo outro faria a proposta de
+    # importação aparecer como revisão de si mesma no comparador da Fase 6.
+    #
+    # Nullable e sem default: proposta que nasce pelo funil não tem origem
+    # especial, e NULL diz isso melhor que 'funil'.
+    origem = db.Column(db.String(30), nullable=True)
+
     # Task #23 — nota de validação escrita pelo supervisor (sem mudar o fluxo
     # de aprovação — apenas campo de texto livre para comunicação interna).
     observacao_validacao = db.Column(db.Text, nullable=True)

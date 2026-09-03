@@ -65,3 +65,36 @@ def test_migration_319_e_idempotente_e_cria_a_coluna():
     row = _coluna_existe('cronograma_template_item', 'peso_medicao')
     assert row is not None, 'a coluna não existe no banco depois da migration'
     assert row[1] == 'YES', f'peso_medicao devia ser nullable, veio {row[1]}'
+
+
+# ---------------------------------------------------------------------------
+# Migration 320 — propostas_comerciais.origem (repõe a 194)
+# ---------------------------------------------------------------------------
+
+def test_proposta_tem_origem_e_ela_nao_se_confunde_com_linhagem():
+    from models import Proposta
+    with app.app_context():
+        assert hasattr(Proposta, 'origem')
+        assert hasattr(Proposta, 'proposta_origem_id'), (
+            'as duas coexistem e querem dizer coisas diferentes: origem é '
+            'de onde o documento veio; proposta_origem_id é de qual '
+            'proposta esta é revisão (linhagem da Fase 6)')
+        col = Proposta.__table__.columns['origem']
+        assert col.nullable, (
+            "origem é nullable e sem default: proposta que nasce pelo funil "
+            "não tem origem especial, e NULL diz isso melhor que 'funil'")
+        assert col.default is None and col.server_default is None, (
+            'um default faria toda proposta do funil nascer carimbada')
+
+
+def test_migration_320_e_idempotente_e_cria_a_coluna():
+    from migrations import _migration_320_proposta_origem
+    with app.app_context():
+        assert _migration_320_proposta_origem() is True, \
+            'a migration 320 falhou na primeira execução'
+        assert _migration_320_proposta_origem() is True, \
+            'a migration 320 não é idempotente: a segunda execução falhou'
+
+    row = _coluna_existe('propostas_comerciais', 'origem')
+    assert row is not None, 'a coluna não existe no banco depois da migration'
+    assert row[1] == 'YES', f'origem devia ser nullable, veio {row[1]}'
