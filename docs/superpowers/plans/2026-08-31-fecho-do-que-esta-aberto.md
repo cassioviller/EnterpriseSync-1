@@ -72,7 +72,7 @@
 > | 8 — Resgate da Espinha Financeira (agora **10 de 10**) | ⬜ |
 > | **12 — Fase 8, o plano de contas canônico** | ⬜ |
 > | **13 — família 404 (B6.4–B6.8)** | ⬜ |
-> | 9 — as sete issues de arquitetura viram plano | ⬜ |
+> | 9 — as sete issues de arquitetura viram plano | 🟡 **o plano está ESCRITO** (`2026-08-31-issues-de-arquitetura.md`, 8 tasks) — falta executá-lo |
 > | **14 — reconferência das automações → spec → planos** | 🟡 **reconferência e spec FEITAS** (`docs/reconferencia-backlog-2026-09-02.md`, `specs/2026-09-02-automacoes-design.md`) — faltam os 3 planos que a spec desenha, e uma decisão do dono |
 > | **15 — reconferência de premissas da Fase 9a/9b → plano novo** | 🟡 **a reconferência está FEITA** (`docs/superpowers/specs/2026-09-02-fase-9-premissas.md`) — falta só a decisão do dono e, se for reescrever, o plano novo |
 > | 10 — **muda de forma:** o ritual de integração entre etapas | ⬜ repetido |
@@ -1273,6 +1273,55 @@ push.
 **Interfaces:**
 - Consumes: nada.
 - Produces: nada.
+
+> ## ✅ O plano está ESCRITO (03/09) — `2026-08-31-issues-de-arquitetura.md`
+>
+> 1.289 linhas, **8 tasks** (7 de código + 1 de fecho). 🔬 Nenhuma cria
+> migration — o máximo real é **318**, a Task 8 leva 319–321 e a Task 12 leva
+> 322–323, então esta etapa não entra na disputa.
+>
+> **Cinco issues viraram task**, e duas trouxeram achado novo que ninguém tinha:
+> - 🔴 **Issue E — o teste de paridade compara duas transcrições, e erra.** Ele
+>   não confronta a implementação com a fonte: confronta duas cópias do mesmo
+>   texto — e ainda assim **erra R$ 0,05** num caso da própria tabela, **10× a
+>   tolerância que ele mesmo declara**.
+> - 🔴 **Issue H — 316 linhas de teste que não testam nada.** 🔬 Conferido por
+>   execução: `pytest tests/test_propostas_block_scripts_213.py --collect-only`
+>   devolve **"no tests collected"**. O arquivo existe, é grande, e prova zero.
+>   ⚠️ E ele não está sozinho: outros **20** arquivos embrulham um `main()` num
+>   único `test_` — recorte adiado e nomeado no plano.
+> - 🔴 **Issue B — o usuário é informado de sucesso quando o lançamento falhou.**
+>   📖 `folha_pagamento_views.py:314-336`: o retorno de
+>   `gerar_lancamento_contabil_automatico` é **descartado**, o `except` só loga
+>   `warning`, e `:340` dispara `flash('Folha processada com sucesso!')` de
+>   qualquer modo. 🔬 Conferido na fonte.
+> - **Issue A:** os dois `@lru_cache` de `models.py:3187`/`:3285` devolvendo
+>   entidade ORM — 🔬 **zero chamadores** hoje: é bug latente, e o plano decide
+>   **converter em vez de apagar**, com o custo de errar escrito.
+> - **Issue C:** 🔬 `app.py` registra 38 blueprints e `main.py` mais 15, mas a
+>   guarda de layout só roda em `main.py:303`. ⚠️ O teste **tem de rodar em
+>   subprocesso**: `conftest.py:65` já importa `main`, e sem isso a guarda passa
+>   por **verdade vácua**.
+>
+> **Metade da issue D já estava fechada, por evidência:** o seeder idempotente
+> (`contabilidade_utils.py:1641`, `ON CONFLICT (admin_id, codigo)`) e a PK
+> composta (migration **218**, `migrations.py:7813`). ⚠️ O commit **não é
+> citável** — `git log -S` cai em `b30923b5`, a reimportação do repo inteiro
+> (1.437 arquivos): a prova é o código, e o plano diz isso em vez de fingir
+> procedência. A outra metade da D é a **Task 12**.
+>
+> **Duas adiadas, com motivo escrito:** **F** — 🔬 a evidência não sobreviveu
+> (zero `ConfiguracaoEmpresa.query` dentro de laço, e o cache por request já
+> existe em `services/pricing.py:73`); volta se uma contagem de queries mostrar
+> outra coisa. **G** — depende do registro persistido que a issue B deixa de
+> fora.
+>
+> ✅ **Nenhuma issue depende de decisão humana.** O plano registra as **três
+> decisões de projeto que ele mesmo toma**, cada uma com o custo de errar.
+>
+> ⚠️ **Resíduo:** o Step 3 abaixo (a coluna de estado em
+> `docs/superpowers/issues/README.md`) ficou **dentro do plano novo, como Task
+> 8 dele** — não foi aplicado ao README aqui.
 
 - [ ] **Step 1: Reconferir cada issue contra a árvore de hoje**
 
