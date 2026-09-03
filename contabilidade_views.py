@@ -613,11 +613,19 @@ def balancete():
             total_debitos += debitos_mes
             total_creditos += creditos_mes
             
-            # Acumular saldos finais
-            if saldo_atual > 0:
-                total_saldo_devedor += saldo_atual
+            # 🔴 Onda 4: a coluna sai da NATUREZA, não do sinal. `saldo_atual`
+            # já vem normalizado (devedora: D−C; credora: C−D), e acumular por
+            # `> 0` depois disso jogava o saldo CREDOR normal de uma conta
+            # credora no total DEVEDOR: D Caixa 1.000 / C Receita 1.000 dava
+            # devedor 2.000, credor 0. É o mesmo defeito de
+            # `contabilidade_utils.obter_dados_balancete`, copiado — e este é o
+            # que o usuário vê na tela.
+            if conta.natureza == 'DEVEDORA':
+                total_saldo_devedor += saldo_atual if saldo_atual > 0 else Decimal('0')
+                total_saldo_credor += abs(saldo_atual) if saldo_atual < 0 else Decimal('0')
             else:
-                total_saldo_credor += abs(saldo_atual)
+                total_saldo_credor += saldo_atual if saldo_atual > 0 else Decimal('0')
+                total_saldo_devedor += abs(saldo_atual) if saldo_atual < 0 else Decimal('0')
     
     # Verificar equilíbrio contábil
     balanceado = abs(total_debitos - total_creditos) < Decimal('0.01')

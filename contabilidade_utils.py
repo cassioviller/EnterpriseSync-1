@@ -440,24 +440,32 @@ def gerar_balanco_patrimonial(admin_id, data_referencia):
                 'nivel': conta.nivel
             }
             ativo['total'] += saldo
+        # 🔴 Onda 4: era `abs(saldo)` nos três ramos abaixo, e o `abs` ESCONDIA
+        # o saldo invertido. 🔬 `calcular_saldo_conta` devolve D−C, sem
+        # normalizar por natureza: um passivo com saldo devedor sai positivo, o
+        # `abs` o mantinha positivo, e ele SOMAVA ao total do passivo em vez de
+        # reduzi-lo — um número plausível e errado, que é pior que faltar.
+        # Agora o saldo é normalizado pela natureza credora (C−D = −saldo): o
+        # passivo normal segue positivo, e o INVERTIDO aparece negativo, como
+        # ele é. A regra da onda: relatório não esconde o que não sabe.
         elif conta.codigo.startswith('2.1'):
             passivo['circulante'][conta.codigo] = {
                 'nome': conta.nome,
-                'saldo': abs(saldo),
+                'saldo': -saldo,
                 'nivel': conta.nivel
             }
-            passivo['total'] += abs(saldo)
+            passivo['total'] += -saldo
         elif conta.codigo.startswith('2.2'):
             passivo['nao_circulante'][conta.codigo] = {
                 'nome': conta.nome,
-                'saldo': abs(saldo),
+                'saldo': -saldo,
                 'nivel': conta.nivel
             }
-            passivo['total'] += abs(saldo)
+            passivo['total'] += -saldo
         elif conta.codigo.startswith('3'):
             patrimonio_liquido[conta.codigo] = {
                 'nome': conta.nome,
-                'saldo': abs(saldo),
+                'saldo': -saldo,
                 'nivel': conta.nivel
             }
     
@@ -617,10 +625,16 @@ def calcular_dre_mensal(admin_id: int, ano: int, mes: int):
                 for partida in partidas:
                     valor = Decimal(str(partida.valor))
                     
-                    # Se tipo esperado for especificado, só conta se for o tipo correto
+                    # 🔴 Onda 4: os DOIS lados entram. O lado esperado soma e o
+                    # inverso SUBTRAI — senão o estorno (que grava a partida
+                    # inversa correta) é filtrado fora e a DRE reporta a receita
+                    # ou a despesa para sempre, discordando do balancete no
+                    # mesmo mês. Antes: só o lado esperado somava.
                     if tipo_esperado:
                         if partida.tipo_partida == tipo_esperado:
                             total += valor
+                        else:
+                            total -= valor
                     else:
                         # Senão, credita positivo e debita negativo
                         if partida.tipo_partida == 'CREDITO':
@@ -861,6 +875,20 @@ def obter_dados_balancete(admin_id, mes, ano):
                         abs(creditos_mes) > Decimal('0.01'))
         
         if tem_movimento:
+            # 🔴 Onda 4: a coluna sai da NATUREZA da conta, não do sinal.
+            # `saldo_atual` já vem normalizado (devedora: D−C; credora: C−D), e
+            # decidir a coluna por `> 0` depois disso jogava o saldo CREDOR
+            # normal de uma conta credora na coluna de DÉBITO: D Caixa 1.000 /
+            # C Receita 1.000 dava devedor 2.000, credor 0 — um balancete de
+            # verificação que nunca amarra. Saldo invertido (o sinal negativo)
+            # continua aparecendo, na coluna oposta à natureza.
+            if conta.natureza == 'DEVEDORA':
+                saldo_devedor = saldo_atual if saldo_atual > 0 else Decimal('0')
+                saldo_credor = abs(saldo_atual) if saldo_atual < 0 else Decimal('0')
+            else:
+                saldo_credor = saldo_atual if saldo_atual > 0 else Decimal('0')
+                saldo_devedor = abs(saldo_atual) if saldo_atual < 0 else Decimal('0')
+
             contas_data.append({
                 'codigo': conta.codigo,
                 'nome': conta.nome,
@@ -868,17 +896,14 @@ def obter_dados_balancete(admin_id, mes, ano):
                 'natureza': conta.natureza,
                 'debitos': debitos_mes,
                 'creditos': creditos_mes,
-                'saldo_devedor': saldo_atual if saldo_atual > 0 else Decimal('0'),
-                'saldo_credor': abs(saldo_atual) if saldo_atual < 0 else Decimal('0')
+                'saldo_devedor': saldo_devedor,
+                'saldo_credor': saldo_credor
             })
             
             total_debitos += debitos_mes
             total_creditos += creditos_mes
-            
-            if saldo_atual > 0:
-                total_saldo_devedor += saldo_atual
-            else:
-                total_saldo_credor += abs(saldo_atual)
+            total_saldo_devedor += saldo_devedor
+            total_saldo_credor += saldo_credor
     
     return {
         'contas': contas_data,
