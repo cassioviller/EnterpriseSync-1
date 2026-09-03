@@ -1361,8 +1361,9 @@ em 01/09, e o registro escrito a partir de um log truncado disse "18% com 2
 FAILED" quando o log real dizia 62% e 7 FAILED — um placar parcial virou placar
 e uma decisão foi tomada em cima dele.
 
-Expected: **0 failed**, **skipped = 8**, **xfailed ≤ 72**, passed ≥ 3193 mais os
-testes da etapa.
+Expected: **0 failed**, **skipped = 8**, **xfailed ≤ 72**, passed ≥ **3247** mais
+os testes da etapa. (🔬 O `3193` que estava aqui era o piso de 01/09 — resíduo
+achado pelo pré-voo da Task 13 em 03/09.)
 
 **Step B: Suíte com browser, pelo runner retomável**
 
@@ -1558,6 +1559,76 @@ manda sobre este texto. E confira que a linha 214 do plano da Fase 8 ("a spec
 inteira antes de escrever a migration 316") também foi renumerada: ela é prosa,
 não código, e um `sed` que só olhasse `_migration_` a deixaria mentindo.
 
+- [ ] **Step 0-b: Desarmar os SEIS sítios que mandam parar (pré-voo de 03/09)**
+
+🔴 **A Task 12 não executa como está escrita, e o Step 0 acima não resolve isso.**
+📖 `2026-08-24-fase-8-plano-de-contas-canonico.md:79` diz, em caixa: *"⚠️ **Não
+execute a Task 4 sem o Cássio julgar a D6.**"* — e mais cinco sítios repetem que
+a D6 está aberta ou que a Task 4 está bloqueada. A D6 **foi respondida em
+01/09** (assinatura estrutural). Substitua os seis antes de despachar qualquer
+task, senão o executor lê o cabeçalho destravado e para no meio. 🔬 É o mesmo
+defeito que o pré-voo achou na Task 8 (Step 2b): destravar o cabeçalho e
+esquecer o corpo.
+
+🔴 **E o `sed` do Step 0 deixa 11 sobras** — 4 delas `[Migration 315]` /
+`[Migration 316]` **dentro de `logger.info`/`logger.error`**, com `M` maiúsculo
+que a regex não casa. Essas quatro viram **código de produção logando o número
+errado**: log que mente é o defeito que esta casa persegue. Confira sítio a
+sítio depois do `sed`, com `grep -n "31[5-9]\|32[0-3]"`, e trate `[Mm]igration`.
+
+⚠️ **Os números 322/323 do Step 0 são hipótese, não medição.** 🔬 O máximo real
+hoje é **318**; 319/320/321 só ficam gastos **se** a Task 8 rodar antes. Calcule
+no dia, do máximo real, como as Global Constraints mandam.
+
+🔴 **Dois dos cinco sinais da "assinatura estrutural" não discriminam** — e este
+é o achado que mais muda a Task 4:
+- **"grupo 6"** é compartilhado com o seeder **canônico** `_V2_CONTAS_SEED`: os
+  tenants que só têm grupo 6 seriam rotulados de legado por engano.
+- **`4.1.01.%` / `2.1.03.001`** idem.
+- 🔴 E existe um **quarto plano** que o método não previu:
+  `scripts/seed_demo_alfa.py:3501-3512`, com as **raízes invertidas**
+  (3 = receita, 4 = despesa) — 📖 e ele roda no **auto-seed do boot**
+  (`app.py:618`), não é código morto. Ele casa com **dois** sinais ao mesmo
+  tempo.
+- **Sinais limpos:** `5.1.01.%` e o `aceita_lancamento` de `5.1.01`. Outros três
+  limpos ficaram de fora do plano e deviam entrar: `5.2.01`, `2.1.03.007-009` e
+  `4.1.02.%`.
+
+🔴 **O teste do Step 3 falha por dois motivos errados** (é a 10ª e a 11ª
+ocorrência do padrão que o ledger já registra: teste que não chega ao código sob
+teste): (1) ele usa uma fixture `app` que **não existe** — 🔬 zero `def app(` em
+`tests/`, e o projeto não tem `pytest-flask`; (2) o `PlanoContas(...)` que ele
+monta omite `natureza` e `nivel`, ambos `NOT NULL` (📖 `models.py:3276-3277`) →
+`IntegrityError` antes da asserção. As demais citações do plano estão exatas.
+
+🔴 **O guarda por `ast` da Task 3 reprova hoje por acusação falsa:** o scan
+devolve **4** pares criadores e `_CRIADORES_CONHECIDOS` lista **2** — faltam
+`scripts/seed_demo_alfa.py::_seed:464` e `::_upsert_conta:3480`, porque
+`scripts/` não está na lista de ignorados.
+
+⚠️ **O Step 1 troca o método e deixa 8 sítios do plano ainda dizendo
+`(codigo, nome)`** (dict, docstring, a query `pares`, o `UPDATE`, o registry, a
+mensagem de commit e a Interface) — instruções opostas no mesmo arquivo.
+E 🔬 `_V2_CONTAS_SEED` tem **36** contas, não 35: falta `6.1.02.009` no
+`SEED_CLASSIFICACAO`, e ela é alvo vivo de `MAPEAMENTO_CONTABIL['despesa_geral']`.
+
+🔬 **"3 de 21 arquivos existem" não reproduz.** São **25** caminhos; dos **18 a
+criar, zero existem**; dos a modificar, 7 de 7. O número honesto é: **nada da
+Fase 8 foi executado**.
+
+🔬 **Linhas que andaram** (ancore por nome): `PlanoContas` 3247→**3253**,
+`seed_plano_contas_if_needed` 1597→**1605**, `contabilidade_views.py:95`→**93**,
+`financeiro_views.py:1329`→**1320**. ✅ **Sem colisão com a Task 13:** os lotes
+B6.4–B6.8 não tocam `contabilidade_views.py`.
+
+**Veredito do pré-voo:** 7 das 10 tasks seguem válidas com correção pontual; a
+**Task 3 precisa de correção obrigatória** (o guarda acusa falso); a **Task 4
+precisa ser REESCRITA**, não só destravada (os sinais não discriminam); a Task 9
+(Domínio) continua sem leiaute. ⚠️ **Não verificado:** a distribuição real no
+banco — o Step 2 exige `from app import app`, que dispara `create_all()` e as
+migrations (`app.py:554`, `:592`, `:720`) e **escreve no banco compartilhado**.
+📖 Relatório completo em `.superpowers/.../preflight-t12.md` (gitignored).
+
 - [ ] **Step 1: Trocar o método da Task 4, ANTES de executar**
 
 O plano manda chavear o de-para por `codigo`. 🔬 Isso mandaria material para
@@ -1697,6 +1768,61 @@ git commit -m "docs(fase-8): a fase fecha 10/10 com de-para por assinatura estru
 **Interfaces:**
 - Consumes: nada.
 - Produces: o `xfailed` do gate **desce** de 72 para perto de 2.
+
+- [ ] **Step 0: O pré-voo desta etapa (03/09) — e o corte em cinco lotes**
+
+🔴 **O Step 1 abaixo mede errado.** `grep "xfail" | wc -l` devolve **44**, mas
+isso conta prosa. 🔬 Os marcadores reais são **13 decoradores**, que produzem os
+**70 testes** por parametrização: propostas 3→**40**, obras 2→**22**, frota
+4→**4**, miscelânea 3→**3**, cauda 1→**1**.
+
+🔴 **O Step 2 é inexequível como está escrito.** "Um commit por sítio, removendo
+o `xfail` correspondente" **não existe**: o marcador é por *função de teste*, e
+os 18 handlers de propostas pendem de **um único** decorador. Ou o commit é o
+**lote inteiro**, ou os testes são re-parametrizados antes. Escolha e escreva
+qual.
+
+⚠️ **Armadilha silenciosa, e é a que mais custa:** 🔬 11 dos 13 arquivos não
+importam `HTTPException` e **5 não importam `abort`** — `views/admin.py` é um
+deles (`abort`: 0 ocorrências). Sem o import, o `abort(404)` novo vira
+`NameError`, **engolido pelo próprio `except Exception` do handler**: o teste
+continua `xfailed` e parece que "o fix não pegou". Todo lote começa conferindo
+os imports.
+
+🔬 **Tamanho real: 61 sítios** (32 de "404 escrito e engolido" + 29 de "404 não
+escrito"), ~90 edições contando os ramos-guarda — o "~60" do plano sobreviveu a
+28 dias. **Todos** os sítios estão vivos, e **todas** as linhas de 06/08
+andaram (de 8 a 95 linhas): ancore por nome de função, nunca por número.
+
+🔴 **O B6.8 encolheu:** seu item-manchete (`views/admin.py:441`, o único oráculo
+de enumeração) já foi corrigido em `0c6590a4` (01/09) e tem teste verde. E a
+premissa "`grep -c 'except HTTPException'` = 0" **caducou**: hoje
+`views/obras.py:2238` e `views/admin.py:460` têm o ramo.
+
+**O corte, e o porquê de cada peça** — 🔬 o achado que decide: *xfail e trabalho
+não são proporcionais*. B6.4+B6.7 são **62 dos 70 xfail** em 29 sítios; os
+outros três lotes são **32 sítios por 8 xfail** — e neles zero xfail cobre
+`configuracoes_views.py` (5 sítios), `views/dashboard.py` (2) e
+`obras.excluir_obra` (1).
+
+**Ordem recomendada: B6.4 → B6.6 → B6.5 → B6.7 → B6.8**, um arquivo de teste por
+commit, com `views/dashboard.py` **recortado do B6.5 para commit próprio** (0
+xfail, e é o único ponto que mexe em 401/403 do login). O B6.6 sobe para segundo
+— contra a ordem de 06/08 — para ensaiar a mecânica do `abort` novo num arquivo
+parado desde 27/08 **antes** de aplicá-la a `views/obras.py`. A única
+serialização dura do plano original (B6.5 antes de B6.7) fica preservada.
+
+**Xfail esperado ao fim de cada etapa: 72 → 32 → 28 → 25 → 3 → 2.** ⚠️ O alvo
+final é **2 xfailed exatos** (`test_p1_dedup_cross_origem.py` e
+`test_arreio_presenca_rotas.py`, que não são desta task), não "perto de 2" — com
+`strict=True`, sobrar ou faltar um é gate vermelho.
+
+**Algum dos 70 já passaria hoje?** ⚠️ **Hipótese, não medição** (o pré-voo não
+roda teste): **nenhum**. O `strict` já filtrou os falsos positivos no
+nascimento — dois sítios entraram verdes por XPASS — e nenhum commit tocou os
+alvos depois dos testes. Confirme na primeira rodada do lote.
+
+📖 Relatório completo em `.superpowers/.../preflight-t13.md` (gitignored).
 
 - [ ] **Step 1: Medir o tamanho real antes de começar**
 
