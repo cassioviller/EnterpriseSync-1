@@ -77,6 +77,32 @@ def _tenant_com_plano(prefixo):
     return t
 
 
+def _garantir_contas(admin_id, *codigos):
+    """Cria, no plano do tenant, as contas que a rotina de integração usa.
+
+    ⚠️ Isto é setup, não conserto. 🔬 As rotinas `contabilizar_*` postam contra
+    códigos escritos para OUTRO seeder (`4.1.02.002`, `2.1.03.007`… não existem
+    no plano canônico), e remapeá-los é trabalho da **Fase 8**. Semear as contas
+    aqui isola o que ESTA task conserta — os atributos inexistentes e a
+    aritmética — do de-para que ainda vai mudar.
+    """
+    from models import PlanoContas
+
+    for codigo in codigos:
+        ja = PlanoContas.query.filter_by(admin_id=admin_id, codigo=codigo).first()
+        if ja:
+            continue
+        grupo = codigo[0]
+        natureza = 'DEVEDORA' if grupo in ('1', '5', '6') else 'CREDORA'
+        db.session.add(PlanoContas(
+            admin_id=admin_id, codigo=codigo, nome=f'Conta {codigo}',
+            tipo_conta={'1': 'ATIVO', '2': 'PASSIVO', '3': 'PATRIMONIO',
+                        '4': 'RECEITA'}.get(grupo, 'DESPESA'),
+            natureza=natureza, nivel=len(codigo.split('.')),
+            aceita_lancamento=True))
+    db.session.flush()
+
+
 def _codigos_existentes(admin_id, *preferidos):
     """Devolve, para cada prefixo pedido, um código que EXISTE no plano.
 
@@ -235,3 +261,178 @@ def test_passivo_invertido_nao_se_disfarca_de_passivo_normal():
         assert Decimal(str(linha['saldo'])) < 0, (
             f"passivo invertido saiu como {linha['saldo']}, positivo — "
             f'disfarçado de passivo normal')
+
+
+# ---------------------------------------------------------------------------
+# Task 2 — a integração contábil para de dar 500
+# ---------------------------------------------------------------------------
+
+def _integrar(admin_id, payload):
+    """Chama a rota de integração. É a rota que dava erro, não a função."""
+    cli = cliente_de(admin_id)
+    return cli.post('/contabilidade/api/processar-integracao', json=payload)
+
+
+def test_integracao_de_proposta_aprovada_nao_estoura():
+    """🔴 `contabilizar_proposta_aprovada` lia `proposta.data_aprovacao`.
+
+    🔬 O atributo NÃO EXISTE em `Proposta` (as datas são `data_proposta`,
+    `data_envio`, `data_resposta_cliente`). A rota devolvia 400 com o
+    `AttributeError` no corpo, e nenhum lançamento nascia.
+    """
+    from models import Cliente, LancamentoContabil, Obra, Proposta
+
+    with app.app_context():
+        t = _tenant_com_plano('onda4_int_prop')
+        # ⚠️ A função sai cedo se `status != 'APROVADA'` (maiúsculas) e usa
+        # `proposta.obra.nome` para nomear o centro de custo: sem os dois, o
+        # teste passaria pelo caminho vazio sem nunca tocar o defeito.
+        cli_obj = Cliente(admin_id=t.admin_id, nome='Cliente Onda 4')
+        db.session.add(cli_obj)
+        db.session.flush()
+        obra = Obra(admin_id=t.admin_id, nome='Obra Onda 4',
+                    data_inicio=date(2026, 7, 1), cliente_id=cli_obj.id)
+        db.session.add(obra)
+        db.session.flush()
+        p = Proposta(admin_id=t.admin_id, numero=f'P{uuid.uuid4().hex[:6]}',
+                     cliente_nome='Cliente Onda 4', valor_total=Decimal('5000.00'),
+                     obra_id=obra.id, data_proposta=date(2026, 7, 10),
+                     data_resposta_cliente=date(2026, 7, 20), status='APROVADA')
+        db.session.add(p)
+        _garantir_contas(t.admin_id, '1.1.02.001', '4.1.02.002')
+        db.session.commit()
+        admin_id, pid = t.admin_id, p.id
+
+    resp = _integrar(admin_id, {'tipo': 'proposta_aprovada', 'origem_id': pid})
+    assert resp.status_code == 200, (
+        f'a integração de proposta falhou: {resp.status_code} {resp.get_json()}')
+    assert resp.get_json()['success'] is True, resp.get_json()
+
+    with app.app_context():
+        gravados = LancamentoContabil.query.filter_by(
+            admin_id=admin_id, origem='MODULO_1', origem_id=pid).count()
+        assert gravados == 1, (
+            f'a rota disse sucesso e gravou {gravados} lançamentos')
+
+
+def test_integracao_de_entrada_material_nao_estoura_e_amarra():
+    """🔴 Dois defeitos no mesmo lugar.
+
+    (1) `nota.fornecedor_nome` e `nota.valor_icms` **não existem** em
+    `NotaFiscal`. (2) Mesmo corrigidos, o débito era `valor_produtos +
+    valor_icms` contra crédito de `valor_total`: sempre que o ICMS está
+    embutido no preço — a norma brasileira — o lançamento fica desbalanceado e
+    `criar_lancamento_automatico` levanta "Lançamento desbalanceado".
+    """
+    from models import Fornecedor, LancamentoContabil, NotaFiscal
+
+    with app.app_context():
+        t = _tenant_com_plano('onda4_int_nf')
+        f = Fornecedor(admin_id=t.admin_id, nome='Fornecedor Onda 4',
+                       cnpj=f'{uuid.uuid4().int % 10**14:014d}')
+        db.session.add(f)
+        db.session.flush()
+        nf = NotaFiscal(
+            admin_id=t.admin_id, numero=f'{uuid.uuid4().int % 10**6:06d}',
+            serie='1', chave_acesso=uuid.uuid4().hex * 1,
+            fornecedor_id=f.id, data_emissao=date(2026, 7, 12),
+            valor_produtos=Decimal('1000.00'), valor_total=Decimal('1000.00'))
+        db.session.add(nf)
+        db.session.commit()
+        admin_id, nid = t.admin_id, nf.id
+
+    resp = _integrar(admin_id, {'tipo': 'entrada_material', 'origem_id': nid})
+    assert resp.status_code == 200, (
+        f'a entrada de material falhou: {resp.status_code} {resp.get_json()}')
+
+    with app.app_context():
+        lanc = LancamentoContabil.query.filter_by(
+            admin_id=admin_id, origem='MODULO_4', origem_id=nid).first()
+        assert lanc is not None, 'a rota disse sucesso e não gravou nada'
+
+        from models import PartidaContabil
+        partidas = PartidaContabil.query.filter_by(lancamento_id=lanc.id).all()
+        deb = sum(p.valor for p in partidas if p.tipo_partida == 'DEBITO')
+        cre = sum(p.valor for p in partidas if p.tipo_partida == 'CREDITO')
+        assert deb == cre, f'lançamento desbalanceado: débito {deb} × crédito {cre}'
+
+
+def test_integracao_de_folha_nao_estoura():
+    """🔴 `contabilizar_folha_pagamento` somava `f.salario_bruto`.
+
+    🔬 `FolhaPagamento` não tem esse atributo — tem `salario_base`,
+    `outros_proventos` e `total_proventos`. O bruto é o `total_proventos`.
+    """
+    from models import Funcionario, FolhaPagamento, LancamentoContabil
+
+    with app.app_context():
+        t = _tenant_com_plano('onda4_int_folha')
+        func = Funcionario.query.filter_by(admin_id=t.admin_id).first()
+        assert func is not None, 'o tenant nasceu sem funcionário — teste vácuo'
+        fp = FolhaPagamento(
+            admin_id=t.admin_id, funcionario_id=func.id,
+            mes_referencia=date(2026, 7, 1), salario_base=Decimal('3000.00'),
+            total_proventos=Decimal('3200.00'),
+            # ⚠️ O líquido tem de respeitar a identidade da própria folha
+            # (bruto − inss − irrf), senão o lançamento sai desbalanceado por
+            # culpa do DADO e o teste acusaria o código de um defeito que é do
+            # teste. Foi o que aconteceu na primeira escrita: 2600 em vez de 2800.
+            salario_liquido=Decimal('2800.00'),
+            inss=Decimal('300.00'), irrf=Decimal('100.00'), fgts=Decimal('256.00'))
+        db.session.add(fp)
+        _garantir_contas(t.admin_id, '6.1.01.001', '6.1.01.002', '2.1.02.001',
+                         '2.1.03.007', '2.1.02.004', '2.1.03.008')
+        db.session.commit()
+        admin_id = t.admin_id
+
+    resp = _integrar(admin_id, {'tipo': 'folha_pagamento',
+                                'mes_referencia': '2026-07-01'})
+    assert resp.status_code == 200, (
+        f'a folha falhou: {resp.status_code} {resp.get_json()}')
+
+    with app.app_context():
+        gravados = LancamentoContabil.query.filter_by(
+            admin_id=admin_id, origem='MODULO_6').count()
+        assert gravados >= 1, 'a rota disse sucesso e não gravou lançamento'
+
+
+def test_conta_ausente_e_recusada_com_nome_e_sem_rastro():
+    """A guarda que esta onda acrescentou ao ponto único das integrações.
+
+    🔬 Antes, postar contra uma conta que o tenant não tem morria em
+    `ForeignKeyViolation` e o usuário recebia um dump de SQL de 400 caracteres.
+    Agora recebe o **nome da conta que falta** — e nada é gravado.
+
+    ⚠️ Este teste é o registro vivo da divergência que a **Fase 8** vai
+    resolver: as rotinas `contabilizar_*` foram escritas contra outro seeder.
+    """
+    from models import Cliente, LancamentoContabil, Obra, Proposta
+
+    with app.app_context():
+        t = _tenant_com_plano('onda4_conta_ausente')
+        cli_obj = Cliente(admin_id=t.admin_id, nome='Cliente sem conta')
+        db.session.add(cli_obj)
+        db.session.flush()
+        obra = Obra(admin_id=t.admin_id, nome='Obra sem conta',
+                    data_inicio=date(2026, 7, 1), cliente_id=cli_obj.id)
+        db.session.add(obra)
+        db.session.flush()
+        p = Proposta(admin_id=t.admin_id, numero=f'P{uuid.uuid4().hex[:6]}',
+                     cliente_nome='Cliente sem conta', valor_total=Decimal('900.00'),
+                     obra_id=obra.id, data_proposta=date(2026, 7, 10),
+                     data_resposta_cliente=date(2026, 7, 20), status='APROVADA')
+        db.session.add(p)
+        db.session.commit()  # SEM _garantir_contas: é o ponto do teste
+        admin_id, pid = t.admin_id, p.id
+
+    resp = _integrar(admin_id, {'tipo': 'proposta_aprovada', 'origem_id': pid})
+    assert resp.status_code == 400, f'esperado 400, veio {resp.status_code}'
+    msg = resp.get_json()['message']
+    assert '4.1.02.002' in msg, f'a recusa não nomeia a conta que falta: {msg}'
+    assert 'psycopg2' not in msg and 'INSERT' not in msg, (
+        f'a recusa vazou SQL para o usuário: {msg}')
+
+    with app.app_context():
+        sobrou = LancamentoContabil.query.filter_by(
+            admin_id=admin_id, origem='MODULO_1', origem_id=pid).count()
+        assert sobrou == 0, f'a recusa deixou rastro: {sobrou} lançamentos'

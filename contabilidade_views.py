@@ -1402,4 +1402,8 @@ def processar_integracao():
         return jsonify({'success': True, 'message': 'Integração processada com sucesso'})
     
     except Exception as e:
+        # Recusar é não deixar rastro: sem o rollback, uma partida já
+        # descarregada na sessão pode aterrissar no próximo commit de outra
+        # requisição.
+        db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
