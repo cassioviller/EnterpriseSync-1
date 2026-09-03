@@ -1280,9 +1280,14 @@ def processar_devolucao_multipla():
                 estoque_id = item_data.get('estoque_id')
                 numero_serie = item_data.get('numero_serie')
 
+                # 🔴 Onda 4: era `funcionario_id`, e a coluna de
+                # `AlmoxarifadoEstoque` é `funcionario_atual_id` — a rota de
+                # item único, logo acima, já usava o nome certo. O erro caía no
+                # `except Exception` da rota e TODA devolução de carrinho
+                # serializado respondia 500 "Erro ao processar operação".
                 estoque = AlmoxarifadoEstoque.query.filter_by(
                     id=estoque_id,
-                    funcionario_id=funcionario_id,
+                    funcionario_atual_id=funcionario_id,
                     status='EM_USO',
                     admin_id=admin_id
                 ).first()

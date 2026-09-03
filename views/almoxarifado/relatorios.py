@@ -36,7 +36,11 @@ def relatorios():
         tipo_controle = request.args.get('tipo_controle', '')
         condicao = request.args.get('condicao', '')
 
-        query = AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id, ativo=True)
+        # 🔴 Onda 4: havia `ativo=True` aqui, e `AlmoxarifadoEstoque` NÃO TEM
+        # a coluna `ativo` — `InvalidRequestError`, 500 seco, nada capturava. O
+        # relatório "Posição de Estoque" nunca funcionou. O escopo que se queria
+        # já está no `admin_id`; a vida do lote é o `status`, não um `ativo`.
+        query = AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id)
         query = query.join(AlmoxarifadoItem, AlmoxarifadoEstoque.item_id == AlmoxarifadoItem.id)
         query = query.join(AlmoxarifadoCategoria, AlmoxarifadoItem.categoria_id == AlmoxarifadoCategoria.id)
 
@@ -283,12 +287,17 @@ def relatorios():
                     admin_id=admin_id
                 ).scalar() or 0
 
-            if qtd_atual < item.estoque_minimo:
+            # 🔴 Onda 4: `estoque_minimo` é nullable no banco (o `default=0` do
+            # ORM só vale para escrita nova), e uma única linha NULL derrubava o
+            # relatório inteiro com TypeError. 📖 `dashboard.py` e `itens.py`
+            # guardam no mesmo cálculo; aqui não guardava.
+            minimo = item.estoque_minimo or 0
+            if qtd_atual < minimo:
                 estoque_baixo.append({
                     'item': item,
                     'qtd_atual': qtd_atual,
-                    'qtd_minima': item.estoque_minimo,
-                    'diferenca': item.estoque_minimo - qtd_atual
+                    'qtd_minima': minimo,
+                    'diferenca': minimo - qtd_atual
                 })
 
         manutencao = AlmoxarifadoEstoque.query.filter_by(

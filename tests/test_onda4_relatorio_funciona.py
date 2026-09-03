@@ -16,6 +16,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import text
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -101,6 +102,19 @@ def _garantir_contas(admin_id, *codigos):
             natureza=natureza, nivel=len(codigo.split('.')),
             aceita_lancamento=True))
     db.session.flush()
+
+
+def _categoria_de(admin_id):
+    """Categoria do almoxarifado do tenant — `categoria_id` é NOT NULL."""
+    from models import AlmoxarifadoCategoria
+
+    cat = AlmoxarifadoCategoria.query.filter_by(admin_id=admin_id).first()
+    if not cat:
+        cat = AlmoxarifadoCategoria(admin_id=admin_id, nome='Geral Onda 4',
+                                    tipo_controle_padrao='CONSUMIVEL')
+        db.session.add(cat)
+        db.session.flush()
+    return cat.id
 
 
 def _codigos_existentes(admin_id, *preferidos):
@@ -436,3 +450,132 @@ def test_conta_ausente_e_recusada_com_nome_e_sem_rastro():
         sobrou = LancamentoContabil.query.filter_by(
             admin_id=admin_id, origem='MODULO_1', origem_id=pid).count()
         assert sobrou == 0, f'a recusa deixou rastro: {sobrou} lançamentos'
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — os dois relatórios do almoxarifado que nunca rodaram
+# ---------------------------------------------------------------------------
+
+def test_relatorio_de_posicao_de_estoque_abre():
+    """🔴 `views/almoxarifado/relatorios.py:39` — `ativo=True` numa tabela que
+    não tem a coluna.
+
+    🔬 `AlmoxarifadoEstoque` (`models.py:5562`) não tem `ativo`:
+    `hasattr(...)` é False e o `grep` na classe devolve zero. O
+    `filter_by(admin_id=..., ativo=True)` levanta `InvalidRequestError`, nada
+    captura na rota, e o relatório "Posição de Estoque" devolve **500 seco**.
+    Nunca funcionou.
+
+    ⚠️ O parâmetro da rota é `tipo`, não `relatorio_tipo` como o plano de 25/08
+    escreveu — com o nome errado a requisição cairia no ramo vazio e o teste
+    passaria verde sem tocar o defeito.
+    """
+    with app.app_context():
+        t = um_tenant('onda4_posic', com_fatos=False)
+        admin_id = t.admin_id
+
+    resp = cliente_de(admin_id).get(
+        '/almoxarifado/relatorios?tipo=posicao_estoque')
+    assert resp.status_code == 200, (
+        f'posição de estoque devolveu {resp.status_code}')
+
+
+def test_relatorio_de_alertas_sobrevive_a_estoque_minimo_nulo():
+    """🔴 `relatorios.py:286` — `qtd_atual < item.estoque_minimo` sem guarda.
+
+    `estoque_minimo` é nullable, e uma única linha NULL derruba o relatório
+    inteiro com `TypeError`. 📖 `dashboard.py` e `itens.py` guardam no mesmo
+    cálculo; aqui não.
+    """
+    from models import AlmoxarifadoItem
+
+    with app.app_context():
+        t = um_tenant('onda4_alerta', com_fatos=False)
+        suf = uuid.uuid4().hex[:8]
+        item = AlmoxarifadoItem(
+            admin_id=t.admin_id, nome=f'Sem mínimo {suf}', codigo=f'SM{suf}',
+            tipo_controle='CONSUMIVEL', unidade='UN',
+            categoria_id=_categoria_de(t.admin_id))
+        db.session.add(item)
+        db.session.commit()
+
+        # ⚠️ O NULL entra por SQL, e isso é deliberado: a coluna é nullable no
+        # banco, mas o ORM tem `default=0`, então escrever `estoque_minimo=None`
+        # pelo modelo grava 0 e o teste passaria sem tocar o defeito — foi o que
+        # aconteceu na primeira escrita. NULL chega por dado legado, migration
+        # ou SQL direto, e é exatamente esse dado que derruba o relatório.
+        db.session.execute(
+            text('UPDATE almoxarifado_item SET estoque_minimo = NULL '
+                 'WHERE id = :i'), {'i': item.id})
+        db.session.commit()
+        conferido = db.session.execute(
+            text('SELECT estoque_minimo FROM almoxarifado_item WHERE id = :i'),
+            {'i': item.id}).scalar()
+        assert conferido is None, 'o NULL não entrou — teste vácuo'
+        admin_id = t.admin_id
+
+    resp = cliente_de(admin_id).get('/almoxarifado/relatorios?tipo=alertas')
+    assert resp.status_code == 200, (
+        f'alertas devolveu {resp.status_code} com estoque_minimo nulo')
+
+
+def test_devolucao_multipla_encontra_o_item_em_uso():
+    """🔴 `movimentos.py:1285` — `filter_by(funcionario_id=...)` num
+    `AlmoxarifadoEstoque`, cuja coluna é `funcionario_atual_id`.
+
+    🔬 A rota de item único (`:1055`) **acerta** o nome; esta erra, e o erro é
+    engolido pelo `except Exception` da rota → toda devolução de carrinho
+    serializado responde erro genérico, sem dizer o que houve.
+
+    O teste afirma primeiro que o item ESTÁ em uso pelo funcionário — sem isso
+    ele passaria verde por não encontrar nada, que é o próprio defeito.
+    """
+    from models import (AlmoxarifadoEstoque, AlmoxarifadoItem, Funcionario)
+
+    with app.app_context():
+        t = um_tenant('onda4_devol', com_fatos=False)
+        func = Funcionario.query.filter_by(admin_id=t.admin_id).first()
+        assert func is not None, 'tenant sem funcionário — teste vácuo'
+        suf = uuid.uuid4().hex[:8]
+        item = AlmoxarifadoItem(
+            admin_id=t.admin_id, nome=f'Serializado {suf}', codigo=f'SR{suf}',
+            tipo_controle='SERIALIZADO', unidade='UN',
+            categoria_id=_categoria_de(t.admin_id))
+        db.session.add(item)
+        db.session.flush()
+        estoque = AlmoxarifadoEstoque(
+            admin_id=t.admin_id, item_id=item.id, numero_serie=f'NS{suf}',
+            quantidade=1, status='EM_USO', funcionario_atual_id=func.id)
+        db.session.add(estoque)
+        db.session.commit()
+
+        # A guarda contra verdade vácua: o item TEM de estar em uso por ele.
+        conferido = AlmoxarifadoEstoque.query.filter_by(
+            id=estoque.id, funcionario_atual_id=func.id,
+            status='EM_USO', admin_id=t.admin_id).first()
+        assert conferido is not None, 'o fixture não deixou o item em uso'
+        admin_id, fid, eid, iid = t.admin_id, func.id, estoque.id, item.id
+        serie = estoque.numero_serie
+
+    resp = cliente_de(admin_id).post(
+        '/almoxarifado/processar-devolucao-multipla',
+        # ⚠️ `funcionario_id` vem DENTRO de cada item (`movimentos.py:1246`),
+        # não no topo, e as condições válidas são capitalizadas ('Bom', não
+        # 'BOM'). Com o payload errado a rota recusa antes do `filter_by` sob
+        # teste, e o teste passaria verde sem provar nada.
+        json={'itens': [{
+            'funcionario_id': fid, 'item_id': iid, 'estoque_id': eid,
+            'numero_serie': serie, 'quantidade': 1,
+            'tipo_controle': 'SERIALIZADO', 'condicao_item': 'Bom'}]})
+
+    corpo = resp.get_json() or {}
+    assert resp.status_code == 200, (
+        f'a devolução falhou: {resp.status_code} {corpo}')
+    assert 'não está em uso pelo funcionário' not in str(corpo), (
+        f'a devolução não achou o item que ESTÁ em uso: {corpo}')
+
+    with app.app_context():
+        from models import AlmoxarifadoEstoque as AE
+        depois = AE.query.get(eid)
+        assert depois.status == 'DISPONIVEL', (
+            f'a rota disse sucesso e o item ficou em {depois.status}')
