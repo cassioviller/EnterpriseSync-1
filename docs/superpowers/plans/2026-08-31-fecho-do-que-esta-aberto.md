@@ -1,70 +1,80 @@
 # Fecho do Que Está Aberto — Implementation Plan
 
-> ## 📍 PONTO DE RETOMADA — sessão encerrada em 02/09, ~23:40
+> ## 📍 PONTO DE RETOMADA — sessão de 03/09, manhã
 >
-> **Leia estas 12 linhas antes de qualquer coisa. Nada está no meio do caminho:
-> a etapa anterior fechou inteira e está no remoto.**
+> **Leia estas linhas antes de qualquer coisa. Nada está no meio do caminho: a
+> Onda 4 fechou inteira, passou pelo ritual e está no remoto.**
 >
-> - 🔴 **PRIMEIRO: há commits presos.** O token do Git **expirou no meio da
->   sessão de 02→03/09** (`remote: Invalid username or token`). Os pushes até
->   `331f3cfc` passaram; os seguintes **não**. Reautentique (`gh auth login`, ou
->   reconecte o GitHub no painel) e rode `git push origin main` **antes de
->   qualquer trabalho novo** — conferindo depois com `git fetch` + comparação de
->   refs, nunca pela saída do `push`.
-> - **Estado do git:** `main` à frente de `origin/main` (`331f3cfc`) pelos
->   commits de pré-voo de 03/09. Árvore limpa — só
->   `tests/reports/` fora do git, por regra. A branch `sdd/a-porta-irma` foi
->   mergeada e **apagada** em 02/09 (a ponta era `bbc2c56a`, contida na `main`
->   pelo merge `83670e76` — nada se perdeu). Ela nunca existiu no `origin`.
->   🔬 Sobraram duas branches locais antigas, **de outras frentes e fora deste
->   plano**: `sdd/onda-5-o-recusado-para-de-ser-gravado` e `sdd/reuniao-20-08`.
-> - **Progresso:** **7 de 16 tasks.** A Task 11 fechou os 7 Steps, incluindo o
->   ritual da Task 10 e o **primeiro push: 125 commits**, a Fase 6 entre eles.
-> - **Pisos vigentes** (não use nenhum anterior): gate **3247 passed / 8
+> - ✅ **Não há commits presos.** O token foi reautenticado em 03/09 e as duas
+>   pilhas subiram: primeiro os 5 commits de documentação do pré-voo
+>   (`origin/main` = `1a66a480`), depois a Onda 4 inteira com o merge
+>   (`origin/main` = **`68a11228`**). Ambos conferidos por `git fetch` +
+>   comparação de refs, **nunca pela saída do `push`**.
+> - **Estado do git:** `main` = `origin/main` = `68a11228`, 0 à frente / 0
+>   atrás. Árvore limpa — só `tests/reports/` fora do git, por regra.
+>   🔬 Sobraram três branches locais de outras frentes, fora deste plano:
+>   `sdd/onda-4-relatorio` (já mergeada, pode ser apagada),
+>   `sdd/onda-5-o-recusado-para-de-ser-gravado` e `sdd/reuniao-20-08`.
+> - **Progresso:** **8 de 16 tasks.** A Onda 4 (T7) fechou 7/7 mais a D7 e
+>   passou pelo **ritual completo da Task 10, Steps A a E**.
+> - **Pisos vigentes** (não use nenhum anterior): gate **3265 passed / 8
 >   skipped / 201 deselected / 72 xfailed / 0 failed**; suíte com browser
->   **3435 passed / 1 failed** — o `1 failed` é o achado **P4** do RDO
->   unificado, registrado na auditoria, e é o **único vermelho conhecido**.
-> - ✅ **Seis agentes de leitura rodaram em 03/09 e o resultado já está
->   integrado neste plano.** As Tasks **8, 12 e 13** ganharam pré-voo (Step 0 /
->   Step 0-b, com os defeitos que eles acharam **neste plano mestre**, não só
->   nos portados); as Tasks **9, 14 e 15** ganharam seus documentos escritos
->   (`2026-08-31-issues-de-arquitetura.md`, `reconferencia-backlog-2026-09-02.md`
->   + `specs/2026-09-02-automacoes-design.md`, `specs/2026-09-02-fase-9-premissas.md`).
->   **Nenhuma task foi executada por eles** — pré-voo e plano são insumo; a
->   execução continua em fila, porque toca banco, migrations e gate.
-> - ⚠️ **Três decisões novas esperam você**, todas nomeadas nos documentos:
->   reescrever ou enterrar a Fase 9a/9b; o que fazer com `obra.progresso_conclusao`;
->   e reabrir (ou não) o corte do A20.
-> - **A PRÓXIMA É A TASK 7 (Onda 4).** Ela já nasce destravada: o **Step 0**
->   (pré-voo, com a correção 🔴 do item (d) — leia-o) e o **Step 0-b** (a D7,
->   respondida "apagar" em 02/09) estão escritos com sítio e linha.
+>   **3453 passed / 1 failed** — o `1 failed` é o achado **P4** do RDO
+>   unificado, decisão de produto registrada na auditoria, e segue sendo o
+>   **único vermelho conhecido**. 🔬 Provado chunk a chunk nesta sessão:
+>   `✗ P4 botão #btn-equipe-1966694 presente`, 33 passed / 1 failed dentro do
+>   E2E — não presumido pelo nome do arquivo.
+> - 🔬 **O gate pós-merge repetiu o número exato da branch:** 3265/8/201/72, 0
+>   failed (39:36, `gate_pos_merge_onda4_1028.log`); o da branch levara 41:04.
+> - ⚠️ **Uma armadilha de método que custou 25 minutos nesta sessão:** o vigia
+>   do gate esperava por `pgrep -f "run_tests.sh --gate"` — padrão que **casa
+>   com a própria linha de comando do vigia**. Ele se viu vivo para sempre e
+>   nunca avisou, com o gate já verde. **Não espere por um processo com
+>   `pgrep -f` usando um padrão que o próprio comando de espera contém.**
+> - 🔬 **Um hash fantasma foi corrigido na tabela abaixo:** a linha da Task 7
+>   citava `1f8f3a3d`, que **não é um objeto git válido**
+>   (`git cat-file -t` → `Not a valid object name`). Os commits reais da onda
+>   são nove, e o oitavo é `a9dd4d0a`.
+> - **A PRÓXIMA É A TASK 8** — Resgate da Espinha Financeira, 10/10, a maior
+>   desta rodada (porte de 2.542 linhas). Nasce destravada, com pré-voo escrito
+>   (Step 0), e o preparo de 03/09 já confirmou na fonte:
+>   🔬 o máximo real de migration é **318** (`migrations.py`, registry
+>   `:7883-7884`), logo **319/320/321 seguem livres** para ela — e a Fase 8
+>   fica com 322/323, como o Ruling C1 do ledger determina.
+> - 🔴 **A T8 precisa de um step que o plano portado não tem:** portar
+>   `_registrar_custo_subempreitada` — ela vive só na branch congelada
+>   (`a18f86e7:cronograma_views.py:917`), a `main` tem **zero** ocorrências, e
+>   `tests/test_resultado_fatia2_custo_nao_mo.py:184` a importa. Sem esse
+>   porte, o `xfail(strict=True)` da Fatia 2 fecha o gate vermelho dos dois
+>   lados (por XPASS ou por falha). Está escrito no Step 2b.
 > - **Comece assim** (o ritual manda branch nova por etapa, a partir da `main`):
 >
 > ```bash
 > git checkout main && git pull origin main
-> git checkout -b sdd/onda-4-relatorio
+> git checkout -b sdd/espinha-financeira
 > cat .superpowers/sdd/2026-08-31-fecho-do-que-esta-aberto/progress.md   # o ledger PRIMEIRO
 > ```
 >
 > - ⚠️ **O ledger não está no remoto.** `.superpowers/sdd/.gitignore` ignora
->   tudo — ele existe **só nesta máquina**. Se você retomar daqui, leia-o. Se
->   retomar de outra máquina, o que estava nele desta sessão está resumido neste
->   bloco e no Step 0 da Task 7, mas o histórico das rulings de 31/08 e 02/09
->   fica para trás.
-> - ⚠️ **A lição que custou caro nesta sessão:** um pré-voo foi refeito sem ler
->   o ledger, e a nota resultante mandava **não procurar um defeito vivo**
->   (`AlmoxarifadoEstoque.ativo`, `views/almoxarifado/relatorios.py:39`). Está
->   corrigida no Step 0 (d) e na auditoria. **O ledger se lê antes.**
-> - **Nada espera decisão humana para a Task 7.** Seguem pendentes, mas de
->   outras tasks: **FASE8-T1** (sem acesso a produção — vira premissa declarada
->   na Task 12) e o `RATIFICAR` da **VIGA-I** (Task 8).
+>   tudo — ele existe **só nesta máquina**, e o mesmo vale para os três
+>   pré-voos (`preflight-t8.md`, `preflight-t12.md`, `preflight-t13.md`).
+> - ⚠️ **A lição que continua valendo:** o ledger se lê **antes** do pré-voo.
+>   Um pré-voo refeito sem ele, em 02/09, mandava não procurar um defeito vivo.
+> - **Seguem pendentes, e nenhuma bloqueia a T8:** **FASE8-T1** (sem acesso a
+>   produção — vira premissa declarada na Task 12) e o `RATIFICAR` da
+>   **VIGA-I** (escolha comercial; o porte não espera por ela).
+> - ⚠️ **Três decisões do dono continuam esperando**, todas de tasks adiante:
+>   reescrever ou enterrar a Fase 9a/9b (T15); o que fazer com
+>   `obra.progresso_conclusao`; e reabrir (ou não) o corte do A20 (T14).
 > - **Sessão anterior:** https://claude.ai/code/session_01FPYxL6k71Ji3b2FqeqJ3ox
+> - **Esta sessão:** https://claude.ai/code/session_018GcHTAxV7iYAu9dTVqVDSp
 
 
 > **Estado em 2026-09-03:** 🟡 **EM EXECUÇÃO — 8 de 16 tasks fechadas.** A
 > primeira integração aconteceu em 02/09 (merge `--no-ff` + push de 125
-> commits); a Onda 4 fechou em 03/09 e **aguarda o ritual** — ⚠️ o token do Git
-> expirou, e há commits presos nesta máquina.
+> commits); a **Onda 4 fechou em 03/09 e passou pelo ritual inteiro** — merge
+> `68a11228`, gate pós-merge repetindo os mesmos 3265, e push confirmado por
+> refs. ✅ Não há commits presos.
 >
 > ⚠️ **ESTENDIDO em 02/09** pelo design
 > `docs/superpowers/specs/2026-09-02-a-lista-vai-a-zero-design.md`, que decidiu
@@ -87,8 +97,8 @@
 > | 5 — `o-que-nao-persiste` (os cinco achados restantes) | ✅ 6/6 tasks, gate 2872/6 skipped |
 > | 6 — Onda 6 (os testes prometidos) | ✅ **fechada em 02/09** — a última task dela (a jornada E2E) foi entregue pelo plano `2026-09-02-a-suite-browser-volta-a-valer.md` |
 > | **11 — o que está a um passo, e a primeira integração** | ✅ `80c3bb31` `acc486ab` `bbc2c56a`, merge `83670e76` — gate **3247/8/201/72, 0 failed** (47:43) |
-> | 7 — Onda 4 (o relatório passa a funcionar) | ✅ **7/7 + a D7** — gate **3265/8/201/72, 0 failed** (41:04). Commits: `6ccf3337` `5fbaf272` `5d39706a` `63a00acc` `7c279a37` `f1027915` `21ed2564` `1f8f3a3d` |
-> | 8 — Resgate da Espinha Financeira (agora **10 de 10**) | ⬜ **próxima** — pré-voo escrito (Step 0), e ⚠️ o `sed` do Step 2 já foi corrigido: ele punha duas migrations na mesma 321 |
+> | 7 — Onda 4 (o relatório passa a funcionar) | ✅ **7/7 + a D7, e o ritual completo** — gate **3265/8/201/72, 0 failed** (41:04); suíte **3453/1** (o P4); merge `68a11228` com gate pós-merge repetindo 3265 (39:36); push conferido por refs. Os nove commits: `6ccf3337` `5fbaf272` `5d39706a` `63a00acc` `7c279a37` `f1027915` `21ed2564` `a9dd4d0a` `cb9a8f20` — 🔬 o `1f8f3a3d` que estava aqui **não é objeto git válido** |
+> | 8 — Resgate da Espinha Financeira (agora **10 de 10**) | ⬜ **próxima, e é a vez dela** — pré-voo escrito (Step 0); o `sed` do Step 2 já corrigido (punha duas migrations na mesma 321); 🔬 máximo de migration medido em 03/09 = **318**, logo 319/320/321 livres |
 > | **12 — Fase 8, o plano de contas canônico** | ⬜ |
 > | **13 — família 404 (B6.4–B6.8)** | ⬜ |
 > | 9 — as sete issues de arquitetura viram plano | 🟡 **o plano está ESCRITO** (`2026-08-31-issues-de-arquitetura.md`, 8 tasks) — falta executá-lo |
