@@ -74,7 +74,7 @@
 > | **13 — família 404 (B6.4–B6.8)** | ⬜ |
 > | 9 — as sete issues de arquitetura viram plano | ⬜ |
 > | **14 — reconferência das automações → spec → planos** | ⬜ |
-> | **15 — reconferência de premissas da Fase 9a/9b → plano novo** | ⬜ |
+> | **15 — reconferência de premissas da Fase 9a/9b → plano novo** | 🟡 **a reconferência está FEITA** (`docs/superpowers/specs/2026-09-02-fase-9-premissas.md`) — falta só a decisão do dono e, se for reescrever, o plano novo |
 > | 10 — **muda de forma:** o ritual de integração entre etapas | ⬜ repetido |
 > | **16 — o índice volta a valer, gate final, push** | ⬜ |
 >
@@ -1064,6 +1064,51 @@ git commit -m "docs(onda-4): a onda fecha, com as duas tasks absorvidas pelo pla
   atividade do cronograma), com alarme, EVM, lente de caixa, roll-up de
   portfólio e o importador de obra por planilha.
 
+- [ ] **Step 0: O pré-voo desta etapa (feito em 03/09) — o que ele mudou**
+
+🔬 Varredura sítio a sítio contra a árvore de hoje. **As 10 tasks continuam
+válidas e nada do porte evaporou** — mas quatro precisam de emenda, e **as duas
+correções mais graves eram deste plano mestre, não do plano portado**: o `sed`
+do Step 2 (corrigido acima) e o Step 2b pela metade (idem).
+
+**O que mais mudou, task a task do plano da Espinha:**
+
+- **Task 3 → migration 319, Task 4 → 320, Task 8 → 321**, depois do `sed`
+  corrigido. Máximo real hoje: **318**.
+- 🔴 **Task 9 — `Files: Create` está errado.** 🔬
+  `scripts/criar_orcamento_baia_rev10.py` **já existe e diverge** da branch (103
+  linhas): a `main` tem o `main()` velho, que pega o primeiro ADMIN; a branch
+  tem `criar_orcamento_baia(admin_id, xlsx_path)`, a forma reusável que o E2E
+  chama. **É sobrescrita, não criação** — trate como merge consciente, não como
+  arquivo novo. E 🔬 `tests/test_rdo_edicao_preserva_tarefa.py` **já está
+  portado, byte a byte idêntico** (`b30923b5`): nada a fazer nele.
+- ⚠️ **O hash do xlsx da Baia diverge** entre `main` e branch (14609 vs 14608
+  bytes). O Step 1 da Task 9 manda "conferir o hash" e essa conferência
+  **falha**. Confira por conteúdo, não por hash.
+- ⚠️ **Task 1:** o `git fetch` que ela manda já não é preciso (o ref é local),
+  mas **a tag ainda falta** — não pule essa parte. 🔬 O inventário do Step 2
+  **bate exatamente** (537/291/27/63/174 + 4 templates) contra a branch
+  congelada `a18f86e7` (15/06): o porte está inteiro e acessível.
+- ⚠️ **Task 7:** a instrução "registrar em `app.py`, junto dos vizinhos de obra"
+  está **certa** hoje — não a troque por `main.py`, que é RDO/portal.
+- ⚠️ **Task 6:** o aviso do escritor único de contrato segue vivo
+  (`services/contrato_obra.py:262`).
+- **Tasks 2 e 5: sem emenda.** As assinaturas e chaves de retorno da 2 foram
+  confirmadas; o Step 1 da 5 (reconfirmar o baseline) segue obrigatório e **não
+  foi verificado** pelo pré-voo — é medição que exige rodar.
+
+**Réguas podres, nos dois planos:** onde se lê **476 commits**, o número real
+medido em 03/09 é **706** — 🔬 conferido com o próprio comando que o plano cita,
+`git rev-list --count origin/fix/fase-0-estancar..main`. Os três sítios: este
+plano em `:1048`, e o da Espinha em `:19` e `:495`. E o inventário "7 de 20
+arquivos existem" é, medido, **4 de 21**. ⚠️ O que **não** muda com o número: as
+linhagens continuam disjuntas e o PR #6 continua não sendo mesclável — é porte,
+não merge.
+
+📖 O relatório completo do pré-voo, com o método de cada medição, ficou em
+`.superpowers/sdd/2026-08-31-fecho-do-que-esta-aberto/preflight-t8.md` —
+⚠️ **gitignored**, existe só nesta máquina.
+
 - [ ] **Step 1: Ler o plano e as specs que ele cita, antes de portar**
 
 ```bash
@@ -1097,17 +1142,30 @@ das Global Constraints manda sobre este texto.
 
 Agora renumere no plano da Espinha, **por conteúdo, nunca por número de linha**:
 
+🔴 **CORRIGIDO em 03/09 — o `sed` que estava aqui produzia exatamente a colisão
+que ele existe para evitar.** 🔬 Provado por execução, em cópia: com o texto
+antigo (duas invocações, a 317→319 primeiro e a 319→321 depois), **as Tasks 3 e
+8 saíam ambas na `321`** — porque a segunda invocação também casa a `319` que a
+primeira acabou de criar. E o ⚠️ que acompanhava o bloco afirmava o **oposto**
+do que acontece: dizia que rodar depois evitava a re-renumeração, quando é
+rodar depois que a causa.
+
+O correto é **ordem decrescente, num comando só** (a `319` sai da frente antes
+de a `317` chegar nela):
+
 ```bash
-sed -i 's/migration 317/migration 319/g; s/_migration_317_template_item_peso_medicao/_migration_319_template_item_peso_medicao/g; s/\[Migration 317\]/[Migration 319]/g' docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md
-sed -i 's/migration 318/migration 320/g; s/migration 319/migration 321/g' docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md
-grep -n "31[7-9]\|32[01]" docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md
+F=docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md
+sed -i 's/migration 319/migration 321/g; s/[Mm]igration 319/migration 321/g; s/migration 318/migration 320/g; s/migration 317/migration 319/g; s/_migration_317_template_item_peso_medicao/_migration_319_template_item_peso_medicao/g; s/\[Migration 317\]/[Migration 319]/g' "$F"
+grep -n "31[7-9]\|32[01]" "$F"
 ```
 
-⚠️ **A segunda linha do `sed` roda DEPOIS da primeira de propósito** — se
-rodasse antes, a `317→319` recém-criada seria renumerada de novo para `321`.
-Confira a saída do `grep`: o esperado é `peso_medicao` na **319**, `origem` na
-**320**, e `verba/lucro/pai` na **321**. A tupla `(317, "Resgate Espinha — ...`
-do registry também tem de virar `(319, ...`.
+⚠️ **`Migration` com M maiúsculo existe e o `sed` antigo não casava:** 📖
+`2026-08-24-resgate-espinha-financeira.md:444` escreve `**Step 3: Migration
+319**`. Confira **sítio a sítio**, não pela ausência de dígito: o esperado é
+`peso_medicao` na **319**, `origem` na **320**, `verba/lucro/pai` na **321**, e
+a tupla `(317, "Resgate Espinha — ...` do registry virando `(319, ...`.
+🔬 Máximo real medido em 03/09: **318** (`migrations.py:7505` e `:7540`,
+registry `:7883`-`:7884`) — os números 319/320/321 seguem livres.
 
 - [ ] **Step 2b: A Task 8 daquele plano ENTRA — a VIGA-I foi respondida**
 
@@ -1121,6 +1179,28 @@ Substitua o aviso de bloqueio no cabeçalho da Task 8 dele por:
 > esta fase entrega. A **opção C está morta** — citada em quatro documentos,
 > definida em nenhum. `RATIFICAR` com o dono: é escolha comercial.
 ```
+
+🔴 **E troque TAMBÉM o Step 1 da Task 8 dele — o pré-voo de 03/09 achou que este
+Step 2b desarmava só metade do bloqueio.** 📖
+`2026-08-24-resgate-espinha-financeira.md:442` ainda diz `**Step 1: 🔴 Confirmar
+a decisão com o Cássio** (verba, lucro %, opção A/B/C). Sem isso, **pare
+aqui**.` Quem executar lê o cabeçalho destravado, chega ao Step 1 e **para**.
+Substitua por:
+
+```markdown
+- [x] **Step 1: A decisão já existe** — opção B (markup uniforme), respondida em
+      01/09 (`2026-09-01-decisoes-respondidas.md`). ⚠️ O `RATIFICAR` com o dono
+      segue pendente e é escolha comercial, mas **não bloqueia o porte**.
+```
+
+🔴 **A Task 8 dele precisa de um step que não existe: portar
+`_registrar_custo_subempreitada`.** 🔬 Medido em 03/09: a função vive **só na
+branch congelada** (`a18f86e7:cronograma_views.py:917`) e a `main` tem **zero**
+ocorrências — mas `tests/test_resultado_fatia2_custo_nao_mo.py:184` a importa. E
+📖 `cronograma_views.py` **não é citado em lugar nenhum** do plano da Espinha.
+Sem esse porte, o Step 5 ("rodar e ver passar") não passa, o `xfail` da Fatia 2
+nunca sai, e como ele é `strict=True` o `xfailed` **não volta ao piso de 72** —
+o gate fecha vermelho por XPASS ou por falha, dos dois lados.
 
 - [ ] **Step 3: Executar as nove tasks pela sub-skill**
 
@@ -1751,6 +1831,39 @@ Execute os Steps A a E da Task 10 ao fim de cada família.
 - Consumes: nada.
 - Produces: ou um plano novo, ou um veredito de morte por escrito. **Os dois
   levam a lista a zero.**
+
+> ## ✅ A reconferência está FEITA (03/09) — falta a decisão
+>
+> 📖 `docs/superpowers/specs/2026-09-02-fase-9-premissas.md` (607 linhas). O
+> plano-alvo **existe**: `2026-07-21-fase-9-portal-assinatura-contratos.md`, e
+> este é o **terceiro** veredito de premissas dele — já havia dois apensados
+> (`941e6738` em 23/07, `a723babe` em 03/08).
+>
+> 🔴 **O achado que domina, e já foi corrigido na fonte:** o cabeçalho dizia
+> **"nunca começada"** e era falso. 🔬 Três migrations levam o nome da fase no
+> registro permanente (`migrations.py:7845-7847`: as tuplas 267, 268 e 269, todas
+> "Fase 9a — …") e dois commits executaram sob o rótulo (`851fd70b`,
+> `1fbc97c0`). A fase estava **parcialmente consumida e era dita virgem**. 📖 É a
+> **terceira** ocorrência desse apodrecimento — o ledger já registrou o mesmo
+> para as Ondas 1 e 2. O cabeçalho do plano de 21/07 foi corrigido em 03/09.
+>
+> **Placar das premissas numeradas (P1–P10):** 3 valem, 0 caíram, 2 mudaram, 5
+> **não verificáveis aqui** (console Google, env de produção, e duas perguntas
+> ao dono abertas há 43 dias). ⚠️ Mas elas **não decidem a fase** — são externas
+> por construção. Quem decide são as premissas não numeradas: **5 valem** (os
+> cinco furos de segurança da 9a, todos vivos e medidos: token em claro
+> `models.py:397`, zero escopo, CSRF exempt `main.py:220-226`, `_PATHS_SENSIVEIS`
+> inalterado `utils/auditoria_acesso.py:29`, zero `Referrer-Policy` no repo),
+> **3 caíram** e **3 mudaram**.
+>
+> **Recomendação da reconferência — a escolha é do dono:** **reescrever, partida
+> em duas.** A **9a** mantém o tamanho (11 de 14 tasks pendentes, sem
+> substituto) mas fica mais barata, porque `ObraSignatarioCliente` +
+> `portal_signatario_auth` já são precedente em produção. A **9b encolhe ~60%**:
+> as Tasks 15, 16 e 18 somem (a Fase 6 as entregou), sobra a 17 (executável
+> hoje) e as 19 e 20 (bloqueadas pelas premissas não verificáveis).
+> 🔴 **Não enterrar:** os cinco furos de segurança seguem vivos, e riscar o plano
+> não fecha nenhum deles.
 
 - [ ] **Step 1: Abrir o plano pela seção de premissas, não pelo começo**
 

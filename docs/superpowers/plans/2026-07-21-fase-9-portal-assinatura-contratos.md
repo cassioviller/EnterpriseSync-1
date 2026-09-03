@@ -1,6 +1,17 @@
 # Fase 9 — Portal do cliente: endurecimento + assinatura de medição (9a) e Contratos/Drive/Notificações (9b)
 
-> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — trabalho real pendente** — nunca começada. 🔬 19 de 35 arquivos prometidos existem — o que existe veio por outros caminhos (portal, medição, ciência). Faltam `services/assinatura_documento.py`, `services/contrato_service.py`, `services/drive_client.py`, `scripts/portal_acessos.py`. A decisão nº 2 já caiu: o dono do `valor_contrato` é a Fase 6, então a 9b vira camada documental. 🔬 19/35 dos arquivos prometidos existem na árvore.
+> 🔴 **CORREÇÃO em 2026-09-03: a frase "nunca começada" abaixo é FALSA, e ficou
+> 40 dias de pé.** 🔬 Medido na reconferência de premissas
+> (`docs/superpowers/specs/2026-09-02-fase-9-premissas.md`): **três migrations
+> levam o nome desta fase no registro permanente** — 📖 `migrations.py:7845-7847`,
+> as tuplas `(267, "Fase 9a — obra_signatario_cliente ...")`, `(268, "Fase 9a —
+> unicidade de assinatura por signatário")` e `(269, "Fase 9a — remove
+> uq_rdo_assinatura_papel ...")` — e **dois commits executaram sob o rótulo**:
+> `851fd70b` (23/07) e `1fbc97c0` (29/07, "ciencia do cliente com N responsaveis
+> por obra (Fase 9a)"). A fase está **parcialmente consumida e era dita virgem**.
+> O veredito e o que sobra de cada metade estão na spec citada acima.
+>
+> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — trabalho real pendente** — ~~nunca começada~~ (ver correção acima). 🔬 19 de 35 arquivos prometidos existem — o que existe veio por outros caminhos (portal, medição, ciência). Faltam `services/assinatura_documento.py`, `services/contrato_service.py`, `services/drive_client.py`, `scripts/portal_acessos.py`. A decisão nº 2 já caiu: o dono do `valor_contrato` é a Fase 6, então a 9b vira camada documental. 🔬 19/35 dos arquivos prometidos existem na árvore.
 >
 > Este é um dos poucos planos que ainda pedem código. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
 > rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
