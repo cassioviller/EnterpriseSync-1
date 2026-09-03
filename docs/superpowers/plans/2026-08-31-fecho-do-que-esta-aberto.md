@@ -61,8 +61,10 @@
 > - **Sessão anterior:** https://claude.ai/code/session_01FPYxL6k71Ji3b2FqeqJ3ox
 
 
-> **Estado em 2026-09-02:** 🟡 **EM EXECUÇÃO — 7 de 16 tasks fechadas**, e a
-> primeira integração aconteceu: a `main` recebeu a etapa por merge `--no-ff`.
+> **Estado em 2026-09-03:** 🟡 **EM EXECUÇÃO — 8 de 16 tasks fechadas.** A
+> primeira integração aconteceu em 02/09 (merge `--no-ff` + push de 125
+> commits); a Onda 4 fechou em 03/09 e **aguarda o ritual** — ⚠️ o token do Git
+> expirou, e há commits presos nesta máquina.
 >
 > ⚠️ **ESTENDIDO em 02/09** pelo design
 > `docs/superpowers/specs/2026-09-02-a-lista-vai-a-zero-design.md`, que decidiu
@@ -85,8 +87,8 @@
 > | 5 — `o-que-nao-persiste` (os cinco achados restantes) | ✅ 6/6 tasks, gate 2872/6 skipped |
 > | 6 — Onda 6 (os testes prometidos) | ✅ **fechada em 02/09** — a última task dela (a jornada E2E) foi entregue pelo plano `2026-09-02-a-suite-browser-volta-a-valer.md` |
 > | **11 — o que está a um passo, e a primeira integração** | ✅ `80c3bb31` `acc486ab` `bbc2c56a`, merge `83670e76` — gate **3247/8/201/72, 0 failed** (47:43) |
-> | 7 — Onda 4 (o relatório passa a funcionar) | ⬜ **próxima** — já tem o pré-voo escrito (Step 0) e a D7 respondida (Step 0-b) |
-> | 8 — Resgate da Espinha Financeira (agora **10 de 10**) | ⬜ |
+> | 7 — Onda 4 (o relatório passa a funcionar) | ✅ **7/7 + a D7** — gate **3265/8/201/72, 0 failed** (41:04). Commits: `6ccf3337` `5fbaf272` `5d39706a` `63a00acc` `7c279a37` `f1027915` `21ed2564` `1f8f3a3d` |
+> | 8 — Resgate da Espinha Financeira (agora **10 de 10**) | ⬜ **próxima** — pré-voo escrito (Step 0), e ⚠️ o `sed` do Step 2 já foi corrigido: ele punha duas migrations na mesma 321 |
 > | **12 — Fase 8, o plano de contas canônico** | ⬜ |
 > | **13 — família 404 (B6.4–B6.8)** | ⬜ |
 > | 9 — as sete issues de arquitetura viram plano | 🟡 **o plano está ESCRITO** (`2026-08-31-issues-de-arquitetura.md`, 8 tasks) — falta executá-lo |
@@ -169,8 +171,8 @@ a Onda 5, `a-porta-irma` nem `o-que-nao-persiste`. A Task 10 o substitui.
 ## Global Constraints
 
 - **Gate:** `bash run_tests.sh --gate` (= `pytest tests/ -m "not browser"`).
-- **Piso vigente, medido em 02/09** (`tests/reports/gate_browser_2154.log`):
-  **3247 passed, 8 skipped, 201 deselected, 72 xfailed, 0 failed** (47:43).
+- **Piso vigente, medido em 03/09** (`tests/reports/gate_onda4_final_0202.log`):
+  **3265 passed, 8 skipped, 201 deselected, 72 xfailed, 0 failed** (41:04).
   Toda task que fecha uma etapa roda o gate e compara contra este piso. (Pisos
   anteriores: 3193/8 em 01/09, 2872/6 em 31/08, 2854/6 em 28/08 — não use
   nenhum deles.)
