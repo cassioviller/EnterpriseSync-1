@@ -5,8 +5,14 @@
 > **Leia estas 12 linhas antes de qualquer coisa. Nada está no meio do caminho:
 > a etapa anterior fechou inteira e está no remoto.**
 >
-> - **Estado do git:** `main` = `origin/main` = `a5ab182b` (mais o commit deste
->   registro). **Zero commits não empurrados.** Árvore limpa — só
+> - 🔴 **PRIMEIRO: há commits presos.** O token do Git **expirou no meio da
+>   sessão de 02→03/09** (`remote: Invalid username or token`). Os pushes até
+>   `331f3cfc` passaram; os seguintes **não**. Reautentique (`gh auth login`, ou
+>   reconecte o GitHub no painel) e rode `git push origin main` **antes de
+>   qualquer trabalho novo** — conferindo depois com `git fetch` + comparação de
+>   refs, nunca pela saída do `push`.
+> - **Estado do git:** `main` à frente de `origin/main` (`331f3cfc`) pelos
+>   commits de pré-voo de 03/09. Árvore limpa — só
 >   `tests/reports/` fora do git, por regra. A branch `sdd/a-porta-irma` foi
 >   mergeada e **apagada** em 02/09 (a ponta era `bbc2c56a`, contida na `main`
 >   pelo merge `83670e76` — nada se perdeu). Ela nunca existiu no `origin`.
@@ -18,6 +24,17 @@
 >   skipped / 201 deselected / 72 xfailed / 0 failed**; suíte com browser
 >   **3435 passed / 1 failed** — o `1 failed` é o achado **P4** do RDO
 >   unificado, registrado na auditoria, e é o **único vermelho conhecido**.
+> - ✅ **Seis agentes de leitura rodaram em 03/09 e o resultado já está
+>   integrado neste plano.** As Tasks **8, 12 e 13** ganharam pré-voo (Step 0 /
+>   Step 0-b, com os defeitos que eles acharam **neste plano mestre**, não só
+>   nos portados); as Tasks **9, 14 e 15** ganharam seus documentos escritos
+>   (`2026-08-31-issues-de-arquitetura.md`, `reconferencia-backlog-2026-09-02.md`
+>   + `specs/2026-09-02-automacoes-design.md`, `specs/2026-09-02-fase-9-premissas.md`).
+>   **Nenhuma task foi executada por eles** — pré-voo e plano são insumo; a
+>   execução continua em fila, porque toca banco, migrations e gate.
+> - ⚠️ **Três decisões novas esperam você**, todas nomeadas nos documentos:
+>   reescrever ou enterrar a Fase 9a/9b; o que fazer com `obra.progresso_conclusao`;
+>   e reabrir (ou não) o corte do A20.
 > - **A PRÓXIMA É A TASK 7 (Onda 4).** Ela já nasce destravada: o **Step 0**
 >   (pré-voo, com a correção 🔴 do item (d) — leia-o) e o **Step 0-b** (a D7,
 >   respondida "apagar" em 02/09) estão escritos com sítio e linha.
