@@ -1625,6 +1625,37 @@ manda sobre este texto. E confira que a linha 214 do plano da Fase 8 ("a spec
 inteira antes de escrever a migration 316") também foi renumerada: ela é prosa,
 não código, e um `sed` que só olhasse `_migration_` a deixaria mentindo.
 
+> ## 📥 O que a Onda 4 (Task 7) deixou explicitamente para esta task — 03/09
+>
+> 🔴 **Duas das três integrações contábeis não conseguem lançar hoje**, e o
+> motivo é exatamente o que esta task existe para resolver: elas postam contra
+> códigos de conta de **outro seeder**. 🔬 Medido em 03/09, num tenant semeado
+> pelo plano canônico:
+>
+> | Integração | Conta que falta |
+> |---|---|
+> | `contabilizar_proposta_aprovada` (`MODULO_1`) | `4.1.02.002` |
+> | `contabilizar_folha_pagamento` (`MODULO_6`) | `2.1.02.004`, `2.1.03.007`, `2.1.03.008` |
+>
+> A Onda 4 **não remapeou** — o plano dela proíbe consertar o mapa antes desta
+> fase, porque seria consertá-lo contra um vocabulário que vai mudar. O que ela
+> fez foi pôr **falha fechada e nomeada** no ponto único
+> (`contabilidade_utils.criar_lancamento_automatico`): em vez de
+> `ForeignKeyViolation` com dump de SQL, o usuário recebe o código da conta que
+> falta, e nada é gravado.
+>
+> ⚠️ **Quando esta task canonizar o plano de contas, os alvos são estes quatro
+> códigos** — e o teste `test_conta_ausente_e_recusada_com_nome_e_sem_rastro`
+> (`tests/test_onda4_relatorio_funciona.py`) é o registro vivo da divergência:
+> ele **passa a falhar** quando a Fase 8 fizer a conta existir, e nesse momento
+> deve ser reescrito para outro código ausente, não apagado.
+>
+> 📖 Também fica para cá o **mapa de prefixos da DRE** (`contabilidade_utils.py`,
+> a função `calcular_dre_mensal`): a Onda 4 o mediu invertido em relação a
+> `criar_plano_contas_padrao` e deslocado um grupo em relação a
+> `financeiro_seeds.py` — locação de equipamento reportando como CMV — e o
+> deixou intacto pela mesma razão.
+
 - [ ] **Step 0-b: Desarmar os SEIS sítios que mandam parar (pré-voo de 03/09)**
 
 🔴 **A Task 12 não executa como está escrita, e o Step 0 acima não resolve isso.**
