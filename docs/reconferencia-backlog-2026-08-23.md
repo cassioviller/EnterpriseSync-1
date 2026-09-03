@@ -1,5 +1,17 @@
 # Reconferência do backlog de automações — 2026-08-23
 
+> ⚠️ **SUBSTITUÍDA em 2026-09-03** por
+> `docs/reconferencia-backlog-2026-09-02.md`, que remede os 11 itens ainda
+> abertos ou parciais contra a árvore de hoje. Este documento continua válido
+> como **registro do que se sabia em 23/08** — e como fonte da evidência que a
+> nova cita. 🔬 Cinco afirmações daqui não sobreviveram à remedição: **A15** e
+> **A23** deixaram de estar travadas (as decisões saíram em 01/09 e ninguém as
+> trouxe de volta), **A16** encolheu (`ed17ab7f`), **A21** foi dada por
+> consertada por uma mensagem de commit que consertou outra coisa, e o **A13**
+> tem três escritores de venda, não dois. 📖 Uma citação também andou:
+> `Cliente.cnpj` está em `models.py:3507`, não em `:3354`.
+
+
 > Reconfere, item a item e contra o código de HOJE (`main` em `2e40f8b0`), os
 > 25 itens de `docs/reconferencia-backlog-2026-08-04.md` §3 — que estava com
 > 19 dias e "zero entregues, 25 vivas". Método: 4 auditores independentes

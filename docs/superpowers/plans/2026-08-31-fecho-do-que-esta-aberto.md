@@ -73,7 +73,7 @@
 > | **12 — Fase 8, o plano de contas canônico** | ⬜ |
 > | **13 — família 404 (B6.4–B6.8)** | ⬜ |
 > | 9 — as sete issues de arquitetura viram plano | ⬜ |
-> | **14 — reconferência das automações → spec → planos** | ⬜ |
+> | **14 — reconferência das automações → spec → planos** | 🟡 **reconferência e spec FEITAS** (`docs/reconferencia-backlog-2026-09-02.md`, `specs/2026-09-02-automacoes-design.md`) — faltam os 3 planos que a spec desenha, e uma decisão do dono |
 > | **15 — reconferência de premissas da Fase 9a/9b → plano novo** | 🟡 **a reconferência está FEITA** (`docs/superpowers/specs/2026-09-02-fase-9-premissas.md`) — falta só a decisão do dono e, se for reescrever, o plano novo |
 > | 10 — **muda de forma:** o ritual de integração entre etapas | ⬜ repetido |
 > | **16 — o índice volta a valer, gate final, push** | ⬜ |
@@ -1883,6 +1883,46 @@ Execute os Steps A a E da Task 10.
 **Interfaces:**
 - Consumes: nada.
 - Produces: 2–3 planos por família, que as etapas seguintes executam.
+
+> ## ✅ A reconferência e a spec estão FEITAS (03/09)
+>
+> 📖 `docs/reconferencia-backlog-2026-09-02.md` (711 linhas) e
+> `docs/superpowers/specs/2026-09-02-automacoes-design.md` (438 linhas). Os 11
+> itens foram remedidos um a um contra a árvore, com a pergunta que a casa
+> aprendeu a fazer depois da A09: **existe teste guardando?** — só **A16** tem
+> (dois `xfail(strict=True)`).
+>
+> 🔴 **Cinco divergências entre o registro e a árvore. Duas destravam trabalho:**
+> - **A15 e A23 NÃO estão mais travadas.** As decisões 4 e 7 foram respondidas
+>   em **01/09** e ninguém levou a resposta de volta ao backlog. Pior: o corte
+>   do A23 dizia *"não existe canal"* — 🔬 e `utils/webhook_dispatcher.py`
+>   **existe desde 22/07** (`0ea9402d`), com allowlist, retry e teste.
+> - 🔴 **A21 — a mensagem de commit afirma o que o commit não fez.** `ce331094`
+>   diz ter consertado "kwargs de colunas inexistentes"; consertou os do
+>   construtor de `RDO`. 🔬 Os três de `crud_rdo_completo.py:427,428,448`
+>   continuam vivos, e provei por execução que as colunas não existem:
+>   `RDOEquipamento.horas_utilizacao`, `RDOEquipamento.observacoes` e
+>   `RDOOcorrencia.descricao_completa` — as três **NÃO EXISTEM**. 📖 Log que
+>   afirma fechado o que está aberto é o defeito que esta casa persegue.
+> - **A16 encolheu:** `ed17ab7f` (27/08) fechou o sítio do totem sem citar o
+>   item.
+> - **A13 tem três escritores de venda em `valor_orcado`, não dois** — o
+>   terceiro (`models.py:8424`) é um listener `after_insert` que dispara sozinho
+>   a cada aprovação.
+>
+> **A spec decide:** 3 planos (RDO×ponto → Portal×medição → cauda barata), 8
+> tasks. **Fora, com destino escrito:** A08 (regra de rateio), A13-origem
+> (backfill + decisão), A20 (reabrir o corte com o dono), A21a (segue cortado).
+> **Escalado como decisão, não como task:** `obra.progresso_conclusao` — a barra
+> some em silêncio em 5 templates e há **dois números candidatos com semânticas
+> diferentes**; a pergunta está escrita em §5.1 da spec.
+>
+> ⚠️ **Um número não foi remedido:** os 3,2% do A13 são o valor de 23/08 —
+> remedir exige o banco compartilhado, proibido enquanto os agentes rodavam em
+> paralelo.
+>
+> ✅ O banner de substituição no topo do documento de 23/08 (Step 2 desta task)
+> foi escrito em 03/09.
 
 - [ ] **Step 1: Reconferir item a item, contra a árvore de hoje**
 
