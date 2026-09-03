@@ -4,7 +4,7 @@
 > do telhado viga I segue a **opção B**; a C foi declarada morta. `RATIFICAR`
 > pendente — a Task 8 daqui destrava ao ratificar.
 >
-> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — trabalho real pendente** — escrito em 24/08, **não executado** — 🔬 7 de 20 arquivos existem. Porte de 2.542 linhas do PR #6. Uma única task presa a decisão de negócio (verba/lucro do telhado viga I). 🔬 7/20 dos arquivos prometidos existem na árvore.
+> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — trabalho real pendente** — escrito em 24/08, **não executado** — 🔬 **4 de 21** arquivos existem (recontagem de 02/09 sobre os 21 caminhos do File Structure; o "7 de 20" era régua velha — há **mais** porte a fazer do que se anunciava, não menos). Porte de 2.542 linhas do PR #6. Uma única task presa a decisão de negócio (verba/lucro do telhado viga I). 🔬 7/20 dos arquivos prometidos existem na árvore.
 >
 > Este é um dos poucos planos que ainda pedem código. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
 > rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
@@ -16,7 +16,7 @@
 
 **Goal:** Trazer para o `main` o *Resultado por Atividade* — valor agregado menos custo incorrido, por atividade do cronograma, com alarme, EVM, lente de caixa e roll-up de portfólio — junto com o importador de obra por planilha, que hoje vivem apenas na branch `design/espinha-financeira-obra` (PR #6), do outro lado da fratura de linhagem de 22/07.
 
-**Architecture:** Não é feature nova: é **porte** de 2.542 linhas já escritas e testadas, contra uma árvore que evoluiu 476 commits em paralelo. O porte é feito em ondas, da menor dependência para a maior: primeiro os dois módulos que entram sem tocar em nada, depois as duas colunas que faltam, depois o read-model, o importador, as telas, e por último a Fatia 2 de subempreitada. **Cada módulo portado ganha teste antes de entrar** — os testes da branch vêm junto, mas não substituem o RED.
+**Architecture:** Não é feature nova: é **porte** de 2.542 linhas já escritas e testadas, contra uma árvore que evoluiu **722 commits** em paralelo (🔬 medido em 03/09 com `git rev-list --count origin/fix/fase-0-estancar..main`; o **476** escrito em 24/08 e o **706** do pré-voo de 02/09 estão os dois vencidos — meça no dia). O porte é feito em ondas, da menor dependência para a maior: primeiro os dois módulos que entram sem tocar em nada, depois as duas colunas que faltam, depois o read-model, o importador, as telas, e por último a Fatia 2 de subempreitada. **Cada módulo portado ganha teste antes de entrar** — os testes da branch vêm junto, mas não substituem o RED.
 
 **Tech Stack:** Flask + SQLAlchemy 2.x, PostgreSQL, pytest, Jinja2, Playwright para as telas.
 
@@ -43,7 +43,7 @@ Em 15/06, quando a branch foi escrita, `RDO.estado` **não existia** — os dois
 
 1. **`FETCH_HEAD` é efêmero.** O código só está acessível enquanto o ref durar. Task 1 resolve isso antes de tudo.
 2. **Três colunas não existem hoje** — as migrations 193/194/195 são da linhagem velha e nunca chegaram. Sem elas, o importador quebra em `AttributeError`.
-3. **A numeração das migrations colide com a Fase 8.** Este plano escreve **317, 318, 319** assumindo que a Fase 8 levou 315/316. **Confira o máximo do repo no dia do commit** e numere em sequência real. Nunca reserve faixa: 📖 o `ESTADO-ATUAL.md` registra que a reserva por faixa foi furada três vezes e que o fantasma do 270 nasceu de renumerar para "organizar".
+3. **A numeração das migrations colide com a Fase 8.** Este plano escreveu **317, 318, 319** assumindo que a Fase 8 levou 315/316. ⚠️ **Renumerado em 03/09 para 319, 320 e 321** — as 317 e 318 foram gastas em 01/09 (A09 e A24); o máximo real medido no dia era **318**. Esta linha guarda o número original de propósito: o resto do plano fala 319/320/321. **Confira o máximo do repo no dia do commit** e numere em sequência real. Nunca reserve faixa: 📖 o `ESTADO-ATUAL.md` registra que a reserva por faixa foi furada três vezes e que o fantasma do 270 nasceu de renumerar para "organizar".
 
 ## Global Constraints
 
@@ -65,11 +65,11 @@ Em 15/06, quando a branch foi escrita, `RDO.estado` **não existia** — os dois
 | `services/caixa_obra_service.py` | 27 | Portar como está |
 | `services/aprendizado_produtividade.py` | 63 | Portar **com** correção de estado |
 | `services/resultado_atividade_service.py` | 537 | Portar **com** correção de estado, **menos** o ramo de subempreitada |
-| `services/importar_obra_completa.py` | 291 | Portar; depende das migrations 317 e 318 |
+| `services/importar_obra_completa.py` | 291 | Portar; depende das migrations 319 e 320 |
 | `resultado_views.py` | 174 | Portar; registrar blueprint |
 | `templates/resultado/{por_atividade,caixa_obra,portfolio,importar_obra}.html` | 4 arquivos | Portar |
 | `scripts/{criar_orcamento_baia_rev10,seed_templates_baia_rev10,importar_baia_easypanel}.py` | 3 arquivos | Portar (Task 8) |
-| `migrations.py` | — | 317, 318, 319 |
+| `migrations.py` | — | 319, 320, 321 |
 | `tests/test_{resultado_atividade_service,resultado_fatia2_custo_nao_mo,importar_obra_completa,caixa_obra,fatia5_inteligencia,import_baia_e2e,rdo_edicao_preserva_tarefa}.py` | 7 arquivos | Portar em ondas |
 | `ESTADO_design_espinha_financeira.md` | 111 | Aposentar na Task 10 |
 
@@ -82,11 +82,18 @@ Em 15/06, quando a branch foi escrita, `RDO.estado` **não existia** — os dois
 
 - [ ] **Step 1: Trazer a branch para um ref durável**
 
-🔬 A leitura do `origin` é **anônima** — não depende do `gh auth login`, que segue pendente.
+🔬 A leitura do `origin` é **anônima** — não depende do `gh auth login`.
+
+⚠️ **Emenda de 03/09:** o `git fetch` **já não é necessário** — o ref
+`origin/design/espinha-financeira-obra` já é remote-tracking local
+(🔬 tip `a18f86e7`, de 15/06, congelado) e `git cat-file -p` lê todos os blobs
+hoje. **Mas a tag continua faltando** (🔬 `git tag | grep espinha` → vazio), e
+sem ela **todo** `git show espinha-pr6-origem:…` das Tasks 2-9 falha. Não pule
+esta parte:
 
 ```bash
-git fetch origin design/espinha-financeira-obra:refs/heads/resgate/espinha-financeira-origem
-git tag espinha-pr6-origem refs/heads/resgate/espinha-financeira-origem
+git tag espinha-pr6-origem origin/design/espinha-financeira-obra
+git tag | grep espinha    # tem de devolver: espinha-pr6-origem
 ```
 
 ⚠️ A branch **não pode ser empurrada** para o `gitsafe-backup`: 📖 `remote: Error: Only pushes to main branch are allowed`. Enquanto o porte não for mesclado, ele existe nesta máquina e no GitHub, e em nenhum outro lugar.
@@ -209,7 +216,7 @@ git commit -m "feat(espinha): porta caixa_obra e aprendizado_produtividade — r
 
 ---
 
-### Task 3 — `cronograma_template_item.peso_medicao` (migration 317)
+### Task 3 — `cronograma_template_item.peso_medicao` (migration 319)
 
 📖 É o **coração** do importador (`importar_obra_completa.py:214`): o peso explícito de cada atividade dentro do serviço (DC8/ADR 0004). 🔬 24/08: `peso_medicao` tem **zero** ocorrências em `models.py`.
 
@@ -243,7 +250,7 @@ def test_template_item_tem_peso_medicao_e_nasce_nulo():
 ```
 
 ```python
-def _migration_317_template_item_peso_medicao():
+def _migration_319_template_item_peso_medicao():
     """Resgate da Espinha Financeira — cronograma_template_item.peso_medicao.
 
     Reposição da migration 193 da linhagem velha (o repo foi recomeçado em
@@ -257,17 +264,17 @@ def _migration_317_template_item_peso_medicao():
                 ALTER TABLE cronograma_template_item
                     ADD COLUMN IF NOT EXISTS peso_medicao NUMERIC(5,2)
             """))
-        logger.info('[Migration 317] cronograma_template_item.peso_medicao criada.')
+        logger.info('[Migration 319] cronograma_template_item.peso_medicao criada.')
         return True
     except Exception as e:
-        logger.error(f'[Migration 317] Falha: {e}', exc_info=True)
+        logger.error(f'[Migration 319] Falha: {e}', exc_info=True)
         return False
 ```
 
 Registre **na ordem**, conferindo antes o máximo real do repo:
 
 ```python
-            (317, "Resgate Espinha — cronograma_template_item.peso_medicao (repoe a 193 da linhagem velha)", _migration_317_template_item_peso_medicao),
+            (319, "Resgate Espinha — cronograma_template_item.peso_medicao (repoe a 193 da linhagem velha)", _migration_319_template_item_peso_medicao),
 ```
 
 - [ ] **Step 4: Rodar, ver passar, provar idempotente por dupla execução.**
@@ -276,12 +283,12 @@ Registre **na ordem**, conferindo antes o máximo real do repo:
 
 ```bash
 git add models.py migrations.py tests/test_espinha_migrations_porte.py
-git commit -m "feat(espinha): peso_medicao no template de cronograma (migration 317)"
+git commit -m "feat(espinha): peso_medicao no template de cronograma (migration 319)"
 ```
 
 ---
 
-### Task 4 — `propostas_comerciais.origem` (migration 318)
+### Task 4 — `propostas_comerciais.origem` (migration 320)
 
 📖 `importar_obra_completa.py:68` grava `origem='importacao_obra'` para manter a Proposta de importação **fora do funil comercial** (ADR 0005).
 
@@ -307,7 +314,7 @@ def test_proposta_tem_origem_e_ela_nao_se_confunde_com_linhagem():
 
 - [ ] **Step 2: Rodar e ver falhar.**
 
-- [ ] **Step 3: Coluna + migration 318**, no mesmo molde da 317: `ADD COLUMN IF NOT EXISTS origem VARCHAR(30)`, nullable, sem default — proposta que nasce pelo funil não tem origem especial e `NULL` diz isso melhor que `'funil'`.
+- [ ] **Step 3: Coluna + migration 320**, no mesmo molde da 319: `ADD COLUMN IF NOT EXISTS origem VARCHAR(30)`, nullable, sem default — proposta que nasce pelo funil não tem origem especial e `NULL` diz isso melhor que `'funil'`.
 
 - [ ] **Step 4: Rodar, ver passar, dupla execução.**
 
@@ -315,7 +322,7 @@ def test_proposta_tem_origem_e_ela_nao_se_confunde_com_linhagem():
 
 ```bash
 git add models.py migrations.py tests/test_espinha_migrations_porte.py
-git commit -m "feat(espinha): propostas_comerciais.origem (migration 318) — proposta de importacao fora do funil"
+git commit -m "feat(espinha): propostas_comerciais.origem (migration 320) — proposta de importacao fora do funil"
 ```
 
 ---
@@ -372,7 +379,7 @@ git show espinha-pr6-origem:tests/test_resultado_fatia2_custo_nao_mo.py > tests/
 .pythonlibs/bin/pytest tests/test_resultado_atividade_service.py tests/test_resultado_fatia2_custo_nao_mo.py tests/test_espinha_rascunho_nao_conta.py -v
 ```
 
-⚠️ Os testes da Fatia 2 que cobrem o ramo de subempreitada **vão falhar** — é esperado, ele foi removido no Step 4. Marque-os com `@pytest.mark.xfail(reason='Fatia 2 §D volta na Task 8 — migration 319')` **nomeando a task**, nunca com `skip` silencioso. O teste do DC3 (MO não conta 2×) **tem de passar**; se ele falhar, pare.
+⚠️ Os testes da Fatia 2 que cobrem o ramo de subempreitada **vão falhar** — é esperado, ele foi removido no Step 4. Marque-os com `@pytest.mark.xfail(reason='Fatia 2 §D volta na Task 8 — migration 321')` **nomeando a task**, nunca com `skip` silencioso. O teste do DC3 (MO não conta 2×) **tem de passar**; se ele falhar, pare.
 
 - [ ] **Step 6: Commit**
 
@@ -432,24 +439,69 @@ git commit -m "feat(espinha): telas de resultado, caixa, portfolio e importacao 
 
 ---
 
-### Task 8 — Fatia 2 §D: verba, lucro e pai na subempreitada (migration 319)
+### Task 8 — Fatia 2 §D: verba, lucro e pai na subempreitada (migration 321)
 
-**Esta é a task que pode ser cortada.** Ela é a única do porte que depende de decisão de negócio ainda não tomada: 📖 o "telhado viga I" precisa de **verba + lucro % + opção A/B/C** do usuário, mantendo a venda total travada. Se o Cássio não decidir, entregue as Tasks 1–7 e 9–10 e deixe esta nomeada como resíduo.
+> ✅ **DESTRAVADA em 01/09 — opção B (markup uniforme).** O ajuste move um
+> único parâmetro declarado (`orcamento.margem_pct_global`, 📖 `models.py`,
+> `db.Numeric(5, 2), nullable=True` — existe e é executável) até a venda total
+> voltar a R$ 1.720.796,75. **Não** reduza margens item a item (opção A): isso
+> muda a margem de itens que ninguém tocou e contamina a própria medida que
+> esta fase entrega. A **opção C está morta** — citada em quatro documentos,
+> definida em nenhum. ⚠️ `RATIFICAR` com o dono segue **pendente**: é escolha
+> comercial, e **não bloqueia o porte**. Nomeie-a como resíduo no fecho.
+>
+> 🔬 A decisão de 01/09 responde **a opção** e **a venda travada**, mas não dá
+> `verba` nem `lucro %` em número. Os Steps 3-5 desta task **não precisam**
+> deles: ali `verba` e `lucro` são **colunas de schema**, e o teste da branch
+> usa valores próprios (`{'verba_unica': 10000, 'lucro_pct': 20}`). Quem
+> precisa dos números é o seed da Baia, na Task 9.
 
 **Files:**
-- Modify: `models.py` (classe do `rdo_subempreitada_apontamento`), `migrations.py`, `services/resultado_atividade_service.py` (devolve o ramo removido na Task 5)
+- Modify: `models.py` (classe do `rdo_subempreitada_apontamento`), `migrations.py`, `services/resultado_atividade_service.py` (devolve o ramo removido na Task 5), 🔴 **`cronograma_views.py`** (o escritor que falta — ver Step 3b)
 - Test: `tests/test_resultado_fatia2_custo_nao_mo.py` (tira os `xfail`)
 
-- [ ] **Step 1: 🔴 Confirmar a decisão com o Cássio** (verba, lucro %, opção A/B/C). Sem isso, **pare aqui**.
-- [ ] **Step 2: Tirar o `xfail` dos testes da Fatia 2 e ver o RED.**
-- [ ] **Step 3: Migration 319** — `verba`, `lucro`, `pai` em `rdo_subempreitada_apontamento` (repõe a 195; 🔬 a tabela já tem `tarefa_cronograma_id`, faltam os três).
+- [x] **Step 1: A decisão já existe** — opção B (markup uniforme), respondida em
+      01/09 (📖 `2026-09-01-decisoes-respondidas.md`). ⚠️ O `RATIFICAR` com o
+      dono segue pendente e é escolha comercial, mas **não bloqueia o porte**.
+      **Não pare aqui.**
+- [ ] **Step 2: Tirar o `xfail` dos testes da Fatia 2 e ver o RED.** 🔬 O arquivo
+      tem 6 testes e **1** deles toca subempreitada: o `xfailed` do gate sobe
+      **1** na Task 5 e volta **1** aqui. Com `strict=True`, marcador que sobra
+      depois do conserto **falha o gate por XPASS**.
+- [ ] **Step 3: Migration 321** — `verba`, `lucro`, `pai` em `rdo_subempreitada_apontamento` (repõe a 195; 🔬 a tabela já tem `tarefa_cronograma_id`, faltam os três).
+- [ ] **Step 3b: 🔴 Portar `_registrar_custo_subempreitada` — o escritor que esta task pressupõe e que NÃO existe na `main`**
+
+🔬 Achado do pré-voo de 02/09, e **nenhum dos dois planos o via**:
+📖 `tests/test_resultado_fatia2_custo_nao_mo.py:184` (na branch) faz
+`from cronograma_views import _registrar_custo_subempreitada`, e 🔬 a função tem
+**zero** ocorrências na `main` (`grep -rn "_registrar_custo_subempreitada" --include=*.py .`
+→ vazio). Na branch ela existe: `cronograma_views.py:917` (definição) e `:1035`
+(chamada). E 🔬 `cronograma_views.py` **não é citado nenhuma vez** no corpo
+original deste plano.
+
+⚠️ **Não porte por cópia do arquivo.** As linhagens são disjuntas e os dois
+`cronograma_views.py` não têm nada a ver: `main` tem 4396 linhas / 186.853
+bytes; a branch, 103.217 bytes. A `main` **já tem** as rotas de subempreitada
+(`apontar_subempreitada` e vizinhas) — o que falta nelas é **gravar custo com
+verba/lucro**, que é exatamente o que o teste exercita.
+
+Porte **só a função**, localizando o sítio **por conteúdo** (junto de
+`apontar_subempreitada`, nunca por número de linha), e adapte ao
+`GestaoCustoFilho` de hoje — 📖 o mapa de tipos (`SALARIO → MAO_OBRA_DIRETA`) é o
+de hoje, não o de 15/06.
+
+⚠️ **Sem este step a Task 8 não fecha:** mesmo com a migration 321 e o ramo
+devolvido no Step 4, falta o escritor, o Step 5 não vê passar, o `xfail` não sai
+e — por ser `strict=True` — o gate fecha vermelho dos dois lados, por XPASS ou
+por falha.
+
 - [ ] **Step 4: Devolver o ramo de subempreitada em `custo_nao_mo_atividade`.**
 - [ ] **Step 5: Rodar e ver passar, dupla execução da migration.**
 - [ ] **Step 6: Commit**
 
 ```bash
-git add models.py migrations.py services/resultado_atividade_service.py tests/test_resultado_fatia2_custo_nao_mo.py
-git commit -m "feat(espinha): Fatia 2 §D — verba/lucro/pai na subempreitada (migration 319)"
+git add models.py migrations.py services/resultado_atividade_service.py cronograma_views.py tests/test_resultado_fatia2_custo_nao_mo.py
+git commit -m "feat(espinha): Fatia 2 §D — verba/lucro/pai na subempreitada (migration 321)"
 ```
 
 ---
@@ -459,10 +511,20 @@ git commit -m "feat(espinha): Fatia 2 §D — verba/lucro/pai na subempreitada (
 Os três scripts são **Baia-específicos** por desenho (`gerar_importacao_baia_rev10.SERVICOS`). Portá-los é portar um caso de produção real, não uma feature genérica — o importador genérico é trabalho novo e **fica fora deste plano**.
 
 **Files:**
-- Create: `scripts/{criar_orcamento_baia_rev10,seed_templates_baia_rev10,importar_baia_easypanel}.py`
-- Test: `tests/test_import_baia_e2e.py`, `tests/test_fatia5_inteligencia.py`, `tests/test_rdo_edicao_preserva_tarefa.py`
+- Create: `scripts/{seed_templates_baia_rev10,importar_baia_easypanel}.py`
+- 🔴 **Sobrescrever, não criar:** `scripts/criar_orcamento_baia_rev10.py` — 🔬 **já existe e diverge** (103 linhas de diferença): a `main` tem o `main()` velho, que pega o primeiro ADMIN; a branch tem `criar_orcamento_baia(admin_id, xlsx_path)`, a forma reusável que o E2E chama. Trate como **merge consciente**, não como arquivo novo.
+- Test: `tests/test_import_baia_e2e.py`, `tests/test_fatia5_inteligencia.py`
+- ✅ **Nada a fazer:** `tests/test_rdo_edicao_preserva_tarefa.py` 🔬 **já está portado, byte a byte idêntico** à branch (chegou em `b30923b5`, 22/07).
 
-- [ ] **Step 1: O xlsx já está na árvore.** 🔬 24/08: `obra_kabod/IMPORTACAO_Baia_REV10_completa.xlsx` existe no `main` de hoje — sobreviveu à fratura porque estava versionado. Nada a trazer; confira o hash antes de confiar.
+- [ ] **Step 1: O xlsx já está na árvore.** 🔬 24/08: `obra_kabod/IMPORTACAO_Baia_REV10_completa.xlsx` existe no `main` de hoje — sobreviveu à fratura porque estava versionado.
+
+🔴 **Emenda de 03/09 — não confira por hash, a conferência falha.** 🔬 O md5 da
+`main` é `607941960fb37cd9d772b2352650b2f4` e o da branch é
+`7338367d9f23341337c0f43bb3c6025d`; os blobs são distintos e os tamanhos são
+**14609** vs **14608** bytes. São arquivos diferentes, quase certamente o mesmo
+conteúdo regravado (xlsx é zip e carimba timestamps). Quem ler este Step como
+"pare se o hash divergir" **para sem motivo**. **Confira por conteúdo** — as
+abas e a lista de serviços —, nunca por byte.
 - [ ] **Step 2: Portar os testes primeiro e ver o RED.**
 - [ ] **Step 3: Portar os três scripts.**
 - [ ] **Step 4: Rodar e ver passar** — inclusive a idempotência do re-import no mesmo tenant, que a branch garantia.
@@ -486,13 +548,13 @@ Referência: o gate do `main` do mesmo dia. Registre passed/skipped/deselected/x
 
 - [ ] **Step 2: `ruff` medido contra a base da branch, com a MESMA config.** Quantas você acrescentou, não quantas existem.
 
-- [ ] **Step 3: Dupla execução das migrations 317, 318 e 319 no banco de dev.**
+- [ ] **Step 3: Dupla execução das migrations 319, 320 e 321 no banco de dev.**
 
 - [ ] **Step 4: Aposentar `ESTADO_design_espinha_financeira.md`**
 
 O arquivo já ganhou em 23/08 um aviso 🔴 de que descreve a branch e não o sistema. Com o porte feito, **o aviso vira falso pela metade** e o documento passa a enganar de novo — parte do que ele descreve existe, parte não.
 
-Reescreva o cabeçalho dizendo, com procedência: o que foi portado e em que commit; o que **não** foi (importador genérico; e a Fatia 2 §D, se a Task 8 tiver sido cortada); e que os "PRÓXIMOS PASSOS" de 15/06 são de outra árvore. O item 6 daquela lista ("Merge do PR #6") deixa de existir: o PR não é mesclável — 🔬 as linhagens são disjuntas, `git rev-list --count origin/fix/fase-0-estancar..main` devolve 476, nada em comum. **Diga isso por escrito**, senão alguém vai tentar mesclar.
+Reescreva o cabeçalho dizendo, com procedência: o que foi portado e em que commit; o que **não** foi (importador genérico; e a Fatia 2 §D, se a Task 8 tiver sido cortada); e que os "PRÓXIMOS PASSOS" de 15/06 são de outra árvore. O item 6 daquela lista ("Merge do PR #6") deixa de existir: o PR não é mesclável — 🔬 as linhagens são disjuntas, `git rev-list --count origin/fix/fase-0-estancar..main` devolve **722** (🔬 03/09; meça no dia, o número anda), e `git merge-base` devolve **vazio** — nada em comum. **Diga isso por escrito**, senão alguém vai tentar mesclar.
 
 - [ ] **Step 5: `ESTADO-ATUAL.md`** — registre o porte e **nomeie os resíduos** em vez de dizer que ficou redondo. Comece por: importador genérico (não feito, é trabalho novo); Fatia 2 §D se cortada; SPI ainda `None` porque as datas por atividade dependem do MPP; e a decisão do telhado viga I.
 
