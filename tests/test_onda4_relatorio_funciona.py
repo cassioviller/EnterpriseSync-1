@@ -681,3 +681,143 @@ def test_item_avariado_aparece_para_quem_le():
     assert len(manutencao) >= 1, (
         'o item avariado não apareceu para quem lê — o vocabulário continua '
         'partido entre escrita e leitura')
+
+
+# ---------------------------------------------------------------------------
+# Task 7 — EVM e medição param de mentir
+# ---------------------------------------------------------------------------
+
+# ⚠️ O plano de 25/08 escreveu estes testes com `inspect.getsource`, checando se
+# uma string de código sumiu. As Global Constraints do PRÓPRIO plano proíbem
+# isso ("nenhum teste prova por inspect.getsource()"), e com razão: aquele teste
+# passaria com o defeito intacto e o texto reescrito. Aqui as funções são
+# CHAMADAS, com a forma de dado que `montar_fisico_financeiro` devolve de
+# verdade — conferida na obra 1 do banco em 03/09.
+
+def test_cpi_zero_nao_e_confundido_com_ausencia_de_cpi():
+    """🔴 `services/evm.py:100` — `eac = (bac / _d(cpi)) if cpi else bac`.
+
+    `cpi == 0.0` (EV=0 com AC>0, o **pior** cenário possível) é falsy e caía no
+    ramo "ainda não gastou nada": EAC = BAC e **VAC = 0**, ou seja, "exatamente
+    no orçamento". Já `cpi is None` significa de fato "sem dado".
+
+    A projeção honesta quando o índice é zero é a fórmula sem CPI:
+    EAC = AC + (BAC − EV) — o que já se gastou mais o que falta, ao custo
+    orçado.
+    """
+    from services.evm import projetar_eac
+
+    bac, ev, ac = Decimal('100000'), Decimal('0'), Decimal('30000')
+
+    eac_sem_dado = projetar_eac(bac, ev, ac, None)
+    assert eac_sem_dado == bac, (
+        f'sem CPI a projeção deveria ser o próprio BAC, veio {eac_sem_dado}')
+
+    eac_zero = projetar_eac(bac, ev, ac, 0.0)
+    assert eac_zero != bac, (
+        'CPI zero ainda é tratado como "sem CPI": EAC saiu igual ao BAC, '
+        'e o VAC diria "exatamente no orçamento" no pior cenário possível')
+    assert eac_zero == ac + (bac - ev), (
+        f'esperado AC + (BAC − EV) = {ac + (bac - ev)}, veio {eac_zero}')
+
+
+def test_pv_conta_a_etapa_de_periodo_que_o_bac_conta():
+    """🔴 `services/evm.py:130` — o PV somava só `etapa['meses']`.
+
+    🔬 Medido na obra 1 em 03/09: ela tem **duas etapas `periodo`** (Honorário
+    de projeto, R$ 12.483,69; Mobilização, R$ 8.738,58) com `meses` **vazio** —
+    `montar_fisico_financeiro` só faseia etapas `entregavel`. O BAC
+    (`custo_orcado_da_obra`) soma TODA linha de custo, inclusive essas. PV menor
+    que o universo do BAC dá **SPI estruturalmente inflado** e SV positivo em
+    obra que está em dia.
+
+    Custo de período é *level of effort*: sem fase própria, ele se apropria
+    linearmente na janela da obra — que é o tratamento clássico, não uma
+    invenção deste conserto.
+    """
+    from services.evm import _pv_ate_hoje
+
+    hoje = date.today().strftime('%Y-%m')
+    passado = '2020-01'
+    dados = {
+        'curva_s': {'meses': [passado, hoje]},
+        'etapas': [
+            {'nome': 'Entregável', 'tipo': 'entregavel',
+             'meses': {passado: Decimal('1000')},
+             'previsto': {'total': Decimal('1000')}},
+            {'nome': 'Honorário', 'tipo': 'periodo', 'meses': {},
+             'previsto': {'total': Decimal('400')}},
+        ],
+    }
+
+    pv = _pv_ate_hoje(dados)
+    assert pv > Decimal('1000'), (
+        f'PV ficou em {pv}: a etapa de período não entrou, e o BAC a conta — '
+        f'o SPI sai estruturalmente inflado')
+
+
+def test_medicao_quinzenal_usa_o_fallback_que_o_vizinho_ja_usa():
+    """🔴 `services/medicao_service.py:156` — `gerar_medicao_quinzenal` usa
+    `calcular_percentual_item` e **omite o fallback** que
+    `_recalcular_imc_avanco` tem 100 linhas abaixo.
+
+    `calcular_percentual_item` devolve 0 quando o item não tem vínculo de
+    cronograma. Sem o fallback por `servico_id`, essas obras geram medição
+    **vazia para sempre** — `perc_periodo = max(0, 0 − 0) = 0` a cada ciclo — e
+    o extrato PDF sai 0% enquanto o RDO mostra a obra andando.
+    """
+    from models import (Cliente, ItemMedicaoComercial, Obra, RDO,
+                        RDOServicoSubatividade, Servico)
+    from services.medicao_service import (calcular_percentual_item,
+                                          gerar_medicao_quinzenal)
+
+    with app.app_context():
+        t = um_tenant('onda4_medicao', com_fatos=False)
+        suf = uuid.uuid4().hex[:6]
+        cli_obj = Cliente(admin_id=t.admin_id, nome=f'Cliente medição {suf}')
+        db.session.add(cli_obj)
+        db.session.flush()
+        obra = Obra(admin_id=t.admin_id, nome=f'Obra medição {suf}',
+                    data_inicio=date(2026, 7, 1), cliente_id=cli_obj.id)
+        serv = Servico(admin_id=t.admin_id, nome=f'Serviço {suf}',
+                       categoria='estrutura', unidade_medida='m2')
+        db.session.add_all([obra, serv])
+        db.session.flush()
+
+        item = ItemMedicaoComercial(
+            admin_id=t.admin_id, obra_id=obra.id, nome=f'Item {suf}',
+            valor_comercial=Decimal('10000.00'), servico_id=serv.id)
+        db.session.add(item)
+        db.session.flush()
+
+        # A fonte que o fallback lê: RDO finalizado com subatividade a 40%.
+        rdo = RDO(admin_id=t.admin_id, obra_id=obra.id,
+                  numero_rdo=f'RDO-{suf}', data_relatorio=date(2026, 7, 15),
+                  status='Finalizado')
+        db.session.add(rdo)
+        db.session.flush()
+        db.session.add(RDOServicoSubatividade(
+            admin_id=t.admin_id, rdo_id=rdo.id, servico_id=serv.id,
+            nome_subatividade='Execução', percentual_conclusao=40.0))
+        db.session.commit()
+
+        # As duas guardas contra verdade vácua: o item NÃO tem vínculo de
+        # cronograma (senão não exercita o fallback), e o fallback TEM o que
+        # devolver (senão a medição sairia vazia com razão).
+        assert calcular_percentual_item(item) == Decimal('0'), (
+            'o item tem vínculo de cronograma — não exercita o fallback')
+        from services.progresso_subatividade import percentual_do_servico_na_obra
+        assert percentual_do_servico_na_obra(serv.id, obra.id, t.admin_id), (
+            'a fonte do fallback está vazia — o teste não provaria nada'
+        )
+
+        medicao, erro = gerar_medicao_quinzenal(
+            obra.id, t.admin_id, periodo_inicio=date(2026, 7, 1),
+            periodo_fim=date(2026, 7, 31))
+        db.session.commit()
+
+        assert medicao is not None, f'nenhuma medição foi gerada: {erro}'
+        total = Decimal(str(medicao.valor_total_medido_periodo or 0))
+        assert total > 0, (
+            f'a medição nasceu vazia ({total}) apesar de o RDO finalizado '
+            f'marcar 40% no serviço — é o fallback que falta')
