@@ -456,7 +456,26 @@ rota irmã de `:1019`.
 
 ### Task 4: `relatorios_financeiros_avancados.py` — apagar ou consertar
 
-> ⚠️ **BLOQUEADA PELA DECISÃO D4.**
+> ✅ **ABSORVIDA e EXECUTADA** pelo plano de fecho (`2026-08-31-fecho-do-que-esta-aberto.md`),
+> Task 2 — a **D4 foi respondida "apagar"** em 31/08. Commits: `3d0873a4` e
+> `41b605d0`. 🔬 O arquivo não existe mais na árvore; a extinção está congelada
+> em `tests/test_fecho_rotas_extintas.py`, provada pelo `url_map`.
+>
+> 🔴 **Mas o defeito que ela media NÃO morreu com o arquivo, e isto é o que
+> importa para quem for executar o resto desta onda:**
+> - **O `km_rodado` sobrevive em outros dois módulos.** `dashboards_especificos.py`
+>   `:396`, `:448`, `:463` (o adendo de 28/08 os aponta em `:394/:446/:461` — as
+>   linhas andaram) segue **vivo e registrado**, e é alvo desta onda.
+> - **`exportacao_relatorios.py` era o terceiro sítio, e saiu em 03/09** pela
+>   **D7**, que é esta mesma pergunta feita de novo: módulo registrado,
+>   inoperante por três defeitos, respondendo `{'success': True, 'resumo': {}}`.
+>   Achado pelo pré-voo desta etapa, não pela onda. Ver
+>   `docs/auditoria/achados-code-review-2026-08-25.md`.
+>
+> ⚠️ **Lição registrada:** a varredura de 25/08 mapeou o `km_rodado` num arquivo
+> e parou ali. Foram precisas **duas** varreduras posteriores para achar os
+> outros dois sítios. Quem consertar `dashboards_especificos.py` confira o repo
+> inteiro antes de dar o defeito por fechado.
 
 🔬 Seis defeitos independentes, todos verificados: `UsoVeiculo.km_rodado` (a
 coluna é `km_percorrido`, em **seis** lugares — `:154`, `:246`, `:407`, `:516`,
@@ -480,7 +499,20 @@ inflando `custo_por_km` ~10×.
 
 ### Task 5: Apagar as seis rotas mortas de veículos
 
-> ⚠️ **BLOQUEADA PELA DECISÃO D3.**
+> ✅ **ABSORVIDA e EXECUTADA** pelo plano de fecho, Task 3 — a **D3 foi
+> respondida "apagar"** em 31/08. Commits: `0b3f932c` e `0d1a7c6d`.
+>
+> 🔬 **E o escopo executado foi MAIOR do que esta task pedia:** em 01/09
+> (`12703381`, "a segunda leva") saíram as **18 rotas** restantes, e
+> `views/vehicles.py` **não existe mais** — o arquivo inteiro. A capacidade viva
+> é o `frota_bp`, e a extinção das seis está congelada em
+> `tests/test_fecho_rotas_extintas.py` (`SEIS_EXTINTAS`), com a contraprova de
+> que a família `frota.*` continua registrada — um guarda que só sabe dizer "não
+> existe" não distingue remoção cirúrgica de estrago.
+>
+> ⚠️ O plano de fecho descreveu esse escopo errado por um tempo, dizendo que as
+> 18 "funcionam e a remoção é decisão que ninguém tomou". Corrigido em 03/09
+> pelo pré-voo desta etapa. **Nada a executar aqui.**
 
 - [ ] **Step 1:** provar que estão mortas, antes de apagar:
 
