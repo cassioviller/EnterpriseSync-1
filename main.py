@@ -152,13 +152,14 @@ try:
 except Exception as e:
     logger.error(f"[ERROR] Erro ao registrar Dashboards Específicos: {e}", exc_info=True)
 
-# Registrar Exportação de Relatórios
-try:
-    from exportacao_relatorios import exportacao_bp
-    app.register_blueprint(exportacao_bp)
-    logger.info("[OK] Exportação de Relatórios registrado")
-except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar Exportação de Relatórios: {e}", exc_info=True)
+# Exportação de Relatórios removida em 03/09 (decisão D7): blueprint registrado
+# e alcançável, mas inoperante por três defeitos independentes em
+# `_obter_dados_resumo_executivo` — `UsoVeiculo.km_rodado` (a coluna é
+# `km_percorrido`), `ManutencaoVeiculo` e `AlertaVeiculo` não importados, e
+# `AlertaVeiculo` sem existir no repositório. O `except` devolvia `{}` e
+# `/api/preview-dados` respondia `{'success': True}`: PDF, Excel e preview
+# saíam VAZIOS em vez de errar. É o mesmo defeito da D4, noutro arquivo.
+# Extinção congelada em tests/test_fecho_rotas_extintas.py.
 
 # Relatórios Financeiros Avançados removido em 31/08 (decisão D4): módulo
 # inoperante por seis defeitos, renderizando templates que nunca existiram
@@ -206,7 +207,6 @@ from app import csrf
 main_py_exempt_blueprints = [
     'rdo_editar', 'rdo_crud', 'cadastrar_servico',
     'analytics_preditivos', 'dashboards_especificos',
-    'exportacao_relatorios', 'relatorios_financeiros',
     'api_funcionarios', 'api_buscar_funcionarios', 'health',
 ]
 for bp_name in main_py_exempt_blueprints:

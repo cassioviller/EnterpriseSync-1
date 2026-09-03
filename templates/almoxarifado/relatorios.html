@@ -226,7 +226,7 @@
                             <option value="">Todas</option>
                             <option value="DISPONIVEL" {% if dados_relatorio.filtros.condicao == 'DISPONIVEL' %}selected{% endif %}>Disponível</option>
                             <option value="EM_USO" {% if dados_relatorio.filtros.condicao == 'EM_USO' %}selected{% endif %}>Em Uso</option>
-                            <option value="EM_MANUTENCAO" {% if dados_relatorio.filtros.condicao == 'EM_MANUTENCAO' %}selected{% endif %}>Em Manutenção</option>
+                            <option value="MANUTENCAO" {% if dados_relatorio.filtros.condicao == 'MANUTENCAO' %}selected{% endif %}>Em Manutenção</option>
                         </select>
                     </div>
                     <div class="col-12">
@@ -284,7 +284,7 @@
                                 <span class="badge bg-success">Disponível</span>
                                 {% elif estoque.status == 'EM_USO' %}
                                 <span class="badge bg-warning">Em Uso</span>
-                                {% elif estoque.status == 'EM_MANUTENCAO' %}
+                                {% elif estoque.status == 'MANUTENCAO' %}
                                 <span class="badge bg-danger">Manutenção</span>
                                 {% else %}
                                 <span class="badge bg-secondary">{{ estoque.status }}</span>

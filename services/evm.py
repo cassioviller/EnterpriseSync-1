@@ -97,7 +97,7 @@ def calcular_evm(obra_id: int, admin_id: int) -> dict:
         # EAC pelo índice de desempenho de custo — a projeção que assume que
         # o desperdício observado continua. Sem CPI (nada gasto ainda), a
         # melhor projeção é o próprio orçamento.
-        eac = (bac / _d(cpi)) if cpi else bac
+        eac = projetar_eac(bac, ev, ac, cpi)
         etc = eac - ac
         vac = bac - eac
 
@@ -115,6 +115,28 @@ def calcular_evm(obra_id: int, admin_id: int) -> dict:
         return vazio
 
 
+def projetar_eac(bac: Decimal, ev: Decimal, ac: Decimal, cpi) -> Decimal:
+    """EAC — a projeção de custo até o fim, e o que fazer quando o CPI é zero.
+
+    🔴 Onda 4: o cálculo era `(bac / _d(cpi)) if cpi else bac`, e `cpi == 0.0`
+    é **falsy**. EV=0 com AC>0 — o pior cenário possível — caía no ramo "ainda
+    não gastou nada", devolvendo EAC = BAC e portanto **VAC = 0**: o painel
+    dizia "exatamente no orçamento" para a obra que gastou e não entregou nada.
+
+    - `cpi is None` (nada gasto): a melhor projeção é o próprio orçamento.
+    - `cpi > 0`: a projeção clássica pelo índice, que assume que o desperdício
+      observado continua.
+    - `cpi == 0`: o índice não é utilizável (divisão por zero). A projeção
+      honesta é a fórmula sem CPI — o que já se gastou mais o que falta ao
+      custo orçado: **AC + (BAC − EV)**.
+    """
+    if cpi is None:
+        return bac
+    if cpi > 0:
+        return bac / _d(cpi)
+    return ac + (bac - ev)
+
+
 def _pv_ate_hoje(dados: dict) -> Decimal:
     """Valor planejado acumulado até o mês corrente.
 
@@ -127,10 +149,33 @@ def _pv_ate_hoje(dados: dict) -> Decimal:
 
     hoje = date.today().strftime('%Y-%m')
     total = Decimal('0')
+
+    # 🔴 Onda 4: só as etapas `entregavel` recebem fase mensal de
+    # `montar_fisico_financeiro`; as de `periodo` saem com `meses` VAZIO. Como o
+    # BAC (`custo_orcado_da_obra`) soma TODA linha de custo, inclusive as de
+    # período, o PV media um universo menor que o BAC — e o SPI saía
+    # estruturalmente inflado, com SV positivo em obra que está em dia.
+    # 🔬 Medido em 03/09 na obra 1: duas etapas de período, R$ 21.222,27 de
+    # previsto, invisíveis ao PV.
+    #
+    # Custo de período é *level of effort*: sem fase própria, apropria-se
+    # linearmente na janela planejada da obra. É o tratamento clássico de LOE em
+    # EVM, não uma invenção deste conserto.
+    meses_obra = [str(m) for m in ((dados.get('curva_s') or {}).get('meses') or [])]
+    decorridos = len([m for m in meses_obra if m <= hoje])
+
     for etapa in dados.get('etapas', []):
-        for mes, valor in (etapa.get('meses') or {}).items():
-            if str(mes) <= hoje:
-                total += _d(valor)
+        meses = etapa.get('meses') or {}
+        if meses:
+            for mes, valor in meses.items():
+                if str(mes) <= hoje:
+                    total += _d(valor)
+        elif etapa.get('tipo') == 'periodo' and meses_obra and decorridos:
+            previsto = etapa.get('previsto') or {}
+            valor_total = _d(previsto.get('total') if isinstance(previsto, dict)
+                             else previsto)
+            total += valor_total * Decimal(decorridos) / Decimal(len(meses_obra))
+
     return total
 
 

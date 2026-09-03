@@ -1,6 +1,46 @@
 # Onda 4 — O Relatório Passa a Funcionar Implementation Plan
 
-> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — duas tasks bloqueadas** — 7 tasks. As Tasks 4 e 5 esperam **D4** (apagar ou consertar `relatorios_financeiros_avancados.py`) e **D3** (as seis rotas mortas de veículos). ⚠️ A Task 2 **torna exploitável** um furo que a Onda 2 fecha — não a execute antes dela.
+> **Estado em 2026-09-03:** ✅ **FECHADA — 7/7 tasks.** Gate verde na branch
+> `sdd/onda-4-relatorio`: **3265 passed, 8 skipped, 201 deselected, 72 xfailed,
+> 0 failed** (41:04, `tests/reports/gate_onda4_final_0202.log`). 🔬 O número foi
+> **previsto antes de rodar** — 3247 (piso) +17 (arquivo novo) +7 (as rotas
+> extintas da D7) −6 (o censo de tenant perdeu um resolvedor) = 3265 — e bateu.
+>
+> | Task | Estado |
+> |---|---|
+> | 1 — DRE e balancete passam a fechar | ✅ `5d39706a` |
+> | 2 — a integração contábil para de dar 500 | ✅ `63a00acc` |
+> | 3 — os dois relatórios do almoxarifado | ✅ `7c279a37` |
+> | 4 — `relatorios_financeiros_avancados.py` | ✅ absorvida (D4, `3d0873a4`) |
+> | 5 — as seis rotas mortas de veículos | ✅ absorvida (D3, `0b3f932c`) |
+> | 6 — o vocabulário partido do almoxarifado | ✅ `f1027915` |
+> | 7 — EVM e medição param de mentir | ✅ `21ed2564` |
+>
+> **Entrou junto, e não estava no plano:** a **D7** (`6ccf3337`) — apagar
+> `exportacao_relatorios.py`, o gêmeo vivo do módulo que a D4 mandou apagar,
+> achado pelo pré-voo desta etapa.
+>
+> 🔬 **Quatro achados que só apareceram na execução:**
+> 1. **Um defeito escondia o outro.** O vocabulário errado da Task 6 só era
+>    gravado pela rota de devolução, que estava quebrada pelo defeito da Task 3.
+>    Por isso o banco tem **zero linhas** com o vocabulário errado — e a
+>    migration que esta task previa **não foi necessária**, o que foi medido, não
+>    suposto.
+> 2. **Um quarto atributo inexistente na Task 2** (`proposta.obra`), que o plano
+>    não listava e só apareceu quando os outros três saíram da frente.
+> 3. **Um quarto defeito na Task 1** (`gerar_balanco_patrimonial` aplicando
+>    `abs()` ao passivo, escondendo saldo invertido), que o plano citava pelo
+>    número da linha sem descrever.
+> 4. **O `abs()` do balanço e o mapa de contas apontam para a Fase 8.** Duas das
+>    três integrações contábeis não conseguem lançar porque postam contra
+>    códigos de **outro seeder** — registrado na Task 12 do plano de fecho, com
+>    os quatro códigos medidos.
+>
+> ⚠️ **Uma contradição do plano original, resolvida:** ele escrevia os testes da
+> Task 7 com `inspect.getsource`, o que as **Global Constraints dele mesmo**
+> proíbem. Foram reescritos chamando as funções.
+>
+> **Estado anterior — 2026-08-25 (varredura de fecho):** 🟡 ABERTO — duas tasks bloqueadas — 7 tasks. As Tasks 4 e 5 esperam **D4** (apagar ou consertar `relatorios_financeiros_avancados.py`) e **D3** (as seis rotas mortas de veículos). ⚠️ A Task 2 **torna exploitável** um furo que a Onda 2 fecha — não a execute antes dela.
 >
 > Escrito na varredura de 25/08. Índice de estado de todos os planos e specs em
 > `docs/planos-em-aberto-2026-08-25.md`.
@@ -456,7 +496,26 @@ rota irmã de `:1019`.
 
 ### Task 4: `relatorios_financeiros_avancados.py` — apagar ou consertar
 
-> ⚠️ **BLOQUEADA PELA DECISÃO D4.**
+> ✅ **ABSORVIDA e EXECUTADA** pelo plano de fecho (`2026-08-31-fecho-do-que-esta-aberto.md`),
+> Task 2 — a **D4 foi respondida "apagar"** em 31/08. Commits: `3d0873a4` e
+> `41b605d0`. 🔬 O arquivo não existe mais na árvore; a extinção está congelada
+> em `tests/test_fecho_rotas_extintas.py`, provada pelo `url_map`.
+>
+> 🔴 **Mas o defeito que ela media NÃO morreu com o arquivo, e isto é o que
+> importa para quem for executar o resto desta onda:**
+> - **O `km_rodado` sobrevive em outros dois módulos.** `dashboards_especificos.py`
+>   `:396`, `:448`, `:463` (o adendo de 28/08 os aponta em `:394/:446/:461` — as
+>   linhas andaram) segue **vivo e registrado**, e é alvo desta onda.
+> - **`exportacao_relatorios.py` era o terceiro sítio, e saiu em 03/09** pela
+>   **D7**, que é esta mesma pergunta feita de novo: módulo registrado,
+>   inoperante por três defeitos, respondendo `{'success': True, 'resumo': {}}`.
+>   Achado pelo pré-voo desta etapa, não pela onda. Ver
+>   `docs/auditoria/achados-code-review-2026-08-25.md`.
+>
+> ⚠️ **Lição registrada:** a varredura de 25/08 mapeou o `km_rodado` num arquivo
+> e parou ali. Foram precisas **duas** varreduras posteriores para achar os
+> outros dois sítios. Quem consertar `dashboards_especificos.py` confira o repo
+> inteiro antes de dar o defeito por fechado.
 
 🔬 Seis defeitos independentes, todos verificados: `UsoVeiculo.km_rodado` (a
 coluna é `km_percorrido`, em **seis** lugares — `:154`, `:246`, `:407`, `:516`,
@@ -480,7 +539,20 @@ inflando `custo_por_km` ~10×.
 
 ### Task 5: Apagar as seis rotas mortas de veículos
 
-> ⚠️ **BLOQUEADA PELA DECISÃO D3.**
+> ✅ **ABSORVIDA e EXECUTADA** pelo plano de fecho, Task 3 — a **D3 foi
+> respondida "apagar"** em 31/08. Commits: `0b3f932c` e `0d1a7c6d`.
+>
+> 🔬 **E o escopo executado foi MAIOR do que esta task pedia:** em 01/09
+> (`12703381`, "a segunda leva") saíram as **18 rotas** restantes, e
+> `views/vehicles.py` **não existe mais** — o arquivo inteiro. A capacidade viva
+> é o `frota_bp`, e a extinção das seis está congelada em
+> `tests/test_fecho_rotas_extintas.py` (`SEIS_EXTINTAS`), com a contraprova de
+> que a família `frota.*` continua registrada — um guarda que só sabe dizer "não
+> existe" não distingue remoção cirúrgica de estrago.
+>
+> ⚠️ O plano de fecho descreveu esse escopo errado por um tempo, dizendo que as
+> 18 "funcionam e a remoção é decisão que ninguém tomou". Corrigido em 03/09
+> pelo pré-voo desta etapa. **Nada a executar aqui.**
 
 - [ ] **Step 1:** provar que estão mortas, antes de apagar:
 

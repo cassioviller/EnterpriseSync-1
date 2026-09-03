@@ -65,6 +65,44 @@ def calcular_percentual_item(item):
     return perc_ponderado.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
+def percentual_do_item_com_fallback(item, obra_id, admin_id):
+    """Percentual do item, com o fallback por `servico_id` quando não há
+    vínculo de cronograma.
+
+    🔴 Onda 4: este fallback existia **só** em `_recalcular_imc_avanco`.
+    `gerar_medicao_quinzenal` chamava `calcular_percentual_item` cru, que
+    devolve 0 sem vínculo — e obras sem cronograma vinculado geravam medição
+    **vazia para sempre** (`perc_periodo = max(0, 0 − 0) = 0` a cada ciclo),
+    com extrato PDF em 0% enquanto o RDO mostrava a obra andando. Agora os dois
+    caminhos passam por aqui; duplicar a regra seria repetir o defeito.
+
+    📖 p8 — o fallback não lê `MAX(RDOServicoSubatividade.percentual_conclusao)`
+    direto: passa por `services/progresso_subatividade.py`, que prefere o
+    percentual da TAREFA de cronograma ligada pelo `subatividade_mestre_id`. Ler
+    a fonte crua faria a mesma obra medir por um número e exibir outro no Gantt.
+    """
+    perc = calcular_percentual_item(item)
+
+    if perc <= 0 and getattr(item, 'servico_id', None):
+        try:
+            from services.progresso_subatividade import (
+                percentual_do_servico_na_obra)
+            max_perc = percentual_do_servico_na_obra(
+                item.servico_id, obra_id, admin_id)
+            if max_perc is not None:
+                perc = Decimal(str(max_perc)).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP)
+        except Exception as e:
+            logger.warning(
+                f'fallback de percentual falhou item={getattr(item, "id", "?")}: {e}')
+
+    if perc > Decimal('100'):
+        perc = Decimal('100')
+    if perc < Decimal('0'):
+        perc = Decimal('0')
+    return perc
+
+
 def validar_pesos_item(item_id):
     """Soma dos pesos do item bate com a convenção de 100 da UI?
 
@@ -153,7 +191,7 @@ def gerar_medicao_quinzenal(obra_id, admin_id, periodo_inicio=None, periodo_fim=
     total_medido_periodo = Decimal('0')
 
     for item in itens_comerciais:
-        perc_atual = calcular_percentual_item(item)
+        perc_atual = percentual_do_item_com_fallback(item, obra_id, admin_id)
         perc_anterior = Decimal(str(item.percentual_executado_acumulado or 0))
         perc_periodo = max(Decimal('0'), perc_atual - perc_anterior)
 
@@ -267,33 +305,10 @@ def _recalcular_imc_avanco(obra_id, admin_id):
     total_medido = Decimal('0')
 
     for item in itens:
-        perc_atual = calcular_percentual_item(item)
-
-        # Fallback por servico_id quando não há vínculos no cronograma.
-        #
-        # p8 — era `MAX(RDOServicoSubatividade.percentual_conclusao)` puro: uma
-        # fonte diferente da que o Gantt mostra, então a mesma obra podia medir
-        # por um número e exibir outro. Agora passa por
-        # `services/progresso_subatividade.py`, que prefere o percentual da
-        # TAREFA de cronograma ligada pelo `subatividade_mestre_id` — elo que
-        # existe dos dois lados e nunca era lido. Sem elo, cai no valor gravado
-        # na linha, que é o comportamento de antes.
-        if perc_atual <= 0 and getattr(item, 'servico_id', None):
-            try:
-                from services.progresso_subatividade import (
-                    percentual_do_servico_na_obra)
-                max_perc = percentual_do_servico_na_obra(
-                    item.servico_id, obra_id, admin_id)
-                if max_perc is not None:
-                    perc_atual = Decimal(str(max_perc)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            except Exception as e:
-                logger.warning(f"_recalcular_imc_avanco fallback RDO falhou item={item.id}: {e}")
-
-        # Cap em 100
-        if perc_atual > Decimal('100'):
-            perc_atual = Decimal('100')
-        if perc_atual < Decimal('0'):
-            perc_atual = Decimal('0')
+        # 🔴 Onda 4: o fallback por `servico_id` e o cap moravam aqui, inline, e
+        # a medição quinzenal não os tinha. Agora os dois caminhos passam pelo
+        # mesmo ponto — ver `percentual_do_item_com_fallback`.
+        perc_atual = percentual_do_item_com_fallback(item, obra_id, admin_id)
 
         valor_comercial = Decimal(str(item.valor_comercial or 0))
         valor_acum = (perc_atual / Decimal('100')) * valor_comercial

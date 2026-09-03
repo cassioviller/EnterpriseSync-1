@@ -103,3 +103,57 @@ def test_a_familia_viva_de_frota_continua_registrada():
     vivos = {e for e in _endpoints() if e.startswith('frota.')}
     assert len(vivos) >= 13, (
         f'a família frota.* encolheu para {len(vivos)} — esperado >= 13')
+
+
+# ---------------------------------------------------------------------------
+# D7 — o gêmeo vivo da D4: mesmo defeito, outro arquivo
+# ---------------------------------------------------------------------------
+
+# 🔬 `exportacao_relatorios.py` era blueprint REGISTRADO (`main.py:157`,
+# url_prefix='/relatorios/exportacao') e constava da lista de módulos de
+# `app.py`. O `_obter_dados_resumo_executivo` quebrava em três lugares
+# independentes — `UsoVeiculo.km_rodado` (a coluna é `km_percorrido`),
+# `ManutencaoVeiculo` e `AlertaVeiculo` não importados, e `AlertaVeiculo` sem
+# existir no repositório inteiro — e o `except Exception: return {}` devolvia
+# forma vazia, com `/api/preview-dados` respondendo `{'success': True}`.
+#
+# 🔴 É a MESMA mentira que a D4 mandou apagar, viva noutro arquivo depois de o
+# primeiro ter saído. O dono respondeu igual: apagar.
+EXPORTACAO_EXTINTA = (
+    'exportacao_relatorios.painel_exportacao',
+    'exportacao_relatorios.gerar_pdf',
+    'exportacao_relatorios.gerar_excel',
+    'exportacao_relatorios.enviar_relatorio_email',
+    'exportacao_relatorios.api_preview_dados',
+    'exportacao_relatorios.agendar_relatorio',
+)
+
+
+@pytest.mark.parametrize('endpoint', EXPORTACAO_EXTINTA)
+def test_rota_de_exportacao_esta_extinta(endpoint):
+    """🔴 D7 — as seis rotas de exportação de relatórios saíram.
+
+    As três que chegavam ao resumo executivo (`/gerar-pdf`, `/gerar-excel`,
+    `/api/preview-dados`) entregavam PDF, Excel e preview VAZIOS em vez de
+    erro: o usuário concluía "não há dados" quando o que havia era um
+    AttributeError engolido.
+
+    Itera sobre as seis pelo mesmo motivo da D3: apagar cinco e deixar a sexta
+    é o defeito que a onda "A Porta Irmã" existiu para fechar.
+    """
+    assert endpoint not in _endpoints(), (
+        f'{endpoint} voltou ao url_map — a D7 decidiu apagar, não consertar')
+
+
+def test_o_modulo_de_exportacao_nao_e_importavel():
+    """A contraprova de que o arquivo saiu, e não só o registro do blueprint.
+
+    🔬 Sem esta afirmação, o teste acima passaria com o módulo inteiro ainda na
+    árvore — bastaria alguém ter comentado a linha de registro em `main.py`, e
+    o próximo a mexer traria de volta 800 linhas inoperantes sem saber.
+    """
+    import importlib.util
+
+    assert importlib.util.find_spec('exportacao_relatorios') is None, (
+        'exportacao_relatorios.py voltou à árvore — a D7 apagou o arquivo, '
+        'não só o registro do blueprint')

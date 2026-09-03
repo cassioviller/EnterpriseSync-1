@@ -74,7 +74,6 @@ MODULOS = {
     'Transporte': ['transporte_views.py'],
     # transversais
     'Relatórios': ['relatorios_funcionais.py'],
-    'Exportação de relatórios': ['exportacao_relatorios.py'],
     'Analytics preditivos': ['analytics_preditivos.py'],
     'Dashboards específicos': ['dashboards_especificos.py'],
     'Métricas': ['views/metricas_views.py'],

@@ -124,6 +124,29 @@ def criar_lancamento_automatico(data, historico, valor, origem, origem_id, admin
     if abs(total_debitos - total_creditos) > 0.01:
         raise ValueError("Lançamento desbalanceado: débitos não são iguais aos créditos.")
 
+    # 🔴 Onda 4 — falha FECHADA e NOMEADA, no ponto único por onde as três
+    # integrações passam. 🔬 Os códigos de conta das rotinas `contabilizar_*`
+    # foram escritos contra um dos seeders do parque, e o tenant pode ter sido
+    # semeado por outro: `4.1.02.002`, por exemplo, não existe no plano
+    # canônico. Sem esta checagem o INSERT morre em `ForeignKeyViolation` e o
+    # usuário recebe um dump de SQL; com ela, recebe o nome da conta que falta.
+    # ⚠️ Remapear os códigos é trabalho da FASE 8, que canoniza o plano de
+    # contas — consertar o mapa aqui seria consertá-lo contra um vocabulário
+    # que vai mudar (ver `2026-08-24-fase-8-plano-de-contas-canonico.md`).
+    from models import PlanoContas
+    codigos = {p['conta'] for p in partidas}
+    existentes = {c.codigo for c in PlanoContas.query.filter(
+        PlanoContas.admin_id == admin_id,
+        PlanoContas.codigo.in_(codigos)).all()}
+    faltando = sorted(codigos - existentes)
+    if faltando:
+        db.session.rollback()
+        raise ValueError(
+            f"plano de contas do tenant {admin_id} não tem "
+            f"{', '.join(faltando)} — a integração '{origem}' foi escrita "
+            f"contra outro seeder. Recusado sem gravar nada; o de-para "
+            f"canônico é da Fase 8.")
+
     lancamento = LancamentoContabil(
         numero=get_next_lancamento_numero(admin_id),
         data_lancamento=data,
@@ -163,9 +186,19 @@ def contabilizar_proposta_aprovada(proposta_id):
     # Cria centro de custo para a obra se não existir
     centro_custo = CentroCustoContabil.query.filter_by(obra_id=proposta.obra_id, admin_id=proposta.admin_id).first()
     if not centro_custo:
+        # 🔴 Onda 4: era `proposta.obra.id` / `proposta.obra.nome`, e
+        # `Proposta` NÃO TEM o relacionamento `obra` — só a coluna `obra_id`.
+        # A rota devolvia 400 com o AttributeError no corpo.
+        from models import Obra
+        obra = Obra.query.filter_by(id=proposta.obra_id,
+                                    admin_id=proposta.admin_id).first()
+        if not obra:
+            raise ValueError(
+                f'proposta {proposta.id} não aponta para obra deste tenant '
+                f'(obra_id={proposta.obra_id}) — sem obra não há centro de custo')
         centro_custo = CentroCustoContabil(
-            codigo=f"OBRA_{proposta.obra.id}", 
-            nome=proposta.obra.nome, 
+            codigo=f"OBRA_{obra.id}", 
+            nome=obra.nome, 
             tipo='OBRA', 
             obra_id=proposta.obra_id, 
             admin_id=proposta.admin_id
@@ -178,8 +211,10 @@ def contabilizar_proposta_aprovada(proposta_id):
         {'tipo': 'CREDITO', 'conta': '4.1.02.002', 'valor': proposta.valor_total, 'centro_custo_id': centro_custo.id}
     ]
 
+    # 🔴 Onda 4: era `proposta.data_aprovacao`, que não existe. A data em que o
+    # cliente respondeu é a aprovação; sem ela, a data da proposta.
     criar_lancamento_automatico(
-        data=proposta.data_aprovacao,
+        data=proposta.data_resposta_cliente or proposta.data_proposta,
         historico=f"Aprovação da Proposta #{proposta.id} - Cliente: {proposta.cliente_nome}",
         valor=proposta.valor_total,
         origem='MODULO_1',
@@ -194,16 +229,33 @@ def contabilizar_entrada_material(nota_fiscal_id):
     if not nota:
         return
 
+    # 🔴 Onda 4: `nota.valor_icms` NÃO EXISTE em `NotaFiscal`, e o débito era
+    # `valor_produtos + valor_icms` contra crédito de `valor_total` — o
+    # lançamento estourava "desbalanceado" sempre que o ICMS estivesse embutido
+    # no preço, que é a norma brasileira. As colunas reais são `valor_produtos`,
+    # `valor_frete`, `valor_desconto` e `valor_total`, e a identidade da NF é
+    # produtos + frete − desconto = total. As partidas seguem essa identidade,
+    # de modo que o lançamento amarra por construção. Quando a NF ganhar coluna
+    # de ICMS, o desdobramento volta — e não antes.
+    frete = nota.valor_frete or Decimal('0')
+    desconto = nota.valor_desconto or Decimal('0')
     partidas = [
-        {'tipo': 'DEBITO', 'conta': '1.1.03.001', 'valor': nota.valor_produtos},
+        {'tipo': 'DEBITO', 'conta': '1.1.03.001',
+         'valor': (nota.valor_produtos or Decimal('0')) + frete},
         {'tipo': 'CREDITO', 'conta': '2.1.01.001', 'valor': nota.valor_total}
     ]
-    if nota.valor_icms and nota.valor_icms > 0:
-        partidas.append({'tipo': 'DEBITO', 'conta': '1.1.04.001', 'valor': nota.valor_icms})
+    if desconto > 0:
+        partidas.append({'tipo': 'CREDITO', 'conta': '1.1.03.001', 'valor': desconto})
+
+    # 🔴 `nota.fornecedor_nome` também não existe — a NF guarda `fornecedor_id`.
+    from models import Fornecedor
+    fornecedor = Fornecedor.query.filter_by(id=nota.fornecedor_id,
+                                            admin_id=nota.admin_id).first()
+    nome_fornecedor = fornecedor.nome if fornecedor else f'#{nota.fornecedor_id}'
 
     criar_lancamento_automatico(
         data=nota.data_emissao,
-        historico=f"Entrada NF #{nota.numero} - Fornecedor: {nota.fornecedor_nome}",
+        historico=f"Entrada NF #{nota.numero} - Fornecedor: {nome_fornecedor}",
         valor=nota.valor_total,
         origem='MODULO_4',
         origem_id=nota.id,
@@ -218,7 +270,10 @@ def contabilizar_folha_pagamento(admin_id, mes_referencia):
         return
 
     # Totalizadores
-    total_salario_bruto = sum(f.salario_bruto or 0 for f in folhas)
+    # 🔴 Onda 4: era `f.salario_bruto`, que não existe em `FolhaPagamento`. O
+    # bruto é `total_proventos` (salário base + outros proventos); o
+    # `salario_base` sozinho subestimaria a despesa e os encargos.
+    total_salario_bruto = sum(f.total_proventos or f.salario_base or 0 for f in folhas)
     total_inss_func = sum(f.inss or 0 for f in folhas)
     total_irrf = sum(f.irrf or 0 for f in folhas)
     total_fgts = sum(f.fgts or 0 for f in folhas)
@@ -440,24 +495,32 @@ def gerar_balanco_patrimonial(admin_id, data_referencia):
                 'nivel': conta.nivel
             }
             ativo['total'] += saldo
+        # 🔴 Onda 4: era `abs(saldo)` nos três ramos abaixo, e o `abs` ESCONDIA
+        # o saldo invertido. 🔬 `calcular_saldo_conta` devolve D−C, sem
+        # normalizar por natureza: um passivo com saldo devedor sai positivo, o
+        # `abs` o mantinha positivo, e ele SOMAVA ao total do passivo em vez de
+        # reduzi-lo — um número plausível e errado, que é pior que faltar.
+        # Agora o saldo é normalizado pela natureza credora (C−D = −saldo): o
+        # passivo normal segue positivo, e o INVERTIDO aparece negativo, como
+        # ele é. A regra da onda: relatório não esconde o que não sabe.
         elif conta.codigo.startswith('2.1'):
             passivo['circulante'][conta.codigo] = {
                 'nome': conta.nome,
-                'saldo': abs(saldo),
+                'saldo': -saldo,
                 'nivel': conta.nivel
             }
-            passivo['total'] += abs(saldo)
+            passivo['total'] += -saldo
         elif conta.codigo.startswith('2.2'):
             passivo['nao_circulante'][conta.codigo] = {
                 'nome': conta.nome,
-                'saldo': abs(saldo),
+                'saldo': -saldo,
                 'nivel': conta.nivel
             }
-            passivo['total'] += abs(saldo)
+            passivo['total'] += -saldo
         elif conta.codigo.startswith('3'):
             patrimonio_liquido[conta.codigo] = {
                 'nome': conta.nome,
-                'saldo': abs(saldo),
+                'saldo': -saldo,
                 'nivel': conta.nivel
             }
     
@@ -617,10 +680,16 @@ def calcular_dre_mensal(admin_id: int, ano: int, mes: int):
                 for partida in partidas:
                     valor = Decimal(str(partida.valor))
                     
-                    # Se tipo esperado for especificado, só conta se for o tipo correto
+                    # 🔴 Onda 4: os DOIS lados entram. O lado esperado soma e o
+                    # inverso SUBTRAI — senão o estorno (que grava a partida
+                    # inversa correta) é filtrado fora e a DRE reporta a receita
+                    # ou a despesa para sempre, discordando do balancete no
+                    # mesmo mês. Antes: só o lado esperado somava.
                     if tipo_esperado:
                         if partida.tipo_partida == tipo_esperado:
                             total += valor
+                        else:
+                            total -= valor
                     else:
                         # Senão, credita positivo e debita negativo
                         if partida.tipo_partida == 'CREDITO':
@@ -861,6 +930,20 @@ def obter_dados_balancete(admin_id, mes, ano):
                         abs(creditos_mes) > Decimal('0.01'))
         
         if tem_movimento:
+            # 🔴 Onda 4: a coluna sai da NATUREZA da conta, não do sinal.
+            # `saldo_atual` já vem normalizado (devedora: D−C; credora: C−D), e
+            # decidir a coluna por `> 0` depois disso jogava o saldo CREDOR
+            # normal de uma conta credora na coluna de DÉBITO: D Caixa 1.000 /
+            # C Receita 1.000 dava devedor 2.000, credor 0 — um balancete de
+            # verificação que nunca amarra. Saldo invertido (o sinal negativo)
+            # continua aparecendo, na coluna oposta à natureza.
+            if conta.natureza == 'DEVEDORA':
+                saldo_devedor = saldo_atual if saldo_atual > 0 else Decimal('0')
+                saldo_credor = abs(saldo_atual) if saldo_atual < 0 else Decimal('0')
+            else:
+                saldo_credor = saldo_atual if saldo_atual > 0 else Decimal('0')
+                saldo_devedor = abs(saldo_atual) if saldo_atual < 0 else Decimal('0')
+
             contas_data.append({
                 'codigo': conta.codigo,
                 'nome': conta.nome,
@@ -868,17 +951,14 @@ def obter_dados_balancete(admin_id, mes, ano):
                 'natureza': conta.natureza,
                 'debitos': debitos_mes,
                 'creditos': creditos_mes,
-                'saldo_devedor': saldo_atual if saldo_atual > 0 else Decimal('0'),
-                'saldo_credor': abs(saldo_atual) if saldo_atual < 0 else Decimal('0')
+                'saldo_devedor': saldo_devedor,
+                'saldo_credor': saldo_credor
             })
             
             total_debitos += debitos_mes
             total_creditos += creditos_mes
-            
-            if saldo_atual > 0:
-                total_saldo_devedor += saldo_atual
-            else:
-                total_saldo_credor += abs(saldo_atual)
+            total_saldo_devedor += saldo_devedor
+            total_saldo_credor += saldo_credor
     
     return {
         'contas': contas_data,

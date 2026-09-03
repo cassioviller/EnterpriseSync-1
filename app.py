@@ -1105,7 +1105,6 @@ csrf_exempt_blueprints = [
     'api_servicos_obra_limpa', 'health', 'ponto', 'landing',
     'rdo_editar', 'rdo_crud', 'cadastrar_servico',
     'analytics_preditivos', 'dashboards_especificos',
-    'exportacao_relatorios', 'relatorios_financeiros',
     'servico_obra_real', 'production', 'relatorios',
     'almoxarifado', 'alimentacao', 'folha', 'contabilidade',
     'financeiro', 'custos', 'propostas', 'configuracoes',

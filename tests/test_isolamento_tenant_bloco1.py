@@ -100,7 +100,6 @@ RESOLVEDORES = [
     'crud_rdo_completo',
     'dashboards_especificos',
     'equipe_views',
-    'exportacao_relatorios',
     'folha_pagamento_views',
     'medicao_views:_admin_id',
     'multitenant_helper',

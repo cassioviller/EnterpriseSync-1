@@ -1280,9 +1280,14 @@ def processar_devolucao_multipla():
                 estoque_id = item_data.get('estoque_id')
                 numero_serie = item_data.get('numero_serie')
 
+                # 🔴 Onda 4: era `funcionario_id`, e a coluna de
+                # `AlmoxarifadoEstoque` é `funcionario_atual_id` — a rota de
+                # item único, logo acima, já usava o nome certo. O erro caía no
+                # `except Exception` da rota e TODA devolução de carrinho
+                # serializado respondia 500 "Erro ao processar operação".
                 estoque = AlmoxarifadoEstoque.query.filter_by(
                     id=estoque_id,
-                    funcionario_id=funcionario_id,
+                    funcionario_atual_id=funcionario_id,
                     status='EM_USO',
                     admin_id=admin_id
                 ).first()
@@ -1343,9 +1348,13 @@ def processar_devolucao_multipla():
                 if condicao_item in ['Perfeito', 'Bom', 'Regular']:
                     estoque.status = 'DISPONIVEL'
                 elif condicao_item == 'Danificado':
-                    estoque.status = 'EM_MANUTENCAO'
+                    # 🔴 Onda 4: era 'EM_MANUTENCAO', fora do vocabulário da
+                    # definição (models.py:5576). Quem lê nos templates de
+                    # perfil e de detalhes testava 'MANUTENCAO' e nunca via.
+                    estoque.status = 'MANUTENCAO'
                 elif condicao_item == 'Inutilizado':
-                    estoque.status = 'INUTILIZADO'
+                    # 🔴 Onda 4: era 'INUTILIZADO'; a definição diz 'DESCARTADO'.
+                    estoque.status = 'DESCARTADO'
 
                 obra_id_movimento = estoque.obra_id
                 estoque.funcionario_atual_id = None

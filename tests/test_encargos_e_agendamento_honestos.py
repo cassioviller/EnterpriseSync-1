@@ -141,8 +141,18 @@ def test_inss_patronal_gravado_por_subtracao_e_nao_por_fator():
         assert soma == esperado == Decimal('855.00')
 
 
-def test_agendar_relatorio_responde_501_em_vez_de_fingir_sucesso():
+def test_agendar_relatorio_nao_confirma_o_que_nunca_aconteceu():
     """TESTE B (B2.15) — a rota que confirmava por escrito o que nunca aconteceu.
+
+    ⚠️ **Atualizado em 03/09 pela decisão D7**, e a preocupação ficou MAIS
+    forte, não mais fraca: a rota respondia `success: true`, foi obrigada por
+    este teste a responder **501**, e agora **não existe mais** — o módulo
+    `exportacao_relatorios.py` inteiro foi apagado, porque era inoperante por
+    três defeitos independentes e devolvia forma vazia com `success: true`
+    (ver `docs/auditoria/achados-code-review-2026-08-25.md`). 📖 A extinção das
+    seis rotas está congelada em `tests/test_fecho_rotas_extintas.py`; este
+    teste continua guardando a outra metade da afirmação, que aquele não cobre:
+    **o banco permanece intocado**.
 
     `agendar_relatorio` devolvia `{'success': True, 'job_id': ...}` para um
     agendamento que morria no fim da requisição: o objeto era instanciado novo a
@@ -169,13 +179,15 @@ def test_agendar_relatorio_responde_501_em_vez_de_fingir_sucesso():
             'incluir_graficos': True,
         })
 
-        assert r.status_code == 501, (
-            f'a rota respondeu {r.status_code} — 200 confirma um agendamento '
-            f'que não existe em lugar nenhum')
-        payload = r.get_json()
-        assert payload['success'] is False
-        assert 'job_id' not in payload, (
-            'a resposta ainda devolve um job_id que não identifica nada')
+        assert r.status_code == 404, (
+            f'a rota respondeu {r.status_code} — a D7 apagou o módulo, então '
+            f'o esperado é 404. Qualquer 2xx aqui significa que alguém a '
+            f'ressuscitou confirmando um agendamento que não existe')
+        # Rota extinta não tem payload JSON; o que sobra — e é o que sempre
+        # importou — é a AUSÊNCIA no banco. 🔬 A asserção do `job_id` morreu
+        # junto com a rota: não há resposta onde ele pudesse voltar.
+        assert b'job_id' not in r.data, (
+            'a resposta ainda menciona um job_id que não identifica nada')
         assert WebhookEntrega.query.count() == antes, (
             'o POST produziu efeito externo — não devia produzir nenhum')
 
