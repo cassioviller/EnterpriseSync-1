@@ -313,6 +313,54 @@ def q7_pontos_duplicados_no_dia(cur):
     print("     zerar ou ser consolidado à mão. Aí seria a migração 280.")
 
 
+SQL_Q8_TENANTS = """
+    WITH por_tenant AS (
+        SELECT admin_id,
+               bool_or(codigo LIKE '5.%%') AS tem5,
+               bool_or(codigo LIKE '6.%%') AS tem6
+          FROM plano_contas
+         GROUP BY admin_id
+    )
+    SELECT count(*) FILTER (WHERE tem5 AND NOT tem6) AS so_5x,
+           count(*) FILTER (WHERE tem6 AND NOT tem5) AS so_6x,
+           count(*) FILTER (WHERE tem5 AND tem6)     AS ambos,
+           count(*) FILTER (WHERE NOT tem5 AND NOT tem6) AS nenhum
+      FROM por_tenant
+"""
+
+SQL_Q8_PARTIDAS_5X = """
+    SELECT count(*) FROM partida_contabil WHERE conta_codigo LIKE '5.%%'
+"""
+
+SQL_Q8_PARTIDAS_ORFAS = """
+    SELECT count(*)
+      FROM partida_contabil p
+     WHERE NOT EXISTS (
+           SELECT 1 FROM plano_contas c
+            WHERE c.codigo = p.conta_codigo AND c.admin_id = p.admin_id)
+"""
+
+
+def q8_planos_de_contas(cur):
+    """Fase 8 / Task 1 — o retrato que decide se a Task 4 é um de-para de
+    algumas centenas de linhas ou um projeto próprio.
+
+    A pergunta que importa é UMA: quantas partidas vivem em `5.x` lá.
+    ⚠️ Se produção mostrar `5.x` dominante, a spec da Fase 8 está errada e o
+    canônico tem de ser reavaliado ANTES de qualquer código.
+    """
+    secao('q8 — planos de contas concorrentes (Fase 8)')
+    for linha in _t(cur, SQL_Q8_TENANTS):
+        print(f'  tenants só 5.x: {linha[0]} | só 6.x: {linha[1]} | '
+              f'ambos: {linha[2]} | nenhum: {linha[3]}')
+    print(f'  partidas em 5.x: {_um(cur, SQL_Q8_PARTIDAS_5X)}')
+    orfas = _um(cur, SQL_Q8_PARTIDAS_ORFAS)
+    print(f'  partidas ÓRFÃS (conta inexistente no plano do tenant): {orfas}')
+    if orfas:
+        print('  🔴 dev media ZERO órfãs. Produção divergiu — PARE e reveja '
+              'a spec inteira antes de escrever a migration 324.')
+
+
 def main():
     url = os.environ.get("DATABASE_URL")
     if not url:
@@ -327,7 +375,8 @@ def main():
 
     for fn in (q1_migracao_270, q2_editor_v2, q3_calendario,
                q4_snapshots_orfaos, q5_baselines_sem_bac,
-               q6_duplicacao_ponto_rdo, q7_pontos_duplicados_no_dia):
+               q6_duplicacao_ponto_rdo, q7_pontos_duplicados_no_dia,
+               q8_planos_de_contas):
         try:
             fn(cur)
         except Exception as exc:      # uma pergunta que falha não derruba as outras
