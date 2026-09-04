@@ -7615,6 +7615,47 @@ def _migration_320_proposta_origem():
         return False
 
 
+def _migration_321_gestao_custo_filho_tarefa():
+    """Resgate da Espinha Financeira — gestao_custo_filho.tarefa_cronograma_id.
+
+    Achado do porte, e nenhum dos dois planos o via. O plano listava tres
+    colunas ausentes da linhagem velha (193/194/195) e conferiu apenas
+    `rdo_subempreitada_apontamento`; a 195 tambem criava esta, e sem ela
+    `services/resultado_atividade_service.custo_nao_mo_atividade` estoura em
+    `TypeError: 'tarefa_cronograma_id' is an invalid keyword argument for
+    GestaoCustoFilho` — a Fatia 2 inteira nao roda.
+
+    Semantica: NULL = custo do dia sem dono, que o read-model rateia entre as
+    atividades pela fracao de hora-homem daquele dia (DC6); preenchido = custo
+    DIRETO da atividade. Nullable de proposito: todo lancamento que ja existe
+    no banco e' anterior a esta atribuicao e tem de continuar sendo rateado.
+
+    Das tres tabelas que a 195 tocava, esta e' a UNICA reposta aqui:
+    `movimentacao_estoque` e `custo_veiculo` nao sao lidas por nada do que se
+    porta (🔬 zero ocorrencias de MovimentacaoEstoque/CustoVeiculo nos cinco
+    modulos portados). Repor coluna que ninguem le seria schema morto.
+
+    Idempotente.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                ALTER TABLE gestao_custo_filho
+                    ADD COLUMN IF NOT EXISTS tarefa_cronograma_id INTEGER
+                        REFERENCES tarefa_cronograma(id) ON DELETE SET NULL
+            """))
+            conn.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS ix_gestao_custo_filho_tarefa_cronograma
+                    ON gestao_custo_filho(tarefa_cronograma_id)
+            """))
+        logger.info('[Migration 321] gestao_custo_filho.tarefa_cronograma_id criada.')
+        return True
+    except Exception as e:
+        logger.error(f'[Migration 321] Falha: {e}', exc_info=True)
+        return False
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7936,6 +7977,7 @@ def executar_migracoes():
             (318, "A24 — flag configuracao_empresa.folha_rateio_encargos (default FALSE): rateio de encargos patronais por obra atras de interruptor por tenant", _migration_318_flag_folha_rateio_encargos),
             (319, "Resgate Espinha — cronograma_template_item.peso_medicao (repoe a 193 da linhagem velha)", _migration_319_template_item_peso_medicao),
             (320, "Resgate Espinha — propostas_comerciais.origem (repoe a 194): proposta de importacao fora do funil comercial", _migration_320_proposta_origem),
+            (321, "Resgate Espinha — gestao_custo_filho.tarefa_cronograma_id (a outra metade da 195): custo direto por atividade; NULL segue rateado por hora-homem", _migration_321_gestao_custo_filho_tarefa),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

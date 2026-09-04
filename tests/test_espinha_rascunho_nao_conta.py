@@ -28,8 +28,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app, db  # noqa: E402
 from helpers_tenant import um_tenant  # noqa: E402
-from models import (RDO, RDOMaoObra, RDOServicoSubatividade,  # noqa: E402
-                    SubatividadeMestre)
+from models import (RDO, RDOCustoDiario, RDOMaoObra,  # noqa: E402
+                    RDOServicoSubatividade, SubatividadeMestre,
+                    TarefaCronograma)
 
 pytestmark = pytest.mark.integration
 
@@ -121,3 +122,70 @@ def test_rdo_preenchido_entra_normalmente():
                                produtividade=12.0, horas=8)
         media, n = produtividade_observada(sub_id, tenant.admin_id)
         assert n == 1 and float(media) == 12.0
+
+
+# ── Task 5 — o mesmo defeito, agora no read-model do custo ────────────────────
+# O read-model da branch não filtra RDO de forma nenhuma: 🔬 zero ocorrências de
+# `status`, `estado` ou `'Finalizado'` nas 537 linhas. `custo_mo_atividade` soma
+# `RDOCustoDiario` de todo RDO que encontrar, e esse número alimenta o alarme
+# (D5), o CPI e o EAC. Rascunho ali é pior que no catálogo: move dinheiro.
+
+
+def _tarefa_com_apontamento(tenant, estado, custo_dia, horas=8.0):
+    """Uma atividade do cronograma com `horas` apontadas por um funcionário num
+    RDO no `estado` pedido, e o custo onerado daquele dia no RDOCustoDiario.
+
+    O `estado` é SEMPRE explícito — RDO sem `estado` nasce 'rascunho'
+    (models.py, `default='rascunho'`), e é essa a dívida de fixture que faz
+    teste honesto ficar vermelho pelo motivo errado.
+    """
+    tarefa = TarefaCronograma(
+        obra_id=tenant.obra_id, admin_id=tenant.admin_id,
+        nome_tarefa=f'Atividade {tenant.marca}', ordem=1, duracao_dias=5,
+        quantidade_total=100.0, percentual_concluido=50.0,
+    )
+    db.session.add(tarefa)
+    db.session.flush()
+
+    rdo = RDO(
+        numero_rdo=f'ESP{uuid4().hex[:12]}',
+        data_relatorio=DIA, obra_id=tenant.obra_id,
+        admin_id=tenant.admin_id, estado=estado,
+    )
+    db.session.add(rdo)
+    db.session.flush()
+
+    db.session.add(RDOMaoObra(
+        admin_id=tenant.admin_id, rdo_id=rdo.id,
+        funcionario_id=tenant.funcionario_id, funcao_exercida='Pedreiro',
+        horas_trabalhadas=horas, tarefa_cronograma_id=tarefa.id,
+    ))
+    db.session.add(RDOCustoDiario(
+        rdo_id=rdo.id, funcionario_id=tenant.funcionario_id,
+        admin_id=tenant.admin_id, data=DIA,
+        tipo_remuneracao_snapshot='salario', custo_total_dia=custo_dia,
+        horas_normais=horas,
+    ))
+    db.session.commit()
+    return tarefa
+
+
+def test_rdo_em_rascunho_nao_entra_no_custo_de_mao_de_obra():
+    from services.resultado_atividade_service import custo_mo_atividade
+    with app.app_context():
+        tenant = um_tenant('espinha-custo', data_ref=DIA, com_fatos=False)
+        tarefa = _tarefa_com_apontamento(tenant, estado='rascunho',
+                                         custo_dia=1000.0)
+        assert float(custo_mo_atividade(tarefa)) == 0.0, (
+            'rascunho entrou no custo incorrido — alarme e EAC passam a '
+            'reagir a documento não submetido')
+
+
+def test_rdo_preenchido_entra_no_custo_de_mao_de_obra():
+    """A contraprova: sem ela, `return 0` passaria no teste de cima."""
+    from services.resultado_atividade_service import custo_mo_atividade
+    with app.app_context():
+        tenant = um_tenant('espinha-custo-ok', data_ref=DIA, com_fatos=False)
+        tarefa = _tarefa_com_apontamento(tenant, estado='preenchido',
+                                         custo_dia=1000.0)
+        assert float(custo_mo_atividade(tarefa)) == 1000.0

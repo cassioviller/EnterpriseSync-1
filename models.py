@@ -7277,6 +7277,16 @@ class GestaoCustoFilho(db.Model):
     )
     origem_tabela = db.Column(db.String(80), nullable=True)
     origem_id = db.Column(db.Integer, nullable=True)
+    # Resgate da Espinha Financeira (migration 321) — a atividade do cronograma
+    # a que este lançamento pertence. NULL significa "custo do dia, sem dono",
+    # e o read-model o rateia entre as atividades pela fração de hora-homem do
+    # dia (DC6); preenchido, o custo é DIRETO da atividade. Repõe a coluna que
+    # a migration 195 da linhagem velha criava e que a fratura de 22/07 levou.
+    tarefa_cronograma_id = db.Column(
+        db.Integer,
+        db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
