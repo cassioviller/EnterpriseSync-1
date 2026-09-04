@@ -1312,22 +1312,35 @@ def plano_contas():
 @login_required
 def inicializar_plano_contas():
     """Inicializa plano de contas padrão"""
-    from financeiro_seeds import criar_plano_contas_padrao
-    
+    # Fase 8 — semeador ÚNICO (ver contabilidade_views.py e a spec:
+    # docs/superpowers/specs/2026-08-17-fase-8-financeiro-design.md).
+    # `seed_plano_contas_if_needed` é `-> None` (contrato da spec, do qual já
+    # dependem `handlers/propostas_handlers.py:601` e
+    # `services/medicao_service.py:368`) — o chamador antigo comparava
+    # `contas_criadas > 0` contra um int devolvido pelo semeador aposentado;
+    # com `None` isso é TypeError. Por isso é o CHAMADOR que conta, antes e
+    # depois. E o semeador só dá `flush` (ver contabilidade_utils.py:1685) —
+    # quem chama decide a transação, daí o `db.session.commit()` explícito.
+    from contabilidade_utils import seed_plano_contas_if_needed
+
     admin_id = get_admin_id()
-    
+
     try:
-        contas_criadas = criar_plano_contas_padrao(admin_id)
-        
+        antes = PlanoContas.query.filter_by(admin_id=admin_id).count()
+        seed_plano_contas_if_needed(admin_id)
+        db.session.commit()
+        contas_criadas = (PlanoContas.query.filter_by(admin_id=admin_id).count()
+                           - antes)
+
         if contas_criadas > 0:
             flash(f'Plano de contas inicializado com {contas_criadas} contas!', 'success')
         else:
             flash('Plano de contas já existe para este usuário', 'warning')
-            
+
     except Exception as e:
         logger.error(f"Erro ao inicializar plano de contas: {str(e)}")
         flash('Erro ao inicializar plano de contas', 'danger')
-    
+
     return redirect(url_for('financeiro.plano_contas'))
 
 

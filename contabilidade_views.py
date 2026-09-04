@@ -90,7 +90,12 @@ def plano_de_contas():
     
     # Criar plano de contas se não existir
     if not PlanoContas.query.filter_by(admin_id=admin_id).first():
-        criar_plano_contas_padrao(admin_id)
+        # Fase 8 — semeador ÚNICO. Antes, cada tela semeava com um conteúdo
+        # diferente e o primeiro a rodar decidia o que `5.1.01` significa
+        # naquele tenant. Ver docs/superpowers/specs/2026-08-17-fase-8-financeiro-design.md
+        from contabilidade_utils import seed_plano_contas_if_needed
+        seed_plano_contas_if_needed(admin_id)
+        db.session.commit()
         flash('Plano de contas padrão criado automaticamente.', 'success')
     
     contas = PlanoContas.query.filter_by(admin_id=admin_id).order_by(PlanoContas.codigo).all()

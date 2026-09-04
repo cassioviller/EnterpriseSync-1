@@ -103,10 +103,17 @@ PLANO_CONTAS_CONSTRUCAO = [
 def criar_plano_contas_padrao(admin_id):
     """
     Cria plano de contas padrão para construção civil para um admin_id específico
-    
+
+    ⚠️ EM APOSENTADORIA (Fase 8, 2026-08-24). Não tem mais chamador vivo.
+    NÃO É APAGADA de propósito: remover a função e mudar o leitor no mesmo
+    release são duas mudanças difíceis de bissetar juntas — mesma decisão
+    da AlocacaoEquipe no p7. O semeador vivo é
+    `contabilidade_utils.seed_plano_contas_if_needed`.
+    Spec: docs/superpowers/specs/2026-08-17-fase-8-financeiro-design.md
+
     Args:
         admin_id: ID do usuário administrador
-    
+
     Returns:
         int: Número de contas criadas
     """
