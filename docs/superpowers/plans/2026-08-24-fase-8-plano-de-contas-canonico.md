@@ -657,14 +657,62 @@ git commit -m "feat(fase8): um semeador so — os dois concorrentes ficam EM APO
 
 **Files:**
 - Create: `services/plano_contas_depara.py`
-- Modify: `contabilidade_utils.py` (`AssinaturaDesconhecida` + `classificar_assinatura`)
+- Modify: `contabilidade_utils.py` (`AssinaturaDesconhecida` + `classificar_assinatura`; e os mapas de leitura do DRE, `:590` e `:712` — ver Step 0)
+- Modify: `event_manager.py` (`:1488`, o escritor vivo de `5.1.01.001` — ver Step 0)
 - Modify: `migrations.py` (`_migration_324_depara_contas_5x` + registro)
-- Test: `tests/test_fase8_depara_5x.py`
+- Modify: `tests/test_fase06_d3_dre_despesas_v2.py` (ele prova a coexistência que esta task remove)
+- Test: `tests/test_fase8_depara_5x.py`, e o censo de literal `5.x` novo
 
 **Interfaces:**
 - Produces: `DEPARA_5X: dict[tuple[str, str], str]` — chave **`(assinatura, codigo)`**, valor o código canônico de destino; `CONTAS_5X_CONHECIDAS: set[str]` derivado das chaves.
 - Produces: `classificar_assinatura(admin_id, conn=None) -> str` em `contabilidade_utils.py`, devolvendo `'contabilidade_utils' | 'financeiro_seeds' | 'sem_5x'`, e a exceção `AssinaturaDesconhecida`.
 - Consumes: nada de fora do repo. **Nenhum sinal lê `plano_contas.nome`.**
+
+- [ ] **Step 0: O inventário dos leitores e escritores VIVOS de `5.x` — 🔴 achado de 04/09, e ele muda o tamanho da task**
+
+🔴 **A Fase 8 não pode migrar as `5.x` e deixar o app apontando para elas.** 🔬
+Medido no banco de dev e na fonte em 04/09, **depois** de o plano estar escrito:
+
+| Sítio vivo | O que faz hoje | O que acontece DEPOIS do de-para, se nada mudar |
+|---|---|---|
+| 📖 `event_manager.py:1488` — handler de `folha_processada` | `PlanoContas.query.filter_by(codigo='5.1.01.001', ativo=True)` | 🔴 o passo 5 desativa a `5.1.01.001` (ela fica sem partida). A busca devolve `None`, e `:1520` faz `logger.warning('Plano de contas incompleto') ; return` — **a folha para de gerar lançamento contábil, em silêncio**. Falha fechada, mas silenciosa: só um warning no log |
+| 📖 `contabilidade_utils.py:712` | `cmv = calcular_valor_contas(['5.1.03'], 'DEBITO')` | 🔴 **o CMV do DRE vai a zero** — nenhuma partida mora mais em `5.1.03` |
+| 📖 `contabilidade_utils.py:590` | `_DRE_PREFIXOS_FORA_DAS_OPERACIONAIS = ('5.1.03', '5.2.01', '5.3.01', '5.3.02')` | 🔴 as quatro linhas próprias do DRE vão a zero |
+| 📖 `contabilidade_utils.py:602-605` | `'pessoal': ('5.1.01','6.1.01')`, `'materiais': ('5.1.02',)`, `'administrativas': ('5.1.04',)`, `'comerciais': ('5.1.05',)` | ⚠️ `pessoal` sobrevive (já lê as duas raízes); **as outras três vão a zero** |
+
+⚠️ **Isto não é a mesma coisa que o mapa de prefixos invertido** que a Onda 4
+mediu e deixou para esta fase. Aquele é um erro de *classificação*; este é o
+dado **sumindo de baixo** do leitor. Os dois se resolvem aqui, mas são
+defeitos diferentes e cada um tem seu teste.
+
+**O que este Step exige, no MESMO commit da migration:**
+
+1. `event_manager.py:1488` passa a `'6.1.01.001'` (o destino que o `DEPARA_5X`
+   já dá para `('financeiro_seeds', '5.1.01.001')` — os dois têm de bater, e há
+   teste que falha se divergirem).
+2. `contabilidade_utils.py:712` e `:590` passam aos prefixos canônicos.
+   ⚠️ **`5.1.03` (CMV) não tem par óbvio no canônico** — 🔬 `_V2_CONTAS_SEED`
+   não tem conta de CMV. Se não houver destino, **declare o resíduo por
+   escrito** e deixe a linha de CMV do DRE saindo como "sem base", nunca como
+   `0,00`: é a Global Constraint *"Indicador sem base sai como 'sem base'"*.
+3. Um **censo** que falhe quando aparecer literal `5.x` novo fora dos dois
+   seeders aposentados — o padrão que a casa já usa para resolvedor de tenant e
+   para rótulo de origem. Sem ele, o próximo caminho de escrita volta calado.
+
+⚠️ 🔬 **`tests/test_fase06_d3_dre_despesas_v2.py` cria contas `5.x` a cada
+rodada** (`_garantir_conta`, `:92`) e existe justamente para provar que
+`6.1.01.001` e `5.1.01.001` coexistem (`:154`). Depois deste Step ele **tem de
+mudar junto** — é a prova viva do comportamento que esta task remove.
+
+🔬 **O banco de dev não ajuda a decidir nada disto, e isso está medido:** dos
+**8.606** tenants com plano de contas, **8.520** têm grupo 6 e só **211** têm
+qualquer conta `5.x` — e os 211 são **resíduo de suíte**
+(`d3_*@test.local`, do teste acima). Os três códigos que carregam partida em
+dev são `5.1.01.001` ('Salários', 42 partidas), `5.1.03.001` (**'CMV'** no
+banco, mas *'Aluguel de Equipamentos'* em `financeiro_seeds.py:85`) e
+`5.2.01.001` ('Despesa financeira', **que não existe em seeder nenhum**).
+🔴 **Prova por que o `(codigo, nome)` da versão de 24/08 teria falhado
+também:** o nome no banco não bate com o nome do seeder.
 
 - [ ] **Step 1: O classificador de assinatura, em `contabilidade_utils.py`**
 
@@ -1081,8 +1129,8 @@ Expected: PASS nos seis; `True True` na dupla execução (a segunda não acha pa
 - [ ] **Step 7: Commit**
 
 ```bash
-git add services/plano_contas_depara.py contabilidade_utils.py migrations.py tests/test_fase8_depara_5x.py
-git commit -m "feat(fase8): de-para das 5.x por assinatura estrutural — migration 324, transacao unica, orfa e desconhecida nomeadas"
+git add services/plano_contas_depara.py contabilidade_utils.py event_manager.py migrations.py tests/test_fase8_depara_5x.py tests/test_fase06_d3_dre_despesas_v2.py
+git commit -m "feat(fase8): de-para das 5.x por assinatura estrutural — migration 324, e os leitores/escritores vivos de 5.x remapeados no mesmo commit"
 ```
 
 ---
