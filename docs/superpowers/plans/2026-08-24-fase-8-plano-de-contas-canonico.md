@@ -619,6 +619,55 @@ Expected: `test_dois_caminhos...` FALHA com planos divergentes (`5.1.01` num, au
         contas_criadas = PlanoContas.query.filter_by(admin_id=admin_id).count()
 ```
 
+- [ ] **Step 3-b: 🔴 O retorno NÃO casa, e a troca ingênua manda a rota para 500**
+
+🔬 Achado em 04/09, antes do despacho. Os dois chamadores não são simétricos:
+
+| Chamador | O que faz com o retorno | Depois da troca |
+|---|---|---|
+| 📖 `contabilidade_views.py:93` | **ignora** — a chamada é guardada por `if not PlanoContas.query.filter_by(admin_id=admin_id).first():` | ✅ troca direta, sem risco |
+| 📖 `financeiro_views.py:1320` | `contas_criadas = criar_plano_contas_padrao(admin_id)` e logo `if contas_criadas > 0:` (`:1322`) | 🔴 **`TypeError`** |
+
+📖 `financeiro_seeds.criar_plano_contas_padrao` devolve **int** (`:120` `return 0`,
+`:153` `return contas_criadas`). 📖 `contabilidade_utils.seed_plano_contas_if_needed`
+é declarada **`-> None`** e não devolve nada. Trocar a chamada sem mexer no
+`if` produz `'>' not supported between instances of 'NoneType' and 'int'`, e a
+rota `POST /financeiro/plano-contas/inicializar` responde **500**.
+
+⚠️ O `except Exception` de `:1327` **engoliria** esse `TypeError` e mostraria
+"Erro ao inicializar plano de contas" — falha silenciosa com cara de erro
+genérico. É o mesmo padrão do `except` que a Onda 4 caçou.
+
+**O que fazer** (nesta ordem, e a escolha é deliberada): **não** dê retorno ao
+semeador canônico só para agradar este chamador — a Interface `-> None` é da
+spec e outros dois consumidores (`handlers/propostas_handlers.py:601`,
+`services/medicao_service.py:368`) já dependem dela. Em vez disso, o **chamador
+conta**:
+
+```python
+    from contabilidade_utils import seed_plano_contas_if_needed
+
+    admin_id = get_admin_id()
+    try:
+        antes = PlanoContas.query.filter_by(admin_id=admin_id).count()
+        seed_plano_contas_if_needed(admin_id)
+        db.session.commit()   # o semeador usa flush, nao commit — ver :1685
+        criadas = PlanoContas.query.filter_by(admin_id=admin_id).count() - antes
+        if criadas > 0:
+            flash(f'Plano de contas inicializado com {criadas} contas!', 'success')
+        else:
+            flash('Plano de contas já existe para este usuário', 'warning')
+```
+
+⚠️ 📖 `seed_plano_contas_if_needed` usa **`flush`, não `commit`** — está escrito
+nos dois consumidores existentes (`handlers/propostas_handlers.py:597-598`,
+`services/medicao_service.py:351`). Quem chama decide a transação. Sem o
+`commit`, a contagem "depois" vê as linhas mas nada é gravado.
+
+**E o teste desta troca tem de exercitar a ROTA**, não só a função: um teste que
+chame `seed_plano_contas_if_needed` direto não veria o `TypeError`, porque ele
+nasce da comparação no chamador. É a 14ª vez que este plano precisa dizer isso.
+
 - [ ] **Step 4: Marcar as duas em aposentadoria (sem apagar)**
 
 No topo da docstring de **ambas** as `criar_plano_contas_padrao`:
