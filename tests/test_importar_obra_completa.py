@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import app, db
 import main  # noqa: F401 — registra blueprints (rota /orcamentos/<id>/importar-obra)
 from models import (
-    Usuario, TipoUsuario, Funcionario, Obra, Cliente,
+    Usuario, TipoUsuario, Funcionario, Obra,
     Orcamento, OrcamentoItem, Proposta, PropostaItem,
     ItemMedicaoComercial, ItemMedicaoCronogramaTarefa, TarefaCronograma,
     RDO, RDOMaoObra, RDOCustoDiario,
@@ -265,7 +265,7 @@ def test_import_marca_origem_e_sai_do_funil_comercial():
     from services.importar_obra_completa import importar_obra_completa
     with app.app_context():
         orc = _orcamento_baia_like()
-        res = importar_obra_completa(orc.id, _fx.admin.id)
+        importar_obra_completa(orc.id, _fx.admin.id)
         ponte = Proposta.query.filter_by(orcamento_id=orc.id).first()
         assert ponte.origem == 'importacao_obra'
 

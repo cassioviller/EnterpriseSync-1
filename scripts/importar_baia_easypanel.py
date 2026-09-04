@@ -14,7 +14,7 @@ Idempotente: se a obra da Baia já existe para o admin, não recria. Em produç�
 """
 import sys
 
-from app import app, db
+from app import app
 from models import Usuario, Orcamento, Proposta
 
 XLSX_PADRAO = 'obra_kabod/IMPORTACAO_Baia_REV10_completa.xlsx'

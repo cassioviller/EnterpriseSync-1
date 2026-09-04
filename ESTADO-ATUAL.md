@@ -93,7 +93,86 @@ de premissas P5-P9 apensada aos planos das Fases 5-9 (`941e6738`) e fix do
 achado R10 — PDF de medição do portal agora respeita expiração de token
 (`fe605252`).
 
-### 🔬 03/08 — `PLANO-NUCLEO.md`: os dez pacotes, entregues
+### ✅ 04/09 — a Espinha Financeira foi PORTADA do PR #6, e o PR continua não-mesclável
+
+`30287f3b` → `b5265988`, **9 commits** na branch `sdd/espinha-financeira`.
+O *Resultado por Atividade* (valor agregado − custo incorrido, por atividade
+do cronograma, com alarme, EVM, lente de caixa e roll-up de portfólio) e o
+importador de obra por planilha saíram da branch `design/espinha-financeira-obra`
+e entraram na árvore de hoje, task a task, pelo plano
+`docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md`.
+
+🔴 **O PR #6 não é mesclável, e isso não vai mudar.** 🔬 04/09:
+`git merge-base main origin/design/espinha-financeira-obra` → **vazio**;
+`git rev-list --count origin/fix/fase-0-estancar..main` → **722**. As
+linhagens se separaram no recomeço de 22/07 e não têm um commit em comum.
+O que se fez foi **porte**, não merge. `ESTADO_design_espinha_financeira.md`
+foi aposentado como fonte de estado e leva esse aviso no cabeçalho, porque
+o documento antigo ainda diz "Merge do PR #6" na lista de próximos passos.
+
+**Porte não foi cópia — três correções obrigatórias, e a primeira move dinheiro:**
+
+1. 📖 O read-model da branch (`services/resultado_atividade_service.py`, 537
+   linhas) **não filtrava estado de RDO**: 🔬 zero ocorrências de `status`,
+   `estado` ou `'Finalizado'` no arquivo inteiro. Ele somava `RDOCustoDiario`
+   e `RDOMaoObra` de todo RDO que encontrasse — correto em 15/06, quando
+   `RDO.estado` não existia; hoje, faria **rascunho contar como custo real**,
+   movendo alarme (D5), CPI e EAC. É o defeito que `95eb585f` fechou do outro
+   lado em 24/08. Cinco leitores ganharam `RDO.estado != 'rascunho'`, com
+   teste próprio (`tests/test_espinha_rascunho_nao_conta.py`). ⚠️ O quinto
+   (`horas_reais` de `indice_horas`) não estava no plano — somava horas de
+   rascunho no denominador do índice.
+2. 📖 O importador gravava `obra.valor_contrato` direto. A Fase 6 fez de
+   `services/contrato_obra` o escritor único, e é ele quem abre a
+   `ObraContratoVersao` nº1: a obra importada nasceria sem baseline
+   versionado, única no sistema nesse estado. Agora passa pelo escritor, com
+   uma origem declarada (`ORIGEM_IMPORTACAO_OBRA`, o 6º escritor) em vez de
+   emprestar `proposta_aprovada`.
+3. 📖 O funil comercial não lia `Proposta.origem`. A Proposta de importação
+   (ADR 0005) aparecia na listagem e contava nos KPIs como receita que
+   ninguém vendeu. `propostas_consolidated.index` passa a filtrá-la.
+
+**Um achado de schema que nenhum dos dois planos via:** o plano listava três
+colunas ausentes da linhagem velha e conferiu só `rdo_subempreitada_apontamento`.
+A migration 195 também criava `gestao_custo_filho.tarefa_cronograma_id`, e sem
+ela `custo_nao_mo_atividade` estoura em `TypeError` — a Fatia 2 inteira não
+roda. Virou a **migration 321**; a da subempreitada virou **322**. As duas
+foram numeradas medindo o máximo real do repo no dia, nunca por faixa
+reservada, e rodadas duas vezes cada no banco de dev.
+
+**Os resíduos, nomeados — não ficou redondo:**
+
+- 🔴 **Importador genérico: não feito, e é trabalho novo.** Os três scripts
+  da Baia são Baia-específicos por desenho (`gerar_importacao_baia_rev10.SERVICOS`).
+  "Qualquer obra pela planilha" precisa de um parser novo — não é porte.
+- 🔴 **SPI continua `None`.** `evm_atividade`/`evm_obra` entregam CPI e EAC;
+  o SPI depende de `data_inicio`/`duracao` por atividade, que vêm do export
+  do `.mpp` para XML. Frente própria, sem dono.
+- 🟡 **Telhado viga I: o schema está de pé, a ratificação comercial não.** A
+  opção B (markup uniforme) foi decidida em 01/09 e a migration 322 entrega
+  `verba_unica`/`lucro_pct`/`gestao_custo_pai_id`. O `RATIFICAR` com o dono
+  segue pendente — é escolha comercial e não bloqueava o porte, mas os
+  números de verba e lucro da Baia dependem dela.
+- 🟡 **Material direto na UI** e o refino do EVM F3-4: refinos listados em
+  15/06, sem dono.
+- ⚠️ **Dívida de fixture, e ela vai reaparecer.** Todo `_rdo()` dos testes
+  portados precisou declarar `estado='preenchido'`: RDO sem estado nasce
+  `'rascunho'` (`models.py`, `default='rascunho'`) e o read-model o descarta.
+  Fixture que omite o estado fica vermelha pelo motivo errado — foi o que
+  fez o trabalho de 24/08 parecer que quebrava dezenas de testes. **Quem
+  escrever teste novo que toque RDO declara o estado.**
+
+**O gate, e as duas falhas que ele achou.** 🔬 04/09, `bash run_tests.sh --gate`
+(3.403 selecionados, sem browser): **3.323 passaram, 0 falharam**, 8 pulados,
+72 xfailed, em 46min17s. Não foi de primeira: a rodada das 07:28 fechou com
+**2 vermelhos**, e os dois eram censos — testes que cobram cadastro, não
+lógica. `test_a_lista_do_censo_cobre_quem_tem_resolvedor_proprio` acusou que
+`resultado_views:_admin_id` é resolvedor de tenant novo e não estava na lista
+do bloco 1; `test_rotulos_de_origem_casam_com_o_vocabulario` acusou que
+`importacao_obra`, origem nova de versão de contrato, não tinha rótulo em
+`templates/aditivos/listar.html` e apareceria cru na tela de aditivos.
+**Os dois são o desenho funcionando:** quem acrescenta resolvedor ou origem
+paga o cadastro no mesmo commit, e o teste é quem cobra. — `PLANO-NUCLEO.md`: os dez pacotes, entregues
 
 `85ab9f4d` → `63cc1c13`, **21 commits em `main`**. O plano nasceu da
 conferência adversarial dos 12 vereditos de 31/07 (**10 confirmados, 2

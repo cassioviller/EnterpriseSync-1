@@ -104,6 +104,7 @@ RESOLVEDORES = [
     'medicao_views:_admin_id',
     'multitenant_helper',
     'propostas_consolidated',
+    'resultado_views:_admin_id',
     'subempreiteiros_views:_admin_id',
     'transporte_views:_get_admin_id',
     'views.almoxarifado',

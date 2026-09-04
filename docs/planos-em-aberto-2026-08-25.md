@@ -77,7 +77,26 @@ arquivos existem.
   chavear em `(código, nome)` por igualdade exata contra os dois conjuntos fechados
   que estão no repo; semelhança de string continua proibida.
 
-### 2. Resgate da Espinha Financeira
+### 2. ~~Resgate da Espinha Financeira~~ — ✅ **EXECUTADO em 04/09**
+
+> 🟢 **Atualização de 2026-09-04.** As **10 tasks foram executadas**
+> (`30287f3b` → `b5265988`, 9 commits em `sdd/espinha-financeira`). O porte
+> saiu — com três correções obrigatórias que o plano não previa por inteiro,
+> a primeira delas o filtro de estado de RDO descrito logo abaixo. O que
+> restou está **nomeado como resíduo**, não como plano em aberto: importador
+> genérico (trabalho novo, não porte), SPI/datas por atividade (depende do
+> export do `.mpp`), material direto na UI, refino do EVM F3-4, e o
+> `RATIFICAR` comercial do telhado viga I — cujo schema entrou (migration
+> 322), cujos números não. Detalhe em `ESTADO-ATUAL.md` (seção de 04/09) e no
+> bloco de estado do próprio plano.
+>
+> **O placar acima segue estampado em 25/08 e não foi reescrito** — este
+> documento é snapshot daquele dia, pela mesma convenção que rege o resto da
+> casa. Com esta linha, dos três herdados que pediam código sobram **dois**
+> (Fase 8 e Fase 9a/9b).
+
+O que o plano dizia em 25/08, preservado:
+
 `plans/2026-08-24-resgate-espinha-financeira.md` · 10 tasks · 🔬 7 de 20 arquivos
 existem.
 

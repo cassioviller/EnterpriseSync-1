@@ -4,13 +4,46 @@
 > do telhado viga I segue a **opção B**; a C foi declarada morta. `RATIFICAR`
 > pendente — a Task 8 daqui destrava ao ratificar.
 >
-> **Estado em 2026-08-25 (varredura de fecho):** 🟡 **ABERTO — trabalho real pendente** — escrito em 24/08, **não executado** — 🔬 **4 de 21** arquivos existem (recontagem de 02/09 sobre os 21 caminhos do File Structure; o "7 de 20" era régua velha — há **mais** porte a fazer do que se anunciava, não menos). Porte de 2.542 linhas do PR #6. Uma única task presa a decisão de negócio (verba/lucro do telhado viga I). 🔬 7/20 dos arquivos prometidos existem na árvore.
+> **Estado em 2026-09-04:** ✅ **EXECUTADO — as 10 tasks fechadas**, `30287f3b` →
+> `b5265988`, 9 commits em `sdd/espinha-financeira`. As caixas `- [ ]` abaixo
+> seguem desmarcadas pela convenção deste arquivo: elas são rascunho de execução,
+> e quem carrega a verdade é este bloco, o `ESTADO-ATUAL.md` (seção de 04/09), o
+> código e o git.
 >
-> Este é um dos poucos planos que ainda pedem código. **As caixas `- [ ]` abaixo não foram marcadas de propósito:** elas são
-> rascunho de execução, não registro de estado. Quem carrega a verdade é este bloco,
-> o `ESTADO-ATUAL.md`, o código e o git. O veredito acima foi dado por **existência de
-> arquivo na árvore**, nunca por contagem de caixa.
-
+> **As cinco emendas que a execução fez ao plano** — todas medidas, nenhuma por
+> conveniência:
+>
+> 1. 🔴 **Faltava uma quarta coluna, e o plano não a via.** A migration 195 da
+>    linhagem velha também criava `gestao_custo_filho.tarefa_cronograma_id`; o
+>    plano conferiu só `rdo_subempreitada_apontamento` e concluiu "três colunas".
+>    Sem ela, `custo_nao_mo_atividade` estoura em `TypeError` e a Fatia 2 inteira
+>    não roda. Virou a **migration 321**, e a da subempreitada deslizou para a
+>    **322** (máximo real do repo medido no dia, como o próprio plano manda).
+> 2. 🔴 **Não havia ramo de subempreitada para remover.** A Task 5 mandava tirá-lo
+>    de `custo_nao_mo_atividade` e a Task 8 mandava devolvê-lo. 🔬 `grep -i
+>    subempreit` no arquivo da branch devolve **duas linhas, ambas comentário**.
+>    O custo chega ao read-model pelo ledger genérico; quem faltava era só o
+>    **escritor** (Step 3b), que o plano já tinha achado. Os dois steps são no-op
+>    declarado.
+> 3. ⚠️ **Um quinto leitor de RDO.** O plano nomeava quatro sítios para o filtro
+>    de estado; o `horas_reais` de `indice_horas` é o quinto, e somava horas de
+>    rascunho no denominador do índice.
+> 4. ⚠️ **Duas metades que faltavam na Task 4/6.** A Task 4 criou
+>    `propostas_comerciais.origem` e ninguém a lia — o Delta 2 da ADR 0005 (tirar
+>    a proposta de importação do funil e dos KPIs) foi feito na Task 6. E a rota
+>    `POST /orcamentos/<id>/importar-obra`, que o teste da Task 6 exercita, não
+>    estava em nenhuma lista de arquivos: mora em `views/orcamentos_views.py`, não
+>    no blueprint `resultado`.
+> 5. ⚠️ **A idempotência do re-import não era testada.** O Step 4 da Task 9 manda
+>    cobri-la e o E2E da branch a **afirmava sem exercitar**. Teste novo:
+>    `test_reimportar_no_mesmo_tenant_nao_duplica`.
+>
+> **O que ficou de fora, de propósito** (e está nomeado no `ESTADO-ATUAL.md`):
+> importador genérico (trabalho novo), datas por atividade / SPI (depende do
+> `.mpp`), material direto na UI, refino do EVM F3-4, e o `RATIFICAR` comercial
+> do telhado viga I — cujo schema entrou, mas cujos números não.
+>
+> Índice de estado de todos os planos e specs: `docs/planos-em-aberto-2026-08-25.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recomendado) ou superpowers:executing-plans para executar este plano task a task. Os passos usam checkbox (`- [ ]`) para acompanhamento.
 

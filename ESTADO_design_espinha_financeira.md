@@ -4,30 +4,70 @@
 > Branch: `design/espinha-financeira-obra` · **PR #6** aberto: https://github.com/cassioviller/EnterpriseSync-1/pull/6
 > Foco do usuário (Cássio): **qualidade**. Trabalho feito fase a fase, com **teste entre cada etapa**.
 
-> 🔴 **23/08 — LEIA ISTO ANTES DO RESTO: o código descrito aqui NÃO está no `main`.**
-> Este documento foi escrito em 15/06, na branch `design/espinha-financeira-obra`
-> (PR #6). Em **22/07 a história do repositório foi recomeçada** — o `main` de hoje
-> tem 476 commits e nenhum ancestral em comum com aquela branch — e o PR nunca foi
-> mesclado. 🔬 conferido em 23/08, arquivo por arquivo: `services/resultado_atividade_service.py`,
-> `services/importar_obra_completa.py`, `services/caixa_obra_service.py`,
-> `services/aprendizado_produtividade.py`, `resultado_views.py`, `templates/resultado/*`
-> e os ~40 testes **não existem na árvore**; `grep` por `resultado_atividade`,
-> `resultado/portfolio` e `por_atividade` no repositório inteiro devolve **zero**.
-> O EVM foi refeito por outro caminho (`services/evm.py`, p10); *resultado por
-> atividade*, o importador de obra por planilha e a lente de caixa, não.
-> Tudo abaixo desta linha descreve a branch, **não o sistema**.
+> 🟢 **04/09 — O PORTE FOI FEITO. Este documento está APOSENTADO como fonte de estado.**
 >
-> ✅ **25/08 — o porte agora tem plano, e ele corrige um defeito que este documento não sabia ter.**
-> `docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md` traz o porte em 10 tasks.
-> 🔴 O achado que impede um `git checkout` simples: 🔬 `services/resultado_atividade_service.py`
-> nesta branch tem **zero** ocorrências de `status`, `estado` ou `'Finalizado'` — ele soma
-> `RDOCustoDiario` e `RDOMaoObra` de **todo** RDO que encontrar; e
-> `services/aprendizado_produtividade.py` filtra `RDO.status == 'Finalizado'`, **que não filtra
-> nada**, porque todo RDO nasce `'Finalizado'`. Em 15/06 os dois estavam certos: `RDO.estado`
-> só nasceu na Fase 5. Portados como estão, fazem **RDO em rascunho contar como custo real**,
-> alimentando alarme, CPI/EAC e o catálogo de produtividade — exatamente o defeito que o `main`
-> fechou em 24/08 do outro lado (`95eb585f`). O plano torna inegociável: todo leitor de RDO
-> portado filtra por `RDO.estado`, com teste próprio provando que rascunho não entra na conta.
+> O que este arquivo descreve foi escrito em 15/06 sobre a branch
+> `design/espinha-financeira-obra` (PR #6). Em 22/07 a história do repositório
+> foi recomeçada e as duas linhagens ficaram **disjuntas**. Entre 03/09 e
+> 04/09 o código foi **portado** para o `main` de hoje, task a task, pelo
+> plano `docs/superpowers/plans/2026-08-24-resgate-espinha-financeira.md`.
+>
+> ### 🔴 O PR #6 NÃO É MESCLÁVEL. Não tente.
+>
+> Isto está escrito porque alguém vai tentar. 🔬 medido em 04/09:
+> `git merge-base main origin/design/espinha-financeira-obra` devolve
+> **vazio** — as duas árvores não têm um único commit em comum — e
+> `git rev-list --count origin/fix/fase-0-estancar..main` devolve **722**
+> (o número anda; meça no dia). Não há merge possível, só porte. O item 6
+> da lista "PRÓXIMOS PASSOS" mais abaixo ("Merge do PR #6") **deixa de
+> existir**: ele descreve uma operação que o git não pode executar.
+>
+> ### O que FOI portado, e em que commit
+>
+> | O quê | Commit |
+> |---|---|
+> | Ref durável (tag `espinha-pr6-origem`) + inventário conferido | `6981caac` |
+> | `caixa_obra_service` e `aprendizado_produtividade`, com filtro de estado | `42bb5000` |
+> | `cronograma_template_item.peso_medicao` (migration 319) | `917637bf` |
+> | `propostas_comerciais.origem` (migration 320) | `0aa54db1` |
+> | Read-model `resultado_atividade_service` + `gestao_custo_filho.tarefa_cronograma_id` (migration 321) | `4ec10aeb` |
+> | Importador de obra por planilha, pelo escritor único de contrato | `dfd15ea4` |
+> | Telas (resultado, caixa, portfólio, importação) + blueprint | `a1fddb6c` |
+> | Fatia 2 §D: verba/lucro/pai na subempreitada (migration 322) | `eb24281c` |
+> | Scripts da Baia REV10 + E2E ponta a ponta | `b5265988` |
+>
+> **O porte não foi cópia.** Três correções obrigatórias, e a primeira é a
+> que importa: o read-model de 15/06 **não filtrava estado de RDO** — somava
+> `RDOCustoDiario` e `RDOMaoObra` de todo RDO que encontrasse, porque
+> `RDO.estado` só nasceu na Fase 5. Portado como estava, faria **rascunho
+> contar como custo real**, movendo alarme, CPI e EAC. Cinco leitores ganharam
+> `RDO.estado != 'rascunho'`, com teste próprio
+> (`tests/test_espinha_rascunho_nao_conta.py`). As outras duas: o importador
+> passou a gravar `valor_contrato` pelo escritor único
+> (`services/contrato_obra`, Fase 6), senão a obra nasceria sem
+> `ObraContratoVersao` nº1; e o funil comercial passou a filtrar
+> `origem='importacao_obra'` da listagem e dos KPIs.
+>
+> ### O que NÃO foi portado (e por quê)
+>
+> 1. **Importador genérico.** Os três scripts da Baia são Baia-específicos
+>    por desenho (`gerar_importacao_baia_rev10.SERVICOS`). "Qualquer obra pela
+>    planilha" precisa de um parser novo: é **trabalho novo**, não porte.
+> 2. **Datas/durações por atividade.** Dependem de exportar o `.mpp` para XML.
+>    Por isso o **SPI continua `None`** — o EVM entrega CPI e EAC, não SPI.
+> 3. **Material direto na UI** e o refino do EVM F3-4. Refinos de 15/06, sem dono.
+> 4. **A ratificação comercial do telhado viga I.** A opção B (markup uniforme)
+>    foi decidida em 01/09 e o schema que ela precisa está no `main`
+>    (migration 322), mas o `RATIFICAR` com o dono segue pendente — é escolha
+>    comercial e não bloqueava o porte.
+>
+> ### Como ler o resto deste arquivo
+>
+> Tudo abaixo desta linha foi escrito em 15/06 e descreve **a branch**. Onde
+> ele fala de arquivos e testes, eles agora existem no `main` — mas com as
+> correções acima, não como estão descritos aqui. Onde ele fala de
+> **próximos passos**, são passos de outra árvore. A fonte de estado é o
+> `ESTADO-ATUAL.md`, o código e o git.
 >
 > Índice de estado de todos os planos e specs: `docs/planos-em-aberto-2026-08-25.md`.
 

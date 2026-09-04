@@ -4,7 +4,6 @@ import sys
 from datetime import date, datetime
 from decimal import Decimal
 
-import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
