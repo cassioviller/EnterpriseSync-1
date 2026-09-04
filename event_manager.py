@@ -1482,50 +1482,72 @@ def criar_lancamento_folha_pagamento(data: dict, admin_id: int):
             logger.error(f"❌ Funcionário {folha.funcionario_id} não encontrado ou sem permissão para admin {admin_id}")
             return
         
-        # Buscar contas do plano de contas
-        # Fase 8 / Task 4 — era '5.1.01.001'. A migration 324 move as partidas
-        # dessa conta para '6.1.01.001' e DESATIVA a 5.1.01.001 (fica sem
-        # partida). Com o codigo velho, este `filter_by(ativo=True)` devolveria
-        # None e o `return` la' embaixo faria a folha parar de gerar lancamento
-        # contabil EM SILENCIO — so' um warning no log. O destino aqui e' o
-        # mesmo do DEPARA_5X[('financeiro_seeds', '5.1.01.001')], e ha' teste
-        # que reprova se os dois divergirem.
-        conta_despesa_pessoal = PlanoContas.query.filter_by(
-            admin_id=admin_id,
-            codigo='6.1.01.001',
-            ativo=True
-        ).first()
-        
-        conta_salarios_pagar = PlanoContas.query.filter_by(
-            admin_id=admin_id,
-            codigo='2.1.02.001',
-            ativo=True
-        ).first()
-        
-        conta_inss_recolher = PlanoContas.query.filter_by(
-            admin_id=admin_id,
-            codigo='2.1.02.002',
-            ativo=True
-        ).first()
-        
-        conta_irrf_recolher = PlanoContas.query.filter_by(
-            admin_id=admin_id,
-            codigo='2.1.03.001',
-            ativo=True
-        ).first()
-        
-        conta_fgts_recolher = PlanoContas.query.filter_by(
-            admin_id=admin_id,
-            codigo='2.1.02.003',
-            ativo=True
-        ).first()
-        
-        # Validar se contas essenciais existem
-        if not conta_despesa_pessoal or not conta_salarios_pagar:
-            logger.warning(f"⚠️ Plano de contas incompleto para admin {admin_id}. Lançamento não criado.")
-            logger.warning(f"   Despesa Pessoal: {'OK' if conta_despesa_pessoal else 'FALTA'}")
-            logger.warning(f"   Salários a Pagar: {'OK' if conta_salarios_pagar else 'FALTA'}")
-            return
+        # Buscar contas do plano de contas.
+        #
+        # Fase 8 / Task 4 — a despesa de pessoal era '5.1.01.001'. A migration
+        # 324 move as partidas dessa conta para '6.1.01.001' e DESATIVA a
+        # 5.1.01.001 (fica sem partida). O destino aqui e' o mesmo do
+        # DEPARA_5X[('financeiro_seeds', '5.1.01.001')], e ha' teste que
+        # reprova se os dois divergirem.
+        #
+        # 🔴 SEMEIA-OU-FALHA, rodada 2. Trocar o codigo nao bastava: o
+        # `return` sobre um `logger.warning` MUDAVA DE LUGAR o silencio em vez
+        # de remove-lo. 🔬 04/09, medido no banco de dev: 202 tenants tem plano
+        # de contas e NAO tem 6.1.01.001 (81 deles ja' com partidas), e 4
+        # desses tem 5.1.01.001 — plano `financeiro_seeds`, que nao tem grupo
+        # 6 nenhum. Para esses 4 o handler FUNCIONAVA antes da Fase 8 e
+        # deixaria de funcionar: a proxima folha escreveria uma linha de log e
+        # nenhum lancamento contabil. Era exatamente o defeito que o Step 0
+        # existe para impedir, reaparecendo do outro lado.
+        #
+        # Agora: se faltar conta essencial, SEMEIA o canonico e busca de novo;
+        # se ainda faltar, LEVANTA. O `except` no fim deste handler transforma
+        # isso em `logger.error` com traceback e `db.session.rollback()`, e o
+        # EventManager conta o handler como falho (`0/N handlers OK`) em vez de
+        # somar um sucesso silencioso.
+        def _buscar_contas():
+            return {
+                codigo: PlanoContas.query.filter_by(
+                    admin_id=admin_id, codigo=codigo, ativo=True).first()
+                for codigo in ('6.1.01.001', '2.1.02.001', '2.1.02.002',
+                               '2.1.03.001', '2.1.02.003')
+            }
+
+        _ESSENCIAIS = ('6.1.01.001', '2.1.02.001')
+        contas = _buscar_contas()
+        if any(contas[c] is None for c in _ESSENCIAIS):
+            import contabilidade_utils as _cu
+            faltando = [c for c in _ESSENCIAIS if contas[c] is None]
+            logger.warning(
+                f"⚠️ Plano de contas incompleto para admin {admin_id} "
+                f"(faltam {faltando}) — semeando o canonico e tentando de novo")
+            # ⚠️ `seed_plano_contas_if_needed` tem cache em memoria
+            # (`_v2_seeded_admins`): se este processo ja' semeou este tenant,
+            # ela RETORNA SEM FAZER NADA — e aqui a conta comprovadamente
+            # falta, entao o cache estaria mentindo. Furar o cache e' o mesmo
+            # que o teste de idempotencia do proprio seed faz
+            # (tests/test_fase06_d4_plano_contas_por_tenant.py). Sem isto o
+            # "semeia-ou-falha" viraria "falha" no segundo evento do processo.
+            _cu._v2_seeded_admins.discard(admin_id)
+            _cu.seed_plano_contas_if_needed(admin_id)
+            db.session.flush()
+            contas = _buscar_contas()
+
+        if any(contas[c] is None for c in _ESSENCIAIS):
+            faltando = [c for c in _ESSENCIAIS if contas[c] is None]
+            raise RuntimeError(
+                f'folha_processada: plano de contas do admin_id={admin_id} '
+                f'continua sem {faltando} DEPOIS de semear o canonico '
+                '(contabilidade_utils.seed_plano_contas_if_needed). A folha '
+                f'{folha_id} NAO gerou lancamento contabil. Isto e falha '
+                'aberta DE PROPOSITO: um `return` sobre warning aqui esconde '
+                'folha sem contabilizacao ate o fechamento do mes.')
+
+        conta_despesa_pessoal = contas['6.1.01.001']
+        conta_salarios_pagar = contas['2.1.02.001']
+        conta_inss_recolher = contas['2.1.02.002']
+        conta_irrf_recolher = contas['2.1.03.001']
+        conta_fgts_recolher = contas['2.1.02.003']
         
         # Verificar se já existe lançamento para esta folha
         lancamento_existente = LancamentoContabil.query.filter_by(

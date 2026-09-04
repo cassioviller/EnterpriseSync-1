@@ -19,6 +19,14 @@ diante de um código que não conhece, e tem de NOMEAR quem o fez parar.
    b. **A conta de DESTINO tem de existir no tenant.** Sem guarda, o
       `UPDATE` morre com `ForeignKeyViolation` nomeando a *constraint* —
       não o tenant. A migration ganhou um passo que nomeia.
+
+2. 🔴 **E tem de SIGNIFICAR o esperado** (rodada 2). Os cinco destinos do
+   de-para colidem entre o seeder nº1 e o canônico — `6.1.02.003` é
+   'Despesa com Material' num e **'Energia Elétrica'** no outro
+   (`contabilidade_utils.py:107`), e há 2 tenants assim no banco de dev. Um
+   tenant nº2 não tem grupo 6 e para na guarda de existência; um tenant nº1
+   **tem** o código com o sentido errado e passaria calado. Era o único
+   caminho silencioso da migration inteira.
 """
 import ast
 import os
@@ -134,6 +142,31 @@ def _tenant_com_partidas_em_5x():
     return admin_id
 
 
+def _tenant_n1_com_partida_em_5_1_01():
+    """Assinatura 'contabilidade_utils': 5.1.01 ANALITICA (Materiais Diretos).
+
+    O mesmo `5.1.01` que em `financeiro_seeds` e' MAO DE OBRA. E' este par que
+    prova a D6 ponta a ponta: o destino tem de ser 6.1.02.003 (material), e
+    nao 6.1.01.001 (salarios).
+    """
+    from contabilidade_utils import seed_plano_contas_if_needed
+    admin_id = _novo_admin('f8n1')
+    seed_plano_contas_if_needed(admin_id)      # canonico: da' o 6.1.02.003
+    _conta(admin_id, '5', 'CUSTOS', False)
+    _conta(admin_id, '5.1', 'CUSTO DOS SERVICOS PRESTADOS', False, pai='5')
+    _conta(admin_id, '5.1.01', 'Materiais Diretos', True, pai='5.1')
+    _partida(admin_id, '5.1.01', 500.00)
+    return admin_id
+
+
+def _conta_codigos_das_partidas(admin_id):
+    from sqlalchemy import text as sa_text
+    db.session.rollback()
+    return sorted(r[0] for r in db.session.execute(sa_text(
+        'SELECT conta_codigo FROM partida_contabil WHERE admin_id = :a'),
+        {'a': admin_id}).fetchall())
+
+
 def _tenant_canonico_sem_5x():
     from contabilidade_utils import seed_plano_contas_if_needed
     admin_id = _novo_admin('f8canon')
@@ -207,12 +240,38 @@ def test_5_1_01_vai_para_destinos_OPOSTOS_conforme_a_assinatura():
 
     Em 'contabilidade_utils', 5.1.01 é Materiais Diretos -> 6.1.02.003.
     Em 'financeiro_seeds', 5.1.01.001 é Salários -> 6.1.01.001.
-    Se este teste passar com um de-para chaveado só por código, o de-para
-    está errado e o teste é que não presta.
+
+    🔴 PONTA A PONTA desde a rodada 2. A versão anterior lia duas entradas do
+    dicionário e mais nada — passaria intacta contra uma migration que
+    ignorasse a assinatura por completo, que é exatamente o defeito que a
+    própria docstring dizia estar testando. Agora dois tenants de assinaturas
+    OPOSTAS existem ao mesmo tempo, a migration roda de verdade sobre os dois,
+    e cada partida é conferida NO DESTINO.
     """
+    from migrations import _migration_324_depara_contas_5x
     from services.plano_contas_depara import DEPARA_5X
+
+    # O contrato do dado, primeiro.
     assert DEPARA_5X[('contabilidade_utils', '5.1.01')] == '6.1.02.003'
     assert DEPARA_5X[('financeiro_seeds', '5.1.01.001')] == '6.1.01.001'
+
+    with app.app_context():
+        from contabilidade_utils import classificar_assinatura
+        n2 = _tenant_com_partidas_em_5x()          # financeiro_seeds
+        n1 = _tenant_n1_com_partida_em_5_1_01()    # contabilidade_utils
+        assert classificar_assinatura(n2) == 'financeiro_seeds'
+        assert classificar_assinatura(n1) == 'contabilidade_utils'
+
+        assert _migration_324_depara_contas_5x() is True
+
+        assert _conta_codigos_das_partidas(n2) == ['6.1.01.001'], (
+            'financeiro_seeds: 5.1.01.001 é Salários e tem de virar pessoal'
+        )
+        assert _conta_codigos_das_partidas(n1) == ['6.1.02.003'], (
+            'contabilidade_utils: 5.1.01 é Materiais Diretos e tem de virar '
+            'material — mandá-lo para 6.1.01.001 seria o erro SILENCIOSO que '
+            'a D6 nomeou'
+        )
 
 
 def test_tenant_canonico_e_no_op_e_nao_para_a_migracao():
@@ -297,6 +356,64 @@ def test_conta_5x_sem_partida_e_desativada_e_nao_apagada():
         assert conta.ativo is False
 
 
+def test_destino_com_OUTRO_SIGNIFICADO_faz_a_migration_parar_e_nomear():
+    """🔴 C1 — o de-para consertava a ambiguidade na origem e a repetia no destino.
+
+    🔬 `6.1.02.003` e' 'Despesa com Material' no canonico (_V2_CONTAS_SEED) e
+    'Energia Eletrica' no seeder aposentado nº1 (contabilidade_utils.py:107).
+    Um tenant nº1 TEM esse codigo — entao a guarda de existencia passa — e a
+    partida de material pousaria na conta de energia eletrica do proprio
+    tenant, sem erro em lugar nenhum. Razao, balancete e exportacao Dominio
+    passariam a reportar material de construcao como energia, para sempre.
+
+    Este e' o unico caminho SILENCIOSO que a migration tinha. A guarda le
+    `nome` de proposito: nao para rotear (proibido pela spec), e sim para
+    RECUSAR ESCRITA quando o destino nao quer dizer o esperado.
+    """
+    from sqlalchemy import text
+    from migrations import _migration_324_depara_contas_5x
+    with app.app_context():
+        admin_id = _tenant_n1_com_partida_em_5_1_01()
+        # O tenant vira nº1 de verdade: 6.1.02.003 passa a ser 'Energia
+        # Eletrica', como o seeder aposentado nº1 o cria.
+        db.session.execute(text(
+            "UPDATE plano_contas SET nome = 'Energia Eletrica' "
+            " WHERE admin_id = :a AND codigo = '6.1.02.003'"), {'a': admin_id})
+        db.session.commit()
+
+        with pytest.raises(RuntimeError) as exc:
+            _migration_324_depara_contas_5x()
+
+        msg = str(exc.value)
+        assert str(admin_id) in msg, 'a excecao tem de NOMEAR o tenant'
+        assert '6.1.02.003' in msg, 'a excecao tem de NOMEAR o codigo'
+        assert 'Energia Eletrica' in msg, 'tem de dizer o nome ENCONTRADO'
+        assert 'Despesa com Material' in msg, 'tem de dizer o nome ESPERADO'
+
+        # E nada foi escrito: a partida continua onde estava.
+        assert _conta_codigos_das_partidas(admin_id) == ['5.1.01'], (
+            'a migration parou mas mexeu no dado assim mesmo'
+        )
+
+
+def test_o_nome_esperado_do_destino_vem_do_seed_e_nao_de_uma_copia():
+    """A guarda de significado nao pode ter uma segunda lista literal.
+
+    Uma copia a mao envelhece em silencio e a guarda passa a aprovar o que
+    devia recusar. `_V2_NOME_CANONICO` e' DERIVADO de `_V2_CONTAS_SEED`.
+    """
+    from contabilidade_utils import _V2_CONTAS_SEED, _V2_NOME_CANONICO
+    from services.plano_contas_depara import DEPARA_5X
+
+    assert _V2_NOME_CANONICO == {c: n for (c, n, *_r) in _V2_CONTAS_SEED}
+    for destino in set(DEPARA_5X.values()):
+        assert destino in _V2_NOME_CANONICO, (
+            f'o de-para manda partida para {destino}, que nao existe no '
+            'plano de contas canonico — a guarda de significado nao teria '
+            'nome esperado para comparar'
+        )
+
+
 # ---------------------------------------------------------------------------
 # Step 0 — o censo dos literais 5.x, e os leitores/escritores vivos
 # ---------------------------------------------------------------------------
@@ -312,19 +429,52 @@ def test_conta_5x_sem_partida_e_desativada_e_nao_apagada():
 # não endereça conta analítica nenhuma nos quatro planos.
 _RE_CODIGO_5X = re.compile(r'5(\.\d{1,3}){2,}\Z')
 
-# Onde literal `5.x` AINDA pode aparecer, e por quê. Qualquer outro arquivo
-# que ganhe um literal 5.x reprova este censo — é o caminho de escrita novo
+# Onde literal `5.x` AINDA pode aparecer, e QUAIS. Qualquer outro arquivo que
+# ganhe um literal 5.x reprova este censo — é o caminho de escrita novo
 # voltando calado, o defeito que a Fase 8 existe para remover.
-_ARQUIVOS_QUE_PODEM_TER_5X = {
-    # Os DOIS seeders aposentados (Task 3). São a definição do legado.
-    'financeiro_seeds.py',
-    'contabilidade_utils.py',
-    # O de-para: a tabela de origem→destino é feita de códigos 5.x.
-    'services/plano_contas_depara.py',
-    # Este censo, e os cenários que ele monta.
-    'tests/test_fase8_depara_5x.py',
+#
+# 🔴 A isenção é por LITERAL, não por arquivo (corrigido na rodada 2). A
+# primeira versão isentava `contabilidade_utils.py` inteiro — 1.900+ linhas
+# que abrigam os leitores do DRE, `criar_lancamento_automatico`,
+# `contabilizar_folha_pagamento` e o `_V2_CONTAS_SEED`. É o lugar MAIS provável
+# de nascer o próximo caminho de escrita contábil, e o censo estava cego para
+# ele. Agora cada arquivo declara o conjunto exato que pode ter.
+#
+# A checagem é de SUBCONJUNTO: apagar literal nunca reprova (a Task 3 vai
+# aposentar os seeders e o conjunto só encolhe), acrescentar reprova sempre.
+_LITERAIS_5X_PERMITIDOS = {
+    # Seeder aposentado nº1 (`criar_plano_contas_padrao`) + os prefixos que o
+    # DRE legado ainda lê para não contar em dobro. Conjunto FECHADO: qualquer
+    # 5.x novo neste arquivo reprova.
+    'contabilidade_utils.py': {
+        '5.1.01', '5.1.02', '5.1.03', '5.1.04', '5.1.05',
+        '5.2.01', '5.3.01', '5.3.02',
+    },
+    # Seeder aposentado nº2 (`PLANO_CONTAS_CONSTRUCAO`). O módulo é só a
+    # tabela de dados do legado — mas o conjunto é fechado do mesmo jeito.
+    'financeiro_seeds.py': {
+        '5.1.01', '5.1.01.001', '5.1.01.002', '5.1.01.003', '5.1.01.004',
+        '5.1.02', '5.1.02.001', '5.1.02.002', '5.1.02.003',
+        '5.1.03', '5.1.03.001', '5.1.03.002',
+        '5.1.04', '5.1.04.001', '5.1.04.002', '5.1.04.003',
+        '5.1.05', '5.1.05.001', '5.1.05.002', '5.1.05.003', '5.1.05.004',
+    },
+    # O de-para: as chaves de origem. Tem de ser um subconjunto do que os dois
+    # seeders acima criam — mapear código que nenhum seeder produz seria
+    # inventar semântica.
+    'services/plano_contas_depara.py': {
+        '5.1.01', '5.1.02', '5.2.01',
+        '5.1.01.001', '5.1.01.002', '5.1.01.003', '5.1.01.004',
+        '5.1.02.001', '5.1.02.002', '5.1.02.003',
+        '5.1.03.001', '5.1.03.002',
+        '5.1.04.001', '5.1.04.002', '5.1.04.003',
+        '5.1.05.001', '5.1.05.002', '5.1.05.003', '5.1.05.004',
+    },
     # Narrativa: o PDF que EXPLICA a colisão 5.1.01. Não lê nem escreve conta.
-    'scripts/gerar_pdf_caminho_dinheiro.py',
+    'scripts/gerar_pdf_caminho_dinheiro.py': {'5.1.01'},
+    # Este censo e os cenários que ele monta. `None` = sem restrição — é o
+    # único arquivo cujo trabalho É falar de 5.x.
+    'tests/test_fase8_depara_5x.py': None,
 }
 
 # Diretorio que comeca com '.' e' ferramenta (.cache/uv, .pythonlibs, .git):
@@ -348,6 +498,14 @@ def _literais_5x(caminho):
                 yield getattr(no, 'lineno', 0), no.value
 
 
+def _todos_literais_str(caminho):
+    """Todos os literais string de um arquivo, por `ast`."""
+    with open(caminho, encoding='utf-8', errors='replace') as fh:
+        arvore = ast.parse(fh.read(), filename=caminho)
+    return {no.value for no in ast.walk(arvore)
+            if isinstance(no, ast.Constant) and isinstance(no.value, str)}
+
+
 def _fontes_python():
     for base, dirs, arquivos in os.walk(RAIZ):
         dirs[:] = [d for d in dirs
@@ -365,13 +523,18 @@ def test_censo_nenhum_literal_5x_novo_fora_dos_seeders_aposentados():
     """
     infratores = []
     for rel, caminho in _fontes_python():
-        if rel.replace(os.sep, '/') in _ARQUIVOS_QUE_PODEM_TER_5X:
+        chave = rel.replace(os.sep, '/')
+        if chave in _LITERAIS_5X_PERMITIDOS and _LITERAIS_5X_PERMITIDOS[chave] is None:
             continue
+        permitidos = _LITERAIS_5X_PERMITIDOS.get(chave, frozenset())
         for n, literal in _literais_5x(caminho):
-            infratores.append(f'{rel}:{n}: {literal!r}')
+            if literal not in permitidos:
+                infratores.append(f'{rel}:{n}: {literal!r}')
     assert not infratores, (
-        'literal de conta 5.x fora dos dois seeders aposentados — a conta foi '
-        'migrada pela migration 324 e este código aponta para o vazio:\n  '
+        'literal de conta 5.x fora do conjunto declarado — a conta foi '
+        'migrada pela migration 324 e este código aponta para o vazio. Se o '
+        'literal for legítimo, declare-o em _LITERAIS_5X_PERMITIDOS e diga '
+        'por quê; não amplie a isenção para o arquivo inteiro:\n  '
         + '\n  '.join(infratores)
     )
 
@@ -394,10 +557,45 @@ def test_o_escritor_vivo_da_folha_usa_o_MESMO_destino_do_depara():
         f'event_manager ainda escreve em {origem}, que a migration 324 '
         'esvazia e desativa'
     )
-    fonte = open(event_manager.__file__, encoding='utf-8').read()
-    assert f"codigo='{destino}'" in fonte, (
+    # Por literal via `ast`, não por texto `codigo='…'`: o handler ganhou um
+    # `_buscar_contas()` na rodada 2 (semeia-ou-falha) e a forma sintática
+    # mudou. O que tem de bater é o CÓDIGO, não como ele é escrito.
+    todos_literais = _todos_literais_str(event_manager.__file__)
+    assert destino in todos_literais, (
         f'event_manager tem de gravar a folha em {destino} — o mesmo destino '
         f'que o DEPARA_5X dá para {origem}'
+    )
+
+
+def test_a_folha_SEMEIA_OU_FALHA_e_nao_volta_calada_com_um_warning():
+    """🔴 I2 — trocar o código não bastava: o silêncio mudou de lugar.
+
+    🔬 04/09, no banco de dev: 202 tenants têm plano de contas e NÃO têm
+    `6.1.01.001` (81 já com partidas), e 4 desses têm `5.1.01.001` — plano
+    `financeiro_seeds`, que não tem grupo 6 nenhum. Para esses 4 o handler
+    FUNCIONAVA antes da Fase 8. Com `codigo='6.1.01.001', ativo=True` e um
+    `return` sobre `logger.warning`, a próxima folha deles escreveria uma
+    linha de log e nenhum lançamento contábil — o defeito que o Step 0 existe
+    para impedir, reaparecendo do outro lado.
+
+    O handler agora SEMEIA o canônico e busca de novo; se ainda faltar,
+    LEVANTA. Falha aberta, nunca `return` calado.
+    """
+    import event_manager
+    fonte = open(event_manager.__file__, encoding='utf-8').read()
+    trecho = fonte[fonte.index('def criar_lancamento_folha_pagamento'):]
+    trecho = trecho[:trecho.index('@event_handler', 1)]
+
+    assert 'seed_plano_contas_if_needed' in trecho, (
+        'o handler da folha tem de SEMEAR o canônico antes de desistir'
+    )
+    assert 'raise RuntimeError' in trecho, (
+        'se a conta continuar faltando DEPOIS de semear, o handler tem de '
+        'falhar alto — não voltar com um warning'
+    )
+    assert 'Lançamento não criado' not in trecho, (
+        'o `return` sobre warning que escondia folha sem contabilização '
+        'ainda está lá'
     )
 
 

@@ -7802,6 +7802,13 @@ def _migration_324_depara_contas_5x():
     contas e nunca o `nome`. Tenant sem 5.x e' no-op. Tenant com 5.x que nao
     casa nenhuma assinatura => FALHA e NOMEIA o tenant.
 
+    🔴 E o DESTINO tambem e' verificado, por codigo E por significado (passo
+    2b). Os cinco destinos do de-para colidem entre o seeder aposentado nº1 e
+    o canonico; sem a guarda, um tenant nº1 receberia a partida numa conta de
+    sentido oposto SEM ERRO NENHUM. Era o unico caminho silencioso desta
+    migration. A guarda le `nome` de proposito e isso NAO viola a proibicao da
+    spec — ela proibe rotear POR nome, e isto e' recusar ESCRITA por nome.
+
     🔴 ELA LEVANTA, NAO DEVOLVE False. Medido em 04/09: `run_migration_safe`
     (migrations.py:170) DESCARTA o valor de retorno e grava 'success' sempre que
     a funcao retorna sem levantar. Uma migration que engole a propria excecao e
@@ -7819,7 +7826,8 @@ def _migration_324_depara_contas_5x():
 
     # AssinaturaDesconhecida NAO e' capturada aqui de proposito: ela sobe pelo
     # `except ... raise` de baixo, ja' nomeando o tenant na propria mensagem.
-    from contabilidade_utils import classificar_assinatura
+    from contabilidade_utils import (_V2_NOME_CANONICO,
+                                     classificar_assinatura)
     from services.plano_contas_depara import DEPARA_5X
     try:
         with db.engine.begin() as conn:
@@ -7856,30 +7864,78 @@ def _migration_324_depara_contas_5x():
                   FROM partida_contabil p
                  WHERE p.conta_codigo LIKE '5.%'
             """)).fetchall()
-            sem_destino = sorted({
-                (assinatura_de[aid], cod) for (aid, cod) in pares
-                if (assinatura_de[aid], cod) not in DEPARA_5X})
+            # 🔴 A falha tem de NOMEAR O TENANT, nao so' o par. A primeira
+            #    versao agregava por (assinatura, codigo) e DESCARTAVA o
+            #    admin_id: em producao a mensagem apontava um operador para
+            #    8.606 tenants sem forma de estreitar. Eu mesmo tive de
+            #    escrever uma query a mao para descobrir quem bloqueava.
+            sem_destino = {}
+            for (aid, cod) in pares:
+                chave = (assinatura_de[aid], cod)
+                if chave not in DEPARA_5X:
+                    sem_destino.setdefault(chave, []).append(aid)
             if sem_destino:
+                detalhe = '; '.join(
+                    f'{chave} em {len(aids)} tenant(s): admin_id='
+                    f'{sorted(aids)[:20]}' + (' …' if len(aids) > 20 else '')
+                    for chave, aids in sorted(sem_destino.items()))
                 raise RuntimeError(
                     'de-para incompleto — pares (assinatura, codigo) SEM '
-                    f'destino: {sem_destino}. A migração não chuta: '
+                    f'destino: {detalhe}. A migração não chuta: '
                     'acrescente o destino em services/plano_contas_depara.py '
                     'e deixe esta migração retentar no próximo boot.')
 
-            # 2b. 🔬 04/09 — a conta de DESTINO tem de EXISTIR no tenant.
-            #     partida_contabil tem FK composta (admin_id, conta_codigo) ->
-            #     plano_contas(admin_id, codigo). Sem esta guarda o UPDATE do
-            #     passo 3 morre com ForeignKeyViolation nomeando a CONSTRAINT
-            #     — nunca o tenant. "A falha tem de NOMEAR" exige o nome.
+            # 2b. 🔴 A conta de DESTINO tem de EXISTIR no tenant **e
+            #     SIGNIFICAR o que o de-para acha que ela significa.**
+            #
+            #     Existir: partida_contabil tem FK composta
+            #     (admin_id, conta_codigo) -> plano_contas(admin_id, codigo).
+            #     Sem a guarda o UPDATE do passo 3 morre com
+            #     ForeignKeyViolation nomeando a CONSTRAINT, nunca o tenant.
+            #
+            #     🔴 Significar (rodada 2, e e' o unico caminho SILENCIOSO que
+            #     existia nesta migration): o de-para consertava a ambiguidade
+            #     na ORIGEM e a reproduzia no DESTINO. 🔬 Os CINCO destinos
+            #     colidem entre o seeder nº1 e o canonico — 6.1.02.003 e'
+            #     'Despesa com Material' no canonico e 'Energia Eletrica' no
+            #     nº1 (contabilidade_utils.py:107), e ha' 2 tenants assim no
+            #     banco de dev. A assimetria: um tenant nº2 nao tem grupo 6
+            #     nenhum e para na guarda de existencia — falha fechada. Um
+            #     tenant nº1 TEM o codigo, com o significado errado: sem esta
+            #     guarda a partida pousava numa conta de sentido oposto, sem
+            #     erro em lugar nenhum, e o razao, o balancete e a exportacao
+            #     Dominio passavam a reportar material de construcao como
+            #     energia eletrica — para sempre.
+            #
+            #     ⚠️ Ler `nome` AQUI nao viola a proibicao da spec, e o proximo
+            #     leitor precisa saber disso antes de "consertar" de volta. A
+            #     proibicao e' sobre usar `nome` para DERIVAR o de-para ou
+            #     IDENTIFICAR o seeder (roteamento por nome). Isto e' o
+            #     contrario: uma GUARDA CONTRA ESCRITA, que se recusa a postar
+            #     quando o destino nao significa o esperado. E' o "nunca chuta"
+            #     aplicado ao destino em vez da origem. Ver
+            #     contabilidade_utils._V2_NOME_CANONICO.
+            #
+            #     ⚠️ Ha' parada FALSA esperada — ('contabilidade_utils',
+            #     '5.1.02') -> 6.1.01.001 e' 'Salarios' no nº1 e 'Despesa com
+            #     Salarios' no canonico; os dois querem dizer salario. NAO
+            #     acrescente excecao por semelhanca de nome: parada falsa e'
+            #     barata, lancamento errado e' permanente.
             sem_conta_destino = []
+            destino_com_outro_significado = []
             for (aid, cod) in pares:
                 destino = DEPARA_5X[(assinatura_de[aid], cod)]
-                existe = conn.execute(sa_text(
-                    'SELECT 1 FROM plano_contas '
+                nome_no_tenant = conn.execute(sa_text(
+                    'SELECT nome FROM plano_contas '
                     ' WHERE admin_id = :a AND codigo = :c'),
                     {'a': aid, 'c': destino}).scalar()
-                if not existe:
+                if nome_no_tenant is None:
                     sem_conta_destino.append((aid, cod, destino))
+                    continue
+                esperado = _V2_NOME_CANONICO.get(destino)
+                if esperado is not None and nome_no_tenant != esperado:
+                    destino_com_outro_significado.append(
+                        (aid, destino, nome_no_tenant, esperado))
             if sem_conta_destino:
                 raise RuntimeError(
                     'conta de DESTINO inexistente no plano de contas do '
@@ -7887,6 +7943,15 @@ def _migration_324_depara_contas_5x():
                     f'{sorted(sem_conta_destino)}. Semeie o canonico nesses '
                     'tenants (contabilidade_utils.seed_plano_contas_if_needed) '
                     'e deixe esta migração retentar no próximo boot.')
+            if destino_com_outro_significado:
+                raise RuntimeError(
+                    'conta de DESTINO com OUTRO SIGNIFICADO no tenant — a '
+                    'migração não posta partida em conta que não quer dizer o '
+                    'que o de-para acha que ela quer dizer. '
+                    '(admin_id, codigo, nome_encontrado, nome_esperado): '
+                    f'{sorted(destino_com_outro_significado)}. Alinhe o plano '
+                    'de contas desses tenants ao canônico (_V2_CONTAS_SEED) e '
+                    'deixe esta migração retentar no próximo boot.')
 
             # 3. Reescreve, tenant a tenant, dentro da MESMA transação.
             for (aid, cod) in pares:
@@ -7913,12 +7978,20 @@ def _migration_324_depara_contas_5x():
                                     WHERE p.admin_id = c.admin_id
                                       AND p.conta_codigo = c.codigo)
             """))
+            # 🔴 NOMEIA. A versao anterior era `f'{sobraram} partidas
+            #    continuam em 5.x'` — literalmente o contador anonimo que o
+            #    brief nomeia como o defeito a remover.
             sobraram = conn.execute(sa_text(
-                "SELECT count(*) FROM partida_contabil "
-                "WHERE conta_codigo LIKE '5.%'")).scalar()
+                "SELECT admin_id, conta_codigo, count(*) "
+                "  FROM partida_contabil WHERE conta_codigo LIKE '5.%' "
+                " GROUP BY 1, 2 ORDER BY 1, 2")).fetchall()
             if sobraram:
+                total = sum(n for (_a, _c, n) in sobraram)
                 raise RuntimeError(
-                    f'{sobraram} partidas continuam em 5.x depois do de-para')
+                    f'{total} partidas continuam em 5.x depois do de-para, em '
+                    f'{len(sobraram)} par(es) (admin_id, conta_codigo, n): '
+                    f'{[(a, c, n) for (a, c, n) in sobraram[:20]]}'
+                    + (' …' if len(sobraram) > 20 else ''))
 
         logger.info(f'[Migration 324] de-para 5.x concluído; {len(pares)} '
                     f'pares migrados em {len(tenants)} tenants, contagem e '

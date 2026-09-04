@@ -144,9 +144,19 @@ def classificar_assinatura(admin_id, conn=None):
                               Diretos', analitica)
       'financeiro_seeds'    — seeder aposentado nº2 (5.1.01 'MAO DE OBRA',
                               sintetica, com filhos 5.1.01.00x)
-      'sem_5x'              — nenhuma conta 5.x: canonico (_V2_CONTAS_SEED) ou
-                              demo (seed_demo_alfa). O de-para e' NO-OP.
+      'sem_5x'              — nenhuma conta 5.x. O de-para e' NO-OP.
       AssinaturaDesconhecida — tem 5.x e nao casa nenhum dos dois.
+
+    🔴 CUIDADO com "o demo Alfa cai em 'sem_5x'": e' falso, e a versao anterior
+    desta docstring afirmava isso. 🔬 04/09, medido: o SEEDER
+    `scripts/seed_demo_alfa.py` cria zero contas 5.x — mas o TENANT demo
+    (`admin@construtoraalfa.com.br`, admin_id=1 no banco de dev) tinha
+    `5.1.01 'MAO DE OBRA'` (aceita=False) e `5.1.01.001 'Salarios'` com CINCO
+    partidas de FOLHA_PAGAMENTO, porque o plano dele nasceu tambem pela tela
+    do Financeiro. Ele classifica `financeiro_seeds`, nao `sem_5x`, e a
+    migration 324 moveu as cinco partidas dele para 6.1.01.001.
+    A licao: a assinatura e' do TENANT, nunca do seeder que "deveria" te-lo
+    criado. Um tenant pode ter passado por mais de uma tela.
 
     ⚠️ `conn` nao e' comodidade: a migration 324 roda dentro de
     `db.engine.begin()`, e chamar `db.session` la' dentro abriria uma SEGUNDA
@@ -710,13 +720,41 @@ _DRE_PREFIXOS_FORA_DAS_OPERACIONAIS = ('5.1.03', '5.2.01', '5.3.01', '5.3.02')
 # do `calcular_dre_gerencial` (Task 6), que chaveia por `classificacao_gasto`.
 #
 # Global Constraint: indicador sem base sai como "sem base", NUNCA 0,00.
-# Estas chaves saem em `dre_data['sem_base']` e os três renderizadores (tela,
-# PDF e Excel) escrevem "sem base" no lugar do valor.
+# As chaves que ENTRAM em `dre_data['sem_base']` saem escritas "sem base" nos
+# três renderizadores (tela, PDF e Excel).
+#
+# 🔴 CONDICIONAL POR TENANT, e não uma constante — corrigido na rodada 2.
+# A primeira versão emitia as três chaves SEMPRE. Num tenant onde a 324 ainda
+# não passou (hoje: todo tenant de produção, porque a migration nem rodou lá),
+# a tela dizia CMV "sem base" enquanto `lucro_bruto = receita_liquida - cmv`
+# continuava subtraindo um número que o leitor não conseguia ver. Um relatório
+# que esconde a parcela e mostra o total mentindo é pior que o 0,00 que a
+# Global Constraint proíbe.
+#
+# A regra: a linha só é "sem base" quando NÃO HÁ NADA por trás dela neste
+# tenant neste mês. Havendo valor, ele aparece — e o Lucro Bruto fecha com o
+# que está na tela.
 _DRE_LINHAS_SEM_BASE = (
     'cmv',
     'resultado_financeiro.despesas',
     'provisao_ir_csll',
 )
+
+
+def _dre_linhas_sem_base(cmv, despesas_financeiras, total_provisoes):
+    """Quais das linhas legadas estão SEM BASE para ESTE tenant/mês.
+
+    Uma linha entra aqui quando o prefixo `5.x` que a alimentava não tem
+    valor nenhum — o caso normal depois da migration 324, e o caso de todo
+    tenant canônico, que nunca teve conta para elas. Havendo valor (tenant
+    ainda não migrado), a linha sai com o número, e não com "sem base".
+    """
+    valor_de = {
+        'cmv': cmv,
+        'resultado_financeiro.despesas': despesas_financeiras,
+        'provisao_ir_csll': total_provisoes,
+    }
+    return [linha for linha in _DRE_LINHAS_SEM_BASE if not valor_de[linha]]
 
 # Raízes de conta de resultado devedor. Nos quatro planos em uso, '5' é
 # CUSTOS/DESPESAS e '6' é DESPESAS — nenhum usa outra raiz para débito de
@@ -985,11 +1023,14 @@ def calcular_dre_mensal(admin_id: int, ano: int, mes: int):
                 'margem_liquida': margem_liquida
             },
 
-            # 🔴 Fase 8 / Task 4 — as linhas cujo prefixo não existe mais no
-            # plano de contas canônico. Elas saem escritas "sem base" na tela,
-            # no PDF e no Excel; NUNCA 0,00. Global Constraint: "indicador sem
-            # base sai como 'sem base'". Ver _DRE_LINHAS_SEM_BASE.
-            'sem_base': list(_DRE_LINHAS_SEM_BASE),
+            # 🔴 Fase 8 / Task 4 — as linhas legadas que, NESTE tenant e neste
+            # mês, não têm nada por trás. Saem escritas "sem base" na tela, no
+            # PDF e no Excel; NUNCA 0,00. Global Constraint: "indicador sem
+            # base sai como 'sem base'". Havendo valor (tenant onde a 324 ainda
+            # não passou), a linha sai com o número — senão o Lucro Bruto seria
+            # reduzido por uma parcela invisível. Ver _dre_linhas_sem_base.
+            'sem_base': _dre_linhas_sem_base(
+                cmv, despesas_financeiras, total_provisoes),
         }
         
         logger.info(f"[OK] DRE {mes}/{ano} calculada: Receita Líquida={receita_liquida}, Lucro Líquido={lucro_liquido}")
@@ -1493,7 +1534,10 @@ def gerar_dre_pdf(admin_id, mes, ano):
         res_fin = dre_data['resultado_financeiro']
         if res_fin['receitas'] > 0:
             table_data.append(['(+) Receitas Financeiras', fmt(res_fin['receitas'])])
-        if res_fin['despesas'] > 0:
+        # Fase 8 / Task 4 — mesma regra do CMV: linha sem base se declara.
+        if 'resultado_financeiro.despesas' in dre_data.get('sem_base', ()):
+            table_data.append(['(-) Despesas Financeiras', 'sem base'])
+        elif res_fin['despesas'] > 0:
             table_data.append(['(-) Despesas Financeiras', f"({fmt(res_fin['despesas'])})"])
         
         # Resultado Antes IR
@@ -1502,7 +1546,9 @@ def gerar_dre_pdf(admin_id, mes, ano):
         
         # Provisões
         prov = dre_data['provisao_ir_csll']
-        if prov['total'] > 0:
+        if 'provisao_ir_csll' in dre_data.get('sem_base', ()):
+            table_data.append(['(-) Provisão IR e CSLL', 'sem base'])
+        elif prov['total'] > 0:
             table_data.append(['(-) Provisão IR e CSLL', f"({fmt(prov['total'])})"])
         
         # Lucro Líquido
@@ -1713,8 +1759,11 @@ def gerar_dre_excel(admin_id, mes, ano):
         if res_fin['receitas'] > 0:
             add_row('(+) Receitas Financeiras', res_fin['receitas'], 
                    f'=B{row}/B${receita_liq_row}*100')
-        if res_fin['despesas'] > 0:
-            add_row('(-) Despesas Financeiras', -res_fin['despesas'], 
+        # Fase 8 / Task 4 — mesma regra do CMV: linha sem base se declara.
+        if 'resultado_financeiro.despesas' in dre_data.get('sem_base', ()):
+            add_row('(-) Despesas Financeiras', 'sem base', None)
+        elif res_fin['despesas'] > 0:
+            add_row('(-) Despesas Financeiras', -res_fin['despesas'],
                    f'=B{row}/B${receita_liq_row}*100')
         
         # Resultado Antes IR
@@ -1724,8 +1773,10 @@ def gerar_dre_excel(admin_id, mes, ano):
         
         # Provisões
         prov = dre_data['provisao_ir_csll']
-        if prov['total'] > 0:
-            add_row('(-) Provisão IR e CSLL', -prov['total'], 
+        if 'provisao_ir_csll' in dre_data.get('sem_base', ()):
+            add_row('(-) Provisão IR e CSLL', 'sem base', None)
+        elif prov['total'] > 0:
+            add_row('(-) Provisão IR e CSLL', -prov['total'],
                    f'=B{row}/B${receita_liq_row}*100')
         
         # Lucro Líquido
@@ -1834,6 +1885,36 @@ _V2_CONTAS_SEED = [
     # RATIFICAR com o contador: nome e grupo; o código fica.
     ('6.1.02.009', 'Despesas Gerais Diversas',     'DESPESA',  'DEVEDORA', 4, '6.1.02',  True),
 ]
+
+# 🔴 Fase 8 / Task 4, rodada 2 — o NOME canonico de cada codigo, DERIVADO do
+# seed. Nunca uma segunda lista literal: uma copia a mao envelhece em silencio
+# e a guarda que ela alimenta passa a aprovar o que devia recusar.
+#
+# Para que serve: a migration 324 so' pode escrever a partida numa conta de
+# destino se essa conta, NAQUELE tenant, significar o que o de-para acha que
+# ela significa. 🔬 04/09 os CINCO destinos do DEPARA_5X colidem entre o
+# seeder aposentado nº1 e o canonico — o mesmo codigo, dois significados:
+#
+#   codigo      | nº1 (criar_plano_contas_padrao) | canonico (_V2_CONTAS_SEED)
+#   6.1.01.001  | Salarios                        | Despesa com Salarios
+#   6.1.01.002  | Encargos Sociais                | Despesa com Alimentacao
+#   6.1.02.001  | Material de Escritorio          | Despesa com Combustivel
+#   6.1.02.002  | Telefone                        | Despesa com Transporte
+#   6.1.02.003  | Energia Eletrica                | Despesa com Material
+#
+# E nao e' hipotese: 🔬 no banco de dev existem 2 tenants com 6.1.02.003
+# gravado como 'Energia Eletrica' (contra 8.485 com 'Despesa com Material').
+#
+# ⚠️ ISTO NAO VIOLA A PROIBICAO DE LER `nome`, e o proximo leitor precisa saber
+# disso antes de "consertar" de volta. A spec proibe usar `nome` para DERIVAR
+# o de-para ou IDENTIFICAR o seeder — roteamento por nome, que e' justamente
+# o dado inconsistente. Aqui o nome nao roteia nada: e' uma GUARDA CONTRA
+# ESCRITA, que recusa postar quando o destino nao significa o que deveria. E'
+# o "nunca chuta" aplicado ao destino em vez da origem. O classificador
+# (`classificar_assinatura`) continua sem ler `nome` nenhum.
+_V2_NOME_CANONICO: dict = {
+    codigo: nome for (codigo, nome, *_resto) in _V2_CONTAS_SEED
+}
 
 _v2_seeded_admins: set = set()
 
