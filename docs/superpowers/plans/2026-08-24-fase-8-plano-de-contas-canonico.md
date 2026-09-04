@@ -753,11 +753,36 @@ defeitos diferentes e cada um tem seu teste.
 1. `event_manager.py:1488` passa a `'6.1.01.001'` (o destino que o `DEPARA_5X`
    já dá para `('financeiro_seeds', '5.1.01.001')` — os dois têm de bater, e há
    teste que falha se divergirem).
-2. `contabilidade_utils.py:712` e `:590` passam aos prefixos canônicos.
-   ⚠️ **`5.1.03` (CMV) não tem par óbvio no canônico** — 🔬 `_V2_CONTAS_SEED`
-   não tem conta de CMV. Se não houver destino, **declare o resíduo por
-   escrito** e deixe a linha de CMV do DRE saindo como "sem base", nunca como
-   `0,00`: é a Global Constraint *"Indicador sem base sai como 'sem base'"*.
+2. `contabilidade_utils.py:712` e `:590` — 🔬 **resolvido em 04/09, e a
+   resposta é declarar o resíduo, não inventar conta.**
+
+   🔬 Medido: o canônico (`_V2_CONTAS_SEED`, 36 contas) **não tem conta de CMV
+   nem grupo de custo** — suas únicas despesas são `6.1.01.*` (pessoal) e
+   `6.1.02.*` (gerais). 📖 E a **spec não menciona CMV em lugar nenhum**: o
+   modelo dela é *receita − variáveis = margem de contribuição; − fixos =
+   resultado* (`2026-08-17-fase-8-financeiro-design.md:223`), que é o
+   `calcular_dre_gerencial` **novo** da Task 6, chaveado por
+   `classificacao_gasto` — não por prefixo de conta.
+
+   🔴 **E o CMV do DRE legado já estava errado antes desta fase.** 📖
+   `contabilidade_utils.py:712` faz `cmv = calcular_valor_contas(['5.1.03'])`, e
+   📖 `5.1.03` no `financeiro_seeds` é **EQUIPAMENTOS** (`:84`), com
+   `5.1.03.001 'Aluguel de Equipamentos'` e `5.1.03.002 'Manutenção de
+   Equipamentos'`. O DRE legado vinha reportando **locação de equipamento como
+   CMV** — que é exatamente o "mapa de prefixos deslocado" que a Onda 4 mediu e
+   deixou para esta fase.
+
+   **Portanto:** o de-para manda `5.1.03.*` para `6.1.02.003` (já está na
+   tabela, e é o destino certo: equipamento é despesa geral, não custo de
+   mercadoria vendida). A linha de CMV do `calcular_dre_mensal` fica **sem
+   base** — e tem de sair escrito "sem base", **nunca `0,00`**, que é a Global
+   Constraint *"Indicador sem base sai como 'sem base'"*. A margem correta passa
+   a vir do `calcular_dre_gerencial` da Task 6.
+
+   ⚠️ **Não crie uma conta de CMV no canônico para salvar a linha do DRE
+   legado.** Seria inventar semântica contábil que a spec não pediu, para
+   preservar um número que já vinha errado. Se o dono quiser CMV de verdade, é
+   decisão comercial e vira frente própria — registre como resíduo nomeado.
 3. Um **censo** que falhe quando aparecer literal `5.x` novo fora dos dois
    seeders aposentados — o padrão que a casa já usa para resolvedor de tenant e
    para rótulo de origem. Sem ele, o próximo caminho de escrita volta calado.
