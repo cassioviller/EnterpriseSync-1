@@ -739,21 +739,28 @@ Medido no banco de dev e na fonte em 04/09, **depois** de o plano estar escrito:
 | Sítio vivo | O que faz hoje | O que acontece DEPOIS do de-para, se nada mudar |
 |---|---|---|
 | 📖 `event_manager.py:1488` — handler de `folha_processada` | `PlanoContas.query.filter_by(codigo='5.1.01.001', ativo=True)` | 🔴 o passo 5 desativa a `5.1.01.001` (ela fica sem partida). A busca devolve `None`, e `:1520` faz `logger.warning('Plano de contas incompleto') ; return` — **a folha para de gerar lançamento contábil, em silêncio**. Falha fechada, mas silenciosa: só um warning no log |
-| 📖 `contabilidade_utils.py:712` | `cmv = calcular_valor_contas(['5.1.03'], 'DEBITO')` | 🔴 **o CMV do DRE vai a zero** — nenhuma partida mora mais em `5.1.03` |
-| 📖 `contabilidade_utils.py:590` | `_DRE_PREFIXOS_FORA_DAS_OPERACIONAIS = ('5.1.03', '5.2.01', '5.3.01', '5.3.02')` | 🔴 as quatro linhas próprias do DRE vão a zero |
-| 📖 `contabilidade_utils.py:602-605` | `'pessoal': ('5.1.01','6.1.01')`, `'materiais': ('5.1.02',)`, `'administrativas': ('5.1.04',)`, `'comerciais': ('5.1.05',)` | ⚠️ `pessoal` sobrevive (já lê as duas raízes); **as outras três vão a zero** |
+| 📖 `contabilidade_utils.py` 🔬 **:720** | `cmv = calcular_valor_contas(['5.1.03'], 'DEBITO')` | 🔴 **o CMV do DRE vai a zero** — nenhuma partida mora mais em `5.1.03` |
+| 📖 `contabilidade_utils.py` 🔬 **:598** | `_DRE_PREFIXOS_FORA_DAS_OPERACIONAIS = ('5.1.03', '5.2.01', '5.3.01', '5.3.02')` | 🔴 as quatro linhas próprias do DRE vão a zero |
+| 📖 `contabilidade_utils.py` 🔬 **:610-613** | `'pessoal': ('5.1.01','6.1.01')`, `'materiais': ('5.1.02',)`, `'administrativas': ('5.1.04',)`, `'comerciais': ('5.1.05',)` | ⚠️ `pessoal` sobrevive (já lê as duas raízes); **as outras três vão a zero** |
 
 ⚠️ **Isto não é a mesma coisa que o mapa de prefixos invertido** que a Onda 4
 mediu e deixou para esta fase. Aquele é um erro de *classificação*; este é o
 dado **sumindo de baixo** do leitor. Os dois se resolvem aqui, mas são
 defeitos diferentes e cada um tem seu teste.
 
+⚠️ 🔬 **As linhas desta tabela foram remedidas em 04/09 DEPOIS da Task 3**, que
+acrescentou docstrings em `contabilidade_utils.py` e empurrou tudo abaixo da
+`:21` em **+8 linhas**. É a segunda remedição num dia. **Localize por conteúdo.**
+📖 De brinde: o cabeçalho de `tests/test_fase06_d3_dre_despesas_v2.py:24` cita
+`event_manager.py:1114` como o escritor de `5.1.01.001`; 🔬 hoje ele está em
+**`:1488`**. Corrija essa citação junto, ou ela envelhece mais um mês.
+
 **O que este Step exige, no MESMO commit da migration:**
 
 1. `event_manager.py:1488` passa a `'6.1.01.001'` (o destino que o `DEPARA_5X`
    já dá para `('financeiro_seeds', '5.1.01.001')` — os dois têm de bater, e há
    teste que falha se divergirem).
-2. `contabilidade_utils.py:712` e `:590` — 🔬 **resolvido em 04/09, e a
+2. `contabilidade_utils.py` 🔬 **:720** e 🔬 **:598** — 🔬 **resolvido em 04/09, e a
    resposta é declarar o resíduo, não inventar conta.**
 
    🔬 Medido: o canônico (`_V2_CONTAS_SEED`, 36 contas) **não tem conta de CMV
@@ -765,7 +772,7 @@ defeitos diferentes e cada um tem seu teste.
    `classificacao_gasto` — não por prefixo de conta.
 
    🔴 **E o CMV do DRE legado já estava errado antes desta fase.** 📖
-   `contabilidade_utils.py:712` faz `cmv = calcular_valor_contas(['5.1.03'])`, e
+   `contabilidade_utils.py:720` faz `cmv = calcular_valor_contas(['5.1.03'])`, e
    📖 `5.1.03` no `financeiro_seeds` é **EQUIPAMENTOS** (`:84`), com
    `5.1.03.001 'Aluguel de Equipamentos'` e `5.1.03.002 'Manutenção de
    Equipamentos'`. O DRE legado vinha reportando **locação de equipamento como
