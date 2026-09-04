@@ -470,9 +470,20 @@ def index():
         cliente_filter = request.args.get('cliente', '')
         
         logger.debug(f"DEBUG PROPOSTAS: admin_id={admin_id}, filters=status:{status_filter}, cliente:{cliente_filter}")
-        
+
+        # Espinha financeira (ADR 0005) — a Proposta de importação
+        # (origem='importacao_obra', migration 320) não é um documento
+        # comercial: é o elo que liga a Obra ao Orçamento quando a obra entra
+        # por planilha, sem passar pelo funil. Deixá-la na listagem
+        # contaminaria o funil com uma proposta que nunca foi ao cliente, e os
+        # KPIs (total, pendentes, valor) contariam receita que ninguém vendeu.
+        # `origem IS NULL` é a proposta comercial de sempre — a coluna nasceu
+        # nullable justamente para não precisar de backfill.
+        _so_comercial = or_(Proposta.origem.is_(None),
+                            Proposta.origem != 'importacao_obra')
+
         # Query base com filtro por admin
-        query = Proposta.query.filter_by(admin_id=admin_id)
+        query = Proposta.query.filter_by(admin_id=admin_id).filter(_so_comercial)
         
         # Aplicar filtros
         if status_filter:
@@ -485,12 +496,12 @@ def index():
             page=page, per_page=20, error_out=False
         )
         
-        # Estatísticas para dashboard
+        # Estatísticas para dashboard (também só comerciais)
         stats = safe_db_operation(lambda: {
-            'total': Proposta.query.filter_by(admin_id=admin_id).count(),
-            'pendentes': Proposta.query.filter_by(admin_id=admin_id, status='pendente').count(),
-            'aprovadas': Proposta.query.filter_by(admin_id=admin_id, status='aprovada').count(),
-            'valor_total': db.session.query(func.sum(Proposta.valor_total)).filter_by(admin_id=admin_id).scalar() or 0
+            'total': Proposta.query.filter_by(admin_id=admin_id).filter(_so_comercial).count(),
+            'pendentes': Proposta.query.filter_by(admin_id=admin_id, status='pendente').filter(_so_comercial).count(),
+            'aprovadas': Proposta.query.filter_by(admin_id=admin_id, status='aprovada').filter(_so_comercial).count(),
+            'valor_total': db.session.query(func.sum(Proposta.valor_total)).filter_by(admin_id=admin_id).filter(_so_comercial).scalar() or 0
         }, {})
         
         logger.debug(f"DEBUG PROPOSTAS: {stats.get('total', 0)} propostas encontradas")

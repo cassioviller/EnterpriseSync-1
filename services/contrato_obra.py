@@ -102,9 +102,17 @@ ORIGEM_IMPORTACAO = 'importacao_fisico_financeiro'
 # chegando atrasado ao baseline. Distinguir os dois na régua é o que permite
 # ler depois "esta obra nasceu com contrato X" vs "alguém editou para X".
 ORIGEM_CONTRATO_ORIGINAL = 'contrato_original'
+# Resgate da Espinha Financeira (Task 6) — o 6º escritor, declarado em vez de
+# descoberto pelo log. `services/importar_obra_completa.py` cria a obra a
+# partir de uma Proposta que nasce FORA do funil comercial
+# (`Proposta.origem='importacao_obra'`, migration 320): não é proposta
+# aprovada pelo cliente nem importação físico-financeira, e chamar de
+# `proposta_aprovada` faria a régua mentir sobre como aquela obra chegou.
+ORIGEM_IMPORTACAO_OBRA = 'importacao_obra'
 
 ORIGENS = (ORIGEM_PROPOSTA, ORIGEM_ADITIVO, ORIGEM_CADASTRO, ORIGEM_EDICAO,
-           ORIGEM_IMPORTACAO, ORIGEM_CONTRATO_ORIGINAL)
+           ORIGEM_IMPORTACAO, ORIGEM_CONTRATO_ORIGINAL,
+           ORIGEM_IMPORTACAO_OBRA)
 
 # origem (vocabulário de log) → origem_tipo (coluna de ObraContratoVersao).
 # Identidade deliberada — ver "Mapeamento origem → origem_tipo" acima.
