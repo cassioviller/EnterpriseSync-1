@@ -940,9 +940,12 @@ def test_codigo_sem_destino_faz_a_migration_falhar_e_nomear():
     from migrations import _migration_324_depara_contas_5x
     with app.app_context():
         admin_id = _tenant_com_partida_em_codigo_desconhecido('5.9.99')
-        assert _migration_324_depara_contas_5x() is False, (
-            'código sem destino tem de FALHAR — ficar failed e retentar a '
-            'cada boot é o comportamento certo (a lição da 279/309)')
+        # LEVANTA, nao devolve False: so' a excecao que sobe faz
+        # run_migration_safe gravar 'failed' e retentar. Ver a docstring da
+        # migration e migrations.py:170.
+        with pytest.raises(RuntimeError) as exc:
+            _migration_324_depara_contas_5x()
+        assert '5.9.99' in str(exc.value), 'a excecao tem de NOMEAR o codigo'
         sobrou = db.session.execute(text(
             "SELECT count(*) FROM partida_contabil "
             "WHERE admin_id=:a AND conta_codigo='5.9.99'"),
@@ -961,10 +964,11 @@ def test_partida_ORFA_e_nomeada_e_nao_apenas_contada():
     from migrations import _migration_324_depara_contas_5x
     with app.app_context():
         admin_id = _tenant_com_partida_orfa('5.3.01')   # sem linha em plano_contas
-        assert _migration_324_depara_contas_5x() is False
-        # o nome do tenant e o código têm de aparecer no log/na exceção
-        assert str(admin_id) in _ultima_mensagem_de_erro()
-        assert '5.3.01' in _ultima_mensagem_de_erro()
+        with pytest.raises(RuntimeError) as exc:
+            _migration_324_depara_contas_5x()
+        # o tenant e o código têm de aparecer NA EXCEÇÃO, não só num contador
+        assert str(admin_id) in str(exc.value)
+        assert '5.3.01' in str(exc.value)
 
 
 def test_conta_5x_sem_partida_e_desativada_e_nao_apagada():
@@ -1015,8 +1019,16 @@ def _migration_324_depara_contas_5x():
     contas e nunca o `nome`. Tenant sem 5.x e' no-op. Tenant com 5.x que nao
     casa nenhuma assinatura => FALHA e NOMEIA o tenant.
 
+    🔴 ELA LEVANTA, NAO DEVOLVE False. Medido em 04/09: `run_migration_safe`
+    (migrations.py:170) DESCARTA o valor de retorno e grava 'success' sempre que
+    a funcao retorna sem levantar. Uma migration que engole a propria excecao e
+    devolve False e' gravada como SUCESSO e nunca retenta — o oposto exato do
+    que esta docstring promete, e a repeticao da licao da 279/309 que ela cita.
+    O molde certo e' o da migration 318 (`except: ... raise`), nao o das 319-322.
+
     Ficar 'failed' e retentar a cada boot é o comportamento certo; é o que a
-    279 deveria ter feito e não fez (lição da 309).
+    279 deveria ter feito e não fez (lição da 309) — e so' se consegue
+    LEVANTANDO.
 
     Nenhuma partida é apagada ou somada. Nenhuma conta é apagada.
     """
@@ -1109,21 +1121,30 @@ def _migration_324_depara_contas_5x():
                     f'pares migrados em {len(tenants)} tenants, contagem e '
                     f'soma conferidas: {antes}.')
         return True
-    except AssinaturaDesconhecida as e:
-        logger.error(f'[Migration 324] Falha (nada foi gravado): {e}',
-                     exc_info=True)
-        return False
     except Exception as e:
+        # LEVANTA. Nao devolve False — ver a docstring. O `with
+        # db.engine.begin()` ja' desfez tudo; o log nomeia o motivo (e o
+        # tenant, quando e' AssinaturaDesconhecida) e a excecao sobe para o
+        # run_migration_safe gravar 'failed' e retentar no proximo boot.
         logger.error(f'[Migration 324] Falha (nada foi gravado): {e}',
                      exc_info=True)
-        return False
+        raise
 ```
 
-⚠️ O `except AssinaturaDesconhecida` separado existe para o **log dizer o
-motivo certo**, não para tratar diferente: os dois devolvem `False` e não
-gravam nada. Se o `ruff` reclamar dos dois ramos idênticos, funda-os em
-`except (AssinaturaDesconhecida, Exception)` — **mas mantenha a mensagem da
-exceção no log**, que é quem nomeia o tenant.
+🔴 **Por que `raise` e não `return False` — medido em 04/09, e é o achado que
+mais muda esta migration.** 📖 `migrations.py:170` chama `migration_func()` e
+**descarta o retorno**; `:175` grava `'success'` logo em seguida. Só uma
+**exceção que sobe** leva ao `except` de `:180` que grava `'failed'`
+(`:194`). Portanto: uma migration que devolve `False` é gravada como
+**SUCESSO**, e `is_migration_executed` (`:68`, `status == 'success'`) faz o
+runner **pular para sempre**. O de-para não rodaria, e ninguém saberia.
+
+⚠️ 🔬 **Isto já está vivo em quatro migrations da `main`:** as **319, 320, 321
+e 322** (o Resgate da Espinha) usam `except ... return False`. A **318** usa
+`except ... raise`, que é a forma certa. Não é escopo desta fase consertá-las —
+mas está registrado aqui e no `ESTADO-ATUAL.md` como resíduo nomeado, porque é
+o mesmo defeito de "gravou sucesso sem pegar" que a migração da
+`notificacao_cliente` teve em 17/08.
 
 Registre **na ordem**, depois da 323:
 
@@ -1137,7 +1158,11 @@ Registre **na ordem**, depois da 323:
 .pythonlibs/bin/pytest tests/test_fase8_depara_5x.py -v
 .pythonlibs/bin/python -c "from app import app; from migrations import _migration_324_depara_contas_5x as m; app.app_context().push(); print(m(), m())"
 ```
-Expected: PASS nos seis; `True True` na dupla execução (a segunda não acha par nenhum e é no-op).
+Expected: PASS nos seis; `True True` na dupla execução (a segunda não acha
+par nenhum e é no-op). ⚠️ Se algum tenant do banco de dev tiver código sem
+destino, a dupla execução **levanta** em vez de imprimir — é o
+comportamento certo, e a mensagem diz qual código. Conserte o de-para ou
+o dado, nunca o `raise`.
 
 - [ ] **Step 7: Commit**
 
