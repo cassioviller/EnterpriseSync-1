@@ -7967,6 +7967,19 @@ class RDOSubempreitadaApontamento(db.Model):
     quantidade_produzida = db.Column(db.Float, nullable=False, default=0.0)
     homem_hora = db.Column(db.Float, nullable=True)  # qtd / (pessoas * horas)
     observacoes = db.Column(db.Text, nullable=True)
+    # Espinha financeira / Fatia 2 §D (DC9), migration 322 — subempreitada vira
+    # CUSTO da atividade. O modelo é verba única + markup: a verba é o que se
+    # paga ao subempreiteiro e `lucro_pct` é o markup sobre ela (decisão de
+    # 01/09, opção B — markup uniforme; a opção C está morta). Nullable: o
+    # apontamento existe para medir produção mesmo antes de alguém precificar,
+    # e verba nula significa "sem custo lançado", não "custo zero".
+    verba_unica = db.Column(db.Numeric(15, 2), nullable=True)
+    lucro_pct = db.Column(db.Numeric(5, 2), nullable=True)
+    gestao_custo_pai_id = db.Column(
+        db.Integer,
+        db.ForeignKey('gestao_custo_pai.id', use_alter=True, name='fk_rdosub_gcp'),
+        nullable=True,
+    )
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

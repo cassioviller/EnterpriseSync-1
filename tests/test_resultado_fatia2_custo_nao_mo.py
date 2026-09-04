@@ -183,10 +183,6 @@ def test_dc3_mo_nao_conta_duas_vezes():
         assert custo_incorrido_atividade(t) == Decimal('620.00')
 
 
-@pytest.mark.xfail(strict=True,
-                   reason='Fatia 2 §D volta na Task 8 — migration 321 e o '
-                          'escritor _registrar_custo_subempreitada, que ainda '
-                          'não existe na main')
 def test_subempreitada_gera_custo_e_idempotente():
     """F2-C/DC9: apontar subempreitada com verba+lucro gera custo na atividade
     (GestaoCustoFilho SUBEMPREITADA ligado à tarefa); reeditar não duplica."""

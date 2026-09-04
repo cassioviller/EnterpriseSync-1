@@ -7656,6 +7656,67 @@ def _migration_321_gestao_custo_filho_tarefa():
         return False
 
 
+def _migration_322_subempreitada_verba_lucro_pai():
+    """Resgate da Espinha Financeira — Fatia 2 §D (DC9): verba, lucro e pai em
+    rdo_subempreitada_apontamento.
+
+    Reposicao da outra metade da migration 195 da linhagem velha. A tabela ja'
+    tem `tarefa_cronograma_id` (chegou por outro caminho); faltavam estas tres.
+
+    Modelo de custo: verba unica + markup. `verba_unica` e' o que se paga ao
+    subempreiteiro, `lucro_pct` e' o markup sobre ela, e o custo lancado no
+    ledger e' verba * (1 + lucro/100). E' a opcao B da decisao de 01/09
+    (markup uniforme); a opcao A (mexer margem item a item) foi recusada
+    porque contaminaria a propria medida, e a C nunca foi definida.
+
+    `gestao_custo_pai_id` e' o elo de volta ao GestaoCustoPai criado pelo
+    lancamento — e' por ele que a tela sabe que aquele apontamento ja' virou
+    custo. FK com use_alter/nome explicito (fk_rdosub_gcp) porque as duas
+    tabelas se referenciam em ordem que o SQLAlchemy nao resolve sozinho.
+
+    As tres sao nullable de proposito: apontamento existe para medir producao
+    mesmo antes de alguem precificar, e todo apontamento que ja' esta' no banco
+    e' anterior a esta feature. Verba nula significa "sem custo lancado", nao
+    "custo zero". Idempotente.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                ALTER TABLE rdo_subempreitada_apontamento
+                    ADD COLUMN IF NOT EXISTS verba_unica NUMERIC(15,2)
+            """))
+            conn.execute(sa_text("""
+                ALTER TABLE rdo_subempreitada_apontamento
+                    ADD COLUMN IF NOT EXISTS lucro_pct NUMERIC(5,2)
+            """))
+            conn.execute(sa_text("""
+                ALTER TABLE rdo_subempreitada_apontamento
+                    ADD COLUMN IF NOT EXISTS gestao_custo_pai_id INTEGER
+            """))
+            # A FK vai em passo separado e condicionado: ADD CONSTRAINT nao
+            # aceita IF NOT EXISTS no Postgres, e rodar duas vezes estouraria.
+            conn.execute(sa_text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint WHERE conname = 'fk_rdosub_gcp'
+                    ) THEN
+                        ALTER TABLE rdo_subempreitada_apontamento
+                            ADD CONSTRAINT fk_rdosub_gcp
+                            FOREIGN KEY (gestao_custo_pai_id)
+                            REFERENCES gestao_custo_pai(id);
+                    END IF;
+                END $$;
+            """))
+        logger.info('[Migration 322] rdo_subempreitada_apontamento: verba_unica, '
+                    'lucro_pct e gestao_custo_pai_id criadas.')
+        return True
+    except Exception as e:
+        logger.error(f'[Migration 322] Falha: {e}', exc_info=True)
+        return False
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -7978,6 +8039,7 @@ def executar_migracoes():
             (319, "Resgate Espinha — cronograma_template_item.peso_medicao (repoe a 193 da linhagem velha)", _migration_319_template_item_peso_medicao),
             (320, "Resgate Espinha — propostas_comerciais.origem (repoe a 194): proposta de importacao fora do funil comercial", _migration_320_proposta_origem),
             (321, "Resgate Espinha — gestao_custo_filho.tarefa_cronograma_id (a outra metade da 195): custo direto por atividade; NULL segue rateado por hora-homem", _migration_321_gestao_custo_filho_tarefa),
+            (322, "Resgate Espinha / Fatia 2 §D — rdo_subempreitada_apontamento.verba_unica, .lucro_pct e .gestao_custo_pai_id: subempreitada vira custo por verba + markup (decisao de 01/09, opcao B)", _migration_322_subempreitada_verba_lucro_pai),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

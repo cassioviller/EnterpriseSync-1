@@ -2709,6 +2709,73 @@ def tarefas_rdo(obra_id: int):
 # SUBEMPREITADA — Apontamentos diários (pessoas × horas × quantidade)
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _registrar_custo_subempreitada(apt, rdo, tarefa, sub, data, admin_id):
+    """Fatia 2 (DC9) — transforma o apontamento de subempreitada em custo na
+    atividade: verba única + markup → GestaoCustoFilho 'SUBEMPREITADA' ligado a
+    `tarefa_cronograma_id`. Idempotente: remove o custo anterior do mesmo
+    apontamento antes de recriar. Sem verba → limpa e não gera custo.
+
+    PORTE 24/08 (Task 8 do resgate) — a função vem da branch do PR #6, mas o
+    arquivo NÃO: os dois `cronograma_views.py` são de linhagens disjuntas e o
+    da `main` já tem as rotas de subempreitada. O que faltava nelas era
+    exatamente isto — gravar o custo. Por isso só a função foi portada, e o
+    sítio foi achado pelo cabeçalho da seção, não por número de linha.
+
+    Idempotência por DELETE-e-recria, e não por UPDATE, de propósito: o
+    apontamento pode ser reeditado com verba menor, maior ou nenhuma, e
+    recriar é a única forma de o terceiro caso (verba removida) zerar o custo
+    em vez de deixar o lançamento velho para trás. Sem isso, reeditar um
+    apontamento somaria custo em cima de custo — que é o que o teste desta
+    task cobre.
+
+    A categoria é 'SUBEMPREITADA' e ela NÃO passa por `_CATEGORIA_LEGADA_MAP`
+    (só SALARIO/COMPRA/VEICULO/REEMBOLSO/DESPESA_GERAL passam), então chega ao
+    ledger com o próprio nome. É o que mantém o DC3 de pé: o read-model exclui
+    do ledger apenas SALARIO/MAO_OBRA_DIRETA/VALE_*, porque essas já vêm do
+    RDOCustoDiario — subempreitada nunca esteve lá, e contá-la como não-MO não
+    duplica nada. (⚠️ `services/resumo_custos_obra` classifica SUBEMPREITADA
+    como mão de obra; é outro relatório, com outro vocabulário, e as duas
+    coisas convivem.)
+    """
+    from decimal import Decimal as _Dec
+    from models import GestaoCustoFilho
+
+    # idempotência: apaga o custo anterior deste apontamento
+    antigos = GestaoCustoFilho.query.filter_by(
+        origem_tabela='rdo_subempreitada_apontamento', origem_id=apt.id, admin_id=admin_id,
+    ).all()
+    for f in antigos:
+        db.session.delete(f)
+    db.session.flush()
+
+    verba_raw = data.get('verba_unica')
+    if verba_raw is None or float(verba_raw or 0) <= 0:
+        apt.verba_unica = None
+        apt.lucro_pct = None
+        apt.gestao_custo_pai_id = None
+        return None
+
+    verba = _Dec(str(verba_raw))
+    lucro = _Dec(str(data.get('lucro_pct') or 0))
+    apt.verba_unica = verba
+    apt.lucro_pct = lucro
+    custo_total = (verba * (_Dec('1') + lucro / _Dec('100'))).quantize(_Dec('0.01'))
+
+    from utils.financeiro_integration import registrar_custo_automatico
+    filho = registrar_custo_automatico(
+        admin_id=admin_id, tipo_categoria='SUBEMPREITADA',
+        entidade_nome=sub.nome, entidade_id=sub.id, data=rdo.data_relatorio,
+        descricao=f'Subempreitada {sub.nome} — {tarefa.nome_tarefa}'[:300],
+        valor=custo_total, obra_id=tarefa.obra_id,
+        origem_tabela='rdo_subempreitada_apontamento', origem_id=apt.id,
+        force_v2=True,
+    )
+    if filho:
+        filho.tarefa_cronograma_id = tarefa.id      # custo direto na atividade (Fatia 2)
+        apt.gestao_custo_pai_id = filho.pai_id
+    return filho
+
+
 @cronograma_bp.route('/rdo/<int:rdo_id>/apontar-subempreitada', methods=['POST'])
 @login_required
 def apontar_subempreitada(rdo_id: int):
@@ -2787,6 +2854,10 @@ def apontar_subempreitada(rdo_id: int):
     apt.quantidade_produzida = qtd_prod
     apt.observacoes = obs
     apt.calcular_homem_hora()
+    db.session.flush()  # garante apt.id para o vínculo do custo
+
+    # Fatia 2 (DC9) — subempreitada vira custo na atividade (verba + markup)
+    _registrar_custo_subempreitada(apt, rdo, tarefa, sub, data, admin_id)
 
     db.session.commit()
 
@@ -2805,6 +2876,8 @@ def apontar_subempreitada(rdo_id: int):
             'quantidade_produzida': apt.quantidade_produzida,
             'homem_hora': apt.homem_hora,
             'observacoes': apt.observacoes,
+            'verba_unica': float(apt.verba_unica) if apt.verba_unica is not None else None,
+            'lucro_pct': float(apt.lucro_pct) if apt.lucro_pct is not None else None,
         },
     })
 
