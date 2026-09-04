@@ -288,3 +288,63 @@ def test_nome_ambiguo_sem_caminho_mantem_o_congelado():
         tree = _arvore_do_portal(obra)
         folha = tree[0].filhos[0].filhos[0]
         assert folha.percentual_apresentacao == 33.0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# O pai CONGELADO — 2026-09-04
+# ─────────────────────────────────────────────────────────────────────────────
+# Os testes acima montam a EAP com o pai gravado JÁ igual ao rollup das filhas
+# (48.75 = média de 5/5/90/95), então eles não distinguem "o portal leu o valor
+# gravado" de "o portal agregou as filhas". O caso real distingue.
+#
+# 🔬 Medido no código em 04/09: `percentual_concluido` do PAI só é recalculado
+# em recálculo de DATAS — `rollup_percentual_pos_recalculo`
+# (utils/cronograma_engine.py:598) só é chamada de
+# `services/cronograma_scheduler.recalcular_obra:616` e de
+# `recalcular_cronograma` (:749). O apontamento de RDO chama
+# `atualizar_percentual_tarefa` (:1426), que atualiza SÓ a própria tarefa —
+# zero menções a pai/rollup/ancestral nas suas ~127 linhas.
+#
+# Resultado: a folha fica fresca, o pai congela no dia em que o cronograma foi
+# mexido pela última vez. O cronograma interno (cronograma_views.py:2701) e o
+# PDF (services/cronograma_pdf.py:207) escondem isso porque agregam em memória
+# ao ler. O portal era o único que não agregava.
+#
+# Forma real relatada (obra Ultragaz - Ambulatório): "DEMOLIÇÃO E FECHAMENTO -
+# ALVENARIA" em 37,5% com as QUATRO filhas em 100%.
+PCT_FILHAS_CONCLUIDAS = [100.0, 100.0, 100.0, 100.0]
+PAI_CONGELADO = 37.5
+
+
+def _cenario_pai_congelado():
+    """Interno com as filhas em 100% e o pai congelado num valor antigo."""
+    admin = _admin()
+    obra = _obra(admin.id)
+    _montar_eap(obra, cliente=False,
+                pct_terreo=PCT_FILHAS_CONCLUIDAS,
+                pct_1_andar=PCT_FILHAS_CONCLUIDAS,
+                pct_pai_terreo=PAI_CONGELADO,
+                pct_pai_1_andar=PAI_CONGELADO,
+                pct_eletrica_terreo=0.0, pct_eletrica_1_andar=0.0)
+    _montar_eap(obra, cliente=True, pct_terreo=[0.0] * 4,
+                pct_1_andar=[0.0] * 4, pct_pai_terreo=0.0,
+                pct_pai_1_andar=0.0, pct_eletrica_terreo=0.0,
+                pct_eletrica_1_andar=0.0)
+    return obra
+
+
+def test_pai_congelado_nao_contradiz_as_filhas_que_estao_na_tela():
+    """Quatro filhas em 100% não podem ficar sob um pai em 37,5%.
+
+    Não existe ponderação que leve quatro filhas 100% a 37,5%: o número vinha
+    do `percentual_concluido` GRAVADO do pai, que nada atualiza quando o avanço
+    de uma filha muda. O portal tem de agregar as filhas que ele mesmo está
+    exibindo — a mesma fórmula do cronograma interno e do PDF.
+    """
+    with app.app_context():
+        obra = _cenario_pai_congelado()
+        terreo, andar = _pavimentos(_arvore_do_portal(obra))
+        assert (terreo.percentual_apresentacao,
+                andar.percentual_apresentacao) == (100.0, 100.0), (
+            'o pai exibiu o valor congelado em vez do agregado das filhas '
+            'que estão logo abaixo dele na mesma tela')

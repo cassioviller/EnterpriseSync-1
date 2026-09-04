@@ -319,6 +319,50 @@ def portal_obra(token: str):
             _nodes_by_id[t.tarefa_pai_id].filhos.append(node)
         else:
             cronograma_cliente_tree.append(node)
+
+    # Bottom-up: o percentual do PAI é agregado das filhas QUE ESTÃO NA TELA,
+    # nunca o `percentual_concluido` gravado dele. Mesma função do cronograma
+    # interno (`cronograma_views.py`, o `rollup_realizado(resultado)` do
+    # payload de tarefas-rdo) e do PDF (`services/cronograma_pdf.py`) — fórmula
+    # num só lugar.
+    #
+    # 🔬 04/09 — POR QUE o gravado não serve: `percentual_concluido` do pai só
+    # é recalculado em recálculo de DATAS. `rollup_percentual_pos_recalculo`
+    # (utils/cronograma_engine.py:598) é chamada de
+    # `services/cronograma_scheduler.recalcular_obra` e de
+    # `recalcular_cronograma`, e de mais nenhum lugar. O apontamento de RDO
+    # chama `atualizar_percentual_tarefa` (utils/cronograma_engine.py:1426),
+    # que atualiza SÓ a própria tarefa — zero menções a pai, rollup ou
+    # ancestral no corpo dela.
+    #
+    # Consequência que o cliente via: a folha ficava fresca e o pai congelava
+    # no dia do último mexido no cronograma. Obra Ultragaz - Ambulatório,
+    # 04/09: "DEMOLIÇÃO E FECHAMENTO - ALVENARIA" em 37,5% com as QUATRO
+    # filhas em 100%, e "HIDRAULICA" em 50% com 4 de 5 filhas em 100%.
+    # Nenhuma ponderação leva quatro filhas 100% a 37,5% — o número não era
+    # uma média errada, era um retrato velho.
+    #
+    # As outras três telas escondiam o defeito porque já agregavam em memória
+    # ao ler; o portal era o único que confiava no valor gravado, e por isso o
+    # único onde o cliente enxergava a contradição.
+    from utils.cronograma_engine import rollup_realizado
+    _itens_rollup = [
+        {
+            'id': t.id,
+            'tarefa_pai_id': t.tarefa_pai_id,
+            'duracao_dias': t.duracao_dias,
+            # A folha entra com o MESMO número que a tela mostra — o que
+            # `_percentual_de` resolveu (caminho, depois nome único, depois o
+            # congelado da cópia-cliente). Agregar outra coisa faria o pai
+            # discordar das filhas logo abaixo dele.
+            'percentual_realizado': _nodes_by_id[t.id].percentual_apresentacao,
+        }
+        for t in _tarefas_cliente
+    ]
+    for _pai_id, _pct in rollup_realizado(_itens_rollup).items():
+        if _pai_id in _nodes_by_id:
+            _nodes_by_id[_pai_id].percentual_apresentacao = _pct
+
     # Linha raiz do cronograma do portal mostra o MESMO número do anel
     # (perc_geral = calcular_progresso_geral_obra_v2), não o rollup hierárquico
     # persistido na raiz — consistente com o cronograma interno. Só quando há uma
