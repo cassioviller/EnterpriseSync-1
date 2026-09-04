@@ -63,7 +63,15 @@ A spec traz números e `caminho:linha` medidos em 17/08. Sete dias depois, quatr
 | migrations **310 e 311** (D4: "a maior aplicada é a 309") | a maior no repo é a **314** | Use **323** e **324**. É a própria regra da D4 aplicada de novo: numerar em sequência real, nunca renumerar para "organizar" — foi assim que nasceu o fantasma do 270 |
 | `scripts/medir_producao.py` "ganha uma **sétima** pergunta" | 📖 o arquivo já tem `q1`..`q7` (a q7 é pontos duplicados no dia) | A pergunta nova é a **q8** |
 | "as **28** contas do canônico" | 🔬 24/08: **35** linhas — 🔴 **04/09: são 36.** `V2 − SEED = {'6.1.02.009'}`, conferido por diferença de conjuntos | O seed de classificação da Task 5 cobre **36** contas. A 36ª é alvo vivo de `MAPEAMENTO_CONTABIL['despesa_geral']` |
-| `PlanoContas` em `models.py:3234`, `PartidaContabil` em `:3332` | 📖 **3247** e **3345** | Deriva de edições posteriores. Ancore por nome de classe, não por linha |
+| `PlanoContas` em `models.py:3234`, `PartidaContabil` em `:3332` | 24/08: 3247 e 3345 · 🔬 **04/09: 3253 e 3351** | Deriva de edições posteriores. **Ancore por nome de classe, nunca por linha** — ver o aviso abaixo |
+
+> ⚠️ **As linhas deste plano envelhecem em dias, não em semanas.** 🔬 Entre o
+> pré-voo de 03/09 e a execução de 04/09, `_V2_CONTAS_SEED` andou de `:1550`
+> para `:1630`, `seed_plano_contas_if_needed` de `:1605` para `:1685`,
+> `calcular_dre_mensal` de `:557` para `:620` e `gerar_balancete_mensal` de
+> `:352` para `:407` — tudo em `contabilidade_utils.py`, num dia. **Localize
+> todo símbolo por nome** (`grep -n "^def nome_da_funcao"`), nunca pela linha
+> citada aqui. As linhas ficam como pista, não como endereço.
 
 ## Global Constraints
 
@@ -125,7 +133,7 @@ contra dois. 🔬 Medidos por AST sobre o fonte:
 |---|---|---|---|
 | 1 | `contabilidade_utils.criar_plano_contas_padrao:21` — **aposentado** | 56 | `5.1.01 'Materiais Diretos'` aceita=**True**, `5.2.01 'Materiais Indiretos'`, `2.1.03.007-009`, `4.1.02.%` |
 | 2 | `financeiro_seeds.PLANO_CONTAS_CONSTRUCAO:10` + `:103` — **aposentado** | 62 | `5.1.01 'MÃO DE OBRA'` aceita=**False** com filhos `5.1.01.001-004`, `2.1.03.001-003`, `4.1.01.001-003` |
-| 3 | `contabilidade_utils._V2_CONTAS_SEED:1550` — **o canônico** | 36 | grupo `6` inteiro, `2.1.03.001`, `4.1.01.001`, **zero contas `5.x`** |
+| 3 | `contabilidade_utils._V2_CONTAS_SEED` 🔬 **:1630** — **o canônico** | 36 | grupo `6` inteiro (10 contas), `2.1.03.001`, `4.1.01.001`, **zero contas `5.x`** — 🔬 conferido por leitura da atribuição real |
 | 4 | `scripts/seed_demo_alfa.py::_upsert_conta:3480` (de `_seed:464`) | 12 | 🔴 **raízes invertidas**: `3` = receita, `4` = despesa; **zero contas `5.x`** |
 
 ⚠️ O nº4 **roda sozinho no boot** (📖 `app.py:618`, auto-seed do demo Alfa) —
@@ -495,7 +503,7 @@ git commit -m "feat(fase8): plano_contas ganha classificacao_gasto e atividade_d
 - Test: `tests/test_fase8_semeador_unico.py`
 
 **Interfaces:**
-- Consumes: `contabilidade_utils.seed_plano_contas_if_needed(admin_id) -> None` (já existe, `:1597`).
+- Consumes: `contabilidade_utils.seed_plano_contas_if_needed(admin_id) -> None` (já existe, 🔬 04/09 em **`:1685`**; o plano dizia `:1597` e o pré-voo `:1605` — localize por nome).
 - Produces: nenhuma assinatura nova. As duas `criar_plano_contas_padrao` continuam importáveis e **não são apagadas**.
 
 - [ ] **Step 1: Escrever os dois testes que falham**
@@ -975,8 +983,13 @@ def test_conta_5x_sem_partida_e_desativada_e_nao_apagada():
 
 ⚠️ **Os helpers `_tenant_*` e `_ultima_mensagem_de_erro` são do próprio arquivo e
 precisam ser escritos.** Ao montar `PlanoContas(...)`, 📖 `natureza` e `nivel` são
-**`NOT NULL`** (`models.py:3276-3277`) e a PK é composta **`(admin_id, codigo)`**
-(`:3271-3273`); o campo do tipo chama-se **`tipo_conta`**, não `tipo` (`:3275`).
+**`NOT NULL`** (🔬 04/09 conferido linha a linha: `models.py:3276` `natureza`,
+`:3277` `nivel` — os números do plano de 24/08 estavam certos) e a PK é composta
+**`(admin_id, codigo)`** (`:3271-3273`); o campo do tipo chama-se
+**`tipo_conta`**, não `tipo` (`:3275`). ⚠️ 🔬 `aceita_lancamento` tem `default=True` mas é
+**nullable**: um `IS NULL` não é nem `True` nem `False`, e o classificador do
+Step 1 cai no ramo seguinte em vez de chutar — é o comportamento certo, mas
+precisa estar escrito.
 Um campo faltando faz o teste falhar por `IntegrityError` — pelo motivo errado, o
 defeito que este plano vem contando desde a Onda 2.
 
