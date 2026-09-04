@@ -7771,6 +7771,169 @@ def _migration_323_plano_contas_semantica():
         raise
 
 
+def _erro_partidas_orfas(orfas):
+    """A mensagem do ramo ORFAO — extraida para poder ser PROVADA.
+
+    🔬 04/09: `partida_contabil` tem FK composta (admin_id, conta_codigo) ->
+    plano_contas(admin_id, codigo) (duas, duplicadas). Enquanto ela existir,
+    partida orfa e' IMPOSSIVEL de criar — e por isso impossivel de montar num
+    teste. O ramo fica assim mesmo: a FK nasceu na migration 218 e pode ser
+    dropada; sem o ramo, a orfa some do JOIN, nao migra, e o passo final
+    estoura com "N partidas continuam em 5.x" sem dizer de QUEM. A Global
+    Constraint exige o NOME — (admin_id, conta_codigo), nao um contador.
+    """
+    return RuntimeError(
+        'partidas ORFAS em 5.x (o codigo nao existe no plano de contas do '
+        'tenant) — (admin_id, conta_codigo): '
+        f'{sorted((a, c) for (a, c) in orfas)}. A migracao nao chuta destino '
+        'para conta que nem existe.')
+
+
+def _migration_324_depara_contas_5x():
+    """Fase 8 / Task 4 — reescreve partida_contabil.conta_codigo das 5.x
+    para o canônico, e desativa as 5.x sem partida.
+
+    TRANSAÇÃO ÚNICA com contagem antes e depois. A lição da migração 218
+    (Fase 0.6) vale aqui: numa troca de significado, a ordem dos atos decide
+    se o backfill é real ou no-op silencioso.
+
+    Chaveia em (ASSINATURA, codigo) — D6 respondida em 01/09. A assinatura sai
+    de contabilidade_utils.classificar_assinatura, que le a FORMA do plano de
+    contas e nunca o `nome`. Tenant sem 5.x e' no-op. Tenant com 5.x que nao
+    casa nenhuma assinatura => FALHA e NOMEIA o tenant.
+
+    🔴 ELA LEVANTA, NAO DEVOLVE False. Medido em 04/09: `run_migration_safe`
+    (migrations.py:170) DESCARTA o valor de retorno e grava 'success' sempre que
+    a funcao retorna sem levantar. Uma migration que engole a propria excecao e
+    devolve False e' gravada como SUCESSO e nunca retenta — o oposto exato do
+    que esta docstring promete, e a repeticao da licao da 279/309 que ela cita.
+    O molde certo e' o da migration 318 (`except: ... raise`), nao o das 319-322.
+
+    Ficar 'failed' e retentar a cada boot é o comportamento certo; é o que a
+    279 deveria ter feito e não fez (lição da 309) — e so' se consegue
+    LEVANTANDO.
+
+    Nenhuma partida é apagada ou somada. Nenhuma conta é apagada.
+    """
+    from sqlalchemy import text as sa_text
+
+    # AssinaturaDesconhecida NAO e' capturada aqui de proposito: ela sobe pelo
+    # `except ... raise` de baixo, ja' nomeando o tenant na propria mensagem.
+    from contabilidade_utils import classificar_assinatura
+    from services.plano_contas_depara import DEPARA_5X
+    try:
+        with db.engine.begin() as conn:
+            antes = conn.execute(sa_text(
+                'SELECT count(*), coalesce(sum(valor),0) FROM partida_contabil'
+            )).one()
+
+            # 0. PARTIDA ORFA: 5.x sem linha em plano_contas. Ela sumiria do
+            #    JOIN e o erro final nao diria de quem e'. Nomeia AQUI.
+            orfas = conn.execute(sa_text("""
+                SELECT DISTINCT p.admin_id, p.conta_codigo
+                  FROM partida_contabil p
+                 WHERE p.conta_codigo LIKE '5.%'
+                   AND NOT EXISTS (SELECT 1 FROM plano_contas c
+                                    WHERE c.admin_id = p.admin_id
+                                      AND c.codigo = p.conta_codigo)
+            """)).fetchall()
+            if orfas:
+                raise _erro_partidas_orfas(orfas)
+
+            # 1. Uma assinatura por tenant que tem partida em 5.x.
+            tenants = [r[0] for r in conn.execute(sa_text("""
+                SELECT DISTINCT admin_id FROM partida_contabil
+                 WHERE conta_codigo LIKE '5.%'
+            """)).fetchall()]
+            assinatura_de = {}
+            for aid in tenants:
+                # conn=conn: o classificador tem de enxergar ESTA transacao.
+                assinatura_de[aid] = classificar_assinatura(aid, conn=conn)
+
+            # 2. Todo (assinatura, codigo) com partida viva precisa de destino.
+            pares = conn.execute(sa_text("""
+                SELECT DISTINCT p.admin_id, p.conta_codigo
+                  FROM partida_contabil p
+                 WHERE p.conta_codigo LIKE '5.%'
+            """)).fetchall()
+            sem_destino = sorted({
+                (assinatura_de[aid], cod) for (aid, cod) in pares
+                if (assinatura_de[aid], cod) not in DEPARA_5X})
+            if sem_destino:
+                raise RuntimeError(
+                    'de-para incompleto — pares (assinatura, codigo) SEM '
+                    f'destino: {sem_destino}. A migração não chuta: '
+                    'acrescente o destino em services/plano_contas_depara.py '
+                    'e deixe esta migração retentar no próximo boot.')
+
+            # 2b. 🔬 04/09 — a conta de DESTINO tem de EXISTIR no tenant.
+            #     partida_contabil tem FK composta (admin_id, conta_codigo) ->
+            #     plano_contas(admin_id, codigo). Sem esta guarda o UPDATE do
+            #     passo 3 morre com ForeignKeyViolation nomeando a CONSTRAINT
+            #     — nunca o tenant. "A falha tem de NOMEAR" exige o nome.
+            sem_conta_destino = []
+            for (aid, cod) in pares:
+                destino = DEPARA_5X[(assinatura_de[aid], cod)]
+                existe = conn.execute(sa_text(
+                    'SELECT 1 FROM plano_contas '
+                    ' WHERE admin_id = :a AND codigo = :c'),
+                    {'a': aid, 'c': destino}).scalar()
+                if not existe:
+                    sem_conta_destino.append((aid, cod, destino))
+            if sem_conta_destino:
+                raise RuntimeError(
+                    'conta de DESTINO inexistente no plano de contas do '
+                    'tenant — (admin_id, origem, destino): '
+                    f'{sorted(sem_conta_destino)}. Semeie o canonico nesses '
+                    'tenants (contabilidade_utils.seed_plano_contas_if_needed) '
+                    'e deixe esta migração retentar no próximo boot.')
+
+            # 3. Reescreve, tenant a tenant, dentro da MESMA transação.
+            for (aid, cod) in pares:
+                conn.execute(sa_text("""
+                    UPDATE partida_contabil SET conta_codigo = :destino
+                     WHERE admin_id = :aid AND conta_codigo = :cod
+                """), {'destino': DEPARA_5X[(assinatura_de[aid], cod)],
+                       'aid': aid, 'cod': cod})
+
+            # 4. Contagem e soma têm de bater. Se não baterem, tudo volta.
+            depois = conn.execute(sa_text(
+                'SELECT count(*), coalesce(sum(valor),0) FROM partida_contabil'
+            )).one()
+            if (antes[0], antes[1]) != (depois[0], depois[1]):
+                raise RuntimeError(
+                    f'contagem/soma mudaram no de-para: {antes} -> {depois}')
+
+            # 5. 5.x sem partida: desativa. NUNCA apaga — relatorio historico
+            #    aponta para a conta.
+            conn.execute(sa_text("""
+                UPDATE plano_contas c SET ativo = false
+                 WHERE c.codigo LIKE '5.%'
+                   AND NOT EXISTS (SELECT 1 FROM partida_contabil p
+                                    WHERE p.admin_id = c.admin_id
+                                      AND p.conta_codigo = c.codigo)
+            """))
+            sobraram = conn.execute(sa_text(
+                "SELECT count(*) FROM partida_contabil "
+                "WHERE conta_codigo LIKE '5.%'")).scalar()
+            if sobraram:
+                raise RuntimeError(
+                    f'{sobraram} partidas continuam em 5.x depois do de-para')
+
+        logger.info(f'[Migration 324] de-para 5.x concluído; {len(pares)} '
+                    f'pares migrados em {len(tenants)} tenants, contagem e '
+                    f'soma conferidas: {antes}.')
+        return True
+    except Exception as e:
+        # LEVANTA. Nao devolve False — ver a docstring. O `with
+        # db.engine.begin()` ja' desfez tudo; o log nomeia o motivo (e o
+        # tenant, quando e' AssinaturaDesconhecida) e a excecao sobe para o
+        # run_migration_safe gravar 'failed' e retentar no proximo boot.
+        logger.error(f'[Migration 324] Falha (nada foi gravado): {e}',
+                     exc_info=True)
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -8095,6 +8258,7 @@ def executar_migracoes():
             (321, "Resgate Espinha — gestao_custo_filho.tarefa_cronograma_id (a outra metade da 195): custo direto por atividade; NULL segue rateado por hora-homem", _migration_321_gestao_custo_filho_tarefa),
             (322, "Resgate Espinha / Fatia 2 §D — rdo_subempreitada_apontamento.verba_unica, .lucro_pct e .gestao_custo_pai_id: subempreitada vira custo por verba + markup (decisao de 01/09, opcao B)", _migration_322_subempreitada_verba_lucro_pai),
             (323, "Fase 8 — plano_contas.classificacao_gasto + atividade_dfc: a semantica que destrava margem de contribuicao e DFC", _migration_323_plano_contas_semantica),
+            (324, "Fase 8 — de-para das contas 5.x para o canonico, chaveado por (assinatura, codigo) via classificar_assinatura; partida orfa e assinatura desconhecida PARAM e nomeiam; 5.x sem partida desativada", _migration_324_depara_contas_5x),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

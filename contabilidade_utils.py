@@ -119,6 +119,97 @@ def criar_plano_contas_padrao(admin_id):
     # Invalidar cache após criação do plano de contas
     PlanoContas.invalidar_cache()
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fase 8 / Task 4 — a ASSINATURA ESTRUTURAL do plano de contas do tenant
+#
+# D6, respondida em 01/09. O de-para das contas 5.x é chaveado em
+# (assinatura, codigo) e NUNCA em nome, porque os dois seeders aposentados
+# trocam o significado de 5.1.01 e 5.1.02 entre si e o nome é justamente o
+# dado inconsistente. Ver services/plano_contas_depara.py.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AssinaturaDesconhecida(Exception):
+    """O plano de contas do tenant tem contas 5.x e nao casa com nenhum dos
+    dois seeders aposentados. A migracao PARA e NOMEIA o tenant — nunca chuta.
+    """
+
+
+def classificar_assinatura(admin_id, conn=None):
+    """Descobre QUAL seeder criou o plano de contas deste tenant, pela FORMA.
+
+    Quatro saidas, e a terceira e' a maioria do parque:
+
+      'contabilidade_utils' — seeder aposentado nº1 (5.1.01 'Materiais
+                              Diretos', analitica)
+      'financeiro_seeds'    — seeder aposentado nº2 (5.1.01 'MAO DE OBRA',
+                              sintetica, com filhos 5.1.01.00x)
+      'sem_5x'              — nenhuma conta 5.x: canonico (_V2_CONTAS_SEED) ou
+                              demo (seed_demo_alfa). O de-para e' NO-OP.
+      AssinaturaDesconhecida — tem 5.x e nao casa nenhum dos dois.
+
+    ⚠️ `conn` nao e' comodidade: a migration 324 roda dentro de
+    `db.engine.begin()`, e chamar `db.session` la' dentro abriria uma SEGUNDA
+    transacao — a contagem "antes/depois" da migration deixaria de valer.
+    Com `conn`, o classificador enxerga o mesmo estado que ela esta' escrevendo.
+
+    🔬 NENHUM sinal le `nome` — a proibicao da spec ("os nomes sao justamente o
+    que esta inconsistente") e' preservada por construcao.
+
+    🔴 Sinais deliberadamente NAO usados, e por que (medidos em 04/09 contra os
+    QUATRO planos concorrentes, nao contra dois):
+      - "existe grupo 6": o CANONICO tem 10 contas 6.*. 🔬 8.520 dos 8.606
+        tenants com plano de contas tem conta 6% — rotularia de legado quase
+        todo tenant sao.
+      - "4.1.01.%" e "2.1.03.001": existem tambem no canonico, e o demo Alfa
+        (scripts/seed_demo_alfa.py, raizes invertidas 3=receita/4=despesa) tem
+        4.1.01 E 4.1.02 ao mesmo tempo.
+
+    ⚠️ `aceita_lancamento` e' NULLABLE (models.py:3279). Um `IS NULL` nao e'
+    nem True nem False: os `is False` / `is True` abaixo sao deliberados, e o
+    tenant cai no ramo seguinte em vez de ser chutado para um dos dois.
+    """
+    from sqlalchemy import text as sa_text
+
+    def _scalar(sql, params):
+        if conn is not None:
+            return conn.execute(sa_text(sql), params).scalar()
+        return db.session.execute(sa_text(sql), params).scalar()
+
+    tem_5x = _scalar(
+        "SELECT count(*) FROM plano_contas "
+        "WHERE admin_id = :a AND codigo LIKE '5%'", {'a': admin_id})
+    if not tem_5x:
+        return 'sem_5x'
+
+    # Sinal limpo de nº2: 5.1.01 tem FILHOS (5.1.01.001-004). O nº1 tem so' a
+    # folha 5.1.01; o canonico e o demo nao tem 5.x nenhuma.
+    filhos_5_1_01 = _scalar(
+        "SELECT count(*) FROM plano_contas "
+        "WHERE admin_id = :a AND codigo LIKE '5.1.01.%'", {'a': admin_id})
+    # Sinal limpo e' o mais direto: 5.1.01 e' analitica no nº1, sintetica no nº2.
+    aceita_5_1_01 = _scalar(
+        "SELECT aceita_lancamento FROM plano_contas "
+        "WHERE admin_id = :a AND codigo = '5.1.01'", {'a': admin_id})
+    # Sinais limpos de nº1, exclusivos entre os quatro.
+    marcas_n1 = _scalar(
+        "SELECT count(*) FROM plano_contas WHERE admin_id = :a AND ("
+        "  codigo = '5.2.01' OR codigo LIKE '4.1.02.%' "
+        "  OR codigo IN ('2.1.03.007', '2.1.03.008', '2.1.03.009'))",
+        {'a': admin_id})
+
+    if filhos_5_1_01 or aceita_5_1_01 is False:
+        return 'financeiro_seeds'
+    if aceita_5_1_01 is True or marcas_n1:
+        return 'contabilidade_utils'
+
+    raise AssinaturaDesconhecida(
+        f'tenant admin_id={admin_id} tem contas 5.x e nao casa com nenhum dos '
+        'dois seeders aposentados. A migracao PARA aqui: acrescente a '
+        'assinatura em contabilidade_utils.classificar_assinatura e o destino '
+        'em services/plano_contas_depara.py, ou migre este tenant a mao.')
+
+
 def get_next_lancamento_numero(admin_id):
     """Obtém o próximo número de lançamento sequencial."""
     last_lancamento = LancamentoContabil.query.filter_by(admin_id=admin_id).order_by(LancamentoContabil.numero.desc()).first()
@@ -597,6 +688,36 @@ def executar_auditoria_automatica(admin_id):
 # Ficam de fora do residual para não serem contados duas vezes.
 _DRE_PREFIXOS_FORA_DAS_OPERACIONAIS = ('5.1.03', '5.2.01', '5.3.01', '5.3.02')
 
+# 🔴 Fase 8 / Task 4 — os QUATRO prefixos acima (três linhas do DRE, porque
+# 5.3.01 e 5.3.02 são a mesma linha de provisão) ficaram SEM BASE.
+#
+# A migration 324 moveu toda partida 5.x para o canônico, e o canônico
+# (_V2_CONTAS_SEED, 36 contas) NÃO TEM conta de CMV, nem de despesa
+# financeira, nem de provisão de IR/CSLL — suas únicas despesas são
+# 6.1.01.* (pessoal) e 6.1.02.* (gerais). Nenhuma partida nova nasce nesses
+# quatro prefixos e nenhuma antiga ficou neles.
+#
+# Os prefixos CONTINUAM sendo lidos de propósito: enquanto a 324 não tiver
+# rodado num tenant (ela pode estar 'failed' e retentando), o valor ainda
+# está lá e não pode ser contado duas vezes no residual `outras`.
+#
+# 🔴 E o CMV legado já vinha ERRADO antes desta fase: ele lê `5.1.03`, que em
+# financeiro_seeds.py:84 é EQUIPAMENTOS ('Aluguel de Equipamentos',
+# 'Manutenção de Equipamentos'). O DRE reportava locação de equipamento como
+# custo de mercadoria vendida — o "mapa de prefixos deslocado" que a Onda 4
+# mediu. Não se inventa conta de CMV no canônico para salvar um número que
+# já estava errado: a spec não menciona CMV, e a margem correta passa a vir
+# do `calcular_dre_gerencial` (Task 6), que chaveia por `classificacao_gasto`.
+#
+# Global Constraint: indicador sem base sai como "sem base", NUNCA 0,00.
+# Estas chaves saem em `dre_data['sem_base']` e os três renderizadores (tela,
+# PDF e Excel) escrevem "sem base" no lugar do valor.
+_DRE_LINHAS_SEM_BASE = (
+    'cmv',
+    'resultado_financeiro.despesas',
+    'provisao_ir_csll',
+)
+
 # Raízes de conta de resultado devedor. Nos quatro planos em uso, '5' é
 # CUSTOS/DESPESAS e '6' é DESPESAS — nenhum usa outra raiz para débito de
 # resultado.
@@ -607,6 +728,17 @@ _DRE_LINHAS_DESPESA_OPERACIONAL = {
     # Só entram aqui os prefixos cujo significado é o MESMO nos planos que os
     # definem. `6.1.01` é "DESPESAS COM PESSOAL" tanto no _V2_CONTAS_SEED
     # quanto em criar_plano_contas_padrao — pode ser classificado.
+    #
+    # ⚠️ Fase 8 / Task 4 — os prefixos 5.x continuam declarados DE PROPÓSITO,
+    # pelo mesmo motivo de _DRE_PREFIXOS_FORA_DAS_OPERACIONAIS: enquanto a
+    # migration 324 não tiver rodado num tenant, o valor ainda está em 5.x e
+    # tem de aparecer na linha certa. Depois dela:
+    #   `pessoal`        sobrevive — já lia as duas raízes, e o destino de
+    #                    5.1.01/5.1.02 (6.1.01.001) cai dentro de '6.1.01';
+    #   `materiais`, `administrativas` e `comerciais` ficam VAZIAS — seus
+    #                    destinos são 6.1.02.*, e o subgrupo 6.1.02 está
+    #                    deliberadamente fora (ver a nota abaixo). O dinheiro
+    #                    não some: ele aparece no residual `outras`.
     'pessoal':          ('5.1.01', '6.1.01'),
     'materiais':        ('5.1.02',),
     'administrativas':  ('5.1.04',),
@@ -717,6 +849,10 @@ def calcular_dre_mensal(admin_id: int, ano: int, mes: int):
         receita_liquida = receita_bruta - deducoes
         
         # 4. CMV/CPV (contas 5.1.03.x - DEBITO)
+        # 🔴 Fase 8 / Task 4: linha SEM BASE — ver _DRE_LINHAS_SEM_BASE. O
+        # prefixo continua sendo lido para não contar em dobro nos tenants
+        # onde a migration 324 ainda não passou; o que a tela, o PDF e o
+        # Excel escrevem é "sem base", nunca 0,00.
         cmv = calcular_valor_contas(['5.1.03'], 'DEBITO')
         
         # 5. LUCRO BRUTO
@@ -847,7 +983,13 @@ def calcular_dre_mensal(admin_id: int, ano: int, mes: int):
                 'margem_bruta': margem_bruta,
                 'margem_ebitda': margem_ebitda,
                 'margem_liquida': margem_liquida
-            }
+            },
+
+            # 🔴 Fase 8 / Task 4 — as linhas cujo prefixo não existe mais no
+            # plano de contas canônico. Elas saem escritas "sem base" na tela,
+            # no PDF e no Excel; NUNCA 0,00. Global Constraint: "indicador sem
+            # base sai como 'sem base'". Ver _DRE_LINHAS_SEM_BASE.
+            'sem_base': list(_DRE_LINHAS_SEM_BASE),
         }
         
         logger.info(f"[OK] DRE {mes}/{ano} calculada: Receita Líquida={receita_liquida}, Lucro Líquido={lucro_liquido}")
@@ -1317,8 +1459,12 @@ def gerar_dre_pdf(admin_id, mes, ano):
         table_data.append(['= RECEITA LÍQUIDA', fmt(dre_data['receita_liquida'])])
         table_data.append(['', ''])
         
-        # CMV
-        if dre_data['cmv'] > 0:
+        # CMV — Fase 8 / Task 4: a linha ficou SEM BASE (o canônico não tem
+        # conta de CMV). Sai escrito "sem base", nunca "R$ 0,00" e nunca
+        # sumindo da tabela: um indicador sem base tem de se declarar.
+        if 'cmv' in dre_data.get('sem_base', ()):
+            table_data.append(['(-) Custo dos Serviços Prestados (CMV)', 'sem base'])
+        elif dre_data['cmv'] > 0:
             table_data.append(['(-) Custo dos Serviços Prestados (CMV)', f"({fmt(dre_data['cmv'])})"])
         
         # Lucro Bruto
@@ -1525,9 +1671,11 @@ def gerar_dre_excel(admin_id, mes, ano):
         add_row('= RECEITA LÍQUIDA', dre_data['receita_liquida'], 100.0, bold=True, bg_color="ecf0f1")
         row += 1
         
-        # CMV
-        if dre_data['cmv'] > 0:
-            add_row('(-) Custo dos Serviços Prestados', -dre_data['cmv'], 
+        # CMV — Fase 8 / Task 4: linha SEM BASE, ver o comentário do PDF.
+        if 'cmv' in dre_data.get('sem_base', ()):
+            add_row('(-) Custo dos Serviços Prestados', 'sem base', None)
+        elif dre_data['cmv'] > 0:
+            add_row('(-) Custo dos Serviços Prestados', -dre_data['cmv'],
                    f'=B{row}/B${receita_liq_row}*100')
         
         # Lucro Bruto

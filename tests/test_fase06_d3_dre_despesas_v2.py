@@ -20,13 +20,23 @@ significados diferentes ao mesmo código:
 | `contabilidade_utils.criar_plano_contas...`| Materiais Dir.| Mão de Obra D.| DESPESAS ADMINISTRAT. |
 | `_V2_CONTAS_SEED` (`:1459`)                | —             | —             | DESPESAS GERAIS       |
 
-E há dois lançadores distintos de "Salários": `contabilidade_utils.py:229`
-grava em `6.1.01.001`, `event_manager.py:1114` grava em `5.1.01.001`.
+Havia dois lançadores distintos de "Salários": `contabilidade_utils.py:229`
+gravava em `6.1.01.001` e `event_manager.py` gravava em `5.1.01.001` — a
+citação original apontava `event_manager.py:1114`; 🔬 04/09 o sítio estava em
+`:1488`, e âncora por número envelhece em um mês.
 
-Unificar os planos é decisão da **Fase 8** (exportação Domínio). O que esta
-correção garante é mais estreito e verificável: **nenhum débito em conta de
-resultado pode ficar de fora do DRE.** Se um código não casar com nenhuma
-linha declarada, ele cai em "outras despesas" — nunca desaparece.
+✅ **A Fase 8 / Task 4 acabou com a coexistência.** A migration 324 move toda
+partida `5.x` para o canônico por (assinatura, código) e desativa as `5.x`
+que ficam sem partida; `event_manager` passou a gravar a folha em
+`6.1.01.001`, o mesmo destino que o `DEPARA_5X` dá para `5.1.01.001`. Por
+isso este arquivo **não cria mais conta `5.x`**: criá-las aqui era o que
+enchia o banco de dev de resíduo de suíte (🔬 04/09: 211 tenants com `5.x`,
+todos `d3_*@test.local`) e o que fazia a própria migration parar.
+
+O que esta correção garante continua sendo mais estreito e verificável:
+**nenhum débito em conta de resultado pode ficar de fora do DRE.** Se um
+código não casar com nenhuma linha declarada, ele cai em "outras despesas" —
+nunca desaparece.
 """
 import os
 import sys
@@ -150,11 +160,13 @@ def test_despesa_do_motor_v2_reduz_o_lucro_liquido(admin):
         assert depois == pytest.approx(antes - 1500.00)
 
 
-def test_as_duas_contas_de_salario_do_sistema_somam_uma_vez_cada(admin):
-    """`6.1.01.001` (contabilidade_utils) e `5.1.01.001` (event_manager).
+def test_salario_tem_UMA_conta_so_e_o_dre_a_ve_uma_vez(admin):
+    """Fase 8 / Task 4 — era `test_as_duas_contas_de_salario_...`.
 
-    Os dois lançadores coexistem. O DRE tem que ver os dois — e não pode
-    contar nenhum duas vezes.
+    O teste antigo provava a COEXISTÊNCIA de `6.1.01.001` (contabilidade_utils)
+    e `5.1.01.001` (event_manager), criando a segunda a cada rodada. Era a
+    prova viva do defeito que a Fase 8 removeu — e a fábrica do resíduo `5.x`
+    do banco de dev. Agora há UM lançador só, e o DRE tem de vê-lo uma vez.
     """
     from contabilidade_utils import criar_lancamento_automatico
     from decimal import Decimal
@@ -163,17 +175,16 @@ def test_as_duas_contas_de_salario_do_sistema_somam_uma_vez_cada(admin):
 
     with app.app_context():
         seed_plano_contas_if_needed(admin)
-        _garantir_conta(admin, '5.1.01.001', 'Salários', pai='5.1.01')
         db.session.commit()
         antes = _dre(admin)['despesas_operacionais']['total']
 
-        for conta in ('6.1.01.001', '5.1.01.001'):
+        for _ in range(2):
             criar_lancamento_automatico(
-                data=DATA, historico=f'salário via {conta}',
+                data=DATA, historico='salário via 6.1.01.001',
                 valor=Decimal('1000.00'), origem='TESTE_D3', origem_id=None,
                 admin_id=admin,
                 partidas=[
-                    {'tipo': 'DEBITO', 'conta': conta, 'valor': Decimal('1000.00')},
+                    {'tipo': 'DEBITO', 'conta': '6.1.01.001', 'valor': Decimal('1000.00')},
                     {'tipo': 'CREDITO', 'conta': '2.1.02.001', 'valor': Decimal('1000.00')},
                 ],
             )
@@ -181,7 +192,7 @@ def test_as_duas_contas_de_salario_do_sistema_somam_uma_vez_cada(admin):
 
         depois = _dre(admin)['despesas_operacionais']['total']
         assert depois == pytest.approx(antes + 2000.00), (
-            'as duas contas de salário têm que somar exatamente uma vez cada'
+            'a conta de salário tem que somar exatamente uma vez por lançamento'
         )
 
 
@@ -222,24 +233,27 @@ def test_conta_de_despesa_desconhecida_cai_em_outras_e_nao_some(admin):
 def test_dre_fecha_com_o_total_de_debitos_de_resultado(admin):
     """Invariante de fechamento: soma das linhas == soma dos débitos.
 
-    CMV, despesas financeiras e provisões saem em linhas próprias do DRE;
-    o resto tem que estar nas despesas operacionais. Nenhum débito em conta
-    de resultado (raízes 5 e 6) pode ficar sem casa.
+    Nenhum débito em conta de resultado pode ficar sem casa: ou está numa
+    linha declarada, ou cai no residual `outras`.
+
+    ⚠️ Fase 8 / Task 4 — este teste criava `5.1.03.001` e `5.2.01.001` a cada
+    rodada. 🔬 Era exatamente o resíduo (74 partidas em 37 tenants, 04/09) que
+    fazia a migration 324 parar com "de-para incompleto". As linhas próprias
+    de CMV, despesa financeira e provisão ficaram SEM BASE no canônico
+    (`_DRE_LINHAS_SEM_BASE`), então o que sobra a provar aqui é o residual.
     """
     from contabilidade_utils import criar_lancamento_automatico
     from decimal import Decimal
 
     with app.app_context():
-        for codigo, nome in (('5.1.03.001', 'CMV'),
-                             ('5.2.01.001', 'Despesa financeira'),
+        for codigo, nome in (('6.1.02.009', 'Despesas Gerais Diversas'),
                              ('6.9.99.001', 'Despesa nunca vista'),
                              ('1.1.01.002', 'Bancos Conta Movimento')):
             pai = codigo.rsplit('.', 1)[0] if codigo != '1.1.01.002' else None
             _garantir_conta(admin, codigo, nome, pai=pai)
         _lancar(admin, 'despesa_alimentacao', 300.00)
         _lancar(admin, 'despesa_transporte', 200.00)
-        for conta, valor in (('5.1.03.001', 100.00),   # CMV
-                             ('5.2.01.001', 50.00),    # despesa financeira
+        for conta, valor in (('6.1.02.009', 100.00),   # despesa geral
                              ('6.9.99.001', 25.00)):   # desconhecida
             criar_lancamento_automatico(
                 data=DATA, historico=f'debito {conta}',
@@ -259,7 +273,11 @@ def test_dre_fecha_com_o_total_de_debitos_de_resultado(admin):
             + dre['resultado_financeiro']['despesas']
             + dre['provisao_ir_csll']['total']
         )
-        assert contabilizado == pytest.approx(300 + 200 + 100 + 50 + 25), (
+        assert contabilizado == pytest.approx(300 + 200 + 100 + 25), (
             'há débito em conta de resultado que o DRE não reporta em '
             'linha nenhuma'
+        )
+        assert 'cmv' in dre['sem_base'], (
+            'a linha de CMV tem de sair declarada SEM BASE — o canônico não '
+            'tem conta de CMV (Fase 8 / Task 4)'
         )

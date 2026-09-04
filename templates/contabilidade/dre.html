@@ -249,7 +249,13 @@
                         <!-- 4. CMV -->
                         <tr class="table-light">
                             <td colspan="2"><strong class="h6">4. (-) CMV/CPV</strong></td>
+                            {# Fase 8 / Task 4 — o canonico nao tem conta de CMV: a linha ficou SEM BASE.
+                               Global Constraint: indicador sem base sai como "sem base", nunca 0,00. #}
+                            {% if 'cmv' in (dre.sem_base or []) %}
+                            <td class="text-end text-muted"><em>sem base</em></td>
+                            {% else %}
                             <td class="text-end text-danger"><strong>(R$ {{ "{:,.2f}".format(dre.cmv) }})</strong></td>
+                            {% endif %}
                         </tr>
 
                         <!-- 5. LUCRO BRUTO -->
@@ -317,7 +323,11 @@
                         <tr>
                             <td></td>
                             <td>8.2. (-) Despesas Financeiras</td>
+                            {% if 'resultado_financeiro.despesas' in (dre.sem_base or []) %}
+                            <td class="text-end text-muted"><em>sem base</em></td>
+                            {% else %}
                             <td class="text-end text-danger">(R$ {{ "{:,.2f}".format(dre.resultado_financeiro.despesas) }})</td>
+                            {% endif %}
                         </tr>
                         <tr class="table-secondary">
                             <td></td>
@@ -346,17 +356,29 @@
                         <tr>
                             <td></td>
                             <td>10.1. Imposto de Renda (IR)</td>
+                            {% if 'provisao_ir_csll' in (dre.sem_base or []) %}
+                            <td class="text-end text-muted"><em>sem base</em></td>
+                            {% else %}
                             <td class="text-end text-danger">(R$ {{ "{:,.2f}".format(dre.provisao_ir_csll.ir) }})</td>
+                            {% endif %}
                         </tr>
                         <tr>
                             <td></td>
                             <td>10.2. Contribuição Social (CSLL)</td>
+                            {% if 'provisao_ir_csll' in (dre.sem_base or []) %}
+                            <td class="text-end text-muted"><em>sem base</em></td>
+                            {% else %}
                             <td class="text-end text-danger">(R$ {{ "{:,.2f}".format(dre.provisao_ir_csll.csll) }})</td>
+                            {% endif %}
                         </tr>
                         <tr class="table-secondary">
                             <td></td>
                             <td><strong>Total de Provisões</strong></td>
+                            {% if 'provisao_ir_csll' in (dre.sem_base or []) %}
+                            <td class="text-end text-muted"><em>sem base</em></td>
+                            {% else %}
                             <td class="text-end text-danger"><strong>(R$ {{ "{:,.2f}".format(dre.provisao_ir_csll.total) }})</strong></td>
+                            {% endif %}
                         </tr>
 
                         <!-- 11. LUCRO LÍQUIDO -->

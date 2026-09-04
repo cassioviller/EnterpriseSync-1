@@ -1483,9 +1483,16 @@ def criar_lancamento_folha_pagamento(data: dict, admin_id: int):
             return
         
         # Buscar contas do plano de contas
+        # Fase 8 / Task 4 — era '5.1.01.001'. A migration 324 move as partidas
+        # dessa conta para '6.1.01.001' e DESATIVA a 5.1.01.001 (fica sem
+        # partida). Com o codigo velho, este `filter_by(ativo=True)` devolveria
+        # None e o `return` la' embaixo faria a folha parar de gerar lancamento
+        # contabil EM SILENCIO — so' um warning no log. O destino aqui e' o
+        # mesmo do DEPARA_5X[('financeiro_seeds', '5.1.01.001')], e ha' teste
+        # que reprova se os dois divergirem.
         conta_despesa_pessoal = PlanoContas.query.filter_by(
             admin_id=admin_id,
-            codigo='5.1.01.001',
+            codigo='6.1.01.001',
             ativo=True
         ).first()
         

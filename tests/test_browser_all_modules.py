@@ -210,17 +210,22 @@ def _garantir_dados_e2e(admin_id: int) -> None:
                 ativo=True,
             ))
 
-    # 0) Conta de despesa de pessoal (5.1.01.001 Salários) exigida pelo handler
-    #    'folha_processada' → criar_lancamento_folha_pagamento (event_manager.py
-    #    l.1110). A PK é (admin_id, codigo) desde a Fase 0.6/D4 — era só
-    #    codigo, global — e conta_pai_codigo é FK composta para ela, então a
-    #    cadeia de pais (5 → 5.1 → 5.1.01) precisa existir antes; criamos em
-    #    ordem hierárquica, com flush por nível para satisfazer o FK.
+    # 0) Conta de despesa de pessoal exigida pelo handler 'folha_processada'
+    #    → criar_lancamento_folha_pagamento (event_manager.py).
+    #    ⚠️ Fase 8 / Task 4 — era a cadeia 5 → 5.1 → 5.1.01 → 5.1.01.001. A
+    #    migration 324 esvazia e DESATIVA as 5.x, e o handler passou a buscar
+    #    '6.1.01.001' com ativo=True: semear a cadeia velha aqui deixaria o
+    #    teste verde contra uma conta que o app não olha mais, e ainda criaria
+    #    resíduo 5.x novo (reprovado pelo censo em
+    #    tests/test_fase8_depara_5x.py). A cadeia canônica é a do
+    #    _V2_CONTAS_SEED. A PK é (admin_id, codigo) desde a Fase 0.6/D4 e
+    #    conta_pai_codigo é FK composta para ela, então os pais precisam
+    #    existir antes; criamos em ordem hierárquica, com flush por nível.
     _cadeia_despesa_pessoal = [
-        ("5", "DESPESAS", 1, None, False),
-        ("5.1", "DESPESAS OPERACIONAIS", 2, "5", False),
-        ("5.1.01", "MÃO DE OBRA", 3, "5.1", False),
-        ("5.1.01.001", "Salários", 4, "5.1.01", True),
+        ("6", "DESPESAS", 1, None, False),
+        ("6.1", "DESPESAS OPERACIONAIS", 2, "6", False),
+        ("6.1.01", "DESPESAS COM PESSOAL", 3, "6.1", False),
+        ("6.1.01.001", "Despesa com Salários", 4, "6.1.01", True),
     ]
     for codigo, nome, nivel, pai, aceita in _cadeia_despesa_pessoal:
         if db.session.get(PlanoContas, (admin_id, codigo)) is None:
@@ -1681,10 +1686,12 @@ class TestIntegracaoFolhaLancamento:
             nome_d = (plano_d.nome or "").lower() if plano_d else ""
             nome_c = (plano_c.nome or "").lower() if plano_c else ""
 
-        assert partida_debito.conta_codigo.startswith(("4.", "5.")), (
+        # Fase 8 / Task 4 — era ("4.", "5."). As 5.x foram migradas pela
+        # migration 324 e o lançador da folha grava em 6.1.01.001.
+        assert partida_debito.conta_codigo.startswith(("4.", "6.")), (
             f"Partida DEBITO folha: conta_codigo='{partida_debito.conta_codigo}' "
-            "não está no grupo 4.x (Custos) nem 5.x (Despesas com Pessoal). "
-            "Esperado '4.2.01' (Salários CLT) ou '5.1.01.001' conforme plano de contas."
+            "não está no grupo 4.x (Custos) nem 6.x (Despesas com Pessoal). "
+            "Esperado '4.2.01' (Salários CLT) ou '6.1.01.001' conforme plano de contas."
         )
         assert any(kw in nome_d for kw in
                    ["salário", "salario", "pessoal", "clt", "custo", "despesa"]), (

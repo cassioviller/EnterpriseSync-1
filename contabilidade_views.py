@@ -16,7 +16,8 @@ import calendar
 # Imports de contabilidade_utils consolidados (antes espalhados em várias linhas)
 from contabilidade_utils import (
     calcular_saldo_conta, criar_plano_contas_padrao, gerar_razao_conta, calcular_dre_mensal, gerar_balancete_pdf, gerar_balancete_excel,
-    gerar_dre_pdf, gerar_dre_excel, gerar_balanco_patrimonial, executar_auditoria_automatica
+    gerar_dre_pdf, gerar_dre_excel, gerar_balanco_patrimonial, executar_auditoria_automatica,
+    _DRE_LINHAS_SEM_BASE
 )
 
 contabilidade_bp = Blueprint('contabilidade', __name__)
@@ -785,6 +786,10 @@ def dre():
             'deducoes': 0,
             'receita_liquida': 0,
             'cmv': 0,
+            # Fase 8 / Task 4 — mesmas linhas sem base do calcular_dre_mensal.
+            # Sem isto, o DRE vazio mostraria "R$ 0,00" onde a tela do DRE
+            # calculado mostra "sem base", e as duas telas se contradiriam.
+            'sem_base': list(_DRE_LINHAS_SEM_BASE),
             'lucro_bruto': 0,
             'despesas_operacionais': {
                 'pessoal': 0,
