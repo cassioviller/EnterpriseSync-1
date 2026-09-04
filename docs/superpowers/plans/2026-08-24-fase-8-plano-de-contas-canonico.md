@@ -81,7 +81,13 @@ A spec traz números e `caminho:linha` medidos em 17/08. Sete dias depois, quatr
 - **Conta nunca é apagada.** `5.x` sem partida vira `ativo = False` — relatório histórico aponta para ela.
 - **Relatório não esconde o que não sabe.** Não classificado aparece **como não classificado, com o valor**. DFC que não fecha **mostra a diferença**. Indicador sem base sai como "sem base", nunca `0%` nem `inf`.
 - **Todo indicador na tela exibe data-base e as contas que o compõem.** Número sem procedência é o defeito de fabricação que abre o `ESTADO-ATUAL.md`.
-- **`classificacao_gasto`** — `VARCHAR(12)`, NOT NULL, default `'nao_classificado'`. Valores: `fixo` | `variavel` | `nao_aplicavel` | `nao_classificado`.
+- **`classificacao_gasto`** — 🔴 **`VARCHAR(17)`** (a spec e este plano diziam
+  `VARCHAR(12)`, e 🔬 04/09 isso é **impossível**: o próprio default
+  `'nao_classificado'` tem **16** caracteres e `'nao_aplicavel'` tem 13. A
+  primeira execução real da migration levantou `StringDataRightTruncation`.
+  17 = 16+1, a mesma convenção do `atividade_dfc`, cujo 14 é 13+1), NOT NULL,
+  default `'nao_classificado'`. Valores: `fixo` | `variavel` | `nao_aplicavel` |
+  `nao_classificado`.
 - **`atividade_dfc`** — `VARCHAR(14)`, NOT NULL, default `'operacional'`. Valores: `operacional` | `investimento` | `financiamento`.
 - **Migrations 323 e 324**, registradas **na ordem** na tupla de `migrations.py`. O runner governa pela ordem da tupla, não pelo máximo do repo. Toda migration é provada idempotente por **dupla execução** no banco de dev antes do commit.
 - **TDD sem exceção.** Teste primeiro, RED conferido e citado no commit, depois o código.

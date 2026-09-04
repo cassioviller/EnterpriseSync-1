@@ -97,7 +97,17 @@ tenant que já tinha conta avulsa.
 
 ### `plano_contas.classificacao_gasto` — o que destrava a margem de contribuição
 
-`VARCHAR(12)`, NOT NULL, default `'nao_classificado'`. Valores: `fixo` | `variavel` |
+> 🔴 **CORREÇÃO de 2026-09-04, na execução:** o `VARCHAR(12)` abaixo é
+> **impossível** e foi substituído por **`VARCHAR(17)`**. 🔬 O próprio default
+> `'nao_classificado'` tem **16** caracteres, e o valor `'nao_aplicavel'` tem
+> 13 — nenhum dos dois cabe em 12. A primeira execução da migration 323
+> levantou `StringDataRightTruncation`. O 17 é 16+1, a mesma convenção que a
+> própria spec usa para `atividade_dfc` (14 = 13+1, e esse está certo).
+> O número errado fica escrito abaixo, riscado, porque ele foi copiado para o
+> plano e para a migration e quem o reencontrar precisa saber que já foi
+> conferido.
+
+~~`VARCHAR(12)`~~ → **`VARCHAR(17)`**, NOT NULL, default `'nao_classificado'`. Valores: `fixo` | `variavel` |
 `nao_aplicavel` | `nao_classificado`.
 
 📖 `PlanoContas` (`models.py:3234`) tem hoje `tipo_conta`, `natureza`, `nivel`,
