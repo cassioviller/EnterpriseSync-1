@@ -951,6 +951,24 @@ with app.app_context():
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint ADITIVOS: {e}", exc_info=True)
 
+    # Resgate da Espinha Financeira / Task 7 — Blueprint RESULTADO
+    # (/obras/<id>/resultado, /obras/<id>/caixa, /resultado/portfolio,
+    # /resultado/importar-obra, /resultado/aprender-produtividade).
+    #
+    # Mesmo bairro, mesmo motivo do ADITIVOS logo acima: a ordem de import em
+    # app.py é contrato não declarado (ESTADO-ATUAL.md, armadilha 5), e este
+    # bloco fica JUNTO DOS VIZINHOS DE OBRA, não no topo. O documento de 15/06
+    # dizia "registrado em main.py"; hoje os blueprints de obra são
+    # registrados aqui, e é aqui que ele entra.
+    try:
+        from resultado_views import resultado_bp
+        app.register_blueprint(resultado_bp)
+        logging.info("[OK] Blueprint RESULTADO (espinha financeira) registrado")
+    except ImportError as e:
+        logging.warning(f"[WARN] Blueprint RESULTADO não encontrado: {e}", exc_info=True)
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint RESULTADO: {e}", exc_info=True)
+
     # Task #62 — Auditoria de vínculos Cronograma↔Subatividade↔Serviço↔MO
     try:
         from vinculos_audit_views import vinculos_audit_bp

@@ -1,0 +1,87 @@
+{% extends "base_completo.html" %}
+{% block title %}Caixa da obra — {{ obra.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Caixa da obra — {{ obra.nome }}</h3>
+    <span class="badge bg-info text-dark">caixa (quando o dinheiro entra/sai)</span>
+  </div>
+  <p class="text-muted small">
+    Lente de <strong>caixa</strong> — distinta do <em>Resultado por Atividade</em> (competência).
+    A variação acumulada parte de zero; Realizado e Previsto são mostrados separados, nunca somados (ADR 0003).
+  </p>
+
+  <form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-auto">
+      <label class="form-label small mb-0">De</label>
+      <input type="date" name="data_inicio" value="{{ data_inicio.isoformat() }}" class="form-control form-control-sm">
+    </div>
+    <div class="col-auto">
+      <label class="form-label small mb-0">Até</label>
+      <input type="date" name="data_fim" value="{{ data_fim.isoformat() }}" class="form-control form-control-sm">
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-sm btn-primary">Filtrar</button>
+    </div>
+  </form>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card shadow-sm"><div class="card-body">
+        <div class="text-muted small">Realizado líquido (período)</div>
+        <div class="h4 mb-0 {{ 'text-danger' if dados.kpis.realizado_liquido < 0 else 'text-success' }}">
+          R$ {{ '%.2f'|format(dados.kpis.realizado_liquido) }}
+        </div>
+      </div></div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm"><div class="card-body">
+        <div class="text-muted small">Previsto líquido (em aberto)</div>
+        <div class="h4 mb-0">R$ {{ '%.2f'|format(dados.kpis.previsto_liquido) }}</div>
+      </div></div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm"><div class="card-body">
+        <div class="text-muted small">Entradas previstas / Saídas previstas</div>
+        <div class="h6 mb-0">
+          <span class="text-success">R$ {{ '%.2f'|format(dados.fluxo.entradas_previstas) }}</span>
+          &nbsp;/&nbsp;
+          <span class="text-danger">R$ {{ '%.2f'|format(dados.fluxo.saidas_previstas) }}</span>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Mês</th>
+          <th class="text-end">Entradas (real)</th>
+          <th class="text-end">Saídas (real)</th>
+          <th class="text-end">Saldo do mês (real)</th>
+          <th class="text-end">Variação acumulada</th>
+          <th class="text-end">Previsto líquido</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in dados.meses %}
+        <tr>
+          <td>{{ m.label }}</td>
+          <td class="text-end text-success">R$ {{ '%.2f'|format(m.entradas_real) }}</td>
+          <td class="text-end text-danger">R$ {{ '%.2f'|format(m.saidas_real) }}</td>
+          <td class="text-end {{ 'text-danger' if m.saldo_mes_real < 0 else '' }}">R$ {{ '%.2f'|format(m.saldo_mes_real) }}</td>
+          <td class="text-end">
+            {% if m.variacao_acumulada is not none %}R$ {{ '%.2f'|format(m.variacao_acumulada) }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end text-muted">R$ {{ '%.2f'|format(m.previsto_liquido) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">Sem movimentos no período.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base_completo.html" %}
+{% block title %}Portfólio — Resultado das obras{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Portfólio — Resultado consolidado</h3>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('resultado.importar_obra_planilha') }}" class="btn btn-sm btn-primary">
+        <i class="fas fa-file-import me-1"></i> Importar obra (planilha)
+      </a>
+      <form method="post" action="{{ url_for('resultado.aprender_produtividade') }}"
+            onsubmit="return confirm('Recalibrar o catálogo de produtividade com o que foi observado nos RDOs?');">
+        <button class="btn btn-sm btn-outline-primary">
+          <i class="fas fa-brain me-1"></i> Aprender produtividade
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card shadow-sm"><div class="card-body">
+        <div class="text-muted small">Valor agregado</div>
+        <div class="h4 mb-0">R$ {{ '%.2f'|format(dados.valor_agregado) }}</div>
+      </div></div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm"><div class="card-body">
+        <div class="text-muted small">Custo incorrido</div>
+        <div class="h4 mb-0">R$ {{ '%.2f'|format(dados.custo_incorrido) }}</div>
+      </div></div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm"><div class="card-body">
+        <div class="text-muted small">Resultado</div>
+        <div class="h4 mb-0 {{ 'text-danger' if dados.resultado < 0 else 'text-success' }}">
+          R$ {{ '%.2f'|format(dados.resultado) }}
+        </div>
+      </div></div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm"><div class="card-body">
+        <div class="text-muted small">Venda total</div>
+        <div class="h4 mb-0">R$ {{ '%.2f'|format(dados.venda_total) }}</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Obra</th>
+          <th class="text-end">Valor agregado</th>
+          <th class="text-end">Custo incorrido</th>
+          <th class="text-end">Resultado</th>
+          <th class="text-end">CPI</th>
+          <th class="text-end">Result. proj.</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in dados.obras %}
+        <tr>
+          <td><a href="{{ url_for('resultado.resultado_por_atividade', obra_id=o.obra_id) }}">{{ o.nome }}</a></td>
+          <td class="text-end">R$ {{ '%.2f'|format(o.valor_agregado) }}</td>
+          <td class="text-end">R$ {{ '%.2f'|format(o.custo_incorrido) }}</td>
+          <td class="text-end {{ 'text-danger' if o.resultado < 0 else '' }}">R$ {{ '%.2f'|format(o.resultado) }}</td>
+          <td class="text-end {{ 'text-danger' if (o.cpi and o.cpi < 1) else '' }}">
+            {% if o.cpi is not none %}{{ '%.3f'|format(o.cpi) }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end {{ 'text-danger' if (o.resultado_projetado is not none and o.resultado_projetado < 0) else '' }}">
+            {% if o.resultado_projetado is not none %}R$ {{ '%.2f'|format(o.resultado_projetado) }}{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">Nenhuma obra ativa.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

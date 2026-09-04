@@ -923,6 +923,25 @@
                         <i class="fas fa-calculator me-2"></i>Planejamento de Custos
                     </a>
                 </li>
+                {# Espinha financeira (Task 7 do resgate) — as duas lentes da
+                   obra, e elas NÃO se somam: Resultado é competência (valor
+                   agregado − custo incorrido), Caixa é o que entrou e saiu
+                   (ADR 0003 / D4). Abas separadas é como o design impede
+                   alguém de juntar as duas num número só. Gated por v2 como
+                   as telas: sem plano, a rota redireciona e um link morto
+                   aqui só geraria clique frustrado. #}
+                {% if is_v2_active() %}
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" href="{{ url_for('resultado.resultado_por_atividade', obra_id=obra.id) }}">
+                        <i class="fas fa-chart-line me-2"></i>Resultado por Atividade
+                    </a>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" href="{{ url_for('resultado.caixa_obra', obra_id=obra.id) }}">
+                        <i class="fas fa-money-bill-wave me-2"></i>Caixa
+                    </a>
+                </li>
+                {% endif %}
             </ul>
         </div>
 

@@ -81,13 +81,6 @@ def test_fluxo_caixa_obra_estrutura_e_variacao_de_zero():
         assert r['kpis']['realizado_liquido'] == 0.0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason='A rota /obras/<id>/caixa nasce em resultado_views.py, que e entrega '
-           'da TASK 7 deste plano ("Portar; registrar blueprint") — nao da Task 2, '
-           'que porta so o service. 🔬 Confirmado na fonte: '
-           'espinha-pr6-origem:resultado_views.py:148-151. O marcador SAI na Task 7, '
-           'e com strict=True o gate obriga: deixado la, falha por XPASS.')
 def test_rota_caixa_responde():
     with app.app_context():
         with app.test_client() as c:

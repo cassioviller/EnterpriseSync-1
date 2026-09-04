@@ -339,9 +339,6 @@ def test_resultado_obra_rollup():
 
 # ── C1: smoke da rota ─────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True,
-                   reason='A rota chega na Task 7 — resultado_views.py e o '
-                          'registro do blueprint ainda nao foram portados')
 def test_rota_resultado_responde():
     with app.app_context():
         t = _tarefa('Atividade Smoke', percentual=10.0)
