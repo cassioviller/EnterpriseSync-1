@@ -79,6 +79,15 @@ triagem). Refazer o login é interativo — item humano, restrito ao `gh`.~~
 > apagá-la é seguro, ficou para decisão humana. Os quatro worktrees em
 > `.claude/worktrees/` foram removidos — ver por quê em "21/08 — sensores" abaixo.
 
+> 🔬 **04/09: `gitsafe-backup/main == main == 09d70106`**, conferido em `git fetch`
+> após o push (`657326c4..09d70106`, 11 commits — a Espinha Financeira portada).
+> São **11 commits** à frente de `origin/main`; o GitHub segue sem credencial
+> (item humano nº 2). A branch `sdd/espinha-financeira` foi mesclada em `main`
+> por **fast-forward** e apagada — era a única forma de tirá-la desta máquina,
+> pela regra do servidor descrita acima. Restam três branches locais
+> (`sdd/onda-4-relatorio`, `sdd/onda-5-o-recusado-para-de-ser-gravado`,
+> `sdd/reuniao-20-08`); nenhuma delas está no backup.
+
 > ⚠️ **O que continua parado não é o push, é a produção.** Os dez pacotes
 > mexem em custo, medição, progresso e contrato — números que o cliente vê — e
 > 🔬 nada disso rodou fora do ambiente de desenvolvimento. Gate completo sobre
@@ -161,6 +170,12 @@ reservada, e rodadas duas vezes cada no banco de dev.
   Fixture que omite o estado fica vermelha pelo motivo errado — foi o que
   fez o trabalho de 24/08 parecer que quebrava dezenas de testes. **Quem
   escrever teste novo que toque RDO declara o estado.**
+
+**Onde o código foi parar.** 🔬 04/09: mesclado em `main` por fast-forward
+(`30287f3b..09d70106`, 11 commits), branch `sdd/espinha-financeira` apagada, e
+`gitsafe-backup/main == main == 09d70106` conferido em `git fetch`. Antes disso
+o porte existia num disco só: o backup recusa branch de feature por hook do
+servidor. Segue **fora do GitHub** — item humano nº 2.
 
 **O gate, e as duas falhas que ele achou.** 🔬 04/09, `bash run_tests.sh --gate`
 (3.403 selecionados, sem browser): **3.323 passaram, 0 falharam**, 8 pulados,
