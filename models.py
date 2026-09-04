@@ -3279,6 +3279,34 @@ class PlanoContas(db.Model):
     aceita_lancamento = db.Column(db.Boolean, default=True)  # True para contas analíticas
     ativo = db.Column(db.Boolean, default=True)
 
+    CLASSIFICACAO_FIXO = 'fixo'
+    CLASSIFICACAO_VARIAVEL = 'variavel'
+    CLASSIFICACAO_NAO_APLICAVEL = 'nao_aplicavel'
+    CLASSIFICACAO_NAO_CLASSIFICADO = 'nao_classificado'
+
+    DFC_OPERACIONAL = 'operacional'
+    DFC_INVESTIMENTO = 'investimento'
+    DFC_FINANCIAMENTO = 'financiamento'
+
+    # Fase 8 — por TENANT e não constante de código, pelo mesmo motivo de
+    # FaixaAlcada: frota é gasto fixo para quem tem frota própria e variável
+    # para quem aluga por obra. Número que é regra de negócio não entra em
+    # `if`. `nao_aplicavel` existe para ativo/passivo/PL/receita: sem ele,
+    # "sem classificação" misturaria o que FALTA classificar com o que NUNCA
+    # será, e o indicador de completude não significaria nada.
+    # VARCHAR(17) e não VARCHAR(12): 🔬 04/09 o próprio default,
+    # 'nao_classificado', tem 16 caracteres — VARCHAR(12) do plano original
+    # (task-2-brief.md) não cabia nem no seu próprio valor default (a
+    # migration levantava StringDataRightTruncation). 17 = maior valor
+    # (nao_classificado, 16) + 1, mesma folga que atividade_dfc já usa
+    # (financiamento tem 13, coluna é VARCHAR(14)).
+    classificacao_gasto = db.Column(db.String(17), nullable=False,
+                                    default=CLASSIFICACAO_NAO_CLASSIFICADO,
+                                    server_default=CLASSIFICACAO_NAO_CLASSIFICADO)
+    atividade_dfc = db.Column(db.String(14), nullable=False,
+                              default=DFC_OPERACIONAL,
+                              server_default=DFC_OPERACIONAL)
+
     conta_pai = db.relationship('PlanoContas', remote_side=[admin_id, codigo])
     
     @staticmethod

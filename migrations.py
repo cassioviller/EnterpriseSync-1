@@ -7717,6 +7717,60 @@ def _migration_322_subempreitada_verba_lucro_pai():
         return False
 
 
+def _migration_323_plano_contas_semantica():
+    """Fase 8 — plano_contas ganha classificacao_gasto e atividade_dfc.
+
+    Os defaults sao escolhidos por motivos OPOSTOS e os dois de proposito:
+    `nao_classificado` no gasto porque classificar por conta propria produz
+    margem errada com cara de pronta; `operacional` no DFC porque na
+    esmagadora maioria das contas de uma construtora e' isso, e um default
+    neutro faria o DFC nascer inutilizavel.
+
+    323 e nao 310, nem 315: a D4 da spec pediu 310 quando a maior aplicada
+    era a 309; 📖 24/08 a maior do repo era a 314, e este plano escreveu 315.
+    🔬 04/09 a maior e' a 322 (o Resgate da Espinha gastou 319-322), logo 323
+    — medido de novo em migrations.py:8042 (tupla de registro) antes de
+    escrever este numero. A regra da propria D4 — numerar pela sequencia
+    real MEDIDA no dia, nunca renumerar para organizar — e' o que manda.
+
+    Idempotente: ADD COLUMN IF NOT EXISTS. A tabela tem ~298 mil linhas
+    (🔬 04/09), mas ADD COLUMN ... NOT NULL DEFAULT '<literal>' e' so'
+    metadado desde o Postgres 11 — nao reescreve a tabela.
+
+    Ao contrario das migrations 319-322 (que engolem a excecao e devolvem
+    False), esta RAISE: o runner (`_executar_migracao_com_rastreamento`,
+    migrations.py:170-194) descarta o retorno da funcao e grava 'success'
+    sempre que nenhuma excecao propaga — uma migration que devolve False sem
+    levantar fica marcada como sucesso e nunca mais roda.
+
+    VARCHAR(17) e nao VARCHAR(12) em classificacao_gasto: 🔬 04/09 o plano
+    original (task-2-brief.md) pedia VARCHAR(12) para um default que e' o
+    proprio 'nao_classificado' — 16 caracteres. A primeira execucao desta
+    migration levantou StringDataRightTruncation contra o proprio DEFAULT.
+    17 = maior valor (nao_classificado, 16) + 1, a mesma folga que
+    atividade_dfc ja usa (financiamento tem 13, coluna e' VARCHAR(14)).
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                ALTER TABLE plano_contas
+                    ADD COLUMN IF NOT EXISTS classificacao_gasto
+                        VARCHAR(17) NOT NULL DEFAULT 'nao_classificado'
+            """))
+            conn.execute(sa_text("""
+                ALTER TABLE plano_contas
+                    ADD COLUMN IF NOT EXISTS atividade_dfc
+                        VARCHAR(14) NOT NULL DEFAULT 'operacional'
+            """))
+        logger.info('[Migration 323] plano_contas: classificacao_gasto e '
+                    'atividade_dfc criadas.')
+        return True
+    except Exception as e:
+        logger.error(f'[Migration 323] Falha: {e}', exc_info=True)
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -8040,6 +8094,7 @@ def executar_migracoes():
             (320, "Resgate Espinha — propostas_comerciais.origem (repoe a 194): proposta de importacao fora do funil comercial", _migration_320_proposta_origem),
             (321, "Resgate Espinha — gestao_custo_filho.tarefa_cronograma_id (a outra metade da 195): custo direto por atividade; NULL segue rateado por hora-homem", _migration_321_gestao_custo_filho_tarefa),
             (322, "Resgate Espinha / Fatia 2 §D — rdo_subempreitada_apontamento.verba_unica, .lucro_pct e .gestao_custo_pai_id: subempreitada vira custo por verba + markup (decisao de 01/09, opcao B)", _migration_322_subempreitada_verba_lucro_pai),
+            (323, "Fase 8 — plano_contas.classificacao_gasto + atividade_dfc: a semantica que destrava margem de contribuicao e DFC", _migration_323_plano_contas_semantica),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
